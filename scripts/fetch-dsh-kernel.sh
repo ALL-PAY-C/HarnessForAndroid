@@ -29,7 +29,7 @@ case "$ABI" in
   arm64|arm64-v8a) ABI="arm64-v8a" ;;
   *) echo "unsupported ABI: $ABI" >&2; exit 2 ;;
 esac
-if [ -z "$ASAR" ]; then ASAR="D:/DSH NEXT/resources/app.asar"; fi
+if [ -z "$ASAR" ]; then echo "set ASAR to the dsh app.asar (official @deepseek-ai/dsh 0.2.1-rc.2) first" >&2; exit 2; fi
 OUT="$ROOT/linux-runtime/src/main/assets/dsh-kernel"
 STAGE="$ROOT/build/dsh-kernel-stage"
 
@@ -412,7 +412,7 @@ NODE_TGZ="${NODE_TGZ:-$ROOT/.mock/agent-env/t6/node22/node-v22.23.4-linux-x64-mu
 if [ ! -f "$NODE_TGZ" ]; then
   echo "node runtime archive missing: $NODE_TGZ" >&2
   echo "先下载官方构建（idmget 走本机 IDM）：" >&2
-  echo "  /d/DSH/tools/idm/idmget https://nodejs.org/dist/v22.23.4/node-v22.23.4-linux-x64-musl.tar.xz -Out 'D:/DSH/dsh-mobile/.mock/agent-env/t6/node22' -Wait" >&2
+  echo "  idmget https://nodejs.org/dist/v22.23.4/node-v22.23.4-linux-x64-musl.tar.xz -Out <staging-dir> -Wait" >&2
   echo "再按脚本注释里的 tar 命令剥 include/ 重打包，然后重跑本脚本。" >&2
   exit 1
 fi

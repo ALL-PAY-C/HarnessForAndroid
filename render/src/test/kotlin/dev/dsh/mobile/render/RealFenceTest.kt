@@ -6,7 +6,7 @@ import org.junit.Test
 class RealFenceTest {
     /**
      * 可移植离线夹具：一份带多种语言围栏代码块的 markdown 文档。
-     * 原实现硬编码读取 D:/DSH/.g5.txt 私有夹具（缺文件即 FileNotFoundException），
+     * 早期版本硬编码读取本机私有夹具文件（缺文件即 FileNotFoundException），
      * 改为内联样本，断言覆盖不变：≥4 个代码块、流式前缀下围栏标记不泄漏成正文。
      */
     private val fixture = """

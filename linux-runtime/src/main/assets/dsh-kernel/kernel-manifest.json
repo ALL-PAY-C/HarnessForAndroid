@@ -136,7 +136,7 @@
   "unpackedBytes": 20253270,
   "nodeEngine": "^22.19.0 || >=24.0.0",
   "license": "MIT",
-  "source": "D:/DSH NEXT/resources/app.asar",
+  "source": "@deepseek-ai/dsh@0.2.1-rc.2 headless closure (app.asar)",
   "sourcePackage": "@deepseek-ai/dsh@0.2.1-rc.2",
   "note": "minimal official headless runtime; bundled profiles/headless, DSH_HOME=/root/dsh; no Electron/native desktop bundles",
   "nodeVersion": "22.23.4",

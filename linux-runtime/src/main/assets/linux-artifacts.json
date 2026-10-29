@@ -50,7 +50,7 @@
   "kernel": {
     "version": "0.2.1-rc.2",
     "sourcePackage": "@deepseek-ai/dsh@0.2.1-rc.2",
-    "source": "D:/DSH NEXT/resources/app.asar (minimal official headless closure)",
+    "source": "@deepseek-ai/dsh@0.2.1-rc.2 headless closure (app.asar, minimal)",
     "archive": "dsh-kernel/dsh-kernel-0.2.1-rc.2.tgz",
     "entry": "node_modules/@deepseek-ai/dsh/lib/bin.js",
     "sha256": "17c8c2889602e72fa315c8ca417ab4c69b95abf0c4124341356baf7481c6c882",
