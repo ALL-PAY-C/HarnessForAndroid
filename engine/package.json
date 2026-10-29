@@ -1,0 +1,25 @@
+{
+  "name": "dsh-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Node-side plugin host for the DSH Android runtime: loads real cordis plugins and exposes a JSON-lines TCP protocol.",
+  "main": "bin.js",
+  "bin": {
+    "dsh-engine": "bin.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "4.0.5",
+    "@deepseek-ai/dsh-home-paths": "0.0.1-rc.3",
+    "@deepseek-ai/dsh-skill-filesystem": "0.0.1-rc.3",
+    "@deepseek-ai/schemastery": "3.18.5",
+    "skills": "1.5.22",
+    "yaml": "2.9.1",
+    "mysql2": "^3.15.3",
+    "ws": "^8.18.0",
+    "zod": "4.1.8"
+  }
+}

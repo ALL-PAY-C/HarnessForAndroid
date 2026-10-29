@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Scheduled backups: an alarm wakes this receiver, which snapshots and re-arms. -->
+        <receiver
+            android:name="dev.dsh.mobile.core.data.backup.BackupReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="dev.dsh.mobile.action.BACKUP" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

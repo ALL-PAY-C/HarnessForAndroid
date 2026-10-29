@@ -1,0 +1,14 @@
+{
+  "name": "dsh-mobile-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ACP v1 over WebSocket bridge for the DSH Android client",
+  "bin": { "dsh-mobile-bridge": "./dsh-mobile-bridge.mjs" },
+  "scripts": {
+    "start": "node dsh-mobile-bridge.mjs --port 8787"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

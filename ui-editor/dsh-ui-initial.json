@@ -1,0 +1,2824 @@
+{
+  "schema": "dsh-ui/1",
+  "app": {
+    "name": "DSH Mobile",
+    "device": {
+      "w": 390,
+      "h": 844
+    },
+    "theme": {
+      "bg": "#F5F7FA",
+      "card": "#FFFFFF",
+      "line": "#EAEEF4",
+      "hover": "#F0F4F9",
+      "t1": "#0D1117",
+      "t2": "#6B7684",
+      "t3": "#A3ADBA",
+      "accent": "#2F7CF6",
+      "accent2": "#12B5A6",
+      "red": "#FF3B30",
+      "green": "#22C55E",
+      "amber": "#F59E0B"
+    }
+  },
+  "initial": "sessions",
+  "screens": [
+    {
+      "id": "sessions",
+      "name": "会话列表",
+      "els": [
+        {
+          "id": "topbar_14",
+          "type": "topbar",
+          "name": "顶栏",
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 52,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF"
+          },
+          "props": {
+            "title": "",
+            "back": false,
+            "actions": "🔍"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "iconBtn_15",
+          "type": "iconBtn",
+          "name": "抽屉按钮",
+          "x": 8,
+          "y": 8,
+          "w": 36,
+          "h": 36,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#0D1117",
+            "fontSize": 20
+          },
+          "props": {
+            "icon": "☰"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "text_16",
+          "type": "text",
+          "name": "标题",
+          "x": 52,
+          "y": 16,
+          "w": 180,
+          "h": 22,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#0D1117",
+            "fontSize": 18,
+            "fontWeight": 700
+          },
+          "props": {
+            "text": "会话"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "chip_17",
+          "type": "chip",
+          "name": "用量",
+          "x": 16,
+          "y": 64,
+          "w": 168,
+          "h": 26,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#F0F4F9",
+            "border": "#EAEEF4",
+            "color": "#6B7684",
+            "fontSize": 12,
+            "radius": 8,
+            "align": "center"
+          },
+          "props": {
+            "text": "余额 1.2M tokens"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "iconBtn_18",
+          "type": "iconBtn",
+          "name": "新建会话",
+          "x": 330,
+          "y": 62,
+          "w": 44,
+          "h": 30,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#2F7CF6",
+            "fontSize": 13,
+            "align": "right"
+          },
+          "props": {
+            "icon": "新建"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "group_19",
+          "type": "group",
+          "name": "分组 最近",
+          "x": 16,
+          "y": 102,
+          "w": 358,
+          "h": 252,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1
+          },
+          "props": {
+            "title": "最近",
+            "count": 3,
+            "open": true
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "listRow_20",
+          "type": "listRow",
+          "name": "会话行1",
+          "x": 26,
+          "y": 144,
+          "w": 338,
+          "h": 62,
+          "parent": "group_19",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 600,
+            "padding": 12
+          },
+          "props": {
+            "title": "M10 收尾",
+            "sub": "还差设备门禁和 dist 交付",
+            "avatar": "收",
+            "avatarColor": "#7C5CFF",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "navigate",
+            "target": "chat"
+          }
+        },
+        {
+          "id": "listRow_21",
+          "type": "listRow",
+          "name": "会话行2",
+          "x": 26,
+          "y": 212,
+          "w": 338,
+          "h": 62,
+          "parent": "group_19",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 600,
+            "padding": 12
+          },
+          "props": {
+            "title": "插件兼容层",
+            "sub": "billion-context 起不来的正则问题",
+            "avatar": "插",
+            "avatarColor": "#12B5A6",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "navigate",
+            "target": "chat"
+          }
+        },
+        {
+          "id": "listRow_22",
+          "type": "listRow",
+          "name": "会话行3",
+          "x": 26,
+          "y": 280,
+          "w": 338,
+          "h": 62,
+          "parent": "group_19",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 600,
+            "padding": 12
+          },
+          "props": {
+            "title": "UI 编辑器",
+            "sub": "把现有界面导出成配置",
+            "avatar": "编",
+            "avatarColor": "#F59E0B",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "navigate",
+            "target": "chat"
+          }
+        },
+        {
+          "id": "group_23",
+          "type": "group",
+          "name": "分组 归档",
+          "x": 16,
+          "y": 366,
+          "w": 358,
+          "h": 150,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1
+          },
+          "props": {
+            "title": "归档",
+            "count": 2,
+            "open": true
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "listRow_24",
+          "type": "listRow",
+          "name": "归档行1",
+          "x": 26,
+          "y": 408,
+          "w": 338,
+          "h": 52,
+          "parent": "group_23",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "旧工程迁移",
+            "sub": "已完成 · 3 天前",
+            "avatar": "旧",
+            "avatarColor": "#A3ADBA",
+            "showAvatar": true,
+            "chevron": false
+          },
+          "action": {
+            "kind": "toast",
+            "message": "打开归档会话",
+            "duration": 1500
+          }
+        },
+        {
+          "id": "listRow_25",
+          "type": "listRow",
+          "name": "归档行2",
+          "x": 26,
+          "y": 464,
+          "w": 338,
+          "h": 52,
+          "parent": "group_23",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "模型灰度",
+            "sub": "已归档 · 上周",
+            "avatar": "灰",
+            "avatarColor": "#6B7684",
+            "showAvatar": true,
+            "chevron": false
+          },
+          "action": {
+            "kind": "toast",
+            "message": "打开归档会话",
+            "duration": 1500
+          }
+        },
+        {
+          "id": "navbar_26",
+          "type": "navbar",
+          "name": "底部导航",
+          "x": 0,
+          "y": 788,
+          "w": 390,
+          "h": 56,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "color": "#A3ADBA",
+            "fontSize": 11
+          },
+          "props": {
+            "items": "会话💬,Agent🤖,插件🧩,设置⚙",
+            "active": 0,
+            "targets": "sessions,agents,pluginHub,settings"
+          },
+          "action": {
+            "kind": "navigate",
+            "target": "sessions"
+          }
+        }
+      ]
+    },
+    {
+      "id": "chat",
+      "name": "聊天",
+      "els": [
+        {
+          "id": "topbar_27",
+          "type": "topbar",
+          "name": "顶栏",
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 52,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF"
+          },
+          "props": {
+            "title": "M10 收尾",
+            "back": true,
+            "actions": "⋯"
+          },
+          "action": {
+            "kind": "back"
+          }
+        },
+        {
+          "id": "bubble_28",
+          "type": "bubble",
+          "name": "对方气泡",
+          "x": 16,
+          "y": 70,
+          "w": 258,
+          "h": 52,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "padding": 12
+          },
+          "props": {
+            "text": "帮我把 M10 收尾，13 个模块都要绿",
+            "mine": false
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "bubble_29",
+          "type": "bubble",
+          "name": "我的气泡",
+          "x": 120,
+          "y": 134,
+          "w": 254,
+          "h": 44,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#2F7CF6",
+            "border": null,
+            "radius": 14,
+            "color": "#FFFFFF",
+            "fontSize": 14,
+            "padding": 12
+          },
+          "props": {
+            "text": "好，先修测试依赖再全量跑",
+            "mine": true
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "bubble_30",
+          "type": "bubble",
+          "name": "对方气泡2",
+          "x": 16,
+          "y": 190,
+          "w": 286,
+          "h": 66,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "color": "#0D1117",
+            "fontSize": 13,
+            "padding": 12
+          },
+          "props": {
+            "text": "核心事实：TurnBarrier 只有 markerConsumed && promptJobFinished 才解封",
+            "mine": false
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "bubble_31",
+          "type": "bubble",
+          "name": "我的气泡2",
+          "x": 152,
+          "y": 268,
+          "w": 222,
+          "h": 44,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#2F7CF6",
+            "border": null,
+            "radius": 14,
+            "color": "#FFFFFF",
+            "fontSize": 14,
+            "padding": 12
+          },
+          "props": {
+            "text": "收到，按这个判据写用例",
+            "mine": true
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "bubble_32",
+          "type": "bubble",
+          "name": "流式占位",
+          "x": 16,
+          "y": 324,
+          "w": 240,
+          "h": 40,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "color": "#6B7684",
+            "fontSize": 12,
+            "padding": 12
+          },
+          "props": {
+            "text": "思考中…（转圈 12s）",
+            "mine": false
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "frame_33",
+          "type": "frame",
+          "name": "输入区",
+          "x": 0,
+          "y": 776,
+          "w": 390,
+          "h": 68,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 0,
+            "shadow": 1
+          },
+          "props": {},
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "iconBtn_34",
+          "type": "iconBtn",
+          "name": "附件",
+          "x": 8,
+          "y": 788,
+          "w": 36,
+          "h": 36,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#F0F4F9",
+            "color": "#6B7684",
+            "fontSize": 20,
+            "radius": 99,
+            "align": "center"
+          },
+          "props": {
+            "icon": "+"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "input_35",
+          "type": "input",
+          "name": "输入框",
+          "x": 52,
+          "y": 788,
+          "w": 270,
+          "h": 38,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#F0F4F9",
+            "border": null,
+            "radius": 12,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "padding": 12
+          },
+          "props": {
+            "placeholder": "发送消息…"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "button_36",
+          "type": "button",
+          "name": "发送按钮",
+          "x": 330,
+          "y": 788,
+          "w": 52,
+          "h": 38,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#2F7CF6",
+            "color": "#FFFFFF",
+            "fontSize": 14,
+            "fontWeight": 600,
+            "radius": 12,
+            "align": "center"
+          },
+          "props": {
+            "text": "发送"
+          },
+          "action": {
+            "kind": "toast",
+            "message": "已发送",
+            "duration": 1500
+          }
+        }
+      ]
+    },
+    {
+      "id": "pluginHub",
+      "name": "插件中心",
+      "els": [
+        {
+          "id": "topbar_37",
+          "type": "topbar",
+          "name": "顶栏",
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 52,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF"
+          },
+          "props": {
+            "title": "插件",
+            "back": false,
+            "actions": "⋯"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "listRow_38",
+          "type": "listRow",
+          "name": "插件管理",
+          "x": 16,
+          "y": 64,
+          "w": 358,
+          "h": 64,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1,
+            "color": "#0D1117",
+            "fontSize": 15,
+            "fontWeight": 600,
+            "padding": 12
+          },
+          "props": {
+            "title": "插件管理",
+            "sub": "启用 / 停用 / 卸载 / 详情",
+            "avatar": "🧩",
+            "avatarColor": "#7C5CFF",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "navigate",
+            "target": "pluginManage"
+          }
+        },
+        {
+          "id": "listRow_39",
+          "type": "listRow",
+          "name": "插件槽位",
+          "x": 16,
+          "y": 136,
+          "w": 358,
+          "h": 64,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1,
+            "color": "#0D1117",
+            "fontSize": 15,
+            "fontWeight": 600,
+            "padding": 12
+          },
+          "props": {
+            "title": "插件槽位",
+            "sub": "把插件组件放到指定位置",
+            "avatar": "🧱",
+            "avatarColor": "#12B5A6",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "navigate",
+            "target": "pluginSlots"
+          }
+        },
+        {
+          "id": "listRow_40",
+          "type": "listRow",
+          "name": "插件市场",
+          "x": 16,
+          "y": 208,
+          "w": 358,
+          "h": 64,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1,
+            "color": "#0D1117",
+            "fontSize": 15,
+            "fontWeight": 600,
+            "padding": 12
+          },
+          "props": {
+            "title": "插件市场",
+            "sub": "安装 · 更新 · 备份回档",
+            "avatar": "🛒",
+            "avatarColor": "#F59E0B",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "navigate",
+            "target": "pluginMarket"
+          }
+        },
+        {
+          "id": "group_41",
+          "type": "group",
+          "name": "分组 插件设置",
+          "x": 16,
+          "y": 290,
+          "w": 358,
+          "h": 196,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1
+          },
+          "props": {
+            "title": "插件设置",
+            "count": 2,
+            "open": true
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "listRow_42",
+          "type": "listRow",
+          "name": "插件设置行1",
+          "x": 26,
+          "y": 332,
+          "w": 338,
+          "h": 58,
+          "parent": "group_41",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "bili 上下文",
+            "sub": "billion-context · 已启用",
+            "avatar": "●",
+            "avatarColor": "#7C5CFF",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "dialog",
+            "title": "插件设置",
+            "message": "这里可以打开插件自带的配置页"
+          }
+        },
+        {
+          "id": "listRow_43",
+          "type": "listRow",
+          "name": "插件设置行2",
+          "x": 26,
+          "y": 396,
+          "w": 338,
+          "h": 58,
+          "parent": "group_41",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "Android 桥接",
+            "sub": "dsh-mobile-bridge · 已启用",
+            "avatar": "●",
+            "avatarColor": "#12B5A6",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "dialog",
+            "title": "插件设置",
+            "message": "这里可以打开插件自带的配置页"
+          }
+        },
+        {
+          "id": "navbar_44",
+          "type": "navbar",
+          "name": "底部导航",
+          "x": 0,
+          "y": 788,
+          "w": 390,
+          "h": 56,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "color": "#A3ADBA",
+            "fontSize": 11
+          },
+          "props": {
+            "items": "会话💬,Agent🤖,插件🧩,设置⚙",
+            "active": 2,
+            "targets": "sessions,agents,pluginHub,settings"
+          },
+          "action": {
+            "kind": "navigate",
+            "target": "pluginHub"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pluginManage",
+      "name": "插件管理",
+      "els": [
+        {
+          "id": "topbar_45",
+          "type": "topbar",
+          "name": "顶栏",
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 52,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF"
+          },
+          "props": {
+            "title": "插件管理",
+            "back": true,
+            "actions": "+"
+          },
+          "action": {
+            "kind": "back"
+          }
+        },
+        {
+          "id": "group_46",
+          "type": "group",
+          "name": "插件 billion-context",
+          "x": 16,
+          "y": 64,
+          "w": 358,
+          "h": 180,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1
+          },
+          "props": {
+            "title": "billion-context",
+            "count": null,
+            "open": true
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "text_47",
+          "type": "text",
+          "name": "版本",
+          "x": 30,
+          "y": 108,
+          "w": 250,
+          "h": 18,
+          "parent": "group_46",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#6B7684",
+            "fontSize": 12,
+            "fontWeight": 400
+          },
+          "props": {
+            "text": "v3.3.4 · bili"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "text_48",
+          "type": "text",
+          "name": "状态",
+          "x": 300,
+          "y": 106,
+          "w": 60,
+          "h": 20,
+          "parent": "group_46",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#22C55E",
+            "fontSize": 12,
+            "fontWeight": 600,
+            "align": "right"
+          },
+          "props": {
+            "text": "已启用"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "chip_49",
+          "type": "chip",
+          "name": "能力 tools",
+          "x": 30,
+          "y": 138,
+          "w": 70,
+          "h": 24,
+          "parent": "group_46",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#F0F4F9",
+            "border": "#EAEEF4",
+            "color": "#6B7684",
+            "fontSize": 11,
+            "radius": 8,
+            "align": "center"
+          },
+          "props": {
+            "text": "tools"
+          },
+          "action": {
+            "kind": "toast",
+            "message": "能力：tools"
+          }
+        },
+        {
+          "id": "chip_50",
+          "type": "chip",
+          "name": "能力 commands",
+          "x": 106,
+          "y": 138,
+          "w": 70,
+          "h": 24,
+          "parent": "group_46",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#F0F4F9",
+            "border": "#EAEEF4",
+            "color": "#6B7684",
+            "fontSize": 11,
+            "radius": 8,
+            "align": "center"
+          },
+          "props": {
+            "text": "commands"
+          },
+          "action": {
+            "kind": "toast",
+            "message": "能力：commands"
+          }
+        },
+        {
+          "id": "chip_51",
+          "type": "chip",
+          "name": "能力 webServer",
+          "x": 182,
+          "y": 138,
+          "w": 70,
+          "h": 24,
+          "parent": "group_46",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#F0F4F9",
+            "border": "#EAEEF4",
+            "color": "#6B7684",
+            "fontSize": 11,
+            "radius": 8,
+            "align": "center"
+          },
+          "props": {
+            "text": "webServer"
+          },
+          "action": {
+            "kind": "toast",
+            "message": "能力：webServer"
+          }
+        },
+        {
+          "id": "text_52",
+          "type": "text",
+          "name": "详情",
+          "x": 30,
+          "y": 172,
+          "w": 300,
+          "h": 16,
+          "parent": "group_46",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#A3ADBA",
+            "fontSize": 12,
+            "fontWeight": 400
+          },
+          "props": {
+            "text": "可配置项 · 槽位贡献 1 个"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "iconBtn_53",
+          "type": "iconBtn",
+          "name": "卸载",
+          "x": 300,
+          "y": 164,
+          "w": 36,
+          "h": 30,
+          "parent": "group_46",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#FF3B30",
+            "fontSize": 13,
+            "align": "right"
+          },
+          "props": {
+            "icon": "卸载"
+          },
+          "action": {
+            "kind": "dialog",
+            "title": "卸载插件",
+            "message": "确定卸载 billion-context ？"
+          }
+        },
+        {
+          "id": "group_54",
+          "type": "group",
+          "name": "插件 dsh-mobile-bridge",
+          "x": 16,
+          "y": 260,
+          "w": 358,
+          "h": 180,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1
+          },
+          "props": {
+            "title": "dsh-mobile-bridge",
+            "count": null,
+            "open": true
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "text_55",
+          "type": "text",
+          "name": "版本",
+          "x": 30,
+          "y": 304,
+          "w": 250,
+          "h": 18,
+          "parent": "group_54",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#6B7684",
+            "fontSize": 12,
+            "fontWeight": 400
+          },
+          "props": {
+            "text": "v1.0.2 · dsh"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "text_56",
+          "type": "text",
+          "name": "状态",
+          "x": 300,
+          "y": 302,
+          "w": 60,
+          "h": 20,
+          "parent": "group_54",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#22C55E",
+            "fontSize": 12,
+            "fontWeight": 600,
+            "align": "right"
+          },
+          "props": {
+            "text": "已启用"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "chip_57",
+          "type": "chip",
+          "name": "能力 tools",
+          "x": 30,
+          "y": 334,
+          "w": 70,
+          "h": 24,
+          "parent": "group_54",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#F0F4F9",
+            "border": "#EAEEF4",
+            "color": "#6B7684",
+            "fontSize": 11,
+            "radius": 8,
+            "align": "center"
+          },
+          "props": {
+            "text": "tools"
+          },
+          "action": {
+            "kind": "toast",
+            "message": "能力：tools"
+          }
+        },
+        {
+          "id": "chip_58",
+          "type": "chip",
+          "name": "能力 webServer",
+          "x": 106,
+          "y": 334,
+          "w": 70,
+          "h": 24,
+          "parent": "group_54",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#F0F4F9",
+            "border": "#EAEEF4",
+            "color": "#6B7684",
+            "fontSize": 11,
+            "radius": 8,
+            "align": "center"
+          },
+          "props": {
+            "text": "webServer"
+          },
+          "action": {
+            "kind": "toast",
+            "message": "能力：webServer"
+          }
+        },
+        {
+          "id": "text_59",
+          "type": "text",
+          "name": "详情",
+          "x": 30,
+          "y": 368,
+          "w": 300,
+          "h": 16,
+          "parent": "group_54",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#A3ADBA",
+            "fontSize": 12,
+            "fontWeight": 400
+          },
+          "props": {
+            "text": "可配置项 · 槽位贡献 1 个"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "iconBtn_60",
+          "type": "iconBtn",
+          "name": "卸载",
+          "x": 300,
+          "y": 360,
+          "w": 36,
+          "h": 30,
+          "parent": "group_54",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#FF3B30",
+            "fontSize": 13,
+            "align": "right"
+          },
+          "props": {
+            "icon": "卸载"
+          },
+          "action": {
+            "kind": "dialog",
+            "title": "卸载插件",
+            "message": "确定卸载 dsh-mobile-bridge ？"
+          }
+        },
+        {
+          "id": "frame_61",
+          "type": "frame",
+          "name": "添加行卡片",
+          "x": 16,
+          "y": 472,
+          "w": 358,
+          "h": 48,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 12
+          },
+          "props": {},
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "text_62",
+          "type": "text",
+          "name": "重新扫描",
+          "x": 112,
+          "y": 486,
+          "w": 200,
+          "h": 20,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#6B7684",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "align": "center"
+          },
+          "props": {
+            "text": "+  重新扫描已安装插件"
+          },
+          "action": {
+            "kind": "snackbar",
+            "message": "扫描完成，发现 2 个插件",
+            "duration": 2500
+          }
+        }
+      ]
+    },
+    {
+      "id": "pluginSlots",
+      "name": "插件槽位",
+      "els": [
+        {
+          "id": "topbar_63",
+          "type": "topbar",
+          "name": "顶栏",
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 52,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF"
+          },
+          "props": {
+            "title": "插件槽位",
+            "back": true,
+            "actions": "+"
+          },
+          "action": {
+            "kind": "back"
+          }
+        },
+        {
+          "id": "group_64",
+          "type": "group",
+          "name": "槽位 聊天页顶部",
+          "x": 16,
+          "y": 64,
+          "w": 358,
+          "h": 120,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1
+          },
+          "props": {
+            "title": "聊天页顶部",
+            "count": 1,
+            "open": true
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "text_65",
+          "type": "text",
+          "name": "槽位 id",
+          "x": 24,
+          "y": 72,
+          "w": 150,
+          "h": 16,
+          "parent": "group_64",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#A3ADBA",
+            "fontSize": 10,
+            "fontWeight": 400
+          },
+          "props": {
+            "text": "chat.top"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "listRow_66",
+          "type": "listRow",
+          "name": "已放置 1",
+          "x": 26,
+          "y": 108,
+          "w": 338,
+          "h": 52,
+          "parent": "group_64",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "bili 用量",
+            "sub": "billion-context",
+            "avatar": "◆",
+            "avatarColor": "#7C5CFF",
+            "showAvatar": true,
+            "chevron": false
+          },
+          "action": {
+            "kind": "sheet",
+            "title": "bili 用量",
+            "message": "上移 / 下移 / 移除"
+          }
+        },
+        {
+          "id": "group_67",
+          "type": "group",
+          "name": "槽位 设置页附加项",
+          "x": 16,
+          "y": 196,
+          "w": 358,
+          "h": 180,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1
+          },
+          "props": {
+            "title": "设置页附加项",
+            "count": 2,
+            "open": true
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "text_68",
+          "type": "text",
+          "name": "槽位 id",
+          "x": 24,
+          "y": 204,
+          "w": 150,
+          "h": 16,
+          "parent": "group_67",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#A3ADBA",
+            "fontSize": 10,
+            "fontWeight": 400
+          },
+          "props": {
+            "text": "settings.extra"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "listRow_69",
+          "type": "listRow",
+          "name": "已放置 1",
+          "x": 26,
+          "y": 240,
+          "w": 338,
+          "h": 52,
+          "parent": "group_67",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "Android 桥接",
+            "sub": "dsh-mobile-bridge",
+            "avatar": "◆",
+            "avatarColor": "#7C5CFF",
+            "showAvatar": true,
+            "chevron": false
+          },
+          "action": {
+            "kind": "sheet",
+            "title": "Android 桥接",
+            "message": "上移 / 下移 / 移除"
+          }
+        },
+        {
+          "id": "listRow_70",
+          "type": "listRow",
+          "name": "已放置 2",
+          "x": 26,
+          "y": 298,
+          "w": 338,
+          "h": 52,
+          "parent": "group_67",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "bili 上下文",
+            "sub": "billion-context",
+            "avatar": "◆",
+            "avatarColor": "#7C5CFF",
+            "showAvatar": true,
+            "chevron": false
+          },
+          "action": {
+            "kind": "sheet",
+            "title": "bili 上下文",
+            "message": "上移 / 下移 / 移除"
+          }
+        },
+        {
+          "id": "text_71",
+          "type": "text",
+          "name": "提示",
+          "x": 16,
+          "y": 394,
+          "w": 358,
+          "h": 34,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#A3ADBA",
+            "fontSize": 12,
+            "fontWeight": 400
+          },
+          "props": {
+            "text": "空槽位点右上「添加」选择插件组件"
+          },
+          "action": {
+            "kind": "none"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pluginMarket",
+      "name": "插件市场",
+      "els": [
+        {
+          "id": "topbar_72",
+          "type": "topbar",
+          "name": "顶栏",
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 52,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF"
+          },
+          "props": {
+            "title": "插件市场",
+            "back": true,
+            "actions": "↻"
+          },
+          "action": {
+            "kind": "back"
+          }
+        },
+        {
+          "id": "ghostBtn_73",
+          "type": "ghostBtn",
+          "name": "从文件安装",
+          "x": 16,
+          "y": 60,
+          "w": 175,
+          "h": 40,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "radius": 12,
+            "align": "center"
+          },
+          "props": {
+            "text": "从文件安装…"
+          },
+          "action": {
+            "kind": "toast",
+            "message": "选择文件…",
+            "duration": 1500
+          }
+        },
+        {
+          "id": "ghostBtn_74",
+          "type": "ghostBtn",
+          "name": "从 GitHub 导入",
+          "x": 199,
+          "y": 60,
+          "w": 175,
+          "h": 40,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "radius": 12,
+            "align": "center"
+          },
+          "props": {
+            "text": "从 GitHub 导入…"
+          },
+          "action": {
+            "kind": "dialog",
+            "title": "GitHub 导入",
+            "message": "粘贴仓库地址或 zip 链接"
+          }
+        },
+        {
+          "id": "search_75",
+          "type": "search",
+          "name": "搜索",
+          "x": 16,
+          "y": 112,
+          "w": 358,
+          "h": 36,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 18,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "padding": 12
+          },
+          "props": {
+            "placeholder": "搜索插件"
+          },
+          "action": {
+            "kind": "toast",
+            "message": "输入关键字搜索",
+            "duration": 1500
+          }
+        },
+        {
+          "id": "group_76",
+          "type": "group",
+          "name": "分组 市场",
+          "x": 16,
+          "y": 162,
+          "w": 358,
+          "h": 232,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1
+          },
+          "props": {
+            "title": "插件市场",
+            "count": 3,
+            "open": true
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "listRow_77",
+          "type": "listRow",
+          "name": "市场行1",
+          "x": 26,
+          "y": 204,
+          "w": 338,
+          "h": 56,
+          "parent": "group_76",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "billion-context",
+            "sub": "上下文压缩 · 3.3.4",
+            "avatar": "⇩",
+            "avatarColor": "#7C5CFF",
+            "showAvatar": true,
+            "chevron": false
+          },
+          "action": {
+            "kind": "dialog",
+            "title": "安装插件",
+            "message": "从市场安装 billion-context ？"
+          }
+        },
+        {
+          "id": "listRow_78",
+          "type": "listRow",
+          "name": "市场行2",
+          "x": 26,
+          "y": 266,
+          "w": 338,
+          "h": 56,
+          "parent": "group_76",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "dsh-mobile-bridge",
+            "sub": "手机桥接 · 1.0.2",
+            "avatar": "⇩",
+            "avatarColor": "#12B5A6",
+            "showAvatar": true,
+            "chevron": false
+          },
+          "action": {
+            "kind": "dialog",
+            "title": "安装插件",
+            "message": "从市场安装 dsh-mobile-bridge ？"
+          }
+        },
+        {
+          "id": "listRow_79",
+          "type": "listRow",
+          "name": "市场行3",
+          "x": 26,
+          "y": 328,
+          "w": 338,
+          "h": 56,
+          "parent": "group_76",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "cordis-plugin-android",
+            "sub": "Android 能力 · 0.9.1",
+            "avatar": "⇩",
+            "avatarColor": "#F59E0B",
+            "showAvatar": true,
+            "chevron": false
+          },
+          "action": {
+            "kind": "dialog",
+            "title": "安装插件",
+            "message": "从市场安装 cordis-plugin-android ？"
+          }
+        },
+        {
+          "id": "group_80",
+          "type": "group",
+          "name": "分组 备份",
+          "x": 16,
+          "y": 406,
+          "w": 358,
+          "h": 152,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1
+          },
+          "props": {
+            "title": "备份回档",
+            "count": 2,
+            "open": true
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "listRow_81",
+          "type": "listRow",
+          "name": "备份行1",
+          "x": 26,
+          "y": 448,
+          "w": 338,
+          "h": 50,
+          "parent": "group_80",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "导出插件清单",
+            "sub": "生成 plugins.json",
+            "avatar": "⤓",
+            "avatarColor": "#6B7684",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "snackbar",
+            "message": "导出插件清单 · 完成",
+            "duration": 2200
+          }
+        },
+        {
+          "id": "listRow_82",
+          "type": "listRow",
+          "name": "备份行2",
+          "x": 26,
+          "y": 502,
+          "w": 338,
+          "h": 50,
+          "parent": "group_80",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "从备份恢复",
+            "sub": "覆盖当前已启用集合",
+            "avatar": "⤓",
+            "avatarColor": "#6B7684",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "snackbar",
+            "message": "从备份恢复 · 完成",
+            "duration": 2200
+          }
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "name": "设置",
+      "els": [
+        {
+          "id": "topbar_83",
+          "type": "topbar",
+          "name": "顶栏",
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 52,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF"
+          },
+          "props": {
+            "title": "设置",
+            "back": false,
+            "actions": ""
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "group_84",
+          "type": "group",
+          "name": "分组 外观",
+          "x": 16,
+          "y": 64,
+          "w": 358,
+          "h": 212,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1
+          },
+          "props": {
+            "title": "外观",
+            "count": 3,
+            "open": true
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "listRow_85",
+          "type": "listRow",
+          "name": "设置行 主题",
+          "x": 26,
+          "y": 104,
+          "w": 338,
+          "h": 50,
+          "parent": "group_84",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "主题",
+            "sub": "跟随系统 / 亮 / 暗",
+            "avatar": "🎨",
+            "avatarColor": "#7C5CFF",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "toast",
+            "message": "打开 主题",
+            "duration": 1400
+          }
+        },
+        {
+          "id": "listRow_86",
+          "type": "listRow",
+          "name": "设置行 字号",
+          "x": 26,
+          "y": 160,
+          "w": 338,
+          "h": 50,
+          "parent": "group_84",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "字号",
+            "sub": "标准",
+            "avatar": "Aa",
+            "avatarColor": "#7C5CFF",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "toast",
+            "message": "打开 字号",
+            "duration": 1400
+          }
+        },
+        {
+          "id": "listRow_87",
+          "type": "listRow",
+          "name": "设置行 气泡圆角",
+          "x": 26,
+          "y": 216,
+          "w": 338,
+          "h": 50,
+          "parent": "group_84",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "气泡圆角",
+            "sub": "14",
+            "avatar": "◜",
+            "avatarColor": "#7C5CFF",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "toast",
+            "message": "打开 气泡圆角",
+            "duration": 1400
+          }
+        },
+        {
+          "id": "group_88",
+          "type": "group",
+          "name": "分组 模型",
+          "x": 16,
+          "y": 288,
+          "w": 358,
+          "h": 212,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1
+          },
+          "props": {
+            "title": "模型",
+            "count": 3,
+            "open": true
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "listRow_89",
+          "type": "listRow",
+          "name": "设置行 当前模型",
+          "x": 26,
+          "y": 328,
+          "w": 338,
+          "h": 50,
+          "parent": "group_88",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "当前模型",
+            "sub": "deepseek-v4.1-flash",
+            "avatar": "◈",
+            "avatarColor": "#7C5CFF",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "toast",
+            "message": "打开 当前模型",
+            "duration": 1400
+          }
+        },
+        {
+          "id": "listRow_90",
+          "type": "listRow",
+          "name": "设置行 端点",
+          "x": 26,
+          "y": 384,
+          "w": 338,
+          "h": 50,
+          "parent": "group_88",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "端点",
+            "sub": "自定义端点",
+            "avatar": "⇢",
+            "avatarColor": "#7C5CFF",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "toast",
+            "message": "打开 端点",
+            "duration": 1400
+          }
+        },
+        {
+          "id": "listRow_91",
+          "type": "listRow",
+          "name": "设置行 并行数",
+          "x": 26,
+          "y": 440,
+          "w": 338,
+          "h": 50,
+          "parent": "group_88",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "并行数",
+            "sub": "2",
+            "avatar": "∥",
+            "avatarColor": "#7C5CFF",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "toast",
+            "message": "打开 并行数",
+            "duration": 1400
+          }
+        },
+        {
+          "id": "group_92",
+          "type": "group",
+          "name": "分组 关于",
+          "x": 16,
+          "y": 512,
+          "w": 358,
+          "h": 156,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1
+          },
+          "props": {
+            "title": "关于",
+            "count": 2,
+            "open": true
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "listRow_93",
+          "type": "listRow",
+          "name": "设置行 版本",
+          "x": 26,
+          "y": 552,
+          "w": 338,
+          "h": 50,
+          "parent": "group_92",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "版本",
+            "sub": "1.23.1",
+            "avatar": "ⓘ",
+            "avatarColor": "#7C5CFF",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "toast",
+            "message": "打开 版本",
+            "duration": 1400
+          }
+        },
+        {
+          "id": "listRow_94",
+          "type": "listRow",
+          "name": "设置行 检查更新",
+          "x": 26,
+          "y": 608,
+          "w": 338,
+          "h": 50,
+          "parent": "group_92",
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": null,
+            "radius": 10,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "padding": 10
+          },
+          "props": {
+            "title": "检查更新",
+            "sub": "当前已是最新",
+            "avatar": "↻",
+            "avatarColor": "#7C5CFF",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "toast",
+            "message": "打开 检查更新",
+            "duration": 1400
+          }
+        },
+        {
+          "id": "navbar_95",
+          "type": "navbar",
+          "name": "底部导航",
+          "x": 0,
+          "y": 788,
+          "w": 390,
+          "h": 56,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "color": "#A3ADBA",
+            "fontSize": 11
+          },
+          "props": {
+            "items": "会话💬,Agent🤖,插件🧩,设置⚙",
+            "active": 3,
+            "targets": "sessions,agents,pluginHub,settings"
+          },
+          "action": {
+            "kind": "none"
+          }
+        }
+      ]
+    },
+    {
+      "id": "agents",
+      "name": "Agent",
+      "els": [
+        {
+          "id": "topbar_96",
+          "type": "topbar",
+          "name": "顶栏",
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 52,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF"
+          },
+          "props": {
+            "title": "Agent",
+            "back": false,
+            "actions": "+"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "listRow_97",
+          "type": "listRow",
+          "name": "Agent 行1",
+          "x": 16,
+          "y": 64,
+          "w": 358,
+          "h": 64,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 600,
+            "padding": 12
+          },
+          "props": {
+            "title": "主 Agent",
+            "sub": "运行中 · 3 个任务",
+            "avatar": "主",
+            "avatarColor": "#7C5CFF",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "navigate",
+            "target": "terminal"
+          }
+        },
+        {
+          "id": "listRow_98",
+          "type": "listRow",
+          "name": "Agent 行2",
+          "x": 16,
+          "y": 136,
+          "w": 358,
+          "h": 64,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 600,
+            "padding": 12
+          },
+          "props": {
+            "title": "设备执行者",
+            "sub": "空闲",
+            "avatar": "设",
+            "avatarColor": "#12B5A6",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "navigate",
+            "target": "terminal"
+          }
+        },
+        {
+          "id": "listRow_99",
+          "type": "listRow",
+          "name": "Agent 行3",
+          "x": 16,
+          "y": 208,
+          "w": 358,
+          "h": 64,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "border": "#EAEEF4",
+            "radius": 14,
+            "shadow": 1,
+            "color": "#0D1117",
+            "fontSize": 14,
+            "fontWeight": 600,
+            "padding": 12
+          },
+          "props": {
+            "title": "只读审查",
+            "sub": "运行中",
+            "avatar": "审",
+            "avatarColor": "#F59E0B",
+            "showAvatar": true,
+            "chevron": true
+          },
+          "action": {
+            "kind": "navigate",
+            "target": "terminal"
+          }
+        },
+        {
+          "id": "button_100",
+          "type": "button",
+          "name": "新建 FAB",
+          "x": 310,
+          "y": 700,
+          "w": 60,
+          "h": 60,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#2F7CF6",
+            "color": "#FFFFFF",
+            "fontSize": 26,
+            "fontWeight": 400,
+            "radius": 99,
+            "align": "center"
+          },
+          "props": {
+            "text": "+"
+          },
+          "action": {
+            "kind": "dialog",
+            "title": "新建 Agent",
+            "message": "选择角色与模型"
+          }
+        },
+        {
+          "id": "navbar_101",
+          "type": "navbar",
+          "name": "底部导航",
+          "x": 0,
+          "y": 788,
+          "w": 390,
+          "h": 56,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF",
+            "color": "#A3ADBA",
+            "fontSize": 11
+          },
+          "props": {
+            "items": "会话💬,Agent🤖,插件🧩,设置⚙",
+            "active": 1,
+            "targets": "sessions,agents,pluginHub,settings"
+          },
+          "action": {
+            "kind": "none"
+          }
+        }
+      ]
+    },
+    {
+      "id": "terminal",
+      "name": "终端",
+      "els": [
+        {
+          "id": "topbar_102",
+          "type": "topbar",
+          "name": "顶栏",
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 52,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#FFFFFF"
+          },
+          "props": {
+            "title": "终端",
+            "back": true,
+            "actions": "⟳"
+          },
+          "action": {
+            "kind": "back"
+          }
+        },
+        {
+          "id": "frame_103",
+          "type": "frame",
+          "name": "终端底",
+          "x": 0,
+          "y": 52,
+          "w": 390,
+          "h": 724,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#0F1116",
+            "border": null,
+            "radius": 0
+          },
+          "props": {},
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "text_104",
+          "type": "text",
+          "name": "行 1",
+          "x": 12,
+          "y": 64,
+          "w": 366,
+          "h": 20,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#9AE6B4",
+            "fontSize": 12,
+            "fontWeight": 400
+          },
+          "props": {
+            "text": "$ gradle :app:assembleRelease"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "text_105",
+          "type": "text",
+          "name": "行 2",
+          "x": 12,
+          "y": 88,
+          "w": 366,
+          "h": 20,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#9AE6B4",
+            "fontSize": 12,
+            "fontWeight": 400
+          },
+          "props": {
+            "text": "BUILD SUCCESSFUL in 3m 14s"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "text_106",
+          "type": "text",
+          "name": "行 3",
+          "x": 12,
+          "y": 112,
+          "w": 366,
+          "h": 20,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#9AE6B4",
+            "fontSize": 12,
+            "fontWeight": 400
+          },
+          "props": {
+            "text": "$ adb install -r app-release.apk"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "text_107",
+          "type": "text",
+          "name": "行 4",
+          "x": 12,
+          "y": 136,
+          "w": 366,
+          "h": 20,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#9AE6B4",
+            "fontSize": 12,
+            "fontWeight": 400
+          },
+          "props": {
+            "text": "Success"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "text_108",
+          "type": "text",
+          "name": "行 5",
+          "x": 12,
+          "y": 160,
+          "w": 366,
+          "h": 20,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#9AE6B4",
+            "fontSize": 12,
+            "fontWeight": 400
+          },
+          "props": {
+            "text": "$ adb shell dumpsys package | grep version"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "text_109",
+          "type": "text",
+          "name": "行 6",
+          "x": 12,
+          "y": 184,
+          "w": 366,
+          "h": 20,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#9AE6B4",
+            "fontSize": 12,
+            "fontWeight": 400
+          },
+          "props": {
+            "text": "versionName=1.23.1"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "text_110",
+          "type": "text",
+          "name": "行 7",
+          "x": 12,
+          "y": 208,
+          "w": 366,
+          "h": 20,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#9AE6B4",
+            "fontSize": 12,
+            "fontWeight": 400
+          },
+          "props": {
+            "text": ""
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "text_111",
+          "type": "text",
+          "name": "行 8",
+          "x": 12,
+          "y": 232,
+          "w": 366,
+          "h": 20,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "transparent",
+            "color": "#6B7684",
+            "fontSize": 12,
+            "fontWeight": 400
+          },
+          "props": {
+            "text": "> 输入命令…"
+          },
+          "action": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "input_112",
+          "type": "input",
+          "name": "命令输入",
+          "x": 0,
+          "y": 776,
+          "w": 390,
+          "h": 68,
+          "parent": null,
+          "hidden": false,
+          "locked": false,
+          "style": {
+            "fill": "#15171C",
+            "border": null,
+            "radius": 0,
+            "color": "#E6E9EF",
+            "fontSize": 13,
+            "padding": 12
+          },
+          "props": {
+            "placeholder": "输入命令…"
+          },
+          "action": {
+            "kind": "none"
+          }
+        }
+      ]
+    }
+  ]
+}

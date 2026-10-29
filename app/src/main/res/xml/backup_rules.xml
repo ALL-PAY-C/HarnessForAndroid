@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android Auto Backup（API ≤ 30，android:fullBackupContent）。
+
+    只排除「含 API Key」的 DataStore：dsh_models 里存的是明文 ModelProfile.apiKey，
+    云备份/迁移绝不能带出去。其余非密钥数据（dsh_settings 的界面偏好、Room 会话库、
+    SharedPreferences 等）保持默认随迁。
+-->
+<full-backup-content>
+    <exclude domain="file" path="datastore/dsh_models.preferences_pb" />
+</full-backup-content>

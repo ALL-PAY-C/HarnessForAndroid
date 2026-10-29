@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android Auto Backup（API 31+，android:dataExtractionRules）。
+
+    云备份与设备迁移都只排除「含 API Key」的 DataStore：dsh_models 里是明文
+    ModelProfile.apiKey，绝不能进 Google 云或随 D2D 拷贝到新设备。其余非密钥数据
+    保持默认随迁（未写 <include> 即「全量包含，仅剔除下面的 exclude」）。
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="datastore/dsh_models.preferences_pb" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="datastore/dsh_models.preferences_pb" />
+    </device-transfer>
+</data-extraction-rules>

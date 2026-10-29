@@ -1,0 +1,75 @@
+# ==========================================================================
+# dsh-mobile .gitignore
+# 原则：源码 / 配置 / 小体积资源入库；构建产物、运行期缓存、以及超过
+#       GitHub 50MB 预警线的二进制一律不入库，改由构建期脚本下载或生成。
+# ==========================================================================
+
+# ---------- 1. Gradle / Android 构建输出 ----------
+.gradle/
+build/
+*/build/
+**/build/
+.externalNativeBuild/
+.cxx/
+captures/
+.kotlin/
+
+# ---------- 2. 本机工具链与临时目录（不进仓库）----------
+toolchain/
+gradle-home/
+android-home/
+tmp/
+ref/
+.mock/
+nul
+gradlew-env.ps1
+
+# ---------- 3. IDE / 操作系统 ----------
+.idea/
+*.iml
+.DS_Store
+
+# ---------- 4. 本机配置与凭据 ----------
+local.properties
+mobile-bridge-identity.json
+*.keystore
+*.jks
+app/keystore/*.jks
+# 签名材料进版本库：证书稳定，别处（含 CI）构建出的包才能覆盖升级已发布的包。
+# 工程不对外分发正式版，私钥放仓库只是为了让签名可复现，不构成额外风险。
+!app/keystore/dsh-debug.jks
+!app/keystore/app-release.jks
+!app/keystore.properties
+
+# ---------- 5. 日志 ----------
+*.log
+
+# ---------- 6. 安装包与发布产物 ----------
+*.apk
+*.aab
+dist/*.apk
+dist/*.zip
+
+# ---------- 7. 超限二进制：构建期下载 / 生成 ----------
+# node 运行时：112MB / 117MB，单文件超 GitHub 100MB 硬限
+node-runtime/src/main/jniLibs/**/libnode.so
+# linux 内核与 musl node 归档（合计约 105MB，scripts/fetch-dsh-kernel.sh 生成）
+linux-runtime/src/main/assets/dsh-kernel/*.tgz
+linux-runtime/src/main/assets/dsh-kernel/node/*.tgz
+# engine 依赖树（npm ci 还原）
+engine/node_modules/
+# engine/ 打包产物（app/build.gradle.kts 构建期生成到 build/generated/）
+app/src/main/assets/runtime/engine.zip
+
+# ---------- 8. 必须入库：显式反选，防止上面的通配误伤 ----------
+!scripts/artifacts/*.tgz
+!linux-runtime/src/main/assets/dsh-kernel/kernel-manifest.json
+!engine/bin.js
+!engine/host/
+!engine/package.json
+!engine/package-lock.json
+!app/src/main/assets/registry.json
+!app/src/main/jniLibs/**/libbusybox.so
+
+# 引擎跑起来后在这里落技能库与状态，不进版本库
+engine/skill-manager/

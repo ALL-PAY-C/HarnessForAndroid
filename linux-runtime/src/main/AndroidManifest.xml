@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- proot / rootfs 归本模块；不声明权限，下载由调用方负责。 -->
+</manifest>
