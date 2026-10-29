@@ -646,7 +646,10 @@ class LocalEngineTransport(
             val rawContent = msg?.get("content")?.jsonPrimitive?.contentOrNullSafe().orEmpty()
             // 正文里混着的  thinking… 段（非流式整包返回时 post 没经过分流）在这里剥掉。
             val split = splitThinking(rawContent)
-            var content = split.first
+            // 工具调用标记也得在推 UI 之前剥掉：plain 整包（post 里提前 return 的那条）与 engine://
+            // 送进来的正文都没经过流式闸门，先发后删就是让用户看见一屏 markup。
+            val dsml = stripDsmlToolCalls(split.first)
+            var content = dsml.first
             // 思维链：字段名各家用得不一样，逐个认（reasoning_content / reasoning / thinking / …）。
             val reasoning = buildString {
                 reasoningOf(msg)?.let { if (it.isNotBlank()) append(it) }
@@ -693,12 +696,8 @@ class LocalEngineTransport(
 
             var toolCalls = msg?.get("tool_calls")?.jsonArray
             // 非流式整包（postOnce 的 plain 分支）不经过上面的兜底，正文里混的标记在这里再兜一次。
-            if (toolCalls.isNullOrEmpty()) {
-                val stripped = stripDsmlToolCalls(content)
-                if (stripped.second.isNotEmpty()) {
-                    content = stripped.first
-                    toolCalls = JsonArray(stripped.second.map { it.toToolCallJson() })
-                }
+            if (toolCalls.isNullOrEmpty() && dsml.second.isNotEmpty()) {
+                toolCalls = JsonArray(dsml.second.map { it.toToolCallJson() })
             }
             if (toolCalls.isNullOrEmpty()) {
                 // 上游这一轮什么都没给（error 字段 / choices 为空 / 被长度截断 / 纯空正文）时，
@@ -1870,7 +1869,17 @@ class LocalEngineTransport(
             throw IOException("引擎回复失败：" + resp.optString("error").ifBlank { "未知错误" })
         }
         val value = resp.optJSONObject("value") ?: JSONObject()
-        val content = value.optString("content")
+        val rawContent = value.optString("content")
+        // engine:// 没有 function calling 通道（见 SUBAGENT_UNSUPPORTED_ON_ENGINE），模型照样会把
+        // 工具调用标记当正文吐回来。不剥就是整屏 markup 涌进 UI：剥掉标记，再补一行「为什么没执行」。
+        val stripped = stripDsmlToolCalls(rawContent)
+        val content = if (stripped.second.isEmpty()) {
+            rawContent
+        } else {
+            listOf(stripped.first, engineToolCallNotice(stripped.second))
+                .filter { it.isNotBlank() }
+                .joinToString("\n")
+        }
         if (content.isNotEmpty()) onText(content)
         // usage 各家字段不一致，原样透给调用方（那边本来就用 contentOrNullSafe 宽松取值）。
         val usage = value.optJSONObject("usage")
@@ -1886,6 +1895,13 @@ class LocalEngineTransport(
             }
             put("usage", usageJsonOf(usage))
         }
+    }
+
+    /** 剥完 DSML 后补的那一行：engine:// 端点上工具请求没有执行通道，得让用户知道为什么没跑。 */
+    private fun engineToolCallNotice(calls: List<DsmlToolCall>): String {
+        val names = calls.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct()
+        val who = names.joinToString("、").ifBlank { "工具" }
+        return "（模型请求调用 " + who + "，但当前 engine:// 端点不支持工具调用；要真正执行，请把该模型换成支持 function calling 的 OpenAI 兼容端点）"
     }
 
     /** engine:// 后面的那段就是插件声明的模型 id；留空则退回配置里的 model 名。 */

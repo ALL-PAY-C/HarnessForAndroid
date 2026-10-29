@@ -69,6 +69,9 @@ internal fun collapsePlan(text: String, streaming: Boolean = false): CollapsePla
 internal fun stripTags(raw: String): String {
     val noBlocks = Regex("<(style|script|head)\\b[\\s\\S]*?</\\1\\s*>", RegexOption.IGNORE_CASE)
         .replace(raw, " ")
+        // 折叠预览按字符数硬切，尾巴上可能留着半个 <script>…（没有闭合标签），配对正则匹配不到，
+        // 正文就漏进预览；没闭合的那一段整块丢到结尾。展开态由 HtmlRenderer 的 DROP_TAGS 分支同理丢弃。
+        .let { Regex("<(style|script|head)\\b[\\s\\S]*$", RegexOption.IGNORE_CASE).replace(it, " ") }
     val sb = StringBuilder(noBlocks.length)
     var inTag = false
     for (c in noBlocks) {

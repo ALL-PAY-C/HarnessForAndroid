@@ -8,12 +8,12 @@ DeepSeek Harness 的 Android 客户端。会话、模型接入、设备工具、
 
 | 项 | 值 |
 | --- | --- |
-| 文件名 | `HarnessForAndroid-release-v0.03.apk` |
+| 文件名 | `HarnessForAndroid-release-v0.04.apk` |
 | 最低系统 | Android 8.0（API 26） |
 | CPU | `arm64-v8a`（release 只打这一个 ABI；`x86_64` 只在 debug 包里，给模拟器用） |
 | 签名 | 签名材料随仓库走（`app/keystore/app-release.jks` + `app/keystore.properties`），任何机器构建出的证书都是 SHA-256 `767bc8b4bcac50fa01f6f4372638aa45dcbdc4024791cf9faf92671aa549c623` |
-| 体积 | 110,594,310。release 只带 arm64 的两份内核归档，x86_64 那两份在打包期剔除；debug 包四份齐全 |
-| SHA-256 | `65385928b1e15a0ec6549c89b1f55f62960ca2b141341299a9014f27e586c604` |
+| 体积 | 110,598,553。release 只带 arm64 的两份内核归档，x86_64 那两份在打包期剔除；debug 包四份齐全 |
+| SHA-256 | `7e57a72b7d5e23f2ea9602de7928912eefdd90123716b7ea022c25f80bac2a1e` |
 | 覆盖安装 | 手机里若是更早那张证书签的包，先卸载再装 |
 
 ## 功能
@@ -55,7 +55,7 @@ cd engine && npm ci && cd ..        # engine/node_modules 不进版本库
 
 两个下载任务走自己的 HTTP 客户端，`--offline` 拦不住；要完全断网就用上面两个环境变量（或 `-PdshLibnodeZip` / `-PdshKernelAssetsDir`）。libnode 解包后仍验 sha256，对不上中止构建。
 
-产物落在 `app/build/outputs/apk/release/HarnessForAndroid-release-v0.03.apk`，文件名取 `appVersionName` 第一段，改版本只改 `app/build.gradle.kts` 顶部的 `appVersionName` / `appVersionCode`。
+产物落在 `app/build/outputs/apk/release/HarnessForAndroid-release-v0.04.apk`，文件名取 `appVersionName` 第一段，改版本只改 `app/build.gradle.kts` 顶部的 `appVersionName` / `appVersionCode`。
 
 ## 已知限制
 

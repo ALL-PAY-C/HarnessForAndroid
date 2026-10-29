@@ -62,6 +62,8 @@ import dev.dsh.mobile.toolbridge.FileBridge
 import dev.dsh.mobile.toolbridge.ShellBridge
 import dev.dsh.mobile.toolbridge.phone.PhoneBridge
 import kotlinx.serialization.json.JsonObject
+import org.json.JSONArray
+import org.json.JSONObject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -558,6 +560,51 @@ class AppContainer(private val context: Context) {
 
     suspend fun disconnect() {
         connectionCoordinator.teardown { disconnectNow() }
+    }
+
+    /**
+     * 引擎插件上报的模型 id（/llm models）——对话框在 engine:// 端点下点「拉取模型列表」走这里。
+     *
+     * 引擎没起来、插件没装、宿主没有 Node 运行时，都只是「没有模型」：探测是可选能力，
+     * 异常吞掉返回空表，别把 AIDL 层的堆栈甩到对话框上。
+     */
+    suspend fun engineModelIds(): List<String> = runCatching {
+        engineModelIdsOf(nodeEngine.rpc("/llm", "models", JSONObject()))
+    }.getOrDefault(emptyList())
+
+    /** value.providers[*].models 与 value.models 两种形状都认（再容错裸数组 / 单个字符串）。 */
+    private fun engineModelIdsOf(resp: JSONObject): List<String> {
+        if (!resp.optBoolean("ok", true)) return emptyList()
+        val value = resp.opt("value") ?: return emptyList()
+        val out = LinkedHashSet<String>()
+        fun collect(from: JSONArray?) {
+            if (from == null) return
+            for (i in 0 until from.length()) {
+                when (val item = from.opt(i)) {
+                    is String -> if (item.isNotBlank()) out += item
+                    is JSONObject -> item.optString("id")
+                        .ifBlank { item.optString("model") }
+                        .ifBlank { item.optString("name") }
+                        .takeIf { it.isNotBlank() }
+                        ?.let { out += it }
+                }
+            }
+        }
+        when (value) {
+            is JSONObject -> {
+                val providers = value.optJSONArray("providers")
+                for (i in 0 until (providers?.length() ?: 0)) {
+                    collect(providers?.optJSONObject(i)?.optJSONArray("models"))
+                }
+                collect(value.optJSONArray("models"))
+                collect(value.optJSONArray("data"))
+                value.optString("model").takeIf { it.isNotBlank() }?.let { out += it }
+            }
+
+            is JSONArray -> collect(value)
+            is String -> if (value.isNotBlank()) out += value
+        }
+        return out.toList()
     }
 
     private suspend fun disconnectNow() {

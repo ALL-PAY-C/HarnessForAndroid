@@ -14,12 +14,37 @@ import java.net.URL
  * pick, instead of silently using one hardcoded default.
  */
 object ModelCatalog {
+    /** engine:// 端点由宿主引擎通道供模型列表，这条 HTTP 路永远不走。 */
+    private const val ENGINE_HINT = "engine:// 端点由引擎插件提供，模型列表走宿主引擎通道（对话框里的「拉取模型列表」会自动用这条通道）"
+
+    /** engine:// 端点：调用方据此换通道（引擎通道），而不是来 fetch。 */
+    fun isEngineEndpoint(baseUrl: String): Boolean =
+        baseUrl.trim().lowercase().startsWith("engine://")
+
+    /**
+     * 端点能不能走 HTTP。返回 null = 可以；否则是给用户看的原因。
+     *
+     * java.net.URL 对 engine:// 抛 MalformedURLException: unknown protocol，
+     * 用户看到的是一句协议层天书；这里换成能照着做的提示，且绝不进 URL。
+     * 纯函数，单测直接打这里。
+     */
+    fun schemeRejection(baseUrl: String): String? {
+        val root = baseUrl.trim()
+        val scheme = root.substringBefore(':', missingDelimiterValue = "").trim().lowercase()
+        return when (scheme) {
+            "http", "https" -> null
+            "engine" -> ENGINE_HINT
+            else -> "只支持 http/https 端点，当前是「${scheme.ifBlank { root }}」"
+        }
+    }
+
     /** OpenAI-compatible `GET /v1/models`, tolerant of the usual shape variants. */
     suspend fun fetch(baseUrl: String, apiKey: String): Result<List<String>> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val root = baseUrl.trim().trimEnd('/')
                 require(root.isNotEmpty()) { "Base URL 为空" }
+                schemeRejection(root)?.let { throw IllegalArgumentException(it) }
                 val candidates = listOf("$root/models", "$root/v1/models").distinct()
                 var lastError: String? = null
                 var found: List<String>? = null
