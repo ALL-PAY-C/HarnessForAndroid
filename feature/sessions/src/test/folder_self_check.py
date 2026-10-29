@@ -1,13 +1,14 @@
 """Run only extracted production folder logic with the cached Kotlin compiler."""
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[4]
 SOURCE = ROOT / "feature/sessions/src/main/kotlin/dev/dsh/mobile/feature/sessions/SessionsViewModel.kt"
-CACHE = Path(os.environ.get("GRADLE_USER_HOME", "D:/DSH/mobile-client/gradle-home")) / "caches/modules-2/files-2.1"
-JAVA = "D:/DSH/mobile-client/toolchain/jdk-17.0.20.1+1/bin/java.exe"
+CACHE = Path(os.environ.get("GRADLE_USER_HOME") or (Path.home() / ".gradle")) / "caches/modules-2/files-2.1"
+JAVA = str(Path(os.environ["JAVA_HOME"]) / "bin" / "java") if os.environ.get("JAVA_HOME") else shutil.which("java")
 source = SOURCE.read_text(encoding="utf-8")
 row = source[source.index("data class FolderRow("):source.index("data class SessionsUiState(")]
 logic = source[source.index("internal fun folderGroupKey"): ]
