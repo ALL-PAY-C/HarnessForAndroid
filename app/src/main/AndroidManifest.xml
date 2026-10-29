@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 完成 / 待确认通知的震动反馈 -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- 应用内自更新：下载完 APK 后交给系统安装器 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!--
+      插件是独立 APK，宿主必须能枚举「没有启动图标」的插件包才能自动认出来。
+      Android 11+ 的包可见性默认把这类包挡在外面（getInstalledPackages 只返回自己 +
+      系统包），表现就是装好了插件宿主永远显示「没有插件」。
+      另外给一条 queries 兜底：插件若声明了 DSH_PLUGIN_ACTION 也能被看见。
+    -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+    <!-- Termux 通道：授权后 shell 工具才能把命令交给 Termux 的 Linux 环境执行 -->
+    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
+    <!-- T1 手机控制：状态浮层（可选，不授权也能操控，只是看不到实时状态） -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!--
+      文件工具（fs_*）要读写整个内部存储：Android 11+ 只有 MANAGE_EXTERNAL_STORAGE 能做到，
+      由设置页「全文件访问」引导用户授权。不授权时 FileBridge 自动退回白名单目录，工具不报死。
+    -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
+    <queries>
+        <intent>
+            <action android:name="dev.dsh.mobile.plugin.DSH_PLUGIN" />
+        </intent>
+        <package android:name="com.termux" />
+        <package android:name="dev.dsh.mobile.plugin.html" />
+    </queries>
+
+    <application
+        android:name=".DshApplication"
+        android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:largeHeap="true"
+        android:extractNativeLibs="true"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:usesCleartextTraffic="true"
+        android:theme="@style/Theme.Dsh"
+        tools:targetApi="35">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.Dsh">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".service.RuntimeService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:stopWithTask="false" />
+
+        <!--
+          Node 引擎独立进程：libnode 不能被启动两次、也不能被杀，引擎里的 process.exit
+          会带走整个进程 —— 放在 :node 里，主进程只会看到一次 binder 断开。
+        -->
+        <service
+            android:name=".node.NodeEngineService"
+            android:enabled="true"
+            android:exported="false"
+            android:process=":node" />
+
+        <receiver
+            android:name=".service.BootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 通知栏里直接点选项/直接打字回传（常驻聚合通知的 Action 落点）。 -->
+        <receiver
+            android:name=".notify.NotificationActionReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+
+</manifest>

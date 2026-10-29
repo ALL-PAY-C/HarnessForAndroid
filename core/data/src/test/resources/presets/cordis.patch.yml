@@ -1,0 +1,80 @@
+# 鲸英模式 (whale-elite)：省 Token、高效率的 Agent 预设。
+# 这是一个纯组合 bundle：只插入一条 @deepseek-ai/dsh-agent-preset 声明，
+# 不包含任何 Host/Client 代码。安装后会在 Agent 预设选择器中出现。
+- insert:
+    - id: preset-whale-elite
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: whale-elite
+        name: 鲸英模式
+        description: 省 Token 且高效率：精简工具面、关闭动态运行时上下文、更早压缩、更激进地裁剪工具结果。
+        order: 0
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              includeRuntimeContext: false
+              prefix: |-
+                你在「鲸英模式」下工作：在保证正确的前提下，让每个 Token 都产出最大价值。
+                纪律：
+                - 先查后写。用 grep/glob 精确定位，再用 read 的 offset/limit 只读需要的片段；不要整文件通读，不要重复读同一文件。
+                - 同一回合内并行发起互不依赖的工具调用，不要串行等待。
+                - 只做被要求的事：不写过程旁白，不复述已知信息，不自作主张扩大范围，不生成未被要求的文件。
+                - 一条命令能验证的不要用三条；优先复用已有函数与既有模式。
+                - 可能产生长输出的命令改为重定向到文件或后台作业，只读回需要的行。
+                - 任务超过两步时先用 todo_write 列出计划，完成一项就勾选一项。
+                - 最终答复只给结论、改动位置和验证结果，不粘贴大段代码。
+                事实靠检查获得，不要问用户；只有用户才能决定的选择才用 ask_user_question。
+              suffix: |-
+                工作目录：{{cwd}}。命令工具已按当前平台选定：Windows 用原生路径（C:\）与 $env:NAME，类 Unix 用 / 与 $NAME。
+          - id: tool-pwsh
+            name: '@deepseek-ai/dsh-tool-pwsh'
+            disabled: !!js process.platform !== 'win32'
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-jobs
+            name: '@deepseek-ai/dsh-tool-jobs'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+                config:
+                  # 真正决定「何时压缩」的是 thresholdRatio。触发点为
+                  #   min(contextWindow × thresholdRatio, messageBudget − headroomTokens)
+                  # 标准模式默认 0.8，这里下调到 0.6，压缩在约六成窗口处触发。
+                  # 注意不要改用 headroomTokens 来调：它是从触发预算里扣除的余量，
+                  # 调小它会让触发点抬高、压缩更晚 —— 方向相反。
+                  thresholdRatio: 0.6
+                  # 保留尾部原文的比例。它决定压缩的「深度」而非「时机」：
+                  # 0.12 低于默认 0.16，压缩后留下的原文更少、历史更短。
+                  retainRatio: 0.12
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 4096
+                  headChars: 2048
+                  tailChars: 512

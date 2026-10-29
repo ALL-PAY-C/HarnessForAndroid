@@ -1,0 +1,26 @@
+{
+  "name": "dsh-whale-elite-preset",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "鲸英模式：省 Token、高效率的 Agent 预设",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "agent-preset",
+    "token-saving"
+  ],
+  "license": "MIT",
+  "files": [
+    "cordis.patch.yml"
+  ],
+  "meta": {
+    "title": "鲸英模式",
+    "description": "省 Token、高效率的 Agent 组合：精简工具面、关闭动态运行时上下文、更早压缩、更激进地裁剪工具结果。"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

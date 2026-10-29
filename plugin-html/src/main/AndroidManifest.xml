@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  插件包：没有 launcher activity，也不声明任何组件。
+  宿主 ExternalPluginStore 用 PathClassLoader(apkPath, context.classLoader) 加载
+  dev.dsh.mobile.plugin.html.HtmlPlugin，register() 里注册渲染器与槽位。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:label="HTML 渲染"
+        android:hasCode="true">
+
+        <!-- 宿主扫描用：没有 launcher activity 的插件 App 靠这个标记被认出来。 -->
+        <meta-data
+            android:name="dsh.plugin"
+            android:value="true" />
+    </application>
+
+</manifest>

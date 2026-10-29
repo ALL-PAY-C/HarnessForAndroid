@@ -1,0 +1,8 @@
+{
+  "name": "dsh-llm-provider-fixture",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "description": "最小样例：provider 插件如何通过 ctx.llm 声明并调用模型网关（引擎测试夹具）"
+}

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="phone_a11y_label">DSH Mobile 手机控制</string>
+    <string name="phone_a11y_summary">允许 DSH 读取当前屏幕并模拟触摸操作</string>
+    <string name="phone_a11y_desc">开启后，DSH Agent 可以通过无障碍服务模拟点击、滑动、输入文本、读取当前屏幕内容、启动应用和截屏，用于执行你下达的手机操作指令。所有数据仅在本机处理，仅在你下达指令时读取。</string>
+</resources>

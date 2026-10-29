@@ -1,0 +1,13 @@
+{
+  "versionCode": 90,
+  "versionName": "v0.03",
+  "apkUrl": "https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.03/HarnessForAndroid-release-v0.03.apk",
+  "apkMirrors": [
+    "https://gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.03/HarnessForAndroid-release-v0.03.apk",
+    "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.03/HarnessForAndroid-release-v0.03.apk",
+    "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.03/HarnessForAndroid-release-v0.03.apk"
+  ],
+  "sha256": "65385928b1e15a0ec6549c89b1f55f62960ca2b141341299a9014f27e586c604",
+  "notes": "v0.03：Markdown 表格识别修好——模型不给 |---| 分隔行也渲染成表格，一条回答里多张表不再只剩最后一张；表格按分隔行的对齐标记排版并按内容分配列宽铺满卡片；侧边栏回到左侧滑出；主程序与具体插件彻底解耦，不再内置任何插件的账号卡、账号种子或原生网关；事件流单条事件出错不再让整个会话失聪；抽屉搜索的 LIKE 通配符加了转义。release 只打 arm64-v8a，Android 8.0 以上。已知限制见 README。",
+  "sizeBytes": 110594310
+}
