@@ -158,8 +158,8 @@ val hasReleaseKeystore = releaseKeystoreProps.getProperty("storeFile")
     ?.let { file(it).isFile } == true
 
 // 版本单一来源：defaultConfig 与 APK 文件名都读这里，改一处即可。
-val appVersionName = "v0.04"
-val appVersionCode = 91
+val appVersionName = "v0.05"
+val appVersionCode = 92
 // 文件名只取版本号本身（"v0.01" 无空格，取到的就是 "v0.01"），中文与空格不进文件名。
 val apkVersionTag = appVersionName.substringBefore(' ')
 
@@ -245,7 +245,9 @@ android {
         // 运行时由 AppContainer 当内置插件注册，见 pluginHost。
         getByName("main") {
             kotlin.srcDir("../plugin-html/src/main/kotlin")
-            java.srcDir("../plugin-html/src/main/resources")
+            // 资源必须进 resources 而不是 java：Java 源集只认 .kt/.java，把 resources
+            // 目录挂到 java 上等于丢包（曾经的 render.js 与 diagram/*.js 就是这么丢的）。
+            resources.srcDir("../plugin-html/src/main/resources")
         }
     }
     packaging {

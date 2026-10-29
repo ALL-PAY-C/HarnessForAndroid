@@ -2,6 +2,7 @@ package dev.dsh.mobile.render
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import dev.dsh.mobile.pluginapi.DiagramRenderers
 import dev.dsh.mobile.pluginapi.HtmlBlockRenderers
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -292,26 +293,36 @@ internal fun safePrefixLength(text: String): Int {
     var mathStart = -1
     var boundary = 0
     var pos = 0
+    // 流式时每来一小段就重算一次，这条循环是主线程上唯一 O(n) 的活：不造 line 子串，
+    // 直接在原文上按位置判首字符 / 判空白行（以前每行一个 substring + trim）。
     while (pos <= text.length) {
         val nl = text.indexOf('\n', pos)
         val lineEnd = if (nl < 0) text.length else nl
-        val line = text.substring(pos, lineEnd)
-        val t = line.trim()
+        var s = pos
+        var e = lineEnd
+        while (s < e && text[s].isWhitespace()) s++
+        while (e > s && text[e - 1].isWhitespace()) e--
+        val len = e - s
+        val blank = len == 0
+        val fence = len >= 3 && text[s] == '\u0060' && text[s + 1] == '\u0060' && text[s + 2] == '\u0060'
+        val mathOnly = len == 2 && text[s] == '\u0024' && text[s + 1] == '\u0024'
+        val mathOpen = len >= 2 && text[s] == '\\' && text[s + 1] == '['
+        val mathEnd = len >= 2 && text[e - 1] == ']' && text[e - 2] == '\\'
         if (!inFence && !inMath) {
-            if (t.startsWith("\u0060\u0060\u0060")) {
+            if (fence) {
                 inFence = true; fenceStart = pos
-            } else if (t == "$$" || t.startsWith("\\[")) {
+            } else if (mathOnly || mathOpen) {
                 inMath = true; mathStart = pos
-            } else if (t.isEmpty()) {
+            } else if (blank) {
                 boundary = if (nl < 0) text.length else nl + 1
             }
         } else if (inFence) {
-            if (t.startsWith("\u0060\u0060\u0060")) {
+            if (fence) {
                 inFence = false
                 boundary = if (nl < 0) text.length else nl + 1
             }
         } else {
-            if (t == "$$" || t.endsWith("\\]")) {
+            if (mathOnly || mathEnd) {
                 inMath = false
                 boundary = if (nl < 0) text.length else nl + 1
             }
@@ -411,22 +422,34 @@ private fun BlockView(
             }
         }
 
-        // ```html 围栏：装了渲染插件就直接把这段 HTML 画出来（脚本/Canvas/动画都能跑），
-        // 没装就退回普通代码块。用户可以一键在「预览」和「源码」之间切。
+        // 围栏代码块的三条出路，顺序就是优先级：
+        //   1) HTML_LANGS 且装了 HTML 插件 -> HtmlFenceView（已有行为，不能动）；
+        //   2) DiagramKinds 认得这个 lang 且装了图形插件 -> DiagramFenceView；
+        //   3) 其余（含"认得但没装插件"）-> CodeBlockView，只是多一句该装什么。
+        // 先判 HTML 再判图形，是为了让 svg/xml 继续待在 WebView 通道上：
+        // 它们本来就在 HTML_LANGS 里，抢过来会改变既有渲染结果。
         is MdBlock.CodeBlock -> {
             // 读 generation 而不是只读 render：插件在首帧之后才注册时，
             // 这一格要能自己重组、从源码翻成预览，用户不用退出重进。
             @Suppress("UNUSED_EXPRESSION")
             HtmlBlockRenderers.generation
-            val web = if (block.lang.lowercase() in HTML_LANGS) HtmlBlockRenderers.render else null
-            if (web != null) {
-                HtmlFenceView(block, style, web)
-            } else if (block.lang.lowercase() in HTML_LANGS) {
-                // 没装 HTML 插件：至少别让人对着一块空白猜。源码照常显示，
-                // 并在标题行提示一句该装什么。
-                CodeBlockView(block, style, hint = "装「HTML 渲染」插件可预览")
-            } else {
-                CodeBlockView(block, style)
+            @Suppress("UNUSED_EXPRESSION")
+            DiagramRenderers.generation
+            val asPage = isHtmlFenceLang(block.lang)
+            val web = if (asPage) HtmlBlockRenderers.render else null
+            val kind = if (web == null) DiagramKinds.of(block.lang) else null
+            val diagram = if (kind != null) DiagramRenderers.render else null
+            when {
+                web != null -> HtmlFenceView(block, style, web)
+                diagram != null && kind != null -> DiagramFenceView(block, style, kind, diagram)
+                asPage -> {
+                    // 没装 HTML 插件：至少别让人对着一块空白猜。源码照常显示，
+                    // 并在标题行提示一句该装什么。
+                    CodeBlockView(block, style, hint = "装「HTML 渲染」插件可预览")
+                }
+                kind != null -> CodeBlockView(block, style, hint = diagramHint(kind))
+                // 普通语言（kotlin/js/bash/…）完全走旧路径，观感一个字不变。
+                else -> CodeBlockView(block, style)
             }
         }
 
@@ -493,6 +516,25 @@ private fun BlockView(
 private val HTML_LANGS = setOf("html", "htm", "xhtml", "svg", "xml")
 
 /**
+ * 这个围栏语言是否走 HTML 通道。
+ *
+ * 单独抽成 internal 函数是为了让单测能验证「HTML 优先级不被 DiagramKinds 抢」，
+ * 而不用把整个 Composable 拖进 JVM 测试。这里故意不 trim：
+ * 解析器产出的 lang 已经 trim 过，多加一步只会悄悄改动既有行为。
+ */
+internal fun isHtmlFenceLang(lang: String): Boolean = lang.lowercase() in HTML_LANGS
+
+/**
+ * 图形插件没装时的兜底说明。tikz/python 不是「装个插件就能看」的类型，
+ * 所以单独说实话：它们缺的是运行环境，不是渲染库。
+ */
+private fun diagramHint(kind: String): String = when (kind) {
+    "tikz" -> "需要本地 LaTeX 才能出图"
+    "python" -> "需要终端运行才能出图"
+    else -> "装「HTML 渲染」插件可预览图形"
+}
+
+/**
  * ```html 围栏的渲染卡片：默认真渲染，右上角可切「源码 / 预览」。
  * 渲染本身由插件提供（HtmlBlockRenderers），宿主只负责这张卡片的框架与兜底。
  */
@@ -541,6 +583,77 @@ private fun HtmlFenceView(
             if (preview) {
                 Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
                     render(block.code)
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = block.code,
+                        style = style.copy(fontFamily = FontFamily.Monospace, fontSize = 13.sp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 图形围栏的渲染卡片（mermaid / dot / echarts / chartjs …）。
+ *
+ * 结构故意与 [HtmlFenceView] 一致：同圆角、同 surfaceVariant、同标题行 + 右侧按钮，
+ * 这样同一屏里 HTML 卡和图形卡不会一个胖一个瘦。渲染本体由插件提供，
+ * 宿主只管卡片框架、预览/源码切换和复制。
+ */
+@Composable
+private fun DiagramFenceView(
+    block: MdBlock.CodeBlock,
+    style: TextStyle,
+    kind: String,
+    render: @Composable (kind: String, source: String) -> Unit,
+) {
+    val clipboard = LocalClipboardManager.current
+    var preview by remember(block.code) { mutableStateOf(true) }
+    var copied by remember(block.code) { mutableStateOf(false) }
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+    ) {
+        Column(modifier = Modifier.padding(vertical = 6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = kind,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = if (preview) "查看源码" else "预览效果",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { preview = !preview },
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = if (copied) "已复制" else "复制",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable {
+                        clipboard.setText(AnnotatedString(block.code))
+                        copied = true
+                    },
+                )
+            }
+            if (preview) {
+                Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
+                    render(kind, block.code)
                 }
             } else {
                 Row(

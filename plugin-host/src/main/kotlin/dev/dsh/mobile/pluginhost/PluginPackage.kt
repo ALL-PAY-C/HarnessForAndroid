@@ -38,6 +38,8 @@ data class PluginManifestFile(
     val author: String = "",
     val contributions: List<ContributionSpec> = emptyList(),
     val config: List<ConfigSpec> = emptyList(),
+    /** 插件主页/控制台地址；plugin.json 写 homepage，旧包可能只写 url。 */
+    val homepage: String = "",
 ) {
     companion object {
         fun parse(text: String): Result<PluginManifestFile> = runCatching {
@@ -51,6 +53,7 @@ data class PluginManifestFile(
                 author = root.optString("author"),
                 contributions = root.optJSONArray("contributions").mapObjects { it.toContribution() },
                 config = root.optJSONArray("config").mapObjects { it.toConfig() },
+                homepage = root.optString("homepage").ifBlank { root.optString("url") },
             )
         }
     }

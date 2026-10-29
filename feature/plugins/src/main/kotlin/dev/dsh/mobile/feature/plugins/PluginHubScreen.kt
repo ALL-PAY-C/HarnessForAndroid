@@ -70,23 +70,68 @@ fun PluginHubScreen(
     slotContributions: List<SlotContribution> = emptyList(),
     onAction: (SlotAction) -> Unit = {},
     drawerResolver: DrawerEntryResolver? = null,
+    /** 每个已装插件一行设置入口，由 [pluginSettingsEntries] 组装。 */
+    pluginSettings: List<PluginSettingsEntry> = emptyList(),
+    /** 写回某个插件的一项配置：pluginId, key, value。 */
+    onConfigSave: (pluginId: String, key: String, value: String) -> Unit = { _, _, _ -> },
+    /** 从设置详情返回列表时通知宿主重读插件（配置可能改了插件行为）。 */
+    onSettingsClosed: () -> Unit = {},
+    onOpenUrl: (String) -> Unit = {},
 ) {
     var open by remember { mutableStateOf<PluginConfigPage?>(null) }
     var openSlot by remember { mutableStateOf<SlotContribution?>(null) }
+    var openSettings by remember { mutableStateOf<PluginSettingsEntry?>(null) }
     // 提到详情页早退分支之前：BackHandler 必须每帧都挂在组合里，
     // 否则详情页打开时它根本不存在，系统返回就落到 NavHost 上。
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
 
     // 页内二级导航先吃返回键：详情页 → 槽位详情 → 插件设置文件夹。
     // 漏掉这一层，NavHost 会 pop 掉整个 plugins/hub 目的地，用户直接回会话主页。
-    val backStep = hubBackStep(pageOpen = open != null, slotOpen = openSlot != null, folderOpen = settingsOpen)
+    val backStep = hubBackStep(
+        pageOpen = open != null,
+        slotOpen = openSlot != null,
+        folderOpen = settingsOpen,
+        settingsOpen = openSettings != null,
+    )
     BackHandler(enabled = backStep != HubBackStep.NotMine) {
         when (backStep) {
             HubBackStep.ClosePage -> open = null
             HubBackStep.CloseSlot -> openSlot = null
+            HubBackStep.CloseSettings -> {
+                openSettings = null
+                onSettingsClosed()
+            }
             HubBackStep.CloseFolder -> settingsOpen = false
             HubBackStep.NotMine -> Unit
         }
+    }
+
+    val currentSettings = openSettings
+    if (currentSettings != null) {
+        Column(Modifier.fillMaxSize().background(LocalQq.current.bg)) {
+            QqTopBar(
+                leading = {
+                    BackChip {
+                        openSettings = null
+                        onSettingsClosed()
+                    }
+                },
+                content = {
+                    Text(
+                        currentSettings.name,
+                        color = LocalQq.current.t1,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                },
+            )
+            PluginSettingsDetail(
+                entry = currentSettings,
+                onSave = { key, value -> onConfigSave(currentSettings.pluginId, key, value) },
+                onAction = onAction,
+                onOpenUrl = onOpenUrl,
+            )
+        }
+        return
     }
 
     val current = open
@@ -138,7 +183,12 @@ fun PluginHubScreen(
     val builtinOrder = listOf("app.plugins.manage", "app.plugins.slots", "app.plugins.market")
     val builtin = builtinOrder.mapNotNull { id -> pages.firstOrNull { it.id == id } }
     val extras = pages.filterNot { page -> builtinOrder.any { it == page.id } }
-    val settingsCount = extras.size + slotContributions.size
+    // 同一个插件在三处都可能出现（配置页 / PluginPage 槽位 / manifest 设置），
+    // 只要有可操作的 manifest 设置行就只留那一行，避免文件夹里同名列好几条。
+    val covered = pluginSettings.filter { it.hasSettings }.map { it.pluginId }.toSet()
+    val extraRows = extras.filter { it.pluginId.isBlank() || it.pluginId !in covered }
+    val slotRows = slotContributions.filter { it.pluginId !in covered }
+    val settingsCount = extraRows.size + slotRows.size + pluginSettings.size
 
     Column(Modifier.fillMaxSize().background(LocalQq.current.bg)) {
         QqTopBar(content = {
@@ -169,15 +219,21 @@ fun PluginHubScreen(
                         )
                         if (settingsOpen) {
                             Column(Modifier.padding(vertical = 6.dp)) {
-                                extras.forEach { page ->
+                                extraRows.forEach { page ->
                                     GroupChild(onClick = { open = page }) {
                                         PluginChildText(page.label, page.subtitle)
                                         SectionChevron(expanded = false)
                                     }
                                 }
-                                slotContributions.forEach { slot ->
+                                slotRows.forEach { slot ->
                                     GroupChild(onClick = { openSlot = slot }) {
                                         PluginChildText(slot.label, slot.subtitle.ifBlank { slot.pluginId })
+                                        SectionChevron(expanded = false)
+                                    }
+                                }
+                                pluginSettings.forEach { entry ->
+                                    GroupChild(onClick = { openSettings = entry }) {
+                                        PluginChildText(entry.name, entry.rowSubtitle)
                                         SectionChevron(expanded = false)
                                     }
                                 }

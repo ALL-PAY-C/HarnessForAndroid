@@ -36,6 +36,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.activity.compose.BackHandler
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import android.content.Intent
+import android.net.Uri
 import dev.dsh.mobile.app.AppContainer
 import dev.dsh.mobile.app.RuntimeControlAdapter
 import dev.dsh.mobile.app.phone.PhoneControlScreen
@@ -51,12 +53,14 @@ import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.QqTabBar
 import dev.dsh.mobile.design.TabSpec
 import dev.dsh.mobile.feature.plugins.PluginHubScreen
+import dev.dsh.mobile.feature.plugins.pluginSettingsEntries
 import dev.dsh.mobile.feature.plugins.SkillCenterScreen
 import java.io.File
 import dev.dsh.mobile.feature.plugins.PluginMarketScreen
 import dev.dsh.mobile.feature.plugins.PluginsScreen
 import dev.dsh.mobile.feature.plugins.PluginsViewModel
 import dev.dsh.mobile.feature.plugins.SlotManagerScreen
+import dev.dsh.mobile.pluginapi.DiagramRenderers
 import dev.dsh.mobile.pluginapi.HtmlBlockRenderers
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
@@ -446,6 +450,19 @@ fun AppNav(container: AppContainer) {
                                     content = { SlotManagerScreen(onBack = {}, showTopBar = false) },
                                 ),
                             ),
+                            pluginSettings = pluginSettingsEntries(
+                                installed = container.installedPlugins.all().values.toList(),
+                                pages = hubRegistry.inSlot(SlotId.PluginPage),
+                                values = { id -> container.installedPlugins.config(id) },
+                            ),
+                            onConfigSave = { id, key, value ->
+                                container.installedPlugins.setConfig(id, key, value)
+                            },
+                            // 配置可能改变插件行为，返回列表时重载一次，别等冷启动。
+                            onSettingsClosed = { container.reloadPlugins() },
+                            onOpenUrl = { url ->
+                                hubContext.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                            },
                         )
                     }
 
@@ -602,6 +619,10 @@ private val HOST_CUSTOM_HANDLERS: Map<String, (android.content.Context) -> Strin
     "html.render" to { _ ->
         if (HtmlBlockRenderers.available) "HTML 渲染已就绪：消息里的 html 代码块会走 WebView"
         else "HTML 渲染插件没注册，代码块仍是源码视图"
+    },
+    "diagram.render" to { _ ->
+        if (DiagramRenderers.available) "图形渲染已就绪：mermaid / dot / echarts / svg 等代码块会画成图"
+        else "图形渲染插件没注册，代码块仍是源码视图"
     },
 )
 

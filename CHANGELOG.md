@@ -2,6 +2,35 @@
 
 结构参照 Keep a Changelog，版本号用 SemVer。
 
+## v0.05
+
+`versionName` v0.05、`versionCode` 92。
+
+### 新增
+
+- 会话内图形渲染：`svg` / `mermaid`（`mmd`）/ `dot`（`graphviz`、`gv`）/ `plantuml`（`puml`）/ `echarts` / `chart.js`（`chart`、`chartjs`）/ `ascii` 代码围栏直接画成图，不再只是源码块。离线库随包（mermaid 3.5 MB、ECharts 1.0 MB、Chart.js 206 KB、Graphviz WASM 1.3 MB），WebView 走 `loadDataWithBaseURL(file://…)`；卡片支持双指缩放（0.5x–4x，只放大后才吞竖滑）、拖动、复制源码、⛶ 全屏（全屏用 WebView 原生缩放控件，带「重置缩放」）。`render` 侧新增 `DiagramKinds` 归一 26 个围栏别名，插件侧新增 `DiagramView` / `DiagramHtml` / `DiagramAssets` / `DiagramWeb` / `PlantUml`。
+- 插件设置页：插件页的「插件设置」文件夹现在按插件列条目（内置的三项排前面），点进去是该插件自己的设置界面——声明式 ui 由 `PluginUiTranslator` 翻成原生控件（开关 / 文本 / 数字 / 下拉），html 设置页走内置 WebView，插件声明了 `homepage` 时给「在浏览器打开」。改动即时回写插件并持久（`shared_prefs` 实测）。
+- 添加模型预设去掉「引擎插件」，内置扩到 9 个（DeepSeek / OpenAI / Gemini / 通义千问 / 智谱 / Kimi / Anthropic / OpenAI 兼容 / 自定义），预设行改成单行横滑。
+
+### 修复
+
+- 内置插件资源其实一直没进 APK：`app/build.gradle.kts` 把 `plugin-html` 的 resources 挂在 `java.srcDir` 上，Java 源集只认 `.kt`/`.java`，`render.js` 与新增的图形库全被丢掉。改挂 `resources.srcDir` 后 `render.js`、`diagram/*.js` 正常进包（release APK 实测条目齐全）。
+- 图形卡并发复制离线库互相踩临时文件：多个卡片同时首次渲染时都写同一个 `<name>.tmp`，后到的 `renameTo` 成功、先到的回头 `copyTo` 就 `NoSuchFileException`（日志「释放离线库失败」）。`DiagramAssets.dir()` 加 `@Synchronized`，临时文件名带线程 id。
+- 长 Markdown 消息渲染卡死主线程（ANR 栈在 `String.indexOf`）：`Markdown.parseInline` 有 5 处无界前向扫描（`[`、`**`、`~~`、`]`、`)`），一个未配对标记就把剩余全文扫一遍且不记忆，密集未配对时 O(n²)。改成每个针只真扫一次、失败后 O(1) 记忆（`NeedleScan`）；行扫描按首字符门控正则、裸表格探针缓存、制表符按需展开；`RichText.safePrefixLength` 改免分配。实测 400k 字符单段未配对标记 134 ms → 6 ms。
+- 插件设置页的开关与下拉点了不动：控件直接绑定列表构建时的快照，写回后不重组。改为本地 `remember` 状态。
+
+### 测试
+
+- `render`：新增 `DiagramKindsTest`（7 条）、`MarkdownPerfBenchTest`（3 条，含 5 万字符语料与未配对标记规模曲线），累计 93 条。
+- `plugin-html`：新增 `DiagramHtmlTest`（6 条：别名降级、各 kind 引对库、graphviz 降级链、echarts 初始高度、源码转义、dark）。
+- `feature:plugins`：新增 `PluginSettingsModelTest`（10 条）。
+- 全量 `:render`、`:core:protocol`、`:core:data`、`:feature:plugins`、`:app` 140 个套件 986 条用例，0 失败。
+
+### 已知限制
+
+- TikZ 与 Python（matplotlib）围栏只显示源码：需要本地 LaTeX / Python 解释器。
+- PlantUML 依赖 kroki.io，离线或 4 秒超时回落源码卡。
+- 双指缩放没做自动化验证（adb 造不出多指手势），只验了全屏原生缩放。
 ## v0.04
 
 `versionName` v0.04、`versionCode` 91。
