@@ -52,7 +52,10 @@ export async function pickProvider(providers, model) {
   return null;
 }
 
-/** provider 的返回结构各家不同：统一成 { content, usage? }（content 一定是字符串）。 */
+/**
+ * provider 的返回结构各家不同：统一成 { content, toolCalls?, usage? }。
+ * 只回工具调用、正文为空是合法的（模型这一轮只调工具），所以 toolCalls 非空时不因空正文报错。
+ */
 export function normalizeChatResult(value) {
   if (typeof value === 'string') return { content: value };
   const content =
@@ -60,10 +63,15 @@ export function normalizeChatResult(value) {
     (typeof value?.text === 'string' && value.text) ||
     (typeof value?.choices?.[0]?.message?.content === 'string' && value.choices[0].message.content) ||
     '';
-  if (content === '') {
+  const toolCalls =
+    Array.isArray(value?.toolCalls) ? value.toolCalls
+      : Array.isArray(value?.choices?.[0]?.message?.tool_calls) ? value.choices[0].message.tool_calls
+        : [];
+  if (content === '' && toolCalls.length === 0) {
     throw Object.assign(new Error('llm.chat 返回里没有 content / text / choices[0].message.content'), { stage: 'provider' });
   }
   const result = { content };
+  if (toolCalls.length > 0) result.toolCalls = toolCalls;
   if (value?.usage !== undefined) result.usage = value.usage;
   if (value?.provider !== undefined) result.provider = value.provider;
   if (value?.model !== undefined) result.model = value.model;

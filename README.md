@@ -8,18 +8,18 @@ DeepSeek Harness 的 Android 客户端。会话、模型接入、设备工具、
 
 | 项 | 值 |
 | --- | --- |
-| 文件名 | `HarnessForAndroid-release-v0.05.apk` |
+| 文件名 | `HarnessForAndroid-release-v0.06.apk` |
 | 最低系统 | Android 8.0（API 26） |
 | CPU | `arm64-v8a`（release 只打这一个 ABI；`x86_64` 只在 debug 包里，给模拟器用） |
 | 签名 | 签名材料随仓库走（`app/keystore/app-release.jks` + `app/keystore.properties`），任何机器构建出的证书都是 SHA-256 `767bc8b4bcac50fa01f6f4372638aa45dcbdc4024791cf9faf92671aa549c623` |
-| 体积 | 113,082,619。release 只带 arm64 的两份内核归档，x86_64 那两份在打包期剔除；debug 包四份齐全 |
-| SHA-256 | `3237b83ad2f3b261fee05800978fdc0db30c558d15385209931f776032167937` |
+| 体积 | 113,082,016。release 只带 arm64 的两份内核归档，x86_64 那两份在打包期剔除；debug 包四份齐全 |
+| SHA-256 | `05fe9e6d6407a10583da1ab89815e3ec270838ec56c05c959fc714a210858346` |
 | 覆盖安装 | 手机里若是更早那张证书签的包，先卸载再装 |
 
 ## 功能
 
 - 会话：本地 SQLite 存消息，支持多模型、工具调用、群聊（多个模型轮流发言）。
-- 模型接入：OpenAI 兼容端点、DeepSeek 官方、以及引擎插件自报的 provider（`engine://`，不需要 API Key）。添加模型时预设单行横滑：DeepSeek / OpenAI / Gemini / 通义千问 / 智谱 / Kimi / Anthropic / 兼容端点 / 自定义。
+- 模型接入：OpenAI 兼容端点、DeepSeek 官方、以及引擎插件自报的 provider（`engine://`，不需要 API Key，且支持工具调用——`shell` / 文件 / 手机控制 / `subagent` 都能在该路由上真跑）。添加模型时预设单行横滑：DeepSeek / OpenAI / Gemini / 通义千问 / 智谱 / Kimi / Anthropic / 兼容端点 / 自定义。
 - 侧边栏：QQ 手机端那种，搜索框同时搜会话标题和消息正文，命中词高亮，点一条直接跳进那个会话。
 - 子代理：引擎里的 subagent 工具，模型可以派一个独立上下文的子代理去跑一段多步任务，只给它 shell / 文件 / 手机控制这几类工具。
 - Agent 预设：六个内置（标准 / 批量 / 创作 / 省 Token / 梁神 / 鲸英），按会话记，可在聊天页「+」面板里开对应开关。

@@ -2,6 +2,32 @@
 
 结构参照 Keep a Changelog，版本号用 SemVer。
 
+## v0.06
+
+`versionName` v0.06、`versionCode` 93。
+
+### 新增
+
+- 引擎路由（`engine://`）支持工具调用：引擎插件把请求里的 `tools` 原样转给上游（OpenAI 形状），回包里的 `tool_calls`（含 SSE 里逐帧拼接的 `delta.tool_calls`）由传输层还原成标准的 `choices[].message.tool_calls`，主循环照常执行 `shell` / `fs_*` / `phone` / `subagent` 等工具，结果以 `role: tool` 回灌给上游继续这一轮。此前该路由不发工具表，模型请求工具只会得到一行「不支持工具调用」。
+
+### 修复
+
+- 只调工具、不说话的回合不再被当成空回复：上游正文为空但带 `tool_calls` 时，引擎此前直接抛「没有内容」，现在允许「空正文 + toolCalls」，两者都空才算空。
+
+- 正文里混着的工具调用标记（`<||DSML||invoke …>`）现在转成真正的工具执行，不再只是从正文里剥掉后补一句说明。
+
+### 测试
+
+- `core:protocol`：新增 `EngineToolCallsTest`（3 条：空正文带 toolCalls 仍执行、工具结果回灌到下一次请求、引擎路由可跑 `subagent`）；`DsmlEngineRouteTest` 重写为「标记变成真工具执行」（5 条，并断言请求体确实带了 `tools`）。
+
+- `engine`：`llm-rpc` 新增两条（空正文 + `toolCalls` 归一、`tools` 透传到 provider），12 条全过。
+
+### 已知限制
+
+- 工具执行仍受 Android 应用沙箱约束：`ls /` 这类会 `Permission denied`，可用范围是应用私有目录与已授权的共享目录。
+
+- 旧会话里历史消息写死过「该端点不支持工具调用」，模型可能照着旧结论复读；新建会话即正常。
+
 ## v0.05
 
 `versionName` v0.05、`versionCode` 92。

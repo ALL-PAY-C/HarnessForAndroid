@@ -1,13 +1,13 @@
 {
-  "versionCode": 92,
-  "versionName": "v0.05",
-  "apkUrl": "https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.05/HarnessForAndroid-release-v0.05.apk",
+  "versionCode": 93,
+  "versionName": "v0.06",
+  "apkUrl": "https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.06/HarnessForAndroid-release-v0.06.apk",
   "apkMirrors": [
-    "https://gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.05/HarnessForAndroid-release-v0.05.apk",
-    "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.05/HarnessForAndroid-release-v0.05.apk",
-    "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.05/HarnessForAndroid-release-v0.05.apk"
+    "https://gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.06/HarnessForAndroid-release-v0.06.apk",
+    "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.06/HarnessForAndroid-release-v0.06.apk",
+    "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.06/HarnessForAndroid-release-v0.06.apk"
   ],
-  "sha256": "3237b83ad2f3b261fee05800978fdc0db30c558d15385209931f776032167937",
-  "notes": "v0.05：会话里直接画图——mermaid / graphviz(dot) / echarts / chart.js / svg / ascii 代码块渲染成卡片，可捏合缩放、拖动、全屏（plantuml 走在线 kroki，离线回落源码；tikz 与 python 只出源码）。插件设置页改成真设置界面，声明式控件与 html 设置页都能改、即时回写。添加模型预设改单行横滑并去掉引擎插件。修内置插件资源没进包、图形库并发复制踩临时文件、长 Markdown 消息渲染卡死主线程（O(n²) 扫描）。release 只打 arm64-v8a，Android 8.0 以上。已知限制见 README。",
-  "sizeBytes": 113082619
+  "sha256": "05fe9e6d6407a10583da1ab89815e3ec270838ec56c05c959fc714a210858346",
+  "notes": "v0.06：引擎插件路由（engine://）现在支持工具调用——模型能真跑 shell / 文件 / 手机控制 / 子代理，工具结果会回灌给模型继续这一轮；之前该路由不发工具表，请求工具只会得到一句「不支持工具调用」。顺带修了「只调工具不说话」的回合被当成空回复、以及正文里的 DSML 标记不再自动转成真执行。release 只打 arm64-v8a，Android 8.0 以上；工具执行受应用沙箱限制，可用范围是应用私有目录与已授权共享目录。已知限制见 README。",
+  "sizeBytes": 113082016
 }

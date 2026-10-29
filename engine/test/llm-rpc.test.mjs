@@ -112,6 +112,15 @@ test('normalizeChatResult：content / text / choices[0].message.content 三种�
   assert.deepEqual(normalizeChatResult({ content: 'A', usage: { total: 3 } }), { content: 'A', usage: { total: 3 } });
   assert.equal('usage' in normalizeChatResult({ content: 'A' }), false);
   assert.throws(() => normalizeChatResult({}), /没有 content/);
+
+  // 只调工具的一轮正文为空是合法的：toolCalls 非空就不算空回复。
+  const calls = [{ id: 'c1', type: 'function', function: { name: 'shell', arguments: '{}' } }];
+  assert.deepEqual(normalizeChatResult({ content: '', toolCalls: calls }), { content: '', toolCalls: calls });
+  assert.deepEqual(
+    normalizeChatResult({ choices: [{ message: { content: '', tool_calls: calls } }] }),
+    { content: '', toolCalls: calls },
+  );
+  assert.equal('toolCalls' in normalizeChatResult({ content: 'A' }), false);
 });
 
 test('/llm chat：三种 provider 返回结构都能取到 content', async () => {
@@ -127,6 +136,25 @@ test('/llm chat：三种 provider 返回结构都能取到 content', async () =>
     assert.equal(reply.ok, true);
     assert.equal(reply.value.content, expected);
   }
+});
+
+test('/llm chat：tools 透传到 provider，toolCalls 原样带回（engine:// 的工具通道）', async () => {
+  const seen = [];
+  const llm = createLlmService({ host: {}, logger: null });
+  llm.registerProvider('demo', {
+    models: () => ['demo-small'],
+    chat: async (request) => {
+      seen.push(request);
+      if (!request.tools) return { content: '没有工具表就不调工具' };
+      return { content: '', toolCalls: [{ id: 'c1', type: 'function', function: { name: 'shell', arguments: '{"command":"ls"}' } }] };
+    },
+  });
+  const tools = [{ type: 'function', function: { name: 'shell', parameters: { type: 'object' } } }];
+  const reply = await handleLlmRpc(llm, 'chat', { messages: userMessage, model: 'demo-small', tools });
+  assert.equal(seen[0].tools.length, 1, 'tools 没透传到 provider');
+  assert.equal(reply.value.content, '');
+  assert.equal(reply.value.toolCalls.length, 1);
+  assert.equal(reply.value.toolCalls[0].function.name, 'shell');
 });
 
 test('/llm chat：messages 为空 / endpoint 未知都报错', async () => {
