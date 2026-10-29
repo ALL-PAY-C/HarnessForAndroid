@@ -52,12 +52,29 @@ object MarkdownParser {
     private val OL = Regex("^(\\s*)(\\d{1,9})[.)]\\s+(.*)$")
     private val DIVIDER = Regex("^\\s*(?:-{3,}|\\*{3,}|_{3,})\\s*$")
     private val HTML_OPEN = Regex("^</?([a-zA-Z][a-zA-Z0-9]*)(\\s[^>]*)?/?>")
+    /**
+     * 认作 HTML 块起点的标签。这里必须覆盖常规 HTML5 块级标签：
+     * 漏一个（曾漏 figure / figcaption / script / style），那一行就会掉进段落、
+     * 把标签原样铺给用户。script/style 进来以后由 HtmlRenderer 的 DROP_TAGS 整块丢弃。
+     * ponytail: 只列已知标签，自定义标签（<my-widget>）仍会按正文显示；要全认就得做真正的标签名判定。
+     */
     private val HTML_TAGS = setOf(
-        "a", "abbr", "b", "blockquote", "br", "code", "dd", "del", "details", "div", "dl", "dt",
-        "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "ins", "kbd", "li", "mark",
-        "ol", "p", "pre", "q", "s", "samp", "small", "span", "strong", "sub", "summary", "sup",
-        "table", "tbody", "td", "tfoot", "th", "thead", "tr", "u", "ul", "var",
+        "a", "abbr", "address", "article", "aside", "audio", "b", "blockquote", "body", "br",
+        "button", "canvas", "caption", "code", "col", "colgroup", "dd", "del", "details", "div",
+        "dl", "dt", "em", "embed", "fieldset", "figcaption", "figure", "footer", "form", "h1",
+        "h2", "h3", "h4", "h5", "h6", "head", "header", "hr", "html", "i", "iframe", "img",
+        "input", "ins", "kbd", "label", "legend", "li", "link", "main", "mark", "meta", "nav",
+        "noscript", "object", "ol", "option", "p", "picture", "pre", "q", "s", "samp", "script",
+        "section", "select", "small", "source", "span", "strong", "style", "sub", "summary",
+        "sup", "svg", "table", "tbody", "td", "template", "textarea", "tfoot", "th", "thead",
+        "title", "tr", "track", "u", "ul", "var", "video",
     )
+
+    /**
+     * 公式里才有的运算符/结构字符。一个 $…$ 里一个都没有、又由「裸数字 + 空格」开头，
+     * 就是金额区间（"$5 到 10$"）而不是公式。
+     */
+    private const val MATH_CHARS = "+-*/=^_{}\\()[]|<>"
 
     /**
      * 模型经常把围栏贴在句子末尾（「……效果：```html」），或者把闭合围栏贴在一行 HTML 的尾巴上
@@ -173,6 +190,28 @@ object MarkdownParser {
                 out.add(MdBlock.MathBlock(inlineMath.second))
                 if (inlineMath.third.isNotEmpty()) para.add(inlineMath.third)
                 i++
+                continue
+            }
+
+            // 另一种常见写法是开标记跟公式挤在同一行、闭合另起一行（"$$x = 1" … "$$"）。
+            // 只认「整行就是 $$」会让它整段掉成正文，两个 $ 原样露出来。
+            if (t.startsWith("$$")) {
+                flushPara()
+                val body = ArrayList<String>()
+                val first = t.removePrefix("$$").trim()
+                if (first.isNotEmpty()) body.add(first)
+                i++
+                while (i < lines.size) {
+                    val raw = lines[i]
+                    if (raw.trim().startsWith("$$")) {
+                        val tail = raw.trim().removePrefix("$$").trim()
+                        if (tail.isNotEmpty()) body.add(tail)
+                        i++
+                        break
+                    }
+                    body.add(raw); i++
+                }
+                out.add(MdBlock.MathBlock(body.joinToString("\n").trim()))
                 continue
             }
 
@@ -312,7 +351,7 @@ object MarkdownParser {
         val t = line.trim()
         if (t.isEmpty()) return true
         if (t.startsWith("```")) return true
-        if (t == "$$" || t.startsWith("\\[")) return true
+        if (t.startsWith("$$") || t.startsWith("\\[")) return true
         if (HEADING.matches(t)) return true
         if (DIVIDER.matches(t)) return true
         if (t.startsWith(">")) return true
@@ -415,6 +454,20 @@ object MarkdownParser {
 
         while (i < n) {
             val c = text[i]
+            // \( … \) 与 \[ … \] 是 LaTeX 的行内定界写法，必须拦在通用反斜杠转义之前，
+            // 否则 \( 会先被吃掉反斜杠、退化成普通圆括号文字。
+            // ponytail: 行内 \[ … \] 也按行内公式画（不换行居中）；要区分展示态得给 MdInline.Math 加 display 标记。
+            if (c == '\\' && i + 1 < n && (text[i + 1] == '(' || text[i + 1] == '[')) {
+                val closer = if (text[i + 1] == '(') "\\)" else "\\]"
+                val end = text.indexOf(closer, i + 2)
+                if (end > i + 2) {
+                    val body = text.substring(i + 2, end)
+                    if (!body.contains('\n') && body.isNotBlank()) {
+                        flush(); out.add(MdInline.Math(body.trim())); i = end + 2
+                        continue
+                    }
+                }
+            }
             if (c == '\\') {
                 if (i + 1 < n) { buf.append(text[i + 1]); i += 2 } else { i++ }
                 continue
@@ -431,11 +484,16 @@ object MarkdownParser {
                 if (end > i + 1) {
                     val body = text.substring(i + 1, end)
                     val before = if (i == 0) ' ' else text[i - 1]
-                    // money guard: "$100" / "$1,200" must stay literal, "$x^2$" must not.
+                    // money guard: "$100" / "$1,200" / "$5 到 10$" must stay literal, "$x^2$" must not.
                     val numeric = body.all { it.isDigit() || it == '.' || it == ',' }
+                    val lead = body.takeWhile { it.isDigit() || it == '.' || it == ',' }
+                    // 金额区间的另一种写法「$5 到 10$」：裸数字后紧跟空格，且整段没有任何数学符号。
+                    // "$100 + 200$" 有运算符，不受这条影响。
+                    val moneySpan = lead.isNotEmpty() && lead.length < body.length &&
+                        body[lead.length].isWhitespace() && body.none { it in MATH_CHARS }
                     val ok = body.isNotEmpty() &&
                         !body.first().isWhitespace() && !body.last().isWhitespace() &&
-                        !before.isDigit() && !numeric
+                        !before.isDigit() && !numeric && !moneySpan
                     if (ok) { flush(); out.add(MdInline.Math(body)); i = end + 1; continue }
                 }
                 buf.append(c); i++

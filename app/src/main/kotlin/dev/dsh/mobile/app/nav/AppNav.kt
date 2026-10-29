@@ -345,7 +345,15 @@ fun AppNav(container: AppContainer) {
                         val vm: AgentsViewModel = viewModel(
                             factory = viewModelFactory {
                                 initializer {
-                                    AgentsViewModel(container.repo, container.settings, container.models, container.runtime, container.shell)
+                                    AgentsViewModel(
+                                        container.repo,
+                                        container.settings,
+                                        container.models,
+                                        container.runtime,
+                                        container.shell,
+                                        // engine:// 端点的模型列表走宿主引擎通道，不经 HTTP。
+                                        container::engineModelIds,
+                                    )
                                 }
                             },
                         )

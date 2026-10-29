@@ -2,6 +2,26 @@
 
 结构参照 Keep a Changelog，版本号用 SemVer。
 
+## v0.04
+
+`versionName` v0.04、`versionCode` 91。
+
+### 修复
+
+- 模型回复里的工具调用标记不再当正文铺出来：网关（含引擎插件路由）把 `<||DSML||invoke name="shell">` 这类标记塞进 `delta.content` 时，正文推给界面前先剥掉（`LocalEngineTransport` 主循环统一剥，不再「先发后删」）。`engine://` 端点本来就没有工具执行通道，剥完补一行说明：请求了哪个工具、为什么不执行、换什么端点才能执行。
+- 引擎端点的「拉取模型列表」不再报 `unknown protocol: engine`：`core/data` 的 `ModelCatalog` 在入口按 scheme 分流，`engine://` 交给宿主引擎通道（`AppContainer.engineModelIds()` → `nodeEngine.rpc("/llm", "models")`），列出的就是插件声明的模型 id。HTTP 路只在 `http`/`https` 上走，绝不再把 `engine://` 递给 `java.net.URL`。
+- 行内数学认 `\( \)` 与 `\[ \]`：以前被通用反斜杠转义吃掉，公式退化成正文。
+- 货币区间不再误判成公式：`$5 到 10$` 这类「数字开头、后面没有运算符」的按正文处理。
+- `$$` 与公式同行时不再漏出 `$$` 并在正文里断成两半。
+- `script` / `style` / `figure` / `figcaption` / `section` 等片段不再把标签原文铺出来（`HTML_TAGS` 补齐到约 90 个）。
+- HTML 表格单元格不再粘连（闭合 `td`/`th` 补空格）。
+- 大块 HTML 的折叠预览不再漏出被截断的 `script` 正文。
+
+### 测试
+
+- `core/protocol`：新增 `DsmlEngineRouteTest`（5 条）；`SubagentFailureVisibilityTest` 的引擎路由用例改为断言「不执行工具、正文给说明」。
+- `core/data`：新增 `ModelCatalogEngineTest`（5 条）。
+- `render`：新增 `MathDelimiterTest`（14 条）、`HtmlFragmentTest`（10 条）。
 ## v0.03
 
 `versionName` v0.03、`versionCode` 90。

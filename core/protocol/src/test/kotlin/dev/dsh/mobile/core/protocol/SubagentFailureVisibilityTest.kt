@@ -157,20 +157,18 @@ class SubagentFailureVisibilityTest {
         assertTrue("引擎端点没被请求：" + bodies.size, bodies.isNotEmpty())
         assertFalse("engine:// 端点不该收到工具表：" + bodies.first().keys().asSequence().toList(), bodies.first().has("tools"))
 
-        // 2）模型硬调 subagent：回可读中文错误，卡片可见。
-        val subagentCalls = events.filterIsInstance<DshEvent.ToolCallEvent>().map { it.call }
-            .filter { it.kind == "subagent" }
-        assertTrue("没有 subagent 工具事件：" + events, subagentCalls.isNotEmpty())
-        val failed = subagentCalls.firstOrNull { it.status == ToolCall.ToolStatus.Failed }
-        assertTrue("subagent 没结算成 Failed：" + subagentCalls.map { it.status }, failed != null)
+        // 2）模型硬调 subagent：engine:// 没有执行通道，不执行工具，只在正文里说明白为什么没跑。
+        assertEquals("工具调用不该被执行（引擎只该被问一次）：" + calls.get(), 1, calls.get())
         assertTrue(
-            "错误原因不是可读中文：" + failed!!.detail,
-            failed.detail.contains("不支持工具调用"),
+            "不该出现 subagent 工具卡：" + events,
+            events.filterIsInstance<DshEvent.ToolCallEvent>().none { it.call.kind == "subagent" },
         )
-
-        // 3）这一轮照常结算：正文 + 一个 TurnEnd。
         val text = events.filterIsInstance<DshEvent.MessageChunk>().joinToString("") { it.text }
-        assertTrue("没有最终正文：" + events, text.contains("引擎侧收尾"))
+        assertTrue("没有说明为什么没执行：" + text, text.contains("不支持工具调用"))
+        assertTrue("提示里没有工具名：" + text, text.contains("subagent"))
+        assertFalse("markup 漏进正文了：" + text, text.contains("DSML"))
+
+        // 3）这一轮照常结算：一个 TurnEnd。
         val ends = events.filterIsInstance<DshEvent.TurnEnd>()
         assertEquals("TurnEnd 数量不对：" + ends, 1, ends.size)
         assertEquals("turn-1", ends[0].turnId)

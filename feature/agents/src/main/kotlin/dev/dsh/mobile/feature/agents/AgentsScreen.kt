@@ -340,6 +340,7 @@ fun AgentsScreen(
         ModelDialog(
             existing = editing,
             providers = viewModel.providers(),
+            loadEngineModels = viewModel::loadEngineModelIds,
             onDismiss = {
                 adding = false
                 editing = null
@@ -375,6 +376,10 @@ fun AgentsScreen(
 
 /** 默认展开的区块 id：主列表展开，状态/次要区块收起。 */
 private val DEFAULT_OPEN_SECTIONS = emptyList<String>()
+
+/** engine:// 端点拉到空表时的提示：协议没错，是插件没上报，给下一步动作而不是报错。 */
+private const val ENGINE_NO_MODELS =
+    "引擎插件没有上报模型：确认插件已安装并在插件页启动过，或直接手填模型名"
 
 /** 折叠标题右侧的运行时状态摘要，与卡片内文案同源。 */
 private fun runtimeLabel(r: RuntimeState): String = when (r) {
@@ -610,6 +615,8 @@ private fun ModelDialog(
     providers: List<ModelProvider>,
     onDismiss: () -> Unit,
     onSave: (ModelProfile) -> Unit,
+    /** engine:// 端点的模型列表来源；默认空表，纯 HTTP 端点用不到。 */
+    loadEngineModels: suspend () -> List<String> = { emptyList() },
 ) {
     val p = LocalQq.current
     var provider by remember { mutableStateOf(providers.first()) }
@@ -623,6 +630,8 @@ private fun ModelDialog(
         mutableStateOf(existing?.contextWindow?.takeIf { it > 0 }?.toString().orEmpty())
     }
     var fetchError by remember { mutableStateOf<String?>(null) }
+    // 引擎通道拿不到模型不是「失败」（协议没错、端点没错），只是插件没上报，单独提示。
+    var engineNote by remember { mutableStateOf<String?>(null) }
     // 新增的高级参数：全部「留空/关闭 = 不发送」，旧行为不受影响
     var effort by remember { mutableStateOf(sanitizeReasoningEffort(existing?.reasoningEffort ?: "high")) }
     var maxOutput by remember {
@@ -681,10 +690,19 @@ private fun ModelDialog(
                         onClick = {
                             fetching = true
                             fetchError = null
+                            engineNote = null
                             scope.launch {
-                                val result = ModelCatalog.fetch(baseUrl.trim(), apiKey.trim())
-                                available = result.getOrDefault(emptyList())
-                                fetchError = result.exceptionOrNull()?.message
+                                val raw = baseUrl.trim()
+                                if (ModelCatalog.isEngineEndpoint(raw)) {
+                                    // engine:// 不打 HTTP：模型列表由引擎插件经宿主通道上报。
+                                    val ids = loadEngineModels()
+                                    available = ids
+                                    engineNote = if (ids.isEmpty()) ENGINE_NO_MODELS else null
+                                } else {
+                                    val result = ModelCatalog.fetch(raw, apiKey.trim())
+                                    available = result.getOrDefault(emptyList())
+                                    fetchError = result.exceptionOrNull()?.message
+                                }
                                 fetching = false
                             }
                         },
@@ -697,6 +715,7 @@ private fun ModelDialog(
                     }
                 }
                 fetchError?.let { Text("拉取失败：$it", color = p.red, fontSize = 11.sp) }
+                engineNote?.let { Text(it, color = p.t3, fontSize = 11.sp) }
                 DialogField("上下文窗口 tokens（留空自动判断）", contextWindow) { input ->
                     contextWindow = input.filter { ch -> ch.isDigit() }
                 }

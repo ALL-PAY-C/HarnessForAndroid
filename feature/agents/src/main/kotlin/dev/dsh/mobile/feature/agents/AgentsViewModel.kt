@@ -46,6 +46,11 @@ class AgentsViewModel(
     private val modelStore: ModelStore,
     runtime: StateFlow<RuntimeState>,
     private val shell: ShellBridge,
+    /**
+     * engine:// 端点的模型列表：由宿主引擎通道给（AppContainer::engineModelIds）。
+     * 默认空实现，既有调用点与测试不用改；纯 HTTP 端点根本不走这里。
+     */
+    private val engineModelIds: suspend () -> List<String> = { emptyList() },
 ) : ViewModel() {
 
     private val message = MutableStateFlow<String?>(null)
@@ -118,6 +123,13 @@ class AgentsViewModel(
     }
 
     fun providers() = ModelProviders.all()
+
+    /**
+     * 引擎插件上报的模型 id。宿主那边已经把「引擎没起来 / 插件没装」吞成空表，
+     * 这里再兜一层：拉模型列表是可选项，不能把异常甩到对话框上。
+     */
+    suspend fun loadEngineModelIds(): List<String> =
+        runCatching { engineModelIds() }.getOrDefault(emptyList())
 
     /**
      * 「测试连接」：GET /models 优先，失败退化成一条 1 token 的 chat 请求。

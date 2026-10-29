@@ -29,6 +29,8 @@ object HtmlRenderer {
 
     private val VOID_TAGS = setOf("br", "hr", "img", "input", "meta", "link", "source", "col")
     private val DROP_TAGS = setOf("script", "style", "head", "title", "noscript", "template")
+    /** 表格单元格：闭合时补一个空格，否则相邻单元格的文字会粘成一串（列A列B）。 */
+    private val CELL_TAGS = setOf("td", "th")
     private val BLOCK_TAGS = setOf(
         "p", "div", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6",
         "blockquote", "pre", "table", "ul", "ol", "section", "article",
@@ -109,6 +111,7 @@ object HtmlRenderer {
                         }
                         apply(builder, stack.removeAt(stack.size - 1), builder.length, baseSize)
                         if (name in BLOCK_TAGS) builder.append('\n')
+                        else if (name in CELL_TAGS) builder.append(' ')
                     }
                     continue
                 }
