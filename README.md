@@ -8,23 +8,25 @@ DeepSeek Harness 的 Android 客户端。会话、模型接入、设备工具、
 
 | 项 | 值 |
 | --- | --- |
-| 文件名 | `HarnessForAndroid-release-v0.04.apk` |
+| 文件名 | `HarnessForAndroid-release-v0.05.apk` |
 | 最低系统 | Android 8.0（API 26） |
 | CPU | `arm64-v8a`（release 只打这一个 ABI；`x86_64` 只在 debug 包里，给模拟器用） |
 | 签名 | 签名材料随仓库走（`app/keystore/app-release.jks` + `app/keystore.properties`），任何机器构建出的证书都是 SHA-256 `767bc8b4bcac50fa01f6f4372638aa45dcbdc4024791cf9faf92671aa549c623` |
-| 体积 | 110,598,553。release 只带 arm64 的两份内核归档，x86_64 那两份在打包期剔除；debug 包四份齐全 |
-| SHA-256 | `7e57a72b7d5e23f2ea9602de7928912eefdd90123716b7ea022c25f80bac2a1e` |
+| 体积 | 113,082,619。release 只带 arm64 的两份内核归档，x86_64 那两份在打包期剔除；debug 包四份齐全 |
+| SHA-256 | `3237b83ad2f3b261fee05800978fdc0db30c558d15385209931f776032167937` |
 | 覆盖安装 | 手机里若是更早那张证书签的包，先卸载再装 |
 
 ## 功能
 
 - 会话：本地 SQLite 存消息，支持多模型、工具调用、群聊（多个模型轮流发言）。
-- 模型接入：OpenAI 兼容端点、DeepSeek 官方、以及引擎插件自报的 provider（`engine://`，不需要 API Key）。
+- 模型接入：OpenAI 兼容端点、DeepSeek 官方、以及引擎插件自报的 provider（`engine://`，不需要 API Key）。添加模型时预设单行横滑：DeepSeek / OpenAI / Gemini / 通义千问 / 智谱 / Kimi / Anthropic / 兼容端点 / 自定义。
 - 侧边栏：QQ 手机端那种，搜索框同时搜会话标题和消息正文，命中词高亮，点一条直接跳进那个会话。
 - 子代理：引擎里的 subagent 工具，模型可以派一个独立上下文的子代理去跑一段多步任务，只给它 shell / 文件 / 手机控制这几类工具。
 - Agent 预设：六个内置（标准 / 批量 / 创作 / 省 Token / 梁神 / 鲸英），按会话记，可在聊天页「+」面板里开对应开关。
 - 插件：插件市场（十二源并发、缓存在本地）、文件安装、链接安装、GitHub 仓库直装；插件能挂工具、出页面、往抽屉里加条目。
 - 技能：技能中心管 `SKILL.md` 库，内置 5 个方法类技能，也能从仓库拉别人的技能包。
+- 图形渲染：消息里的 `svg` / `mermaid` / `dot` / `plantuml` / `echarts` / `chart.js` / `ascii` 代码块直接画成图，卡片可捏合缩放、拖动、复制源码、全屏查看；离线库（mermaid、ECharts、Chart.js、Graphviz WASM）随包，PlantUML 走 kroki.io（4 秒超时回落源码）。
+- 插件设置：插件页的「插件设置」文件夹按插件列条目，点进去是插件自己的设置界面（声明式 ui 翻成原生控件，html 设置页走内置 WebView），改动即时回写并持久。
 - 设备工具：shell、文件读写、手机控制（免 root，走无障碍）、后台任务。
 - Linux 环境：musl node 加内核归档，跑真 shell。
 
@@ -55,7 +57,7 @@ cd engine && npm ci && cd ..        # engine/node_modules 不进版本库
 
 两个下载任务走自己的 HTTP 客户端，`--offline` 拦不住；要完全断网就用上面两个环境变量（或 `-PdshLibnodeZip` / `-PdshKernelAssetsDir`）。libnode 解包后仍验 sha256，对不上中止构建。
 
-产物落在 `app/build/outputs/apk/release/HarnessForAndroid-release-v0.04.apk`，文件名取 `appVersionName` 第一段，改版本只改 `app/build.gradle.kts` 顶部的 `appVersionName` / `appVersionCode`。
+产物落在 `app/build/outputs/apk/release/HarnessForAndroid-release-v0.05.apk`，文件名取 `appVersionName` 第一段，改版本只改 `app/build.gradle.kts` 顶部的 `appVersionName` / `appVersionCode`。
 
 ## 已知限制
 
@@ -65,6 +67,9 @@ cd engine && npm ci && cd ..        # engine/node_modules 不进版本库
 - 插件市场靠外部 registry；全源不可达时只剩缓存和内置索引。
 - 引擎在 `:node` 子进程里，脚本 `process.exit` 或 OOM 只死这一个进程，主进程重连后重新拉起，代价是插件启动多一次进程创建（实测约 4 s）；`:node` 里不初始化 `AppContainer`。
 - 技能中心的「项目级」开关要宿主传 `projectRoot`，当前宿主没传，所以自定义技能只能全局启停。
+- TikZ 与 Python（matplotlib）代码块只显示源码：要本地 LaTeX / Python 解释器才能出图，容器里没带。
+- PlantUML 需要外网（kroki.io），离线或超时时退化成源码卡。
+- 图形卡首次打开要把约 8 MB 离线库从包内复制到缓存目录（IO 线程，一般 1 秒内），之后命中缓存。
 
 ## 目录
 

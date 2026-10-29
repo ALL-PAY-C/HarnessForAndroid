@@ -3,6 +3,8 @@ package dev.dsh.mobile.feature.agents
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -652,12 +653,12 @@ private fun ModelDialog(
         text = {
             // 字段变多了：内容区自己滚动，保存/取消按钮由 AlertDialog 固定在底部
             Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
-                // 预设 5 个、一屏放不下：换行排，不靠横滑（竖滑容器里横滑手势会被抢）。
-                FlowRow(
+                // 预设改成一行横滑：竖滑容器里 LazyRow 的横滑手势不会被外层抢走。
+                androidx.compose.foundation.lazy.LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    providers.forEach { prov ->
+                    items(providers, key = { it.id }) { prov ->
                         Box(
                             Modifier
                                 .clip(RoundedCornerShape(9.dp))

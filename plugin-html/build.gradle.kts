@@ -78,4 +78,13 @@ dependencies {
     // 显式抬到缓存里有的版本，插件包本来也不打包它们（compileOnly）。
     compileOnly("androidx.annotation:annotation:1.8.1")
     compileOnly("androidx.collection:collection:1.4.4")
+
+    // 只为纯 JVM 的 HTML 生成器加：DiagramHtml/PlantUml 不碰 Android，能在 JVM 单测里直接断言。
+    // 与仓库其它模块同一个版本；testImplementation 不参与插件 APK。
+    testImplementation("junit:junit:4.13.2")
+
+    // compose 编译器插件对 test 源集同样生效，它开编前要看到 compose runtime，
+    // 而主源集用的是 compileOnly。照抄一份到 testCompileOnly，不引入任何新产物。
+    testCompileOnly(composeBom)
+    testCompileOnly("androidx.compose.runtime:runtime")
 }

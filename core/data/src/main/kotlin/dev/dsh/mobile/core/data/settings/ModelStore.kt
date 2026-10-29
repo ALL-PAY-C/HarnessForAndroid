@@ -94,6 +94,41 @@ object ModelProviders {
             override val hint = "官方 API Key，sk- 开头"
         },
         object : ModelProvider {
+            override val id = "openai"
+            override val label = "OpenAI"
+            override val defaultBaseUrl = "https://api.openai.com/v1"
+            override val defaultModel = "gpt-4.1-mini"
+            override val hint = "官方 Key，sk- 开头；也支持 gpt-4.1 / o 系列"
+        },
+        object : ModelProvider {
+            override val id = "gemini"
+            override val label = "Gemini"
+            override val defaultBaseUrl = "https://generativelanguage.googleapis.com/v1beta/openai"
+            override val defaultModel = "gemini-2.5-flash"
+            override val hint = "Google AI Studio 的 Key，走 OpenAI 兼容层"
+        },
+        object : ModelProvider {
+            override val id = "qwen"
+            override val label = "通义千问"
+            override val defaultBaseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            override val defaultModel = "qwen-max"
+            override val hint = "阿里云百炼 Key；兼容模式端点"
+        },
+        object : ModelProvider {
+            override val id = "zhipu"
+            override val label = "智谱 GLM"
+            override val defaultBaseUrl = "https://open.bigmodel.cn/api/paas/v4"
+            override val defaultModel = "glm-4-plus"
+            override val hint = "bigmodel.cn 的 Key"
+        },
+        object : ModelProvider {
+            override val id = "moonshot"
+            override val label = "Kimi"
+            override val defaultBaseUrl = "https://api.moonshot.cn/v1"
+            override val defaultModel = "moonshot-v1-8k"
+            override val hint = "Moonshot 开放平台 Key"
+        },
+        object : ModelProvider {
             override val id = "openai-compatible"
             override val label = "OpenAI 兼容"
             override val defaultBaseUrl = "https://api.openai.com/v1"
@@ -113,15 +148,6 @@ object ModelProviders {
             override val defaultBaseUrl = "http://192.168.1.10:11434/v1"
             override val defaultModel = "qwen2.5:7b"
             override val hint = "本地 Ollama / vLLM / 第三方中转"
-        },
-        // 地址填 engine://<模型 id>，请求不走网络，直接交给 :node 引擎里插件注册的 provider。
-        object : ModelProvider {
-            override val id = "engine"
-            override val label = "引擎插件"
-            override val defaultBaseUrl = "engine://"
-            override val defaultModel = "deepseek-v4.1-flash"
-            override val hint = "用 :node 引擎里插件注册的 provider；先在插件页打开一次引擎，" +
-                "模型名填插件声明的 id（如 deepseek-v4.1-flash）"
         },
     )
 

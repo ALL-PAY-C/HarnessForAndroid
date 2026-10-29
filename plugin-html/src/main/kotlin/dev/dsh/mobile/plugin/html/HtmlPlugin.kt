@@ -1,6 +1,8 @@
 package dev.dsh.mobile.plugin.html
 
 import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.plugin.html.diagram.DiagramView
+import dev.dsh.mobile.pluginapi.DiagramRenderers
 import dev.dsh.mobile.pluginapi.DshPlugin
 import dev.dsh.mobile.pluginapi.HtmlBlockRenderers
 import dev.dsh.mobile.pluginapi.PluginCapability
@@ -27,6 +29,9 @@ class HtmlPlugin : DshPlugin {
 
         // 宿主 Markdown 渲染器遇到的 html 代码围栏交给这里真渲染（气泡仍由宿主绘制）。
         HtmlBlockRenderers.install { html -> HtmlWebView(html = html) }
+
+        // 图形围栏（mermaid / dot / echarts / chart.js / plantuml / ascii …）走同一套离线 WebView。
+        DiagramRenderers.install { kind, source -> DiagramView(kind = kind, source = source) }
 
         // 不再往 ChatOverflow 塞「网页视图渲染」条目：这个插件已内置进 app，会话右侧边栏
         // 只留用户要的「特殊格式渲染」滑块；那条 custom 动作只是回报接管状态，宿主侧

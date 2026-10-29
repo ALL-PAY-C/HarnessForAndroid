@@ -136,6 +136,7 @@ object MarkdownParser {
             return listOf(MdBlock.HtmlBlock(doc.trimEnd()))
         }
         val lines = normalizeInlineFences(text.replace("\r\n", "\n").replace('\r', '\n'))
+        val tableProbe = BareTableProbe(lines)
         val out = ArrayList<MdBlock>()
         val para = ArrayList<String>()
         var i = 0
@@ -275,7 +276,7 @@ object MarkdownParser {
 
             // 没有分隔行的「裸表格」：模型经常只写 | 列 | 列 | 再加几行数据，不给 |---|---|。
             // GFM 不认这种写法，但用户看到的就是一张表；不收进来就会露出一屏竖线源码。
-            val bare = barePipeTable(lines, i)
+            val bare = tableProbe.at(i)
             if (bare != null) {
                 flushPara()
                 val headers = bare.first()
@@ -284,8 +285,15 @@ object MarkdownParser {
                 continue
             }
 
-            val olm = OL.find(line.replace("\t", "    "))
-            val ulm = UL.find(line.replace("\t", "    "))
+            // 正文行占绝大多数：首字符不是列表标记就完全不必展开制表符、也不必跑正则。
+            val lead = firstNonSpace(line)
+            val listLine = if (lead.isDigit() || lead == '-' || lead == '*' || lead == '+') {
+                if (line.indexOf('\t') >= 0) line.replace("\t", "    ") else line
+            } else {
+                null
+            }
+            val olm = if (listLine != null && lead.isDigit()) OL.find(listLine) else null
+            val ulm = if (listLine != null && !lead.isDigit()) UL.find(listLine) else null
             if (olm != null || ulm != null) {
                 flushPara()
                 val items = ArrayList<MutableList<MdInline>>()
@@ -330,14 +338,14 @@ object MarkdownParser {
                 val body = ArrayList<String>()
                 // 起始行本身就算块起点，必须先吃掉一行，否则这里会原地死循环（曾经 OOM）。
                 body.add(lines[i]); i++
-                while (i < lines.size && lines[i].isNotBlank() && !isBlockStartAt(lines, i)) {
+                while (i < lines.size && lines[i].isNotBlank() && !isBlockStartAt(lines, i, tableProbe)) {
                     body.add(lines[i]); i++
                 }
                 out.add(MdBlock.HtmlBlock(body.joinToString("\n").trim()))
                 continue
             }
 
-            while (i < lines.size && !isBlockStartAt(lines, i)) {
+            while (i < lines.size && !isBlockStartAt(lines, i, tableProbe)) {
                 para.add(lines[i]); i++
             }
             if (para.isEmpty()) { para.add(line); i++ }
@@ -346,21 +354,61 @@ object MarkdownParser {
         return out
     }
 
-    private fun isBlockStartAt(lines: List<String>, i: Int): Boolean {
+    /**
+     * barePipeTable 的单项缓存：主循环先问一次「这是不是裸表格」，紧接着段落循环的
+     * [isBlockStartAt] 又为同一行再问一次——pipe 密集的行上这是两倍的重复扫描。
+     */
+    private class BareTableProbe(private val lines: List<String>) {
+        private var at = -1
+        private var rows: List<List<String>>? = null
+
+        fun at(i: Int): List<List<String>>? {
+            if (i == at) return rows
+            val probe = barePipeTable(lines, i)
+            at = i
+            rows = probe
+            return probe
+        }
+    }
+
+    /** 行里第一个非空白字符（全是空白时返回空格）：用它先挡一道，省掉正则和新字符串。 */
+    private fun firstNonSpace(line: String): Char {
+        for (c in line) if (!c.isWhitespace()) return c
+        return ' '
+    }
+
+    /**
+     * 「这一行能不能开始一个新块」。
+     *
+     * 每个正文行都会走一遍，所以先按首字符挡掉绝大多数正则调用（每行 4 个正则曾是长消息
+     * 的主要开销）；制表符展开也只在真需要时才做（replace 会为每个正文行白造一个字符串）。
+     */
+    private fun isBlockStartAt(lines: List<String>, i: Int, table: BareTableProbe): Boolean {
         val line = lines[i]
         val t = line.trim()
         if (t.isEmpty()) return true
-        if (t.startsWith("```")) return true
-        if (t.startsWith("$$") || t.startsWith("\\[")) return true
-        if (HEADING.matches(t)) return true
-        if (DIVIDER.matches(t)) return true
-        if (t.startsWith(">")) return true
-        val expanded = line.replace("\t", "    ")
-        if (UL.matches(expanded) || OL.matches(expanded)) return true
-        if (t.contains('|') && i + 1 < lines.size && isTableSeparator(lines[i + 1])) return true
-        if (t.startsWith("|") && barePipeTable(lines, i) != null) return true
-        val html = HTML_OPEN.find(t)
-        if (html != null && html.groupValues[1].lowercase() in HTML_TAGS) return true
+        val first = t[0]
+        if (first == '`' && t.startsWith("```")) return true
+        if (first == '$' && t.startsWith("$$")) return true
+        if (first == '\\' && t.startsWith("\\[")) return true
+        if (first == '#' && HEADING.matches(t)) return true
+        if ((first == '-' || first == '*' || first == '_') && DIVIDER.matches(t)) return true
+        if (first == '>') return true
+        val lead = firstNonSpace(line)
+        if (lead.isDigit() || lead == '-' || lead == '*' || lead == '+') {
+            val expanded = if (line.indexOf('\t') >= 0) line.replace("\t", "    ") else line
+            if (OL.matches(expanded) || UL.matches(expanded)) return true
+        }
+        if (first == '|') {
+            if (i + 1 < lines.size && isTableSeparator(lines[i + 1])) return true
+            if (table.at(i) != null) return true
+        } else if (t.contains('|') && i + 1 < lines.size && isTableSeparator(lines[i + 1])) {
+            return true
+        }
+        if (first == '<') {
+            val html = HTML_OPEN.find(t)
+            if (html != null && html.groupValues[1].lowercase() in HTML_TAGS) return true
+        }
         return false
     }
 
@@ -438,6 +486,48 @@ object MarkdownParser {
 
     // ---------------------------------------------------------------- inline
 
+    /**
+     * 「后面不会再有」缓存：String 不可变，所以 indexOf(needle, p) == -1 之后，任何 q >= p
+     * 都必然也是 -1。每个针只需真扫一次全文，其余命中失败变成 O(1) 比较。
+     *
+     * 没有它时，一段几万字符里只要全是未配对的 `[`、`**`、`~~`，每个标记都要一路扫到结尾，
+     * 整体退化成 O(n²)——真机 ANR 的栈就停在 java.lang.String.indexOf 上（80k 未配对 `[`
+     * 实测 11ms，翻倍即 ~40ms，逐段叠加就卡死主线程）。
+     */
+    private class NeedleScan(private val text: String) {
+        private var bracketMissAt = Int.MAX_VALUE
+        private var parenMissAt = Int.MAX_VALUE
+        private var strMiss: HashMap<String, Int>? = null
+
+        fun closeBracket(from: Int): Int {
+            if (from >= bracketMissAt) return -1
+            val at = text.indexOf(']', from)
+            if (at < 0) bracketMissAt = from
+            return at
+        }
+
+        fun closeParen(from: Int): Int {
+            if (from >= parenMissAt) return -1
+            val at = text.indexOf(')', from)
+            if (at < 0) parenMissAt = from
+            return at
+        }
+
+        fun needle(needle: String, from: Int): Int {
+            val m = strMiss
+            if (m != null) {
+                val missAt = m[needle]
+                if (missAt != null && from >= missAt) return -1
+            }
+            val at = text.indexOf(needle, from)
+            if (at < 0) {
+                val mm = m ?: HashMap<String, Int>(4).also { strMiss = it }
+                mm[needle] = from
+            }
+            return at
+        }
+    }
+
     fun parseInline(text: String): List<MdInline> = parseInline(text, 0)
 
     private fun parseInline(text: String, depth: Int): List<MdInline> {
@@ -447,6 +537,7 @@ object MarkdownParser {
         val buf = StringBuilder()
         var i = 0
         val n = text.length
+        val scan = NeedleScan(text)
 
         fun flush() {
             if (buf.isNotEmpty()) { out.add(MdInline.Text(buf.toString())); buf.setLength(0) }
@@ -459,7 +550,7 @@ object MarkdownParser {
             // ponytail: 行内 \[ … \] 也按行内公式画（不换行居中）；要区分展示态得给 MdInline.Math 加 display 标记。
             if (c == '\\' && i + 1 < n && (text[i + 1] == '(' || text[i + 1] == '[')) {
                 val closer = if (text[i + 1] == '(') "\\)" else "\\]"
-                val end = text.indexOf(closer, i + 2)
+                val end = scan.needle(closer, i + 2)
                 if (end > i + 2) {
                     val body = text.substring(i + 2, end)
                     if (!body.contains('\n') && body.isNotBlank()) {
@@ -501,7 +592,7 @@ object MarkdownParser {
             }
             if (c == '*') {
                 if (i + 1 < n && text[i + 1] == '*') {
-                    val end = text.indexOf("**", i + 2)
+                    val end = scan.needle("**", i + 2)
                     if (end > i + 2) {
                         val body = text.substring(i + 2, end)
                         if (body.isNotEmpty() && !body.first().isWhitespace() && !body.last().isWhitespace()) {
@@ -537,7 +628,7 @@ object MarkdownParser {
                 continue
             }
             if (c == '~' && i + 1 < n && text[i + 1] == '~') {
-                val end = text.indexOf("~~", i + 2)
+                val end = scan.needle("~~", i + 2)
                 if (end > i + 2) {
                     flush(); out.add(MdInline.Strike(parseInline(text.substring(i + 2, end), depth + 1)))
                     i = end + 2
@@ -547,9 +638,9 @@ object MarkdownParser {
                 continue
             }
             if (c == '[') {
-                val close = text.indexOf(']', i + 1)
+                val close = scan.closeBracket(i + 1)
                 if (close > 0 && close + 1 < n && text[close + 1] == '(') {
-                    val paren = text.indexOf(')', close + 2)
+                    val paren = scan.closeParen(close + 2)
                     if (paren > close + 2) {
                         flush()
                         out.add(
