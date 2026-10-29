@@ -66,6 +66,46 @@ class PluginHostLifecycleTest {
         assertEquals(1, host.plugins.value.size)
     }
 
+    /**
+     * 装上了但加载不起来：register() 成功不代表包能跑，列表必须显示真实的运行期失败，
+     * 而且开关拨回来也洗不掉 —— 只有下一次真实加载成功才恢复。
+     */
+    @Test fun runtimeLoadFailureMarksRowFailedUntilRealSuccess() {
+        val host = PluginHost()
+        host.load(plugin())
+        assertTrue(host.plugins.value.single().enabled)
+
+        host.noteLoadResult("test.plugin", "Cannot find package '@deepseek-ai/dsh-credentials'")
+        val failed = host.plugins.value.single()
+        assertFalse("加载失败的行不许显示已启用", failed.enabled)
+        assertEquals("Cannot find package '@deepseek-ai/dsh-credentials'", failed.loadError)
+
+        host.setEnabled("test.plugin", true)
+        assertFalse("开关洗不掉引擎的失败", host.plugins.value.single().enabled)
+
+        host.noteLoadResult("test.plugin", null)
+        assertTrue("下一次加载成功才恢复", host.plugins.value.single().enabled)
+        assertNull(host.plugins.value.single().loadError)
+    }
+
+    @Test fun blankRuntimeFailureIsNotAFailure() {
+        val host = PluginHost()
+        host.load(plugin())
+        host.noteLoadResult("test.plugin", "   ")
+        assertTrue(host.plugins.value.single().enabled)
+        assertNull(host.plugins.value.single().loadError)
+    }
+
+    @Test fun uninstallDropsRuntimeFailure() {
+        val host = PluginHost()
+        host.load(plugin())
+        host.noteLoadResult("test.plugin", "boom")
+        host.uninstall("test.plugin")
+        host.load(plugin())
+        assertTrue("同名重装不继承上一份失败", host.plugins.value.single().enabled)
+        assertNull(host.plugins.value.single().loadError)
+    }
+
     @Test fun backgroundPluginGatedBySafeModeAndEnabled() {
         val byDefault: (String, Boolean) -> Boolean = { _, d -> d }
         assertFalse(shouldStartBackgroundPlugin("foo.x", true, safeMode = true, byDefault))

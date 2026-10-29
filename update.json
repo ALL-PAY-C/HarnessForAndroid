@@ -1,13 +1,13 @@
 {
-  "versionCode": 93,
-  "versionName": "v0.06",
-  "apkUrl": "https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.06/HarnessForAndroid-release-v0.06.apk",
+  "versionCode": 94,
+  "versionName": "v0.07",
+  "apkUrl": "https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.07/HarnessForAndroid-release-v0.07.apk",
   "apkMirrors": [
-    "https://gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.06/HarnessForAndroid-release-v0.06.apk",
-    "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.06/HarnessForAndroid-release-v0.06.apk",
-    "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.06/HarnessForAndroid-release-v0.06.apk"
+    "https://gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.07/HarnessForAndroid-release-v0.07.apk",
+    "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.07/HarnessForAndroid-release-v0.07.apk",
+    "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.07/HarnessForAndroid-release-v0.07.apk"
   ],
-  "sha256": "05fe9e6d6407a10583da1ab89815e3ec270838ec56c05c959fc714a210858346",
-  "notes": "v0.06：引擎插件路由（engine://）现在支持工具调用——模型能真跑 shell / 文件 / 手机控制 / 子代理，工具结果会回灌给模型继续这一轮；之前该路由不发工具表，请求工具只会得到一句「不支持工具调用」。顺带修了「只调工具不说话」的回合被当成空回复、以及正文里的 DSML 标记不再自动转成真执行。release 只打 arm64-v8a，Android 8.0 以上；工具执行受应用沙箱限制，可用范围是应用私有目录与已授权共享目录。已知限制见 README。",
-  "sizeBytes": 113082016
+  "sha256": "c79186f5f07cd5e7bde3c0ed3dedf2823a4aeafe04a7b8a14d2ac218043eda29",
+  "notes": "v0.07：技能进模型——系统提示词会列出可用技能，模型还能用 skill 工具按名字取 SKILL.md 全文；插件依赖自动安装，npm 档插件装完会递归装运行期依赖（修掉了把 ^7.8.5 当版本号拼 URL 的老毛病）；插件管理页不再谎报「已启用」，加载失败会写明原因；ESM default / class 形状的插件也能装载。release 只打 arm64-v8a，Android 8.0 以上；依赖桌面版宿主服务的插件仍装不上（缺 dsh-tools、dsh-credentials、systemPrompt 等服务），管理页会显示具体缺什么。已知限制见 README。",
+  "sizeBytes": 113093023
 }

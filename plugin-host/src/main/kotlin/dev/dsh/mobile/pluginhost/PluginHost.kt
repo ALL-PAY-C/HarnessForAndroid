@@ -32,7 +32,15 @@ import kotlinx.coroutines.launch
 data class LoadedPlugin(
     val manifest: PluginManifest,
     val enabled: Boolean = true,
+    /** 注册期错误（register() 抛出的异常）。 */
     val error: String? = null,
+    /**
+     * 运行期加载错误（Node 引擎 plugins.load 的真实回执）。
+     *
+     * 与 [error] 分开是因为两者来源不同：register() 成功不代表包能跑起来（缺依赖的 npm 包就是
+     * 注册成功、引擎 import 时才炸）。插件管理列表只认这两个字段，绝不按「安装目录存在」猜状态。
+     */
+    val loadError: String? = null,
 )
 
 /**
@@ -65,6 +73,9 @@ class PluginHost(
 
     private val _plugins = MutableStateFlow<List<LoadedPlugin>>(emptyList())
     val plugins: StateFlow<List<LoadedPlugin>> = _plugins.asStateFlow()
+
+    /** 运行期加载失败回执：插件 id → 原因。来自引擎真实加载结果，不来自目录探测。 */
+    private val runtimeFailures = LinkedHashMap<String, String>()
 
     /**
      * 槽位版本号。`registry` 里的列表是普通可变集合，Compose 看不见它的变化；
@@ -111,8 +122,9 @@ class PluginHost(
                 error = failure.message?.takeIf { it.isNotBlank() } ?: failure::class.simpleName ?: "插件注册失败"
             }
         }
+        val row = LoadedPlugin(m, enabled = false, error = error)
         _plugins.update { list ->
-            list.filterNot { it.manifest.id == m.id } + LoadedPlugin(m, wanted && error == null, error)
+            list.filterNot { it.manifest.id == m.id } + recompute(row, wanted, error)
         }
         bump()
     }
@@ -132,6 +144,49 @@ class PluginHost(
      */
     fun refresh(plugin: DshPlugin) {
         if (instances[plugin.manifest.id] === plugin) load(plugin, force = true)
+    }
+
+    /**
+     * 记录一次**真实**运行期加载结果（Node 引擎 plugins.load 的回执）。
+     *
+     * register() 成功只说明贡献注册完了，包能不能跑要等引擎 import 才见分晓；以前失败原因
+     * 只进 logcat，列表里依旧显示「已启用」。这里把回执落到 [LoadedPlugin.loadError]，
+     * 列表就能显示「加载失败：缺什么」。传 null 表示这次加载成功（清掉旧失败）。
+     */
+    fun noteLoadResult(id: String, failure: String?) {
+        val message = failure?.takeIf { it.isNotBlank() }
+        val previous = runtimeFailures[id]
+        if (message == null) {
+            runtimeFailures.remove(id)
+        } else {
+            runtimeFailures[id] = message
+        }
+        if (previous == message) return
+        _plugins.update { list ->
+            list.map { if (it.manifest.id == id) recompute(it, null, it.error) else it }
+        }
+        bump()
+    }
+
+    /**
+     * 由启用意图 + 注册期错误 + 运行期回执算出这一行。
+     *
+     * [wanted] 为 null 表示「按 store 重算」（setEnabled / noteLoadResult 用）；三处入口共用
+     * 同一个算法，就不会再出现「开关说启用、引擎说失败」这种自相矛盾的行。
+     */
+    private fun recompute(
+        row: LoadedPlugin,
+        wanted: Boolean?,
+        registerError: String?,
+    ): LoadedPlugin {
+        val id = row.manifest.id
+        val loadError = runtimeFailures[id]
+        val on = wanted ?: isEnabled(id, row.manifest.enabledByDefault)
+        return row.copy(
+            enabled = on && registerError == null && loadError == null,
+            error = registerError,
+            loadError = loadError,
+        )
     }
 
     fun loadAll(plugins: List<DshPlugin>, force: Boolean = false) = plugins.forEach { load(it, force) }
@@ -174,7 +229,7 @@ class PluginHost(
                 .onFailure { registry.clearPlugin(id) }
                 .exceptionOrNull()
             _plugins.update { list ->
-                list.map { if (it.manifest.id == id) it.copy(enabled = err == null, error = err?.message) else it }
+                list.map { if (it.manifest.id == id) recompute(it, null, err?.message) else it }
             }
             bump()
         } else {
@@ -188,6 +243,8 @@ class PluginHost(
         onUninstall(id)
         registry.clearPlugin(id)
         instances.remove(id)
+        // 卸载后旧回执必须一起丢掉：同名重装时不能继承上一份的「加载失败」。
+        runtimeFailures.remove(id)
         _plugins.update { list -> list.filterNot { it.manifest.id == id } }
         bump()
     }

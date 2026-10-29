@@ -240,6 +240,34 @@ test('frontmatter 缺 name/description 时退到目录名与正文，disable-mod
   await ctx.dispose();
 });
 
+test('read 回 SKILL.md 原文与描述，超长截断并标注', async () => {
+  const home = await makeHome([['alpha', 'First demo skill.']]);
+  // 塞一段够长的正文，验证 20000 字符截断与末尾标记（模型要能看出被截了）。
+  const padding = 'x'.repeat(20050);
+  await writeFile(join(home, 'skill-manager', '.agents', 'skills', 'alpha', 'SKILL.md'), skillMd('alpha', 'First demo skill.') + padding, 'utf8');
+  const { ctx, rpc } = start(home);
+
+  const value = (await rpc('read', { name: 'alpha' })).value;
+  assert.equal(value.name, 'alpha');
+  assert.equal(value.description, 'First demo skill.');
+  assert.equal(value.path, join(home, 'skill-manager', '.agents', 'skills', 'alpha', 'SKILL.md'));
+  assert.ok(value.content.startsWith('---\nname: alpha'), value.content.slice(0, 40));
+  assert.ok(value.content.endsWith('…（已截断）'), value.content.slice(-20));
+  assert.ok(value.content.length < 20100, 'content 长度 ' + value.content.length);
+  await ctx.dispose();
+});
+
+test('read 未知技能 / 空名 / 路径穿越都给可读错误，不碰磁盘', async () => {
+  const home = await makeHome([['alpha', 'First demo skill.']]);
+  const { ctx, rpc } = start(home);
+
+  await assert.rejects(() => rpc('read', { name: '不存在的技能' }), /未知技能/);
+  await assert.rejects(() => rpc('read', {}), /缺少技能名 name/);
+  // name 只用来比对名单，永远不会拼进路径
+  await assert.rejects(() => rpc('read', { name: '../../state.json' }), /未知技能/);
+  await ctx.dispose();
+});
+
 test('bin.js 真起进程后 /skill-manager 可用（外部插件不在时）', async () => {
   const home = await makeHome([['online', 'Registered by bin.js.']]);
   const child = spawn(process.execPath, [join(engineRoot, 'bin.js'), '--port', '0', '--home', home], {

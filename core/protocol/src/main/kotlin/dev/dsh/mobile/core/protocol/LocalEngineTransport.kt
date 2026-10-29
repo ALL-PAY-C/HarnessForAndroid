@@ -199,6 +199,13 @@ class LocalEngineTransport(
     private val shellExecChannel: suspend (String, String?) -> String = { cmd, _ -> shellExec(cmd) },
     private val channelListExec: suspend () -> String = { "[]" },
     private val bgExec: suspend (String, JsonObject) -> String = { _, _ -> "后台任务未接入" },
+    /**
+     * 宿主注入的技能读取通道（skill 工具的落地实现）。
+     *
+     * 这里只认「参数对象 -> 文本」，不碰文件：技能库在 :node 引擎的 DSH_HOME 下，本类连路径都不该知道；
+     * 失败也由注入方转成可读文本，工具结果要能让模型看到原因。
+     */
+    private val skillExec: suspend (JsonObject) -> String = { "技能未接入" },
     /** 与群聊相同，预算直接以字符计，默认复用群聊预算。 */
     private val contextBudgetProvider: suspend (String) -> Int = { GroupPlan(emptyList()).contextBudget },
     /**
@@ -224,7 +231,9 @@ class LocalEngineTransport(
 
     // ---- 工具防抖 / 执行器 / 每 Agent 线程 / 执行池（需求 A、B、D、E） ----
     private val loopGuard = ToolLoopGuard()
-    private val toolRunner = ToolExecutor(
+
+    /** internal 而非 private：单测要证明注入的通道真的被走到（toolsJson 只是声明，不执行）。 */
+    internal val toolRunner = ToolExecutor(
         mapOf(
             "shell" to { args -> shellExecChannel(args["command"]?.jsonPrimitive?.contentOrNullSafe().orEmpty(), (args["channel"] as? JsonPrimitive)?.contentOrNullSafe()) },
             "fs_read" to { args -> fsExec("fs_read", args) },
@@ -236,6 +245,7 @@ class LocalEngineTransport(
             "bg_status" to { args -> bgExec("bg_status", args) },
             "bg_kill" to { args -> bgExec("bg_kill", args) },
             "phone" to phoneExec,
+            "skill" to { args -> skillExec(args) },
         ) + web.toolHandlers(),
     )
 
@@ -1598,6 +1608,20 @@ class LocalEngineTransport(
                         putJsonObject("pid") { put("type", "integer") }
                     }
                     putJsonArray("required") { add("pid") }
+                }
+            }
+        })
+        add(buildJsonObject {
+            put("type", "function")
+            putJsonObject("function") {
+                put("name", "skill")
+                put("description", "读取一个已安装技能的完整说明（SKILL.md）。当任务与某个技能描述匹配时，先调用本工具读取再按技能执行。")
+                putJsonObject("parameters") {
+                    put("type", "object")
+                    putJsonObject("properties") {
+                        putJsonObject("name") { put("type", "string"); put("description", "技能名") }
+                    }
+                    putJsonArray("required") { add("name") }
                 }
             }
         })
