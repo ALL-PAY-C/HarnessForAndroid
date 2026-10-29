@@ -9,10 +9,15 @@
 ### 新增
 
 - 技能进模型：系统提示词末尾追加「可用技能」段（只列名字 + 一句描述），并新增 `skill` 工具——模型要看具体步骤时按名字取 `SKILL.md` 全文（单篇上限 20000 字符，超出截断并标注）。技能库为空时这一段自然不出现。
+- 技能中心移除入口：每行开关键旁多一个删除按钮，确认弹窗写明「下次启动会重新铺回」的内置技能语义，移除后按引擎回包刷新列表。
 - 插件依赖自动安装：npm 档插件装完会读 `dependencies` 递归安装运行期依赖（上限 60 个包 / 3 层 / 5 分钟），落到插件自己的 `node_modules`，逐条回执写进安装结果。
 
 ### 修复
 
+- 「下载完装不上 / 覆盖升级失败」的根因是签名：`app/keystore.properties` 与 `app-release.jks` 之前被 `.gitignore` 挡在版本库外，别的机器 clone 后 `hasReleaseKeystore` 为 false，回退到 debug 证书，签出来的包与线上包证书不同。两份签名材料现在进版本库（证书 SHA-256 `767bc8b4…a549c623`），clone 即得同证书产物。
+- 桌面宿主服务面补齐，市场里的真插件不再是「装上了跑不起来」：`ctx.llm` 成员从 8 个扩到 29 个（`registerAdapter` / `listModels` / `resolveModelInfo` / `stream` 等 17 个真实现，其余明确抛 `LLM_UNSUPPORTED` 并带成员名）；新增 `ctx.dshLoader` 门面（`.dsh` 的 `defineTool`、`deadline`、`credentialRef`、`BasicCompactionEngine` 等模块级符号，`.llm` 的 `createUserMessage` / `deepFreeze`，以及 `.settings.installSection`）、`credentials.resolve`、`systemPrompt.section`。`dsh-auxiliary 0.6.4` 与 `ollama-cloud 0.2.1` 装上后 `apply` 成功。
+- 插件配置默认值不生效：cordis 只从交给 `root.plugin` 的对象上读 `Config`，解包 `export default` 之后 schema 丢了就整段跳过校验，插件拿到的是裸 `config`。现在把命名空间上的 `Config` 搬回插件对象。
+- 插件路由误判：`classifyPlugin` 只看 `node:` / `@deepseek-ai/` 前缀，`import Schema from 'schemastery'` 这种裸包名被判成 Rhino 档（Rhino 侧没有 npm 解析器，必挂）。改成按真实外部模块扫描结果判断。
 - npm 依赖装不上的根因：解析器把 `^7.8.5` 这类范围直接拼进 registry URL（`/semver/^7.8.5`），registry 只认精确版本和 dist-tag，必然 404/405。现在先取整个 packument，再按范围挑版本（`^` / `~` / 精确 / `>=` 都支持，预发布版本一律跳过）。
 - 插件管理页谎报「已启用」：现在以引擎真实回执为准，注册失败或运行期报错会显示「加载失败」徽标，并把 `加载失败：<原因>` 常显在行内。
 - ESM 入口的插件装载：入口是命名空间对象时取 `default`，class 形状的插件包一层 `new` 再交给 cordis。此前这类包一律报「缺少 apply 函数」。
@@ -22,11 +27,17 @@
 - `plugin-host`：新增 `NpmVersionPickTest`（8 条：caret / tilde / 精确 / dist-tag / 预发布跳过 / 无解 / 非版本串 / scoped URL），`PluginDependenciesTest` 的假 registry 改成返回 packument，共 144 条 0 失败。
 - `engine`：`smoke.mjs` 9 项 PASS，`llm-rpc` 12 条、`skill-manager` 12 条全过（新增 `read` 正常 / 未知技能 + 路径穿越两条）。
 - `core:protocol`：新增 `SkillToolTest`（4 条），`WebToolsWiringTest` 工具名单补 `skill`。
+- `engine` 宿主服务面新增 6 个测试文件：`host-llm-surface`（9 条，含 12 个未实现成员抛 `LLM_UNSUPPORTED`）、`host-plugin-config`（5 条，`ctx.plugin(mod)` 与 `ctx.plugin(mod, {})` 的 A/B 对比）、`host-dshloader`（8 条）、`host-services`（12 条）、`desktop-deps`（10 条）、`e2e-dshloader-market`（真包 apply：dsh-auxiliary 0.6.4 + ollama-cloud 0.2.1）。
+- `plugin-host`：新增 `bare npm import routes to node` 用例，17 个测试类 0 失败。
 
 ### 已知限制
 
-- 依赖桌面版宿主服务的 npm 插件仍然装不上：`@deepseek-ai/dsh-tools`、`@deepseek-ai/dsh-credentials`、`systemPrompt`、`attachments` 等手机引擎没有对应实现，管理页会显示具体缺什么。
-- 技能中心没有删除入口（引擎 `/skill-manager remove` 已实现，界面未暴露）。
+- `dshLoader.settings.installSection` 只做同步 thunk：`onChange` 回灌与 `watch` 没接，插件改设置后要靠重进页面才刷新。
+- `delegationDepthOf` 恒返回 0：手机引擎没有嵌套派发通道，子代理深度暂时恒为顶层。
+- `locale` / `slots` / `compaction` 只在插件客户端半区使用，宿主半区没提供；`dsh-auxiliary` 的服务端功能不受影响。
+- 插件里打包的 `libnode.so` 仍是 4 KB 页对齐（四个 LOAD 段 `p_align=0x1000`），16 KB 页设备（少数新机）上跑 Node 插件可能崩，需要重建 libnode 才能根治。
+- release 包只含 `arm64-v8a`，x86_64 设备（模拟器）请用 debug 包。
+
 ## v0.06
 
 `versionName` v0.06、`versionCode` 93。

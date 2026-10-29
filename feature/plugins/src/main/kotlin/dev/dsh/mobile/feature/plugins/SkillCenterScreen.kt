@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -82,12 +83,20 @@ fun SkillCenterScreen(
     var installInput by remember { mutableStateOf("") }
     var installBusy by remember { mutableStateOf(false) }
     var installError by remember { mutableStateOf<String?>(null) }
+    var deleteTarget by remember { mutableStateOf<SkillEntry?>(null) }
+    var deleteBusy by remember { mutableStateOf(false) }
+    var bundledNames by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     // 宿主给的目录来自「已安装插件」注册表，它只覆盖从界面装过的插件；随包投放进
     // filesDir/plugins 的技能插件只能靠磁盘发现补上。注册表非空（里面躺着 boot 这类普通插件）
     // 也不能跳过发现，所以两者取并集而不是二选一。
     val pluginsRoot = remember(context) { File(context.filesDir, "plugins") }
     val dirs = remember(pluginDirs, pluginsRoot) { skillPluginDirs(pluginDirs, pluginsRoot) }
+
+    // 内置判定只读一次随包资产清单（assets 是只读的，运行期不会变）。
+    LaunchedEffect(context) {
+        bundledNames = withContext(Dispatchers.IO) { bundledSkillNames(context.assets) }
+    }
 
     LaunchedEffect(engine, dirs, reload) {
         state = SkillUiState.Loading
@@ -191,6 +200,40 @@ fun SkillCenterScreen(
         }
     }
 
+    /**
+     * 移除技能：确认后先让这一行进 busy（行内按钮换转圈、[deleteBusy] 挡连点），再调
+     * `/skill-manager remove`。引擎把移除后的新目录随回包一起带回来
+     * （skill-manager.js:433 `return this.catalog(...)`），所以成功路径直接吃回包、不再跑一趟
+     * list；回包里要是没有 entries 才退回重载。失败一条都不动列表 —— 引擎才是唯一真相。
+     */
+    fun removeSkill(entry: SkillEntry) {
+        val node = engine
+        if (node == null || deleteBusy) return
+        deleteBusy = true
+        busy = busy + entry.name
+        scope.launch {
+            val outcome = runCatching {
+                node.rpc("/skill-manager", "remove", removePayload(entry.name))
+            }
+            val failure = outcome.exceptionOrNull()
+            val reply = outcome.getOrNull()
+            val refused = reply != null && !reply.optBoolean("ok", true)
+            deleteBusy = false
+            deleteTarget = null
+            busy = busy - entry.name
+            if (failure != null || refused) {
+                val reason = (failure as? NodeEngineException)?.message
+                    ?: failure?.message
+                    ?: reply?.optJSONObject("error")?.optString("message").orEmpty()
+                snackbar.showSnackbar(removeFailureNotice(reason))
+                return@launch
+            }
+            val refreshed = reply?.let { catalogState(it) }
+            if (refreshed is SkillUiState.Ready) state = refreshed else reload++
+            snackbar.showSnackbar(removedNotice(entry.name))
+        }
+    }
+
     Column(modifier.fillMaxSize().background(p.bg)) {
         QqTopBar(
             content = { Text("技能中心", color = p.t1, fontWeight = FontWeight.SemiBold) },
@@ -230,6 +273,7 @@ fun SkillCenterScreen(
                                         entry = entry,
                                         busy = entry.name in busy,
                                         onToggle = { toggle(entry, it) },
+                                        onDelete = { deleteTarget = entry },
                                     )
                                     if (index != s.entries.lastIndex) QqCardDivider()
                                 }
@@ -248,6 +292,15 @@ fun SkillCenterScreen(
                 error = installError,
                 onConfirm = { installSkill(installInput.trim()) },
                 onDismiss = { if (!installBusy) installOpen = false },
+            )
+        }
+        deleteTarget?.let { target ->
+            RemoveSkillDialog(
+                name = target.name,
+                bundled = target.name in bundledNames,
+                busy = deleteBusy,
+                onConfirm = { removeSkill(target) },
+                onDismiss = { if (!deleteBusy) deleteTarget = null },
             )
         }
     }
@@ -314,6 +367,45 @@ private fun InstallSkillDialog(
     )
 }
 
+/**
+ * 「移除技能」确认框：标题固定「移除技能」，正文带技能名；内置技能的正文由
+ * [removeConfirmBody] 补一句「下次启动会重新铺回」。确认后按钮转圈，转圈期间取消也点不动，
+ * 免得删到一半改主意。
+ */
+@Composable
+private fun RemoveSkillDialog(
+    name: String,
+    bundled: Boolean,
+    busy: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val p = LocalQq.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("移除技能", color = p.t1, fontWeight = FontWeight.SemiBold) },
+        text = { Text(removeConfirmBody(name, bundled), color = p.t2, fontSize = 13.sp) },
+        confirmButton = {
+            TextButton(enabled = !busy, onClick = onConfirm) {
+                if (busy) {
+                    CircularProgressIndicator(
+                        color = p.accent,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(16.dp),
+                    )
+                } else {
+                    Text("移除", color = p.red, fontSize = 14.sp)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(enabled = !busy, onClick = onDismiss) {
+                Text("取消", color = p.t2, fontSize = 14.sp)
+            }
+        },
+    )
+}
+
 /** 一屏状态：引擎还没起来 / 起不来 / 起来了但没内置 / 有列表。 */
 internal sealed interface SkillUiState {
     data object Loading : SkillUiState
@@ -338,6 +430,10 @@ private const val SKILL_READY_DELAY_MS = 250L
  * 技能库根与引擎一致 —— NodeEngineHost.kt:53 的 homeDir = filesDir/runtime/home。
  */
 private const val BUNDLED_SKILLS_ASSET = "bundled-skills"
+
+/** 随包内置技能名（assets/bundled-skills/ 下的目录名）；拿不到资产就是空集，判定退化为「非内置」。 */
+internal fun bundledSkillNames(assets: AssetManager): Set<String> =
+    bundledSkillSet(runCatching { assets.list(BUNDLED_SKILLS_ASSET) }.getOrNull())
 
 /**
  * 铺资产的标记，故意不和 skill-manager.js:133 的 .builtin-bootstrapped 同名。
@@ -500,7 +596,12 @@ private fun FailureBody(stage: String, message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun SkillRow(entry: SkillEntry, busy: Boolean, onToggle: (Boolean) -> Unit) {
+private fun SkillRow(
+    entry: SkillEntry,
+    busy: Boolean,
+    onToggle: (Boolean) -> Unit,
+    onDelete: () -> Unit,
+) {
     val p = LocalQq.current
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
@@ -519,7 +620,20 @@ private fun SkillRow(entry: SkillEntry, busy: Boolean, onToggle: (Boolean) -> Un
                 )
             }
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(4.dp))
+        // 删除入口与开关并排：busy 时换成同尺寸转圈，行宽不跳。
+        if (busy) {
+            Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    color = p.accent,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        } else {
+            IconBtn(Icons.Filled.Delete, "移除 ${entry.name}") { onDelete() }
+        }
+        Spacer(Modifier.width(6.dp))
         Switch(checked = entry.effectiveEnabled, onCheckedChange = onToggle, enabled = !busy)
     }
 }

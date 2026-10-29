@@ -7,7 +7,7 @@
     "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.07/HarnessForAndroid-release-v0.07.apk",
     "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.07/HarnessForAndroid-release-v0.07.apk"
   ],
-  "sha256": "c79186f5f07cd5e7bde3c0ed3dedf2823a4aeafe04a7b8a14d2ac218043eda29",
-  "notes": "v0.07：技能进模型——系统提示词会列出可用技能，模型还能用 skill 工具按名字取 SKILL.md 全文；插件依赖自动安装，npm 档插件装完会递归装运行期依赖（修掉了把 ^7.8.5 当版本号拼 URL 的老毛病）；插件管理页不再谎报「已启用」，加载失败会写明原因；ESM default / class 形状的插件也能装载。release 只打 arm64-v8a，Android 8.0 以上；依赖桌面版宿主服务的插件仍装不上（缺 dsh-tools、dsh-credentials、systemPrompt 等服务），管理页会显示具体缺什么。已知限制见 README。",
-  "sizeBytes": 113093023
+  "sha256": "109f63b2235aec78d331fe97e79691c8cb81289e7997a44264dcb7ce0cb07f60",
+  "notes": "v0.07（修订）：签名材料随仓库走，别处 clone 构建出的包与线上同证书，可覆盖升级；桌面宿主服务面补齐 llm / dshLoader（.dsh 模块符号、.llm、settings.installSection）/ credentials.resolve / systemPrompt.section，dsh-auxiliary、ollama-cloud 这类插件能在引擎里真正 apply；技能中心加了移除入口；插件路由按真实 import 判断，裸 npm 包不再错走 Rhino。release 只打 arm64-v8a，Android 8.0 以上。",
+  "sizeBytes": 113312185
 }

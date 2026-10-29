@@ -24,13 +24,19 @@ data class NpmInstallResult(
 /** 数据包插件的执行形态。 */
 internal enum class PluginKind { Declarative, Rhino, Node }
 
-/** 看包目录决定走哪条宿主：无 JS 入口 → 声明式；有 node:/@deepseek-ai/ 依赖 → Node；否则 Rhino。 */
+/**
+ * 看包目录决定走哪条宿主：无 JS 入口 → 声明式；引用了任何本端没有的外部模块 → Node；否则 Rhino。
+ *
+ * 「任何」包括裸 npm 包（schemastery / semver / zod），不只是 node: 与 @deepseek-ai/。
+ * Rhino 侧根本没有 npm 解析器，能满足的外部模块数是零，所以只要 [ExternalModules.scan]
+ * 报出来一个模块，这条路就只能交给 NodeEngineHost —— 否则插件会在 Rhino 的模块加载阶段
+ * 直接失败，用户看到的是「该插件依赖外部模块」，而不是它能跑起来。
+ */
 internal fun classifyPlugin(dir: File): PluginKind {
     val entry = JsPluginRuntime.resolveEntry(dir) ?: return PluginKind.Declarative
     val entryFile = File(dir, entry.path)
     val missing = ExternalModules.scan(dir, entryFile)
-    val nodeish = missing.any { it.startsWith("node:") || it.startsWith("@deepseek-ai/") }
-    return if (nodeish) PluginKind.Node else PluginKind.Rhino
+    return if (missing.isNotEmpty()) PluginKind.Node else PluginKind.Rhino
 }
 
 /**

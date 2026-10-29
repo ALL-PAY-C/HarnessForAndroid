@@ -14,6 +14,19 @@ import { EventEmitter } from 'node:events';
 import { createServer } from 'node:http';
 import { Context } from '@deepseek-ai/cordis';
 import { createCredentialsService, createLlmService } from './llm.js';
+import {
+  createAttachmentsService,
+  createFsService,
+  createJobsService,
+  createSessionPersistenceService,
+  createSessionsService,
+  createSettingsService,
+  createSystemPromptService,
+  createTimerService,
+  createWorkspaceRegistryService,
+  installCredentialResolve,
+  installDshLoaderFacade,
+} from './services-extra.js';
 
 /** ctx -> 宿主状态。symbol 属性在 cordis 的 proxy 上也能写，但 WeakMap 更省心。 */
 const HOST = new WeakMap();
@@ -276,19 +289,34 @@ function asCallable(plugin) {
 function applyPlugin(root, host, mod, config) {
   const target = asCallable(unwrapModule(mod));
   const definition = definitionOf(target);
-  // 命名空间上的 name/inject 是插件作者的权威声明，default 上的 static 字段可能没有。
+  // 命名空间上的 name/inject/Config 是插件作者的权威声明，default 上的 static 字段可能没有。
   if (mod && typeof mod === 'object') {
     if (definition.name === 'anonymous' && typeof mod.name === 'string') definition.name = mod.name;
     if (definition.inject.length === 0 && Array.isArray(mod.inject)) definition.inject = mod.inject;
   }
+  // 「export default class Service + export { Config }」的写法里 schema 在命名空间上，
+  // unwrapModule 取 default 之后 target 上没有 Config；而 cordis 只认交给 root.plugin 的
+  // 那个对象上的 Config（@deepseek-ai/cordis lib/index.js:1627-1636 runtime = { Config: plugin.Config }），
+  // 读不到就整段跳过 schemastery —— 插件拿到裸 config，连默认值都没有。把它搬回 target 上。
+  if (definition.Config === undefined && mod !== target && mod && typeof mod === 'object' && mod.Config !== undefined) {
+    definition.Config = mod.Config;
+  }
+  if (definition.Config !== undefined && target.Config === undefined) {
+    try {
+      target.Config = definition.Config;
+    } catch { /* 冻结的插件对象改不动：维持原状，cordis 会跳过 schema */ }
+  }
   if (typeof definition.apply !== 'function') {
     throw Object.assign(new Error('插件 ' + definition.name + ' 缺少 apply 函数'), { stage: 'apply' });
   }
-  const fiber = root.plugin(target, config ?? {});
+  // 有 Config schema 就原样交给 cordis（undefined 也会被 schema 填满默认值，塞 {} 只会把
+  // 「没配置」固化成空对象）；没有 schema 时保持旧行为给 {}，免得读 config.xxx 的插件崩在 undefined。
+  const forwarded = definition.Config === undefined ? (config ?? {}) : config;
+  const fiber = root.plugin(target, forwarded);
   const record = {
     name: definition.name,
     inject: [...definition.inject],
-    config: config ?? {},
+    config: forwarded ?? {},
     appliedAt: Date.now(),
     status: 'pending',
     fiber,
@@ -310,6 +338,9 @@ async function disposeHost(root, host) {
   try {
     await root.fiber.dispose();
   } finally {
+    for (const cleanup of host.cleanups.splice(0)) {
+      try { cleanup(); } catch { /* 清理失败不阻断其它清理 */ }
+    }
     host.services.clear();
     host.plugins.length = 0;
   }
@@ -351,10 +382,12 @@ export function createContext(options = {}) {
     nativeCall: options.nativeCall ?? null,
     bridge: options.bridge ?? null,
     disposed: false,
+    /** 服务自带的清理钩子（timer 的定时器、进程 exit 监听等），ctx.dispose 时按序执行。 */
+    cleanups: [],
   };
   HOST.set(root, host);
 
-  const provide = (key, value) => { root.provide(key, value); host.services.add(key); };
+  const provide = (key, value) => { root.provide(key, value); host.services.add(key); return value; };
   provide('home', home);
   provide('skills', createSkillsService());
   provide('connection', createConnectionService());
@@ -362,12 +395,33 @@ export function createContext(options = {}) {
   provide('commands', createRegistryService('commands', '命令定义'));
   provide('agents', createAgentsService());
   provide('webServer', createWebServerService(logger));
-  provide('loader', createHonestRegistry('loader', { actions: ['load', 'unload', 'resolve'] }));
+  // loader 同时以 dshLoader 暴露（同一对象）：市场插件里两种名字都有人 inject。
+  const loaderService = createHonestRegistry('loader', { actions: ['load', 'unload', 'resolve'] });
+  // dshLoader 门面（.dsh/.llm/.settings）原地挂上去：同一对象，保住 ctx.loader === ctx.dshLoader。
+  // ctx.get 惰性解析，所以此时 credentials 还没 provide 也不影响（调用时才取）。
+  installDshLoaderFacade(loaderService, { logger, ctx: { get: (key) => root.get(key) } });
+  provide('loader', loaderService);
+  provide('dshLoader', loaderService);
   provide('typert', createHonestRegistry('typert', { actions: ['resolve'] }));
   provide('subprocess', createHonestRegistry('subprocess', { actions: ['run', 'spawn', 'exec', 'execFile', 'execSync'] }));
   // 新增两服务：llm（转发 Kotlin 模型网关）、credentials（插件存取密钥，落 Kotlin SecretStore）。
   provide('llm', createLlmService({ host, logger }));
-  provide('credentials', createCredentialsService({ host, logger }));
+  // credentials.resolve/describe/unset 原地补（llm.js 不动；degraded getter 必须保留）。
+  provide('credentials', installCredentialResolve(createCredentialsService({ host, logger }), { logger }));
+
+  // 市场插件 inject 里高频、移动端此前缺失的 10 个服务（fs/settings/systemPrompt/attachments/
+  // sessions/sessionPersistence/workspaceRegistry/jobs/timer/dshLoader）。能真做的真做，
+  // 会话类只能反向查 Kotlin（nativeCall），没接通时调用抛说明性错误。
+  provide('fs', createFsService({ home }));
+  const settingsService = provide('settings', createSettingsService({ home, logger }));
+  provide('systemPrompt', createSystemPromptService());
+  provide('attachments', createAttachmentsService({ home }));
+  provide('sessions', createSessionsService({ host }));
+  provide('sessionPersistence', createSessionPersistenceService({ host }));
+  provide('workspaceRegistry', createWorkspaceRegistryService({ home, settings: settingsService, logger }));
+  provide('jobs', createJobsService({ logger }));
+  const timerService = provide('timer', createTimerService({ logger }));
+  host.cleanups.push(() => timerService.dispose());
 
   const overrides = {
     dispose: () => disposeHost(root, host),

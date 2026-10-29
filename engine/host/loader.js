@@ -26,6 +26,29 @@ const ENGINE_MODULES = join(ENGINE_ROOT, 'node_modules');
 const IS_BARE = (specifier) => !specifier.startsWith('.') && !specifier.startsWith('/')
   && !specifier.startsWith('#') && !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(specifier);
 
+/**
+ * 裸模块别名：生态包的 npm 名与代码里 import 的裸名不一致（插件写 'schemastery'，
+ * 真包是 @deepseek-ai/schemastery）。表里只放「正常解析一定失败、真实包一定存在」的名字；
+ * 命中后按引擎根解析一次，解析不到仍抛原始错误，不吞错。
+ * semver 是真包，列在这里只为把这条通路显式化（正常解析会先命中，别名不生效）。
+ */
+const BARE_ALIASES = {
+  schemastery: '@deepseek-ai/schemastery',
+  cosmokit: '@deepseek-ai/cosmokit',
+  cordis: '@deepseek-ai/cordis',
+  semver: 'semver',
+};
+
+/** 'schemastery' → '@deepseek-ai/schemastery'；带子路径的 'x/y' 只替换包名部分。 */
+function aliasOf(specifier) {
+  if (!IS_BARE(specifier)) return undefined;
+  const slash = specifier.indexOf('/');
+  const name = slash === -1 ? specifier : specifier.slice(0, slash);
+  const target = BARE_ALIASES[name];
+  if (!target || target === name) return undefined;
+  return target + specifier.slice(name.length);
+}
+
 let installed = false;
 
 /**
@@ -130,6 +153,14 @@ export function installModuleFallback() {
           return nextResolve(specifier, context);
         } catch (error) {
           if (!IS_BARE(specifier)) throw error;
+          const alias = aliasOf(specifier);
+          if (alias) {
+            try {
+              return nextResolve(alias, { ...context, parentURL: ENGINE_BASE_URL });
+            } catch {
+              // 别名指不到包时继续走原有回退，最后仍抛最原始的解析错误
+            }
+          }
           try {
             return nextResolve(specifier, { ...context, parentURL: ENGINE_BASE_URL });
           } catch {
@@ -143,10 +174,14 @@ export function installModuleFallback() {
 
   // node 18.19 / 20.x：只有异步 register()
   const source = 'const base = ' + JSON.stringify(ENGINE_BASE_URL) + ';\n'
+    + 'const aliases = ' + JSON.stringify(BARE_ALIASES) + ';\n'
     + 'const isBare = (s) => !s.startsWith(".") && !s.startsWith("/") && !s.startsWith("#") && !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(s);\n'
+    + 'const aliasOf = (s) => { const i = s.indexOf("/"); const n = i === -1 ? s : s.slice(0, i); const t = aliases[n]; return t && t !== n ? t + s.slice(n.length) : undefined; };\n'
     + 'export async function resolve(specifier, context, nextResolve) {\n'
     + '  try { return await nextResolve(specifier, context); } catch (error) {\n'
     + '    if (!isBare(specifier)) throw error;\n'
+    + '    const alias = aliasOf(specifier);\n'
+    + '    if (alias) { try { return await nextResolve(alias, { ...context, parentURL: base }); } catch {} }\n'
     + '    try { return await nextResolve(specifier, { ...context, parentURL: base }); } catch { throw error; }\n'
     + '  }\n'
     + '}\n';

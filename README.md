@@ -57,7 +57,7 @@ cd engine && npm ci && cd ..        # engine/node_modules 不进版本库
 
 两个下载任务走自己的 HTTP 客户端，`--offline` 拦不住；要完全断网就用上面两个环境变量（或 `-PdshLibnodeZip` / `-PdshKernelAssetsDir`）。libnode 解包后仍验 sha256，对不上中止构建。
 
-产物落在 `app/build/outputs/apk/release/HarnessForAndroid-release-v0.05.apk`，文件名取 `appVersionName` 第一段，改版本只改 `app/build.gradle.kts` 顶部的 `appVersionName` / `appVersionCode`。
+产物落在 `app/build/outputs/apk/release/HarnessForAndroid-release-<版本>.apk`，文件名取 `appVersionName` 第一段，改版本只改 `app/build.gradle.kts` 顶部的 `appVersionName` / `appVersionCode`。
 
 ## 已知限制
 

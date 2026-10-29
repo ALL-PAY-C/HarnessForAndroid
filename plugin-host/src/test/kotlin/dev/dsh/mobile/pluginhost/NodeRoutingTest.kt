@@ -49,6 +49,14 @@ class NodeRoutingTest {
         assertEquals(PluginKind.Node, classifyPlugin(dir))
     }
 
+    @Test
+    fun `bare npm import routes to node`() {
+        val dir = tmp.newFolder()
+        dir.resolve("index.js")
+            .writeText("import Schema from 'schemastery'; export const Config = Schema.object({}); export function apply(){ return {} }")
+        assertEquals(PluginKind.Node, classifyPlugin(dir))
+    }
+
     // ---- loadNodePlugins 编排回归：禁用不执行 / 取消上抛 / 引擎失败 / 正常应用 ----
 
     private class FakeNodeEngine(
