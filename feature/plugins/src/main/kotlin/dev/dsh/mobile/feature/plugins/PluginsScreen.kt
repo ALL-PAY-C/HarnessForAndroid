@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.dsh.mobile.design.LocalQq
@@ -264,6 +265,8 @@ private fun PluginCard(
 ) {
     val p = LocalQq.current
     var expanded by rememberSaveable(plugin.manifest.id) { mutableStateOf(false) }
+    // 运行期回执优先于启用意图：装上了但加载失败，这一行必须是失败态而不是「已启用」。
+    val status = pluginRowStatus(plugin.enabled, plugin.loadError ?: plugin.error)
     GroupFrame(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
         GroupHeader(
             label = plugin.manifest.name,
@@ -271,10 +274,17 @@ private fun PluginCard(
             onClick = { expanded = !expanded },
             trailing = {
                 Text(
-                    if (plugin.enabled) "已启用" else "已停用",
-                    color = if (plugin.enabled) p.accent else p.t3,
+                    status.text,
+                    color = when {
+                        status.failed -> MaterialTheme.colorScheme.error
+                        plugin.enabled -> p.accent
+                        else -> p.t3
+                    },
                     style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.clickable { onToggle(!plugin.enabled) }.padding(horizontal = 8.dp, vertical = 6.dp),
+                    // 失败行点开关没有意义（启用意图已经写在配置里，失败来自加载），别给它假的可操作感。
+                    modifier = Modifier
+                        .clickable(enabled = !status.failed) { onToggle(!plugin.enabled) }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
                 )
                 Icon(
                     Icons.Filled.Delete,
@@ -284,6 +294,17 @@ private fun PluginCard(
                 )
             },
         )
+        if (status.failed) {
+            // 常显（不用展开）：失败原因就是用户来这一页要看的唯一信息。
+            Text(
+                "加载失败：" + (status.detail ?: "原因未知"),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
+            )
+        }
         if (expanded) {
             Column(Modifier.padding(12.dp)) {
                 Text(

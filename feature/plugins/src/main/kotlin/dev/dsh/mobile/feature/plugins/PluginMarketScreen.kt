@@ -422,7 +422,13 @@ fun PluginMarketScreen(
                             // 逐条试，失败就退下一条：npm → 直链归档 → GitHub 仓库 → 直链兜底。
                             val steps = buildList<Pair<String, suspend () -> Result<String>>> {
                                 if (entry.npm.isNotBlank() && target != null) {
-                                    add("npm" to { target.installNpm(entry.npm).map { it.name + "（npm 包）" } })
+                                    add("npm" to {
+                                        target.installNpm(entry.npm).map { done ->
+                                            // 装上几个依赖是用户排查「装上了为什么加载不起来」的第一手线索。
+                                            done.manifest.name + "（npm 包" +
+                                                (if (done.deps.installed > 0) "，依赖 " + done.deps.installed + " 个" else "") + "）"
+                                        }
+                                    })
                                 }
                                 if (directArchive && target != null) {
                                     add("直链" to { target.installUrl(url).map { it.name + "（数据插件）" } })

@@ -10,6 +10,17 @@ import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/**
+ * npm 安装的结果：清单 + 运行期依赖摘要。
+ *
+ * 单独一个类型（而不是继续返回 [PluginManifestFile]）是因为「装上了」不等于「跑得起来」：
+ * 依赖装失败时调用方要能把摘要带出去（UI 提示 / 日志），而不是去翻 logcat。
+ */
+data class NpmInstallResult(
+    val manifest: PluginManifestFile,
+    val deps: DependencySummary,
+)
+
 /** 数据包插件的执行形态。 */
 internal enum class PluginKind { Declarative, Rhino, Node }
 
@@ -110,7 +121,7 @@ class PluginInstaller(
      * 直接下 tgz；传 [version] 可钉死某个版本（/<name>/<version>），修复与回归要靠它。
      * 这条路对社区插件覆盖率最高：market-v2 索引里 322/521 个可安装条目是 npm 形态。
      */
-    suspend fun installNpm(name: String, version: String = "latest"): Result<PluginManifestFile> =
+    suspend fun installNpm(name: String, version: String = "latest"): Result<NpmInstallResult> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val trimmed = name.trim()
@@ -118,15 +129,47 @@ class PluginInstaller(
                 require(!trimmed.contains("..")) { "npm 包名非法：" + trimmed }
                 val spec = version.trim().ifBlank { "latest" }
                 require(!spec.contains("..") && !spec.contains('/')) { "npm 版本号非法：" + spec }
-                val metaUrl = "https://registry.npmjs.org/" + trimmed.replace("/", "%2f") + "/" + spec
+                val metaUrl = npmMetaUrl(trimmed, spec)
                 val meta = fetchText(metaUrl)
                 val json = JSONObject(meta)
                 val tarball = json.optJSONObject("dist")?.optString("tarball").orEmpty()
                 if (tarball.isBlank()) error("npm 包 $trimmed 没有 tarball（可能是个空壳包）")
                 val file = downloadToCache(tarball)
-                installArchive(file).getOrElse { file.delete(); throw it }
+                val result = packages.installArchive(file, source = "npm/" + trimmed + "@" + spec)
+                if (!result.ok) {
+                    file.delete()
+                    error(result.error ?: "安装失败")
+                }
+                val manifest = result.manifest ?: error(result.error ?: "安装失败：没有清单")
+                // 依赖装在活动版本目录里：npm 包从不带 node_modules，缺依赖时 Node 引擎在 import
+                // 阶段直接抛 Cannot find package（真机实测 @lihuu/dsh-ollama-cloud@0.2.1）。
+                // 装依赖失败只降级成 warning —— 包已经落地且声明式插件照跑，不能因依赖回滚安装。
+                val warnings = mutableListOf<String>()
+                val deps = installDependencies(File(result.path), warnings)
+                warnings.forEach { AppLog.w("npm 插件 " + trimmed + " " + it) }
+                AppLog.d("npm 插件 " + trimmed + "@" + spec + " " + deps.text())
+                NpmInstallResult(manifest, deps)
             }
         }
+
+    /**
+     * 装一个 npm 插件的运行期依赖。
+     *
+     * registry 的 /<name>/<spec> 同时吃版本号、tag 与 semver 范围，所以 package.json 里写
+     * "^0.2.1" 也能取到对应 tarball。规则与边界全在 [NpmDependencyResolver]：这里只负责
+     * 把安装器已有的 fetchText / downloadToCache 接到那条窄缝上，不另写 HTTP 客户端。
+     */
+    private suspend fun installDependencies(dir: File, warnings: MutableList<String>): DependencySummary {
+        val packageJson = runCatching { JSONObject(File(dir, "package.json").readText()) }.getOrNull()
+        val resolver = NpmDependencyResolver(
+            source = object : NpmRegistrySource {
+                override fun fetchText(url: String): String = this@PluginInstaller.fetchText(url)
+                override fun download(url: String, timeoutMs: Int): File =
+                    this@PluginInstaller.downloadToCache(url, timeoutMs)
+            },
+        )
+        return resolver.install(dir, packageJson, warnings)
+    }
 
     fun uninstall(id: String): Result<Unit> {
         val result = packages.remove(id)
@@ -231,7 +274,7 @@ class PluginInstaller(
 
     // ---------------------------------------------------------------- 网络
 
-    private fun downloadToCache(url: String): File {
+    private fun downloadToCache(url: String, timeoutMs: Int = 60_000): File {
         val ext = url.substringBefore('?').let {
             when {
                 it.endsWith(".tgz", true) || it.endsWith(".tar.gz", true) -> "tgz"
@@ -241,8 +284,9 @@ class PluginInstaller(
         }
         val file = File(context.cacheDir, "plugin-dl-" + url.hashCode() + "." + ext)
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 15_000
-            readTimeout = 60_000
+            // 依赖安装传 45s（单包上限），插件包本体仍用 60s：超时是墙钟上限，不是越快越好。
+            connectTimeout = minOf(15_000, timeoutMs)
+            readTimeout = timeoutMs
             instanceFollowRedirects = true
             setRequestProperty("Accept", "application/zip,application/gzip,application/octet-stream,*/*")
             setRequestProperty("User-Agent", "dsh-mobile")

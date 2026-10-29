@@ -134,6 +134,8 @@ class NodeBackedPlugin(
                 val msg = started.exceptionOrNull()?.message ?: "Node 引擎启动失败"
                 runnable.forEach { p ->
                     p.status.value = NodePluginStatus.Failed(stage = "engine", message = msg)
+                    // 引擎起不来也是真实的运行期失败：列表行要显示它，别继续挂「已启用」。
+                    host.noteLoadResult(p.spec.id, msg)
                     host.refresh(p)
                 }
                 return
@@ -146,6 +148,7 @@ class NodeBackedPlugin(
                         version = res.optString("version").ifBlank { p.spec.version },
                         appliedAt = System.currentTimeMillis(),
                     )
+                    host.noteLoadResult(p.spec.id, null)
                 } catch (e: CancellationException) {
                     throw e // 取消必须上抛，不能被当成插件加载失败吞掉。
                 } catch (t: Throwable) {
@@ -162,6 +165,8 @@ class NodeBackedPlugin(
                         if (entries.isNotEmpty()) append("（包内根层: ").append(entries.joinToString(" ")).append("）")
                     }
                     p.status.value = NodePluginStatus.Failed(stage = stage, message = message)
+                    // 把引擎回执接到插件管理列表：界面显示的失败原因必须来自这次真实加载。
+                    host.noteLoadResult(p.spec.id, "[" + stage + "] " + message)
                     AppLog.w("Node 插件 " + p.spec.id + " 加载失败：[" + stage + "] " + message)
                     AppLog.w("Node 插件 " + p.spec.id + " 目录 " + dir + " 条目 " + entries.joinToString(" "))
                     detail?.optString("stack")?.takeIf { it.isNotBlank() }?.let {

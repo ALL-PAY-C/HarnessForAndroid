@@ -43,7 +43,7 @@ class WebToolsWiringTest {
         val names = transport(webToolkit()).toolsJson().mapNotNull { element ->
             element.jsonObject["function"]?.jsonObject?.get("name")?.jsonPrimitive?.content
         }
-        assertEquals(listOf("shell", "phone", "fs_read", "fs_write", "fs_list", "fs_op", "channel_list", "run_bg", "bg_status", "bg_kill", "subagent", "web_search", "web_fetch", "download"), names)
+        assertEquals(listOf("shell", "phone", "fs_read", "fs_write", "fs_list", "fs_op", "channel_list", "run_bg", "bg_status", "bg_kill", "skill", "subagent", "web_search", "web_fetch", "download"), names)
     }
 
     @Test

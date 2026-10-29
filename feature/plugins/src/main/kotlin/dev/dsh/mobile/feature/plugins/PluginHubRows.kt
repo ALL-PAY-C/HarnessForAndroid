@@ -35,6 +35,30 @@ internal fun mergeHubRows(pageKeys: List<String>, slotKeys: List<String>): List<
 internal fun slotRowKey(contribution: SlotContribution): String =
     contribution.slot.wire + ":" + contribution.id
 
+/** 行内失败原因最多显示多少字符：引擎报错常常带整段堆栈，原样贴会把整行挤爆。 */
+internal const val LOAD_ERROR_MAX_CHARS = 120
+
+/**
+ * 一行在插件管理页该显示什么。
+ *
+ * [detail] 非空才是失败态；[PluginRowStatus.failed] 决定徽标/开关的视觉。调用方只许把
+ * 真实的加载回执塞进 [loadError]（register() 抛的异常或 Node 引擎 plugins.load 的失败），
+ * 不能拿「安装目录在不在」来推断状态 —— 那正是「装上了但报错」被显示成「已启用」的根源。
+ */
+internal data class PluginRowStatus(val text: String, val failed: Boolean, val detail: String?)
+
+/** 失败优先于启用态：装上了但跑不起来，就不许显示「已启用」。 */
+internal fun pluginRowStatus(
+    enabled: Boolean,
+    loadError: String?,
+    limit: Int = LOAD_ERROR_MAX_CHARS,
+): PluginRowStatus {
+    val error = loadError?.trim()?.takeIf { it.isNotEmpty() }
+    if (error == null) return PluginRowStatus(if (enabled) "已启用" else "已停用", false, null)
+    val clipped = if (error.length <= limit) error else error.take(limit) + "…"
+    return PluginRowStatus("加载失败", true, clipped)
+}
+
 /**
  * 把几个槽位的贡献并成一张列表，调用方按「越靠前越先显示」的顺序传入。
  *

@@ -2,6 +2,57 @@
 
 结构参照 Keep a Changelog，版本号用 SemVer。
 
+## v0.07
+
+`versionName` v0.07、`versionCode` 94。
+
+### 新增
+
+- 技能进模型：系统提示词末尾追加「可用技能」段（只列名字 + 一句描述），并新增 `skill` 工具——模型要看具体步骤时按名字取 `SKILL.md` 全文（单篇上限 20000 字符，超出截断并标注）。技能库为空时这一段自然不出现。
+- 插件依赖自动安装：npm 档插件装完会读 `dependencies` 递归安装运行期依赖（上限 60 个包 / 3 层 / 5 分钟），落到插件自己的 `node_modules`，逐条回执写进安装结果。
+
+### 修复
+
+- npm 依赖装不上的根因：解析器把 `^7.8.5` 这类范围直接拼进 registry URL（`/semver/^7.8.5`），registry 只认精确版本和 dist-tag，必然 404/405。现在先取整个 packument，再按范围挑版本（`^` / `~` / 精确 / `>=` 都支持，预发布版本一律跳过）。
+- 插件管理页谎报「已启用」：现在以引擎真实回执为准，注册失败或运行期报错会显示「加载失败」徽标，并把 `加载失败：<原因>` 常显在行内。
+- ESM 入口的插件装载：入口是命名空间对象时取 `default`，class 形状的插件包一层 `new` 再交给 cordis。此前这类包一律报「缺少 apply 函数」。
+
+### 测试
+
+- `plugin-host`：新增 `NpmVersionPickTest`（8 条：caret / tilde / 精确 / dist-tag / 预发布跳过 / 无解 / 非版本串 / scoped URL），`PluginDependenciesTest` 的假 registry 改成返回 packument，共 144 条 0 失败。
+- `engine`：`smoke.mjs` 9 项 PASS，`llm-rpc` 12 条、`skill-manager` 12 条全过（新增 `read` 正常 / 未知技能 + 路径穿越两条）。
+- `core:protocol`：新增 `SkillToolTest`（4 条），`WebToolsWiringTest` 工具名单补 `skill`。
+
+### 已知限制
+
+- 依赖桌面版宿主服务的 npm 插件仍然装不上：`@deepseek-ai/dsh-tools`、`@deepseek-ai/dsh-credentials`、`systemPrompt`、`attachments` 等手机引擎没有对应实现，管理页会显示具体缺什么。
+- 技能中心没有删除入口（引擎 `/skill-manager remove` 已实现，界面未暴露）。
+## v0.06
+
+`versionName` v0.06、`versionCode` 93。
+
+### 新增
+
+- 引擎路由（`engine://`）支持工具调用：引擎插件把请求里的 `tools` 原样转给上游（OpenAI 形状），回包里的 `tool_calls`（含 SSE 里逐帧拼接的 `delta.tool_calls`）由传输层还原成标准的 `choices[].message.tool_calls`，主循环照常执行 `shell` / `fs_*` / `phone` / `subagent` 等工具，结果以 `role: tool` 回灌给上游继续这一轮。此前该路由不发工具表，模型请求工具只会得到一行「不支持工具调用」。
+
+### 修复
+
+- 只调工具、不说话的回合不再被当成空回复：上游正文为空但带 `tool_calls` 时，引擎此前直接抛「没有内容」，现在允许「空正文 + toolCalls」，两者都空才算空。
+
+- 正文里混着的工具调用标记（`<||DSML||invoke …>`）现在转成真正的工具执行，不再只是从正文里剥掉后补一句说明。
+
+### 测试
+
+- `core:protocol`：新增 `EngineToolCallsTest`（3 条：空正文带 toolCalls 仍执行、工具结果回灌到下一次请求、引擎路由可跑 `subagent`）；`DsmlEngineRouteTest` 重写为「标记变成真工具执行」（5 条，并断言请求体确实带了 `tools`）。
+
+- `engine`：`llm-rpc` 新增两条（空正文 + `toolCalls` 归一、`tools` 透传到 provider），12 条全过。
+
+### 已知限制
+
+- 工具执行仍受 Android 应用沙箱约束：`ls /` 这类会 `Permission denied`，可用范围是应用私有目录与已授权的共享目录。
+
+- 旧会话里历史消息写死过「该端点不支持工具调用」，模型可能照着旧结论复读；新建会话即正常。
+
 ## v0.05
 
 `versionName` v0.05、`versionCode` 92。

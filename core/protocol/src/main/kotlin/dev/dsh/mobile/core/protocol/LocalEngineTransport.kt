@@ -199,6 +199,13 @@ class LocalEngineTransport(
     private val shellExecChannel: suspend (String, String?) -> String = { cmd, _ -> shellExec(cmd) },
     private val channelListExec: suspend () -> String = { "[]" },
     private val bgExec: suspend (String, JsonObject) -> String = { _, _ -> "后台任务未接入" },
+    /**
+     * 宿主注入的技能读取通道（skill 工具的落地实现）。
+     *
+     * 这里只认「参数对象 -> 文本」，不碰文件：技能库在 :node 引擎的 DSH_HOME 下，本类连路径都不该知道；
+     * 失败也由注入方转成可读文本，工具结果要能让模型看到原因。
+     */
+    private val skillExec: suspend (JsonObject) -> String = { "技能未接入" },
     /** 与群聊相同，预算直接以字符计，默认复用群聊预算。 */
     private val contextBudgetProvider: suspend (String) -> Int = { GroupPlan(emptyList()).contextBudget },
     /**
@@ -224,7 +231,9 @@ class LocalEngineTransport(
 
     // ---- 工具防抖 / 执行器 / 每 Agent 线程 / 执行池（需求 A、B、D、E） ----
     private val loopGuard = ToolLoopGuard()
-    private val toolRunner = ToolExecutor(
+
+    /** internal 而非 private：单测要证明注入的通道真的被走到（toolsJson 只是声明，不执行）。 */
+    internal val toolRunner = ToolExecutor(
         mapOf(
             "shell" to { args -> shellExecChannel(args["command"]?.jsonPrimitive?.contentOrNullSafe().orEmpty(), (args["channel"] as? JsonPrimitive)?.contentOrNullSafe()) },
             "fs_read" to { args -> fsExec("fs_read", args) },
@@ -236,6 +245,7 @@ class LocalEngineTransport(
             "bg_status" to { args -> bgExec("bg_status", args) },
             "bg_kill" to { args -> bgExec("bg_kill", args) },
             "phone" to phoneExec,
+            "skill" to { args -> skillExec(args) },
         ) + web.toolHandlers(),
     )
 
@@ -576,9 +586,9 @@ class LocalEngineTransport(
                 put("messages", JsonArray(messages))
                 // 最后一轮不再给工具：模型必须直接用正文收尾，而不是再要一次工具、
                 // 然后被「轮数用尽」静默掐断（用户看到的是一句话没说完就停了）。
-                // engine:// 引擎插件自己注入工具说明，且从不回 tool_calls：别再把它拿不到的工具表发过去，
-                // 否则 subagent 在这条端点上等于凭空出现（模型照着工具表调，然后没有执行通道）。
-                if (useTools && cfg.supportsTools && !isEngineRoute(cfg.baseUrl) && shouldOfferTools(round, MAX_ROUNDS)) {
+                // engine:// 也发表：插件 provider 把 tools 原样转给上游（OpenAI 形状），
+                // 回包里的 tool_calls 由 postToEngine 还原成 choices[].message.tool_calls。
+                if (useTools && cfg.supportsTools && shouldOfferTools(round, MAX_ROUNDS)) {
                     put("tools", toolsJson())
                 }
                 if (cfg.maxTokens > 0) put("max_tokens", cfg.maxTokens)
@@ -819,10 +829,6 @@ class LocalEngineTransport(
                         // G：不可逆 shell 命令先问用户；没确认就当被拒，错误照常回灌模型。phone 参数非 shell 命令，不确认。
                         name == "shell" && needsConfirmation(command) && confirm(task, sessionId, command) != "allow" ->
                             ToolExecResult(ok = false, output = "", error = "用户未确认，已跳过该命令")
-                        // engine:// 引擎插件不实现 function calling：这条端点上 subagent 没有执行通道。
-                        // 回一条中文错误（进 Failed 工具卡 + 收尾留痕），不要静默结束整轮。
-                        name == "subagent" && isEngineRoute(cfg.baseUrl) ->
-                            ToolExecResult(ok = false, output = "", error = SUBAGENT_UNSUPPORTED_ON_ENGINE)
                         // 子代理不能走 toolRunner：那里是 30 秒单次超时 + 1 次重试，
                         // 而一个子代理要跑满 8 轮工具往返、总预算 180 秒。
                         name == "subagent" -> runSubagent(cfg, parentSystem, args) { step ->
@@ -1608,6 +1614,20 @@ class LocalEngineTransport(
         add(buildJsonObject {
             put("type", "function")
             putJsonObject("function") {
+                put("name", "skill")
+                put("description", "读取一个已安装技能的完整说明（SKILL.md）。当任务与某个技能描述匹配时，先调用本工具读取再按技能执行。")
+                putJsonObject("parameters") {
+                    put("type", "object")
+                    putJsonObject("properties") {
+                        putJsonObject("name") { put("type", "string"); put("description", "技能名") }
+                    }
+                    putJsonArray("required") { add("name") }
+                }
+            }
+        })
+        add(buildJsonObject {
+            put("type", "function")
+            putJsonObject("function") {
                 put("name", "subagent")
                 put("description", subagentHelp())
                 putJsonObject("parameters") {
@@ -1852,8 +1872,9 @@ class LocalEngineTransport(
     /**
      * 一次引擎往返：把 [body] 原样当 JSONObject 递进 :node，拿 value.content 当整段回复。
      *
-     * 契约（引擎侧 /llm chat）：返回 {ok:true,value:{content,usage?}}；content 是完整正文，
-     * 不流式（引擎里没有 token 级回调），所以只 onText 一次，再由调用方做增量去重。
+     * 契约（引擎侧 /llm chat）：返回 {ok:true,value:{content,toolCalls?,usage?}}；content 是完整正文，
+     * 不流式（引擎里没有 token 级回调），所以只 onText 一次，再由调用方做增量去重；
+     * toolCalls 是插件 provider 转出来的 OpenAI 形状调用，原样塞进 choices[].message.tool_calls。
      */
     private suspend fun postToEngine(
         cfg: LlmConfig,
@@ -1870,15 +1891,22 @@ class LocalEngineTransport(
         }
         val value = resp.optJSONObject("value") ?: JSONObject()
         val rawContent = value.optString("content")
-        // engine:// 没有 function calling 通道（见 SUBAGENT_UNSUPPORTED_ON_ENGINE），模型照样会把
-        // 工具调用标记当正文吐回来。不剥就是整屏 markup 涌进 UI：剥掉标记，再补一行「为什么没执行」。
-        val stripped = stripDsmlToolCalls(rawContent)
-        val content = if (stripped.second.isEmpty()) {
-            rawContent
+        // 插件 provider 转出来的结构化工具调用（OpenAI 形状），直接还原成 choices[].message.tool_calls。
+        val calls = mutableListOf<JsonObject>()
+        value.optJSONArray("toolCalls")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val one = arr.optJSONObject(i) ?: continue
+                runCatching { DshJson.parseToJsonElement(one.toString()).jsonObject }.getOrNull()?.let { calls += it }
+            }
+        }
+        // 插件没给结构化调用时，再从正文里捞 DSML / <tool_call> 标记（部分 provider 只会写正文），
+        // 捞到的同样进 tool_calls，标记文本从正文剔掉，避免 markup 整屏涌进 UI。
+        val content = if (calls.isEmpty()) {
+            val stripped = stripDsmlToolCalls(rawContent)
+            stripped.second.forEach { calls += it.toToolCallJson() }
+            stripped.first
         } else {
-            listOf(stripped.first, engineToolCallNotice(stripped.second))
-                .filter { it.isNotBlank() }
-                .joinToString("\n")
+            rawContent
         }
         if (content.isNotEmpty()) onText(content)
         // usage 各家字段不一致，原样透给调用方（那边本来就用 contentOrNullSafe 宽松取值）。
@@ -1890,6 +1918,7 @@ class LocalEngineTransport(
                     putJsonObject("message") {
                         put("role", "assistant")
                         put("content", content)
+                        if (calls.isNotEmpty()) put("tool_calls", JsonArray(calls))
                     }
                 }
             }
@@ -1897,12 +1926,6 @@ class LocalEngineTransport(
         }
     }
 
-    /** 剥完 DSML 后补的那一行：engine:// 端点上工具请求没有执行通道，得让用户知道为什么没跑。 */
-    private fun engineToolCallNotice(calls: List<DsmlToolCall>): String {
-        val names = calls.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct()
-        val who = names.joinToString("、").ifBlank { "工具" }
-        return "（模型请求调用 " + who + "，但当前 engine:// 端点不支持工具调用；要真正执行，请把该模型换成支持 function calling 的 OpenAI 兼容端点）"
-    }
 
     /** engine:// 后面的那段就是插件声明的模型 id；留空则退回配置里的 model 名。 */
     private fun engineModelOf(cfg: LlmConfig): String =
@@ -2033,9 +2056,7 @@ class LocalEngineTransport(
         const val ENGINE_SCHEME = "engine://"
         const val ENGINE_NOT_READY = "引擎未就绪：先在插件页打开一次，让 :node 进程起来"
 
-        // engine:// 引擎插件没有 function calling：subagent 在这条端点上没有执行通道。
-        const val SUBAGENT_UNSUPPORTED_ON_ENGINE =
-            "当前模型端点（engine:// 引擎插件）不支持工具调用，subagent 无法执行；请把该模型换成支持 function calling 的 OpenAI 兼容端点"
+
         const val PERMISSION_TIMEOUT_MS = 180_000L
         val JSON = "application/json; charset=utf-8".toMediaType()
         val CONFIRM_PATTERNS = listOf("rm -rf", "mkfs", "pm uninstall", "reboot", " su ", "su -", "fastboot")

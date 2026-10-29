@@ -29,6 +29,8 @@ const MAX_SCANNED_DIRS = 4000;
 const MAX_BUNDLES = 200;
 /** 这些目录里不会有人放技能，且体量最大（.git / node_modules / 构建产物）。 */
 const SKIPPED_DIRS = new Set(['node_modules', '.git', 'dist', 'build']);
+/** SKILL.md 回给模型的长度上限：一个技能动辄几十 KB，整篇塞进上下文会挤掉本轮真正要用的东西。 */
+const MAX_SKILL_CHARS = 20000;
 
 /** state.json 里只认这三个字段；写坏/字段缺失都不该让技能中心白屏。 */
 function normalizeState(value) {
@@ -239,6 +241,44 @@ class SkillManager {
   }
 
   /**
+   * 按名字读 SKILL.md 原文，给模型侧的 skill 工具用。
+   *
+   * name 只拿去和 scan() 的名单比对，绝不参与拼路径：否则 name 里塞 ../ 就能把任意文件
+   * 读进模型上下文。真实路径一律取自扫描结果。
+   */
+  async readSkill(rawName) {
+    const name = typeof rawName === 'string' ? rawName.trim() : '';
+    if (name === '') throw Object.assign(new Error('缺少技能名 name'), { stage: 'rpc' });
+    const skill = (await this.candidates()).find((item) => item.name === name);
+    if (skill === undefined) throw UNKNOWN_SKILL(name);
+    const file = await findSkillFile(skill.dir);
+    if (file === null) {
+      throw Object.assign(new Error('技能缺少 SKILL.md: ' + JSON.stringify(name)), { stage: 'rpc' });
+    }
+    let bytes;
+    try {
+      bytes = await readFile(file);
+    } catch (error) {
+      throw Object.assign(
+        new Error('技能说明读取失败: ' + JSON.stringify(name) + '：' + (error?.message ?? error)),
+        { stage: 'rpc' },
+      );
+    }
+    let content;
+    try {
+      // fatal 而不是默认替换：二进制/GBK 文件被替换成一堆问号塞给模型，比直接报错更误导。
+      content = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch {
+      throw Object.assign(new Error('技能说明不是 UTF-8 文本: ' + JSON.stringify(name)), { stage: 'rpc' });
+    }
+    // 有的技能写上几万字：整篇进上下文会挤掉本轮真正要用的东西，截断并在末尾明确告知。
+    const clipped = content.length > MAX_SKILL_CHARS
+      ? content.slice(0, MAX_SKILL_CHARS) + '\n…（已截断）'
+      : content;
+    return { name: skill.name, description: skill.description, content: clipped, path: file };
+  }
+
+  /**
    * staging 目录 → 技能包目录列表，有界递归发现。
    *
    * 现实里的技能仓库布局五花八门：<name>/SKILL.md（obra/superpowers 是 skills/<name>/SKILL.md，
@@ -403,6 +443,12 @@ const UNKNOWN_ENDPOINT = (endpoint) => Object.assign(
   { stage: 'rpc' },
 );
 
+/** 名字不在扫描名单里：报错而不是按名字去磁盘上找，避免入参变成文件读取能力。 */
+const UNKNOWN_SKILL = (name) => Object.assign(
+  new Error('未知技能: ' + JSON.stringify(name)),
+  { stage: 'rpc' },
+);
+
 /** endpoint 表与桌面插件一致；enable/disable 是 set-enabled 的简写（internal 任务要求）。 */
 async function handleRpc(manager, endpoint, payload) {
   const args = payload !== null && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
@@ -422,6 +468,8 @@ async function handleRpc(manager, endpoint, payload) {
         ok: true,
         value: await manager.setEnabled(args.name, 'global', undefined, endpoint === 'enable'),
       };
+    case 'read':
+      return { ok: true, value: await manager.readSkill(args.name) };
     case 'remove':
       return { ok: true, value: await manager.remove(args.name, optionalString(args.projectRoot)) };
     default:

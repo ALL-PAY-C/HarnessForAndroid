@@ -246,17 +246,45 @@ function definitionOf(mod) {
 }
 
 /**
+ * ESM 入口拿到的永远是命名空间对象：'default' in mod 说明插件本体在 default 上
+ * （export default class Service 是社区插件的常见写法），不拆包就会报「缺少 apply 函数」。
+ */
+function unwrapModule(mod) {
+  if (mod && typeof mod === 'object' && mod.default !== undefined && (mod.default !== null)) {
+    return mod.default;
+  }
+  return mod;
+}
+
+/** cordis 只认「函数」或「{ apply }」两种形状；class 被当函数调用会抛 cannot be invoked without 'new'，包一层。 */
+function asCallable(plugin) {
+  if (typeof plugin !== 'function') return plugin;
+  const text = Function.prototype.toString.call(plugin).trimStart();
+  const looksLikeClass = text.startsWith('class') || (plugin.prototype && Object.getOwnPropertyNames(plugin.prototype).length > 1);
+  if (!looksLikeClass) return plugin;
+  return function classPlugin(ctx, config) {
+    return new plugin(ctx, config);
+  };
+}
+
+/**
  * ctx.plugin 的宿主包装：真 fiber 交给 cordis 跑，宿主只记账。
  *
  * 返回的记录**不是 thenable**——注入没齐的插件在 cordis 里是延迟状态，await 它会一直等；
  * 想拿 apply 结果用 record.settled()（cordis fiber.await()，配置校验/apply 抛错都在这里抛）。
  */
 function applyPlugin(root, host, mod, config) {
-  const definition = definitionOf(mod);
+  const target = asCallable(unwrapModule(mod));
+  const definition = definitionOf(target);
+  // 命名空间上的 name/inject 是插件作者的权威声明，default 上的 static 字段可能没有。
+  if (mod && typeof mod === 'object') {
+    if (definition.name === 'anonymous' && typeof mod.name === 'string') definition.name = mod.name;
+    if (definition.inject.length === 0 && Array.isArray(mod.inject)) definition.inject = mod.inject;
+  }
   if (typeof definition.apply !== 'function') {
     throw Object.assign(new Error('插件 ' + definition.name + ' 缺少 apply 函数'), { stage: 'apply' });
   }
-  const fiber = root.plugin(mod, config ?? {});
+  const fiber = root.plugin(target, config ?? {});
   const record = {
     name: definition.name,
     inject: [...definition.inject],

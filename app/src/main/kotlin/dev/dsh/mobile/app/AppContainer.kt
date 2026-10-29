@@ -106,9 +106,53 @@ class AppContainer(private val context: Context) {
     private suspend fun presetSystemPrompt(sessionId: String): String {
         val s = settings.settings.first()
         val base = dev.dsh.mobile.core.data.preset.CapabilityGuide.augment(LlmConfig.DEFAULT_SYSTEM)
-        val preset = presetStore.get(s.presetFor(sessionId)) ?: return base
+        // 技能目录按库现取而不是按会话存：装了/关了技能，下一轮就生效，不用重建会话。
+        val skills = skillsBlock(skillsCatalog())
+        val preset = presetStore.get(s.presetFor(sessionId)) ?: return base + skills
         val on = dev.dsh.mobile.core.data.preset.AgentPresets.switchOn(preset, s.switchOnFor(sessionId))
-        return dev.dsh.mobile.core.data.preset.AgentPresets.compose(preset, base, cwd(), on)
+        return dev.dsh.mobile.core.data.preset.AgentPresets.compose(preset, base, cwd(), on) + skills
+    }
+
+    /**
+     * 当前可被模型调用的技能目录（名字 + 一句描述）。
+     *
+     * 技能库落在 :node 引擎的 DSH_HOME 下，这边看不到文件，只能问 /skill-manager；
+     * 没启引擎、没装技能、引擎报错都退成空表 —— 提示词少一段技能说明，会话照常能聊。
+     */
+    private suspend fun skillsCatalog(): List<Pair<String, String>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val resp = nodeEngine.rpc("/skill-manager", "list", JSONObject())
+            val entries = (resp.opt("value") as? JSONObject)?.optJSONArray("entries")
+            buildList {
+                for (i in 0 until (entries?.length() ?: 0)) {
+                    val e = entries?.optJSONObject(i) ?: continue
+                    // 关掉的技能不进目录：列出来模型就会去读，然后拿一个「未知技能」回来。
+                    if (!e.optBoolean("effectiveEnabled")) continue
+                    if (!e.optBoolean("modelInvocable", true)) continue
+                    val name = e.optString("name")
+                    if (name.isBlank()) continue
+                    add(name to e.optString("description"))
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    /**
+     * 技能目录拼成系统提示词的一段。
+     *
+     * 只放名字和一句描述：全文有几十 KB，写在提示词里每轮都要付钱，让模型真要用时再调 skill 读。
+     */
+    private fun skillsBlock(items: List<Pair<String, String>>): String {
+        if (items.isEmpty()) return ""
+        return buildString {
+            append("\n\n## 可用技能\n")
+            append("下面这些技能能直接用。任务与某条描述对得上时，先调 skill 工具按名字读它的完整说明，再照着做。\n")
+            for ((name, desc) in items) {
+                append("- ").append(name)
+                if (desc.isNotBlank()) append("：").append(desc)
+                append('\n')
+            }
+        }
     }
 
     val runtimeHost: EmbeddedRuntimeHost by lazy { EmbeddedRuntimeHost(context, scope) }
@@ -221,6 +265,34 @@ class AppContainer(private val context: Context) {
     val shellExecChannel: suspend (String, String?) -> String get() = toolExecutors::shellExecChannel
     val channelListExec: suspend () -> String get() = toolExecutors::channelListExec
     val bgExec: suspend (String, JsonObject) -> String get() = toolExecutors::bgExec
+
+    /**
+     * skill 工具：只把技能名转给引擎，路径一律由引擎侧按扫描结果解析，这边不拼路径。
+     *
+     * 失败转成可读文本而不是抛异常：工具结果要能告诉模型「为什么没读到」，
+     * 抛出去只剩一个类名，模型下一轮只会照着猜。
+     */
+    val skillExec: suspend (JsonObject) -> String = { args ->
+        val name = (args["name"] as? kotlinx.serialization.json.JsonPrimitive)
+            ?.let { if (it.isString) it.content else null }
+            .orEmpty()
+            .trim()
+        if (name.isEmpty()) {
+            "缺少技能名 name"
+        } else {
+            try {
+                val resp = withContext(Dispatchers.IO) {
+                    nodeEngine.rpc("/skill-manager", "read", JSONObject().put("name", name))
+                }
+                (resp.opt("value") as? JSONObject)?.optString("content")?.takeIf { it.isNotBlank() }
+                    ?: "技能读取失败：引擎没有返回内容"
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                "技能读取失败：" + (t.message ?: t.javaClass.simpleName)
+            }
+        }
+    }
 
     /** 工具链预装每进程只起一次；重复调用在主线程直接短路，真正的探测都在 IO 上。 */
     @Volatile
@@ -518,6 +590,7 @@ class AppContainer(private val context: Context) {
                             shellExecChannel = shellExecChannel,
                             channelListExec = channelListExec,
                             bgExec = bgExec,
+                            skillExec = skillExec,
                             contextBudgetProvider = { settings.settings.first().groupContextBudget },
                             // 引擎插件：baseUrl = engine://<模型 id> 时走 :node 的 /llm，不碰网络。
                             // nodeEngine 是 lazy，这里只是传闭包，真正碰引擎发生在发消息那一刻。
