@@ -102,31 +102,92 @@ internal fun sanitizeGroupText(text: String, ownName: String, roster: List<Strin
 
 private val BRACKET_SPEAKER = Regex("""^\s*\[([^\]]{1,24})]\s*(.*)$""")
 
-/** 本地图片 → data URL（视觉模型要求内联 base64）。超过 8MB 直接放弃，别把请求撑爆。 */
-internal fun imageDataUrl(path: String): String? = runCatching {
+/** 缩放长边上限：主流视觉模型都按 1568 左右的长边算 token，再大只是白烧上下文。 */
+private const val IMAGE_MAX_EDGE = 1568
+
+/** 单张图片压缩后的字节上限；超过继续降质量，别让一次带图请求把网关顶回去。 */
+private const val IMAGE_MAX_BYTES = 3_500_000
+
+/**
+ * 本地图片 → data URL。
+ * 相机原图动辄 8MB / 4000px：直接 base64 会被网关拒或拖垮请求，
+ * 老实现超 8MB 就静默丢图（用户以为发了、模型其实没看到），这里改成先缩放再压 JPEG。
+ * 返回 null 表示这张图确实用不了，调用方要把原因写进正文，不能装没事。
+ */
+internal fun imageDataUrl(path: String): String? {
     val file = java.io.File(path)
-    if (!file.isFile || file.length() > 8L * 1024 * 1024) return@runCatching null
-    val mime = when (file.extension.lowercase()) {
-        "png" -> "image/png"
-        "webp" -> "image/webp"
-        "gif" -> "image/gif"
-        else -> "image/jpeg"
+    if (!file.isFile) return null
+    val pngOrGif = file.extension.lowercase() in setOf("png", "gif")
+    val bytes = compressForUpload(file, pngOrGif) ?: return null
+    val mime = if (pngOrGif) "image/png" else "image/jpeg"
+    val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+    return "data:" + mime + ";base64," + b64
+}
+
+/** 缩边 + 压到 [IMAGE_MAX_BYTES] 以内；解码失败返回 null。 */
+private fun compressForUpload(file: java.io.File, keepPng: Boolean): ByteArray? = runCatching {
+    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    android.graphics.BitmapFactory.decodeFile(file.absolutePath, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
+    var sample = 1
+    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= IMAGE_MAX_EDGE) sample *= 2
+    val decoded = android.graphics.BitmapFactory
+        .decodeFile(file.absolutePath, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+        ?: return@runCatching null
+    val edge = maxOf(decoded.width, decoded.height)
+    val bitmap = if (edge > IMAGE_MAX_EDGE) {
+        val ratio = IMAGE_MAX_EDGE.toFloat() / edge
+        android.graphics.Bitmap.createScaledBitmap(
+            decoded,
+            (decoded.width * ratio).toInt().coerceAtLeast(1),
+            (decoded.height * ratio).toInt().coerceAtLeast(1),
+            true,
+        )
+    } else {
+        decoded
     }
-    val b64 = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
-    "data:" + mime + ";base64," + b64
+    val format = if (keepPng) android.graphics.Bitmap.CompressFormat.PNG else android.graphics.Bitmap.CompressFormat.JPEG
+    var quality = 85
+    var out = encode(bitmap, format, quality)
+    while (!keepPng && out.size > IMAGE_MAX_BYTES && quality > 45) {
+        quality -= 15
+        out = encode(bitmap, format, quality)
+    }
+    out
 }.getOrNull()
+
+private fun encode(bitmap: android.graphics.Bitmap, format: android.graphics.Bitmap.CompressFormat, quality: Int): ByteArray {
+    val bos = java.io.ByteArrayOutputStream()
+    bitmap.compress(format, quality, bos)
+    return bos.toByteArray()
+}
 
 /**
  * user 消息的 content：纯文本时保持字符串（很多网关只吃字符串），
  * 带图时切成 OpenAI 的 parts 数组，并在正文尾部列出本地路径供 shell 工具读取。
  */
 internal fun buildUserContent(userText: String, userImages: List<String>): JsonElement {
+    // 单趟处理：每张图只解码一次，同时记下哪张没上去。
+    val inlined = ArrayList<Pair<String, String>>(userImages.size)
+    val dropped = ArrayList<String>()
+    userImages.forEach { path ->
+        val dataUrl = imageDataUrl(path)
+        if (dataUrl != null) inlined += path to dataUrl else dropped += path
+    }
+    if (userImages.isNotEmpty()) {
+        AppLog.i("user images: sent=" + inlined.size + " dropped=" + dropped.size)
+    }
     val text = buildString {
         append(userText)
         if (userImages.isNotEmpty()) {
             if (isNotBlank()) append("\n\n")
             append("附件（本地绝对路径，可用 shell 工具直接读取）：")
             append(userImages.joinToString("、"))
+        }
+        if (dropped.isNotEmpty()) {
+            // 静默丢图是最坑的：用户以为发了图，模型只看到一行路径，于是答非所问。
+            append("\n\n这几张图没能随请求发出，本轮看不到它们：")
+            append(dropped.joinToString("、"))
         }
     }
     val parts = buildJsonArray {
@@ -136,8 +197,7 @@ internal fun buildUserContent(userText: String, userImages: List<String>): JsonE
                 put("text", text)
             }
         }
-        userImages.forEach { path ->
-            val dataUrl = imageDataUrl(path) ?: return@forEach
+        inlined.forEach { (_, dataUrl) ->
             addJsonObject {
                 put("type", "image_url")
                 putJsonObject("image_url") { put("url", dataUrl) }

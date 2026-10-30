@@ -18,6 +18,8 @@
 - 桌面宿主服务面补齐，市场里的真插件不再是「装上了跑不起来」：`ctx.llm` 成员从 8 个扩到 29 个（`registerAdapter` / `listModels` / `resolveModelInfo` / `stream` 等 17 个真实现，其余明确抛 `LLM_UNSUPPORTED` 并带成员名）；新增 `ctx.dshLoader` 门面（`.dsh` 的 `defineTool`、`deadline`、`credentialRef`、`BasicCompactionEngine` 等模块级符号，`.llm` 的 `createUserMessage` / `deepFreeze`，以及 `.settings.installSection`）、`credentials.resolve`、`systemPrompt.section`。`dsh-auxiliary 0.6.4` 与 `ollama-cloud 0.2.1` 装上后 `apply` 成功。
 - 插件配置默认值不生效：cordis 只从交给 `root.plugin` 的对象上读 `Config`，解包 `export default` 之后 schema 丢了就整段跳过校验，插件拿到的是裸 `config`。现在把命名空间上的 `Config` 搬回插件对象。
 - 插件路由误判：`classifyPlugin` 只看 `node:` / `@deepseek-ai/` 前缀，`import Schema from 'schemastery'` 这种裸包名被判成 Rhino 档（Rhino 侧没有 npm 解析器，必挂）。改成按真实外部模块扫描结果判断。
+- 发图问「你能看到图片吗」却得到一句空话：相机原图超过 8MB（或解码失败）时旧实现直接跳过，只把文件路径写进正文，模型根本没收到像素。现在先按 1568px 长边缩图、JPEG 压到 3.5MB 以内再内联；实在发不出去的图会在正文里点名说明，不再静默丢。带图请求被上游打回时，报错也会点明「上游可能不吃图文混排」。
+- 同一个应用里两套预设：会话里的「配置智能体」写了三条硬编码预设（标准 / 简洁 / 工具），「Agent 预设」页是另一份六个内置预设。现在两处都取 `AgentPresets.builtins`，显示同一份。
 - npm 依赖装不上的根因：解析器把 `^7.8.5` 这类范围直接拼进 registry URL（`/semver/^7.8.5`），registry 只认精确版本和 dist-tag，必然 404/405。现在先取整个 packument，再按范围挑版本（`^` / `~` / 精确 / `>=` 都支持，预发布版本一律跳过）。
 - 插件管理页谎报「已启用」：现在以引擎真实回执为准，注册失败或运行期报错会显示「加载失败」徽标，并把 `加载失败：<原因>` 常显在行内。
 - ESM 入口的插件装载：入口是命名空间对象时取 `default`，class 形状的插件包一层 `new` 再交给 cordis。此前这类包一律报「缺少 apply 函数」。

@@ -630,7 +630,7 @@ class LocalEngineTransport(
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 kotlinx.coroutines.currentCoroutineContext().ensureActive()
                 AppLog.w("llm call failed: ${e.message}")
-                _events.tryEmit(DshEvent.MessageChunk(sessionId, "\n\n[请求失败] " + friendlyRequestError(e, cfg.baseUrl), authorId, authorName, turnId))
+                _events.tryEmit(DshEvent.MessageChunk(sessionId, "\n\n[请求失败] " + friendlyRequestError(e, cfg.baseUrl, userImages.isNotEmpty()), authorId, authorName, turnId))
                 _events.tryEmit(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
                 return
             }
@@ -2036,7 +2036,7 @@ class LocalEngineTransport(
     private fun JsonPrimitive.contentOrNullSafe(): String? = if (this is JsonNull) null else content
 
     /** 把连接类错误翻成人话：本机网关没起来时，用户根本不知道要去哪点一下。 */
-    private fun friendlyRequestError(e: Throwable, baseUrl: String): String {
+    private fun friendlyRequestError(e: Throwable, baseUrl: String, hasImages: Boolean = false): String {
         val raw = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
         val uri = runCatching { java.net.URI(baseUrl.trim()) }.getOrNull()
         val host = uri?.host ?: ""
@@ -2048,6 +2048,11 @@ class LocalEngineTransport(
             val port = uri?.port?.takeIf { it > 0 } ?: 80
             return "本机网关 127.0.0.1:" + port + " 没在运行（" + raw + "）。\n" +
                 "宿主启动时会自动拉起它；仍失败就到「插件」页点一次启动，或把这个模型的地址改成上游直连。"
+        }
+        // 带图请求被上游打回时，报错文本常常只有一句 400，看不出是图片的问题。
+        if (hasImages && (raw.contains("400") || raw.contains("image", true) || raw.contains("content", true))) {
+            return raw + "\n\n这一轮带了图片：上游多半不吃图文混排（纯文本模型会把 image_url 直接打回）。" +
+                "换一个支持视觉的模型重试，或者把图里的内容打字发出来。"
         }
         return raw
     }

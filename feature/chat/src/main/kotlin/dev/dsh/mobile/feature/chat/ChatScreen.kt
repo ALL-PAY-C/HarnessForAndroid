@@ -1,6 +1,7 @@
 package dev.dsh.mobile.feature.chat
 
 import android.net.Uri
+import dev.dsh.mobile.core.data.preset.AgentPresets
 import dev.dsh.mobile.core.data.repo.SendQueue
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -1277,15 +1278,14 @@ private fun EditDialog(
     )
 }
 
-/** 内置预设：和 DSH 侧的运行模式对齐，插件还可以再加自己的。 */
 /**
- * 内置预设只放「标准行为」，花活预设由插件通过 SlotId.AgentPreset 注入。
+ * 「配置智能体」的预设按钮与「Agent 预设」页同源：都取 [AgentPresets.builtins]。
+ *
+ * 以前这里是另写的一份硬编码三条（标准/简洁/工具），于是同一个应用里两个入口
+ * 显示出两套完全不同的预设，用户以为装错了版本。
  */
-private val BUILTIN_PRESETS = listOf(
-    "标准模式" to "",
-    "简洁模式" to "回答尽量短：先给结论或可直接执行的命令，再补一句必要说明。不复述问题，不写过程旁白。",
-    "工具模式" to "需要动手时先调用工具，再根据真实输出回答；不要臆造命令结果，失败就看 stderr 调整。",
-)
+private val BUILTIN_PRESETS: List<Pair<String, String>> =
+    AgentPresets.builtins.map { it.name to (it.prefix + it.suffix).trim() }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
