@@ -304,8 +304,10 @@ class LocalEngineTransport(
     override suspend fun connect() {
         _state.value = RuntimeState.Starting("读取模型配置")
         val cfg = configProvider("")
+        // 没配模型不是「运行时坏了」：留 NotConfigured，抽屉别把首次安装写成「运行时异常」。
+        // AppContainer 的模型监听对 Failed/NotConfigured 一视同仁，配上 Key 会自动重连。
         _state.value = if (cfg == null) {
-            RuntimeState.Failed("未接入模型：到 Agent 页添加 API Key 后点重试", retryable = true)
+            RuntimeState.NotConfigured
         } else {
             RuntimeState.Ready(dev.dsh.mobile.core.model.TransportKind.InProcess, "本地引擎 · ${cfg.model}")
         }

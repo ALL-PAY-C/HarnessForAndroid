@@ -7,7 +7,7 @@
     "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.07/HarnessForAndroid-release-v0.07.apk",
     "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.07/HarnessForAndroid-release-v0.07.apk"
   ],
-  "sha256": "109f63b2235aec78d331fe97e79691c8cb81289e7997a44264dcb7ce0cb07f60",
+  "sha256": "350e6c4560612a65e0070c4acebe50bc429211bdd11b944ee084995f35eab34f",
   "notes": "v0.07（修订）：签名材料随仓库走，别处 clone 构建出的包与线上同证书，可覆盖升级；桌面宿主服务面补齐 llm / dshLoader（.dsh 模块符号、.llm、settings.installSection）/ credentials.resolve / systemPrompt.section，dsh-auxiliary、ollama-cloud 这类插件能在引擎里真正 apply；技能中心加了移除入口；插件路由按真实 import 判断，裸 npm 包不再错走 Rhino。release 只打 arm64-v8a，Android 8.0 以上。",
-  "sizeBytes": 113312185
+  "sizeBytes": 113312317
 }
