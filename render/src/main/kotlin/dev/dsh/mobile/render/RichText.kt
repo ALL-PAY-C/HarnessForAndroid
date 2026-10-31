@@ -426,8 +426,9 @@ private fun BlockView(
         //   1) HTML_LANGS 且装了 HTML 插件 -> HtmlFenceView（已有行为，不能动）；
         //   2) DiagramKinds 认得这个 lang 且装了图形插件 -> DiagramFenceView；
         //   3) 其余（含"认得但没装插件"）-> CodeBlockView，只是多一句该装什么。
-        // 先判 HTML 再判图形，是为了让 svg/xml 继续待在 WebView 通道上：
-        // 它们本来就在 HTML_LANGS 里，抢过来会改变既有渲染结果。
+        // 先判 HTML 再判图形；svg 是唯一被摘出来的：它虽在 HTML_LANGS 里，
+        // 但 DiagramKinds 认得它，交给图形插件才能真画出 SVG 而不是塞给 WebView。
+        // xml 保持原样，继续走 HTML 通道。
         is MdBlock.CodeBlock -> {
             // 读 generation 而不是只读 render：插件在首帧之后才注册时，
             // 这一格要能自己重组、从源码翻成预览，用户不用退出重进。
@@ -435,13 +436,13 @@ private fun BlockView(
             HtmlBlockRenderers.generation
             @Suppress("UNUSED_EXPRESSION")
             DiagramRenderers.generation
-            val asPage = isHtmlFenceLang(block.lang)
+            val asPage = usesHtmlFenceView(block.lang)
             val web = if (asPage) HtmlBlockRenderers.render else null
             val kind = if (web == null) DiagramKinds.of(block.lang) else null
             val diagram = if (kind != null) DiagramRenderers.render else null
             when {
                 web != null -> HtmlFenceView(block, style, web)
-                diagram != null && kind != null -> DiagramFenceView(block, style, kind, diagram)
+                diagram != null && kind != null -> DiagramFenceView(block, kind, diagram)
                 asPage -> {
                     // 没装 HTML 插件：至少别让人对着一块空白猜。源码照常显示，
                     // 并在标题行提示一句该装什么。
@@ -525,6 +526,16 @@ private val HTML_LANGS = setOf("html", "htm", "xhtml", "svg", "xml")
 internal fun isHtmlFenceLang(lang: String): Boolean = lang.lowercase() in HTML_LANGS
 
 /**
+ * 围栏该不该走 HTML 通道（HtmlFenceView）。
+ *
+ * 与 [isHtmlFenceLang] 的差别只有 svg：svg 同时在 HTML_LANGS 和 DiagramKinds 里，
+ * 在这里把 svg 排掉，[DiagramKinds] 才轮得到它，SVG 才会被真正画出来而不是塞给
+ * WebView 当页面源码。
+ */
+internal fun usesHtmlFenceView(lang: String): Boolean =
+    isHtmlFenceLang(lang) && !lang.trim().equals("svg", ignoreCase = true)
+
+/**
  * 图形插件没装时的兜底说明。tikz/python 不是「装个插件就能看」的类型，
  * 所以单独说实话：它们缺的是运行环境，不是渲染库。
  */
@@ -558,7 +569,7 @@ private fun HtmlFenceView(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "html",
+                    text = block.lang.ifBlank { "html" },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.weight(1f),
@@ -602,73 +613,20 @@ private fun HtmlFenceView(
 }
 
 /**
- * 图形围栏的渲染卡片（mermaid / dot / echarts / chartjs …）。
+ * 图形围栏的渲染入口（mermaid / dot / echarts / svg …）。
  *
- * 结构故意与 [HtmlFenceView] 一致：同圆角、同 surfaceVariant、同标题行 + 右侧按钮，
- * 这样同一屏里 HTML 卡和图形卡不会一个胖一个瘦。渲染本体由插件提供，
- * 宿主只管卡片框架、预览/源码切换和复制。
+ * 宿主这里只把 (kind, source) 交给插件：卡片背景、标题行、源码/复制/全屏
+ * 都是插件自己画的那一套，多包一层 Surface + 标题行就会叠成两层头。
+ * 插件没装时不会走到这里，调用方会退回 [CodeBlockView]。
  */
 @Composable
 private fun DiagramFenceView(
     block: MdBlock.CodeBlock,
-    style: TextStyle,
     kind: String,
     render: @Composable (kind: String, source: String) -> Unit,
 ) {
-    val clipboard = LocalClipboardManager.current
-    var preview by remember(block.code) { mutableStateOf(true) }
-    var copied by remember(block.code) { mutableStateOf(false) }
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-    ) {
-        Column(modifier = Modifier.padding(vertical = 6.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = kind,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = if (preview) "查看源码" else "预览效果",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { preview = !preview },
-                )
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    text = if (copied) "已复制" else "复制",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable {
-                        clipboard.setText(AnnotatedString(block.code))
-                        copied = true
-                    },
-                )
-            }
-            if (preview) {
-                Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
-                    render(kind, block.code)
-                }
-            } else {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                ) {
-                    Text(
-                        text = block.code,
-                        style = style.copy(fontFamily = FontFamily.Monospace, fontSize = 13.sp),
-                    )
-                }
-            }
-        }
+    Box(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        render(kind, block.code)
     }
 }
 

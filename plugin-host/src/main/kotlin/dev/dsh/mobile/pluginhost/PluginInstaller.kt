@@ -36,8 +36,30 @@ internal fun classifyPlugin(dir: File): PluginKind {
     val entry = JsPluginRuntime.resolveEntry(dir) ?: return PluginKind.Declarative
     val entryFile = File(dir, entry.path)
     val missing = ExternalModules.scan(dir, entryFile)
-    return if (missing.isNotEmpty()) PluginKind.Node else PluginKind.Rhino
+    if (missing.isNotEmpty()) return PluginKind.Node
+    // 依赖齐也可能跑不起来：Rhino 只到 ES6，现代包普遍带可选链 / 空值合并 / async / 展开，
+    // 这些在 Rhino 是编译期 syntax error，报出来像「插件坏了」，其实是引擎不认。这类包同样
+    // 交给 NodeEngineHost —— libnode 是完整 ES2022 运行时，语法层一次都不用降级。
+    return if (needsModernSyntax(entryFile)) PluginKind.Node else PluginKind.Rhino
 }
+
+/** 入口文件超过这个大小就不扫了：读全文只为判定路由，40 万字符覆盖了绝大多数插件包。 */
+private const val MODERN_SCAN_LIMIT = 2_000_000L
+
+/**
+ * Rhino 语法之外的最小特征集：可选链、空值合并、async 函数/箭头、数组与对象展开。
+ * 只用来决定「这包该交给哪个引擎」，不做严格解析 —— 漏判只是继续走 Rhino 并报原来的编译错。
+ */
+private val MODERN_SYNTAX = Regex(
+    "\\?\\.|\\?\\?" +
+        "|(?<![\\w\\$.])async\\s*(?:function|\\(|[A-Za-z_\\$][\\w\\$]*\\s*=>)" +
+        "|[\\[{]\\s*\\.\\.\\.",
+)
+
+/** 入口源码里有没有 Rhino 消化不了的现代语法；读不到就当没有（[classifyPlugin] 保持老行为）。 */
+internal fun needsModernSyntax(entryFile: File): Boolean = runCatching {
+    entryFile.length() <= MODERN_SCAN_LIMIT && MODERN_SYNTAX.containsMatchIn(entryFile.readText())
+}.getOrDefault(false)
 
 /**
  * 卸载核心：先删目录，删失败即抛、不触碰 [remove]（配置保留）；成功才 [remove]。

@@ -63,6 +63,7 @@ import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
 import dev.dsh.mobile.core.common.AppLog
 import dev.dsh.mobile.design.IconBtn
+import dev.dsh.mobile.design.LocalFontRoles
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.toolbridge.ShellBridge
 import dev.dsh.mobile.toolbridge.ShellSpec
@@ -341,8 +342,9 @@ private fun TabChip(title: String, selected: Boolean, onSelect: () -> Unit, onCl
         )
         if (onClose != null) {
             Spacer(Modifier.width(6.dp))
+            // 命中区 34dp，叉号视觉 12dp：原来 18dp 的框点了半天点不中。
             Box(
-                Modifier.size(18.dp).clip(RoundedCornerShape(50)).clickable(onClick = onClose),
+                Modifier.size(34.dp).clip(RoundedCornerShape(50)).clickable(onClick = onClose),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -451,7 +453,7 @@ private fun SimpleArea(shell: ShellBridge, spec: ShellSpec) {
             Text(
                 spec.label + " · " + spec.shell,
                 color = p.t3,
-                fontSize = 11.sp,
+                fontSize = 11.sp * LocalFontRoles.current.terminal,
                 fontFamily = FontFamily.Monospace,
             )
             Spacer(Modifier.height(8.dp))
@@ -459,8 +461,9 @@ private fun SimpleArea(shell: ShellBridge, spec: ShellSpec) {
                 Text(
                     line.text,
                     color = if (line.command) p.accent else p.t1,
-                    fontSize = 12.5.sp,
-                    lineHeight = 18.sp,
+                    // 终端字号跟设置里的「终端字号」走，等宽字体不变。
+                    fontSize = 12.5.sp * LocalFontRoles.current.terminal,
+                    lineHeight = 18.sp * LocalFontRoles.current.terminal,
                     fontFamily = FontFamily.Monospace,
                 )
                 Spacer(Modifier.height(4.dp))

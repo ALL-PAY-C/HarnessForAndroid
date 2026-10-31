@@ -15,7 +15,8 @@ package dev.dsh.mobile.pluginhost
  *  - export const/let/var NAME   -> 原声明 + 文件尾 __exports.NAME = NAME（支持逗号多声明）
  *  - export function/class NAME  -> 原声明 + 文件尾 __exports.NAME = NAME
  *  - export { a, b as c }        -> 文件尾 __exports.a = a; __exports.c = b
- *  - import.meta.url             -> ''
+ *  - import.meta.url             -> __metaUrl（宿主注入本模块的 file:// URL）
+ *  - import.meta.resolve(x)      -> __metaResolve(x)（宿主抛错，插件自带的 catch 会回落）
  *
  * ponytail: 不做 AST 级变换 —— 只按行首匹配。已知上限：
  *  1) 跨多行的 import 子句（import { 换行 a, 换行 b 换行 } from 'm'）不认，抛 UnsupportedException；
@@ -40,7 +41,11 @@ object EsmTransform {
         // 幂等：没有任何 ESM 痕迹就原样返回，现有 14 项运行时测试走的都是这条路。
         if (!looksLikeEsm(source)) return source
 
-        val text = source.replace("import.meta.url", "''")
+        // 先换 .url：给的是本模块真实的 file:// 地址，插件拿它 fileURLToPath + dirname
+        // 就能找到自己所在目录，换成空串会让后面那一步直接抛 TypeError。
+        val text = source
+            .replace("import.meta.url", "__metaUrl")
+            .replace("import.meta.resolve", "__metaResolve")
         val lines = text.split("\n")
         val out = StringBuilder(text.length + 256)
         val tail = mutableListOf<String>()
@@ -65,7 +70,7 @@ object EsmTransform {
                 continue
             }
             if (RE_IMPORT_META.containsMatchIn(trimmed)) {
-                throw UnsupportedException(file, lineNo, "import.meta 只支持 .url，其余字段本端没有")
+                throw UnsupportedException(file, lineNo, "import.meta 只支持 .url 和 .resolve，其余字段本端没有")
             }
             if (RE_DYNAMIC_IMPORT.containsMatchIn(trimmed)) {
                 throw UnsupportedException(file, lineNo, "不支持动态 import()，模块必须静态引入")
@@ -101,32 +106,51 @@ object EsmTransform {
         if (line.length > 6 && !" \t{*'\"".contains(line[6])) return null
         if (line.length == 6) return null
 
-        RE_IMPORT_BARE.matchEntire(line)?.let { m ->
-            return indent + "__require('" + esc(m.groupValues[2]) + "');"
+        // 打包产物（esbuild/terser）会把多条 import 挤在同一行，且 import 后面紧跟正文，
+        // 所以按「行首逐条消费」处理：单条 import 的行走同一路径，吃完只剩空串，
+        // 行为与按行整体匹配完全一致；一条都消费不掉才当作不认识的写法。
+        val decls = StringBuilder()
+        var cursor = line
+        while (true) {
+            val one = matchLeadingImport(cursor, file, lineNo) ?: break
+            decls.append(one.first)
+            cursor = cursor.substring(one.second)
+            if (cursor.isBlank()) break
         }
-        RE_IMPORT_NS.matchEntire(line)?.let { m ->
-            return indent + "const " + m.groupValues[1] + " = __require('" + esc(m.groupValues[3]) + "');"
+        if (decls.isEmpty()) {
+            throw UnsupportedException(file, lineNo, "认不出的 import 写法：" + line.take(160))
         }
-        RE_IMPORT_DEF_NS.matchEntire(line)?.let { m ->
+        return indent + decls.toString() + cursor
+    }
+
+    /** 吃掉行首一条 import：返回（转换后的声明, 消费的字符数）；不是 import 返回 null。 */
+    private fun matchLeadingImport(line: String, file: String, lineNo: Int): Pair<String, Int>? {
+        RE_IMPORT_BARE_P.find(line)?.let { m ->
+            return "__require('" + esc(m.groupValues[2]) + "');" to m.range.last + 1
+        }
+        RE_IMPORT_NS_P.find(line)?.let { m ->
+            return "const " + m.groupValues[1] + " = __require('" + esc(m.groupValues[3]) + "');" to m.range.last + 1
+        }
+        RE_IMPORT_DEF_NS_P.find(line)?.let { m ->
             val spec = esc(m.groupValues[4])
             val ns = m.groupValues[2]
-            return indent + "const " + ns + " = __require('" + spec + "'); " +
-                "const " + m.groupValues[1] + " = __interop(" + ns + ");"
+            return ("const " + ns + " = __require('" + spec + "'); " +
+                "const " + m.groupValues[1] + " = __interop(" + ns + ");") to m.range.last + 1
         }
-        RE_IMPORT_NAMED.matchEntire(line)?.let { m ->
+        RE_IMPORT_NAMED_P.find(line)?.let { m ->
             val binds = destructure(m.groupValues[1], file, lineNo)
-            return indent + "const " + binds + " = __require('" + esc(m.groupValues[3]) + "');"
+            return "const " + binds + " = __require('" + esc(m.groupValues[3]) + "');" to m.range.last + 1
         }
-        RE_IMPORT_DEF_NAMED.matchEntire(line)?.let { m ->
+        RE_IMPORT_DEF_NAMED_P.find(line)?.let { m ->
             val spec = esc(m.groupValues[4])
             val binds = destructure(m.groupValues[2], file, lineNo)
-            return indent + "const " + m.groupValues[1] + " = __interop(__require('" + spec + "')); " +
-                "const " + binds + " = __require('" + spec + "');"
+            return ("const " + m.groupValues[1] + " = __interop(__require('" + spec + "')); " +
+                "const " + binds + " = __require('" + spec + "');") to m.range.last + 1
         }
-        RE_IMPORT_DEFAULT.matchEntire(line)?.let { m ->
-            return indent + "const " + m.groupValues[1] + " = __interop(__require('" + esc(m.groupValues[3]) + "'));"
+        RE_IMPORT_DEFAULT_P.find(line)?.let { m ->
+            return "const " + m.groupValues[1] + " = __interop(__require('" + esc(m.groupValues[3]) + "'));" to m.range.last + 1
         }
-        throw UnsupportedException(file, lineNo, "认不出的 import 写法：" + line)
+        return null
     }
 
     /** 花括号子句 -> 解构赋值：{ a, b as c } 变成 { a, b: c }。 */
@@ -265,6 +289,17 @@ object EsmTransform {
     private val RE_IMPORT_DEF_NS =
         Regex("^import\\s+" + IDG + "\\s*,\\s*\\*\\s+as\\s+" + IDG + "\\s+from\\s+" + STR + "\\3\\s*;?\\s*$")
     private val RE_IMPORT_DEFAULT = Regex("^import\\s+" + IDG + "\\s+from\\s+" + STR + "\\2\\s*;?\\s*$")
+
+    // 前缀版：不锚行尾，供「一行多条 import」逐条消费（见 [matchLeadingImport]）。
+    // 空格一律 \s*：压缩包把 "from 'x'" 写成 "from'x'"，多一个 + 就整条匹配不上。
+    private val RE_IMPORT_BARE_P = Regex("^import\\s*" + STR + "\\1\\s*;?")
+    private val RE_IMPORT_NS_P = Regex("^import\\s*\\*\\s*as\\s+" + IDG + "\\s*from\\s*" + STR + "\\2\\s*;?")
+    private val RE_IMPORT_DEF_NS_P =
+        Regex("^import\\s*" + IDG + "\\s*,\\s*\\*\\s*as\\s+" + IDG + "\\s*from\\s*" + STR + "\\3\\s*;?")
+    private val RE_IMPORT_NAMED_P = Regex("^import\\s*\\{([^}]*)\\}\\s*from\\s*" + STR + "\\2\\s*;?")
+    private val RE_IMPORT_DEF_NAMED_P =
+        Regex("^import\\s*" + IDG + "\\s*,\\s*\\{([^}]*)\\}\\s*from\\s*" + STR + "\\3\\s*;?")
+    private val RE_IMPORT_DEFAULT_P = Regex("^import\\s*" + IDG + "\\s*from\\s*" + STR + "\\2\\s*;?")
 
     private val RE_EXPORT_STAR = Regex("^export\\s+\\*")
     private val RE_EXPORT_NAMED_FROM = Regex("^export\\s*\\{[^}]*\\}\\s*from\\s+")

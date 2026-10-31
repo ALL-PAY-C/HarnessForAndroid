@@ -58,6 +58,8 @@ class DeclarativePlugin(
 
         // 插件自带的页面（桌面端 dsh.ui / package.json / HTML 面板）：翻译成功就额外占一个
         // plugin.page 槽位，用户点开插件能看到它；翻译不出来就什么都不加，绝不伪造界面。
+        // plugin.json 自己声明了 plugin.page 贡献时以它为准，否则详情里会出现两张一样的页面卡。
+        if (registry.contributions.any { it.pluginId == spec.id && it.slot == SlotId.PluginPage }) return
         val page = runCatching { DesktopUiAdapter.fromPlugin(spec, packageDir) }.getOrNull() ?: return
         registry.contribute(
             SlotContribution(

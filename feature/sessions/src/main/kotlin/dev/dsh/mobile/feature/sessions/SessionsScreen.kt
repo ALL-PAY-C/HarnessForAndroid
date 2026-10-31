@@ -71,9 +71,20 @@ import dev.dsh.mobile.design.IconBtn
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.SectionChevron
+import dev.dsh.mobile.design.SlotEditFrame
+import dev.dsh.mobile.design.SlotEditItem
+import dev.dsh.mobile.design.SlotEditState
+import dev.dsh.mobile.design.SlotPickerDialog
+import dev.dsh.mobile.design.SlotPlusButton
 import dev.dsh.mobile.design.SwipeAction
 import dev.dsh.mobile.design.SwipeableRow
 import dev.dsh.mobile.design.TokenPill
+import dev.dsh.mobile.design.UiEditMode
+import dev.dsh.mobile.design.UiEditSlotPlusRow
+import dev.dsh.mobile.pluginapi.SlotAction
+import dev.dsh.mobile.pluginapi.SlotContribution
+import dev.dsh.mobile.pluginhost.PluginSlotItem
+import dev.dsh.mobile.pluginhost.rememberHostThemeTokens
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -83,6 +94,13 @@ fun SessionsScreen(
     onOpenSession: (String) -> Unit,
     onOpenDrawer: () -> Unit = {},
     sessionRowExtras: List<@Composable (Session) -> Unit> = emptyList(),
+    // 槽位接线：AppNav 把 target = SlotId.SessionList 的已放置项 / 候选 / 加删回调传进来，
+    // 本屏不知道「属于哪个槽位」这件事。
+    slotPlaced: List<SlotContribution> = emptyList(),
+    slotCandidates: List<SlotEditItem> = emptyList(),
+    onSlotAdd: (SlotEditItem) -> Unit = {},
+    onSlotRemove: (SlotEditItem) -> Unit = {},
+    onSlotAction: (SlotAction) -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val models by viewModel.models.collectAsStateWithLifecycle()
@@ -103,12 +121,29 @@ fun SessionsScreen(
     var movingSelected by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    // 编辑态开着且点了右下角「+」：候选列表弹窗。
+    var pickingSlot by remember { mutableStateOf(false) }
+    val hostTokens = rememberHostThemeTokens()
     fun toast(msg: String) { scope.launch { snackbar.showSnackbar(msg) } }
     val visibleIds = state.groups.flatMap { it.second }.map { it.id }
 
     LaunchedEffect(state.error) {
         state.error?.let { viewModel.dismissError() }
     }
+
+    // 祖先折叠判定：内容区三态与列表渲染共用同一份，否则「分组全被祖先吞掉」在列表外判不出空。
+    fun hiddenByAncestor(path: String): Boolean {
+        var acc = ""
+        val parts = folderPathFromGroup(path).split('/')
+        for (i in 0 until parts.size - 1) {
+            acc = if (acc.isEmpty()) parts[i] else acc + "/" + parts[i]
+            val key = folderGroupKey(acc)
+            if (key in state.collapsed) return true
+        }
+        return false
+    }
+    // 这些才是真正会渲染出列表行的分组。
+    val contentRows = state.groups.filterNot { hiddenByAncestor(it.first) }
 
     Column(Modifier.fillMaxSize().background(p.bg)) {
         QqTopBar(
@@ -155,6 +190,11 @@ fun SessionsScreen(
             }
         }
 
+        // UI 修改模式：会话列表项 / 抽屉分组旁各多一个可横滑的「+」，
+        // 点开就是既有候选弹窗（插件组件摆进来）。关着时这两行完全不渲染。
+        UiEditSlotPlusRow(slot = UiEditMode.Slot.SessionList, onClick = { pickingSlot = true })
+        UiEditSlotPlusRow(slot = UiEditMode.Slot.DrawerGroup, onClick = { pickingSlot = true })
+
         if (searching) {
             Row(
                 Modifier.fillMaxWidth().background(p.card).padding(horizontal = 12.dp, vertical = 6.dp),
@@ -174,8 +214,15 @@ fun SessionsScreen(
         }
 
         Box(Modifier.weight(1f)) {
-            // loaded 之前一律不判空：首帧还没到就说「还没有会话」是假空态。
-            if (state.loaded && state.groups.all { it.second.isEmpty() } && state.folders.isEmpty()) {
+            // 内容区恒有可见输出：加载态 / 空态 / 列表，三选一，任何一帧都不许落到「0 个子项的 LazyColumn」。
+            // 以前 loaded=false（首帧未到）或所有分组都被祖先折叠吞掉时会走到 else 那个 0 行列表 ——
+            // 内容区只剩纯背景，就是「退出会话后偶发整页空白」。
+            if (!state.loaded) {
+                EmptyState(
+                    title = "正在读取会话",
+                    subtitle = "稍等片刻，本地会话列表马上就好",
+                )
+            } else if (state.groups.all { it.second.isEmpty() } && state.folders.isEmpty()) {
                 EmptyState(
                     title = "还没有会话",
                     subtitle = when (val rt = state.runtime) {
@@ -186,10 +233,22 @@ fun SessionsScreen(
                         else -> "先在 Agent 页添加模型（填 API Key），再回到这里点 + 新建对话"
                     },
                 )
+            } else if (contentRows.isEmpty()) {
+                // 所有分组都被祖先折叠吞掉：列表会渲染 0 行，这里给一条能自己走出去的空态。
+                EmptyState(
+                    title = "没有可显示的会话",
+                    subtitle = "分组都收起了：点上方文件夹条展开，或到设置里同步历史会话",
+                )
             } else {
                 LazyColumn(
                     Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(10.dp),
+                    // 编辑态右下角浮着「+」：底部多留 72dp，最后一行不被它压住。
+                    contentPadding = PaddingValues(
+                        start = 10.dp,
+                        top = 10.dp,
+                        end = 10.dp,
+                        bottom = if (SlotEditState.enabled) 82.dp else 10.dp,
+                    ),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     val depthOf = state.folders.associate {
@@ -198,20 +257,8 @@ fun SessionsScreen(
                     val countOf = state.folders.associate {
                         folderGroupKey(it.path) to (it.sessions.size + it.children)
                     }
-                    // 父文件夹收起时整棵子树一起收：靠路径前缀判断，不需要递归渲染。
-                    fun hiddenByAncestor(path: String): Boolean {
-                        var acc = ""
-                        val parts = folderPathFromGroup(path).split('/')
-                        for (i in 0 until parts.size - 1) {
-                            acc = if (acc.isEmpty()) parts[i] else acc + "/" + parts[i]
-                            val key = folderGroupKey(acc)
-                            if (key in state.collapsed) return true
-                        }
-                        return false
-                    }
-
-                    state.groups.forEach { (group, sessions) ->
-                        if (hiddenByAncestor(group)) return@forEach
+                    // 父文件夹收起时整棵子树一起收：contentRows 已在内容区外面按路径前缀过滤过。
+                    contentRows.forEach { (group, sessions) ->
                         val collapsible = state.isCollapsible(group)
                         val isCollapsed = collapsible && group in state.collapsed
                         val depth = depthOf[group] ?: 0
@@ -234,7 +281,8 @@ fun SessionsScreen(
                                 Row(
                                     Modifier
                                         .fillMaxWidth()
-                                        .height(34.dp)
+                                        // 原 34dp 整行可点，低于 48dp 最小热区；heightIn 不压 chevron 视觉。
+                                        .heightIn(min = 48.dp)
                                         .background(p.hover)
                                         .clickable(enabled = collapsible) { viewModel.toggleGroup(group) }
                                         // 长按文件夹头 = 删掉这个文件夹（组内会话归档，会话本身还在）。
@@ -400,8 +448,50 @@ fun SessionsScreen(
                             }
                         }
                     }
+                    // 已放置的插件组件排在列表末尾：编辑态每项右上角带「−」。
+                    if (slotPlaced.isNotEmpty()) {
+                        item(key = "slot-placed") {
+                            Column(Modifier.fillMaxWidth()) {
+                                Text(
+                                    "插件",
+                                    color = p.t2,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(start = 10.dp, top = 2.dp, bottom = 6.dp),
+                                )
+                                slotPlaced.forEach { placed ->
+                                    SlotEditFrame(
+                                        onRemove = {
+                                            onSlotRemove(
+                                                SlotEditItem(placed.pluginId, placed.id, placed.label, placed.subtitle),
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                    ) {
+                                        PluginSlotItem(placed, hostTokens, onSlotAction)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
+            // 右下角贴边「+」：只在编辑态出现，不压新建会话（它在上方顶栏）。
+            if (SlotEditState.enabled) {
+                Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
+                    SlotPlusButton(label = "添加插件组件") { pickingSlot = true }
+                }
+            }
+        }
+
+        if (pickingSlot) {
+            SlotPickerDialog(
+                title = "添加到会话列表",
+                items = slotCandidates,
+                emptyHint = "没有可添加的插件组件：先到插件页装一个带会话列表槽位的插件",
+                onPick = { pickingSlot = false; onSlotAdd(it) },
+                onDismiss = { pickingSlot = false },
+            )
         }
 
         if (state.selectionMode) {

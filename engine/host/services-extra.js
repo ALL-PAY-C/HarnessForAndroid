@@ -15,6 +15,8 @@ import { defineTool, ToolArgsError } from '@deepseek-ai/dsh-tools';
 import { deadline } from '@deepseek-ai/dsh-timeout';
 import { credentialRef } from '@deepseek-ai/dsh-credentials';
 import { BlockAssembler, createUserMessage, deepFreeze } from '@deepseek-ai/dsh-llm';
+// 压缩后端 / 会话状态仓库：与 /tool-state RPC 共用同一份统计（见 tool-state.js）。
+import { estimateTokens, summarizeMessages, toolStateStore } from './tool-state.js';
 
 /** 运行期能力缺失 / 参数错误：stage=service 便于 logcat 与 stage=apply 区分。 */
 function serviceError(service, message, extra = {}) {
@@ -541,6 +543,126 @@ export function createSessionPersistenceService(options = {}) {
   };
 }
 
+// ── sessionProjections ──────────────────────────────────────────────────────
+/**
+ * 会话投影注册表。
+ *
+ * 桌面侧这个服务由会话库驱动：插件 register 一个投影，宿主在会话事件上跑它，
+ * 结果缓存给仪表盘读。移动端的会话库在 Kotlin 里，投影缓存没有对等物，所以这里
+ * 只保证契约形状（register 存下来、restore/hydrate 返回 null = 没有快照），
+ * 插件 apply 能过、register 不抛，UI 侧按「无数据」渲染，而不是整包加载失败。
+ */
+export function createSessionProjectionsService(options = {}) {
+  const logger = options.logger ?? null;
+  const items = new Map();
+  let seq = 0;
+  const nameOf = (projection) => {
+    if (typeof projection?.name === 'string' && projection.name !== '') return projection.name;
+    if (typeof projection?.id === 'string' && projection.id !== '') return projection.id;
+    seq += 1;
+    return 'projection-' + seq;
+  };
+  return {
+    register(projection) {
+      if (!projection || typeof projection !== 'object') {
+        throw serviceError('sessionProjections', 'register 需要一个投影对象', { method: 'register' });
+      }
+      const name = nameOf(projection);
+      items.set(name, projection);
+      logger?.debug?.('sessionProjections: 注册 ' + name);
+      return () => { items.delete(name); };
+    },
+    unregister(name) {
+      return items.delete(name);
+    },
+    list() {
+      return [...items.keys()];
+    },
+    get(name) {
+      return items.get(name);
+    },
+    // 没有桌面那套投影缓存：明确的空值比抛错更适合插件里的 sniff（它们先检测 typeof）。
+    restore() { return null; },
+    async hydrate() { return null; },
+  };
+}
+
+// ── sessionQuery / sessionProjectionCache / userQuestions ────────────────────
+/**
+ * dsh-context 的查询层：桌面侧会话库直接同步返回会话与事件；
+ * 移动端的会话库在 Kotlin 里，Node 侧只能反向查（dsh.sessions.list / dsh.sessions.observe）。
+ * 没有反向通道就抛 stage=transport（与 sessions 服务同一约定），不返回伪造的会话列表。
+ * observeSession 的返回值按 dsh-context 实际读取的字段归一化：header / events / inheritedEventCount。
+ */
+export function createSessionQueryService(options = {}) {
+  const host = options.host ?? null;
+  const call = createNativeReader('sessionQuery', host, 'Kotlin 端未实现 dsh.sessions.list / dsh.sessions.observe 时就是这个错');
+  return {
+    async listSessions() {
+      return asArray(await call('dsh.sessions.list', {}));
+    },
+    async observeSession(sessionId, query = {}) {
+      if (typeof sessionId !== 'string' || sessionId === '') {
+        throw serviceError('sessionQuery', 'observeSession 需要非空会话 id', { method: 'observeSession' });
+      }
+      // signal 是 AbortSignal，过不了反向通道；只透传可序列化的字段。
+      const raw = await call('dsh.sessions.observe', {
+        id: sessionId,
+        projectionMode: typeof query.projectionMode === 'string' ? query.projectionMode : 'none',
+      });
+      const detail = raw && typeof raw === 'object' ? raw : {};
+      return {
+        ...detail,
+        header: detail.header ?? null,
+        events: asArray(detail.events),
+        inheritedEventCount: Number.isFinite(detail.inheritedEventCount) ? detail.inheritedEventCount : 0,
+      };
+    },
+  };
+}
+
+/**
+ * 会话投影缓存：桌面侧把投影结果写进会话库并缓存给仪表盘读。
+ * 移动端没有这一层（会话数据在 Kotlin，Node 侧不落缓存），所以读走明确的空值
+ * （null / undefined = 「没有快照」，调用方按无数据处理），写直接抛 notImplemented，
+ * 不给插件一个「写成功了」的假象。
+ */
+export function createSessionProjectionCacheService(options = {}) {
+  const logger = options.logger ?? null;
+  return {
+    cachedSnapshot() { return null; },
+    stateOf() { return undefined; },
+    coldSnapshot() {
+      throw notImplemented('sessionProjectionCache', 'coldSnapshot', '移动端没有投影缓存层，快照无处可落（会话数据在 Kotlin）');
+    },
+    write() {
+      throw notImplemented('sessionProjectionCache', 'write', '移动端没有投影缓存层，快照无处可落（会话数据在 Kotlin）');
+    },
+  };
+}
+
+/**
+ * 交互式提问：桌面侧把问题推给 UI 客户端等用户选完再回来。
+ * 移动端的提问面板在 Kotlin 里，ask() 反向调用原生的 dsh.userQuestions.ask，
+ * 返回 { answers: [{ id, selected }] }（与 dsh 同名契约一致）。
+ * 反向通道没接通就抛 stage=transport：插件的工具调用拿到明确错误，
+ * 而不是一个「用户没选」的假结果。
+ */
+export function createUserQuestionsService(options = {}) {
+  const host = options.host ?? null;
+  const call = createNativeReader('userQuestions', host, 'Kotlin 端未实现 dsh.userQuestions.ask（移动端提问面板）时就是这个错');
+  return {
+    async ask(request = {}) {
+      const questions = Array.isArray(request?.questions) ? request.questions : [];
+      if (questions.length === 0) {
+        throw serviceError('userQuestions', 'ask 至少需要一个 question', { method: 'ask' });
+      }
+      const raw = await call('dsh.userQuestions.ask', { questions });
+      return { answers: asArray(raw?.answers ?? raw) };
+    },
+  };
+}
+
 // ── workspaceRegistry ────────────────────────────────────────────────────────
 /**
  * 工作目录登记表：纯内存 + 落 settings.json 的 workspaces 数组。
@@ -844,10 +966,11 @@ export function delegationDepthOf(agent) {
 }
 
 /**
- * BasicCompactionEngine：桌面 compaction 基类的构造壳。
+ * BasicCompactionEngine：桌面 compaction 基类的**真实现**。
  * dsh-auxiliary 会 `class CompressEngineImpl extends dsh().compaction.BasicCompactionEngine`
- * 并在 constructor 里 `super(ctx, config)` —— 所以本类**必须可构造且不抛**，
- * 真正做不到的只剩基类那两个方法（子类都覆写了；没覆写就抛说明性错误，不静默成功）。
+ * 并在 constructor 里 `super(ctx, config)`；子类覆写就转子类，不覆写也能真的压 ——
+ * 以前两个方法直接抛 DSH_UNSUPPORTED_MEMBER，插件里 compress 成员注册不上，
+ * 界面永远看不到「压缩发生过」。现在：真摘要 + 真记账（次数 / 前后 token / 摘要长度）。
  */
 export class BasicCompactionEngine {
   constructor(ctx, config) {
@@ -856,12 +979,62 @@ export class BasicCompactionEngine {
     this.logger = ctx?.log ?? null;
   }
 
-  compactIfNeeded() {
-    throw unsupportedMember('compaction.BasicCompactionEngine.compactIfNeeded', '移动端引擎没有会话压缩后端，请在子类覆写该方法');
+  /** 该引擎归属的会话；插件没给就记到 default（统计仍对前端可见）。 */
+  get sessionId() {
+    const raw = this.config?.sessionId ?? this.ctx?.session?.id ?? 'default';
+    return String(raw);
   }
 
-  summarize() {
-    throw unsupportedMember('compaction.BasicCompactionEngine.summarize', '移动端引擎没有会话压缩后端，请在子类覆写该方法');
+  /** 用于记账的仓库：插件可注入，默认与 /tool-state 共用同一份。 */
+  get store() {
+    return this.config?.store ?? toolStateStore;
+  }
+
+  /** 结构化摘要（角色 / 任务 / 已决定 / 未完成 / 关键文件路径 五段）。 */
+  summarize(messages, options = {}) {
+    const items = Array.isArray(messages) ? messages : [];
+    return summarizeMessages(items, {
+      maxChars: options.maxChars ?? this.config?.summaryChars ?? 1200,
+    });
+  }
+
+  /**
+   * 超预算才压；压完把统计写进会话状态，前端因此能读到「压缩几次、省多少 token」。
+   * 未超预算返回 compacted=false（不记账，避免把空转当压缩）。
+   */
+  compactIfNeeded(messages, options = {}) {
+    const items = Array.isArray(messages) ? messages : [];
+    const beforeTokens = estimateTokens(items);
+    const budgetTokens = Number(options.budgetTokens ?? this.config?.budgetTokens ?? 0) || 0;
+    if (budgetTokens > 0 && beforeTokens <= budgetTokens) {
+      return { compacted: false, beforeTokens, afterTokens: beforeTokens, summary: '', summaryChars: 0 };
+    }
+    const keepRecent = Number(options.keepRecent ?? this.config?.keepRecent ?? 8) || 8;
+    const older = items.slice(0, Math.max(0, items.length - keepRecent));
+    if (older.length === 0) {
+      return { compacted: false, beforeTokens, afterTokens: beforeTokens, summary: '', summaryChars: 0 };
+    }
+    const summary = this.summarize(older, options);
+    const afterTokens = estimateTokens(summary) + estimateTokens(items.slice(items.length - keepRecent));
+    const sessionId = String(options.sessionId ?? this.sessionId);
+    const stats = this.store.recordCompaction(sessionId, {
+      beforeTokens,
+      afterTokens,
+      summaryChars: summary.length,
+    });
+    if (typeof this.logger?.info === 'function') {
+      this.logger.info('compaction ' + sessionId + '：' + beforeTokens + ' → ' + afterTokens + ' tokens');
+    }
+    return {
+      compacted: true,
+      droppedMessages: older.length,
+      beforeTokens,
+      afterTokens,
+      savedTokens: Math.max(0, beforeTokens - afterTokens),
+      summaryChars: summary.length,
+      summary,
+      stats,
+    };
   }
 }
 

@@ -67,10 +67,10 @@ fun MathFormula(
     val box = remember(cacheKey) {
         MathBoxCache.get(cacheKey) {
             try {
-                LatexLayout(measurer, density, color, basePx, display).layout(latex)
+                latexLayout(measurer, density, color, basePx, display).layout(latex)
             } catch (t: Throwable) {
                 // 任何解析/测量异常都降级成纯文本, 绝不把异常抛给调用方
-                LatexLayout(measurer, density, color, basePx, display).plain(latex)
+                latexLayout(measurer, density, color, basePx, display).plain(latex)
             }
         }
     }
@@ -128,6 +128,10 @@ private sealed class Tok {
     class Txt(val s: String, val kind: TextKind) : Tok()
     class Space(val em: Float) : Tok()
     class Delim(val open: Boolean, val text: String) : Tok()
+    class Begin(val env: String) : Tok()
+    object End : Tok()
+    object Amp : Tok()
+    object NewRow : Tok()
     object LB : Tok()
     object RB : Tok()
     object Sub : Tok()
@@ -199,6 +203,26 @@ private fun tokenize(src: String): List<Tok> {
                                 out.add(Tok.Cmd(name))
                             }
                         }
+                        // 环境: 已知矩阵族进语法树, 其余整段原文(含反斜杠)保留成文本
+                        "begin" -> {
+                            val env = readEnvName(src, i)
+                            if (env == null) {
+                                out.add(Tok.Cmd(name))
+                            } else if (env.first in MATRIX_DELIMS) {
+                                i = env.second
+                                out.add(Tok.Begin(env.first))
+                            } else {
+                                val stop = findEnvEnd(src, env.second, env.first)
+                                val end = if (stop < 0) n else stop
+                                out.add(Tok.Txt(src.substring(start - 1, end), TextKind.ROMAN))
+                                i = end
+                            }
+                        }
+                        "end" -> {
+                            val env = readEnvName(src, i)
+                            if (env != null) i = env.second
+                            out.add(Tok.End)
+                        }
                         "quad" -> out.add(Tok.Space(1f))
                         "qquad" -> out.add(Tok.Space(2f))
                         "enspace" -> out.add(Tok.Space(0.5f))
@@ -208,7 +232,8 @@ private fun tokenize(src: String): List<Tok> {
                 } else {
                     i++
                     when (c2) {
-                        ',', ':', ';', ' ', '\\', '!' -> out.add(
+                        '\\' -> out.add(Tok.NewRow)
+                        ',', ':', ';', ' ', '!' -> out.add(
                             Tok.Space(
                                 when (c2) {
                                     ',' -> 0.17f
@@ -245,7 +270,10 @@ private fun tokenize(src: String): List<Tok> {
                 out.add(Tok.Space(0.3f))
                 i++
             }
-            c == '&' -> i++
+            c == '&' -> {
+                out.add(Tok.Amp)
+                i++
+            }
             c.isWhitespace() -> i++
             c.isDigit() || c == '.' -> {
                 val start = i
@@ -262,6 +290,52 @@ private fun tokenize(src: String): List<Tok> {
 }
 
 // ---------------------------------------------------------------------------------------------
+// 环境 (egin{...} ... end{...})
+// ---------------------------------------------------------------------------------------------
+
+/** 支持的矩阵族环境 -> 括号对; 值为 null 表示不带括号。键集合就是"认识的环境"白名单。 */
+private val MATRIX_DELIMS: Map<String, Pair<String, String>?> = mapOf(
+    "matrix" to null,
+    "pmatrix" to Pair("(", ")"),
+    "bmatrix" to Pair("[", "]"),
+    "vmatrix" to Pair("|", "|"),
+    "Bmatrix" to Pair("{", "}"),
+)
+
+/** i 指向 \begin / \end 之后。读出 {env} 里的名字, 返回名字与右花括号之后的下标。 */
+private fun readEnvName(src: String, from: Int): Pair<String, Int>? {
+    var j = from
+    val n = src.length
+    while (j < n && src[j].isWhitespace()) j++
+    if (j >= n || src[j] != '{') return null
+    val close = src.indexOf('}', j + 1)
+    if (close < 0) return null
+    return Pair(src.substring(j + 1, close).trim(), close + 1)
+}
+
+/** 从 from 起找配对 \end{env} 的结束下标(右花括号之后); 找不到返回 -1。同名环境按层数配对。 */
+private fun findEnvEnd(src: String, from: Int, env: String): Int {
+    val beginMark = "\\begin{$env}"
+    val endMark = "\\end{$env}"
+    var depth = 1
+    var k = from
+    while (k < src.length) {
+        val b = src.indexOf(beginMark, k)
+        val e = src.indexOf(endMark, k)
+        if (e < 0) return -1
+        if (b in 0 until e) {
+            depth++
+            k = b + beginMark.length
+        } else {
+            depth--
+            k = e + endMark.length
+            if (depth == 0) return k
+        }
+    }
+    return -1
+}
+
+// ---------------------------------------------------------------------------------------------
 // 语法树
 // ---------------------------------------------------------------------------------------------
 
@@ -274,6 +348,9 @@ private sealed class Node {
     class Script(val base: Node, val sub: List<Node>?, val sup: List<Node>?) : Node()
     class Delim(val open: String, val close: String, val body: List<Node>) : Node()
     class BigOp(val sym: String) : Node()
+
+    /** rows[行][列] -> 该单元格的节点列表。env 决定外层括号。 */
+    class Matrix(val env: String, val rows: List<List<List<Node>>>) : Node()
 }
 
 private val GREEK: Map<String, String> = mapOf(
@@ -308,7 +385,7 @@ private val SYMBOLS: Map<String, String> = mapOf(
     "aleph" to "\u2135", "Re" to "\u211c", "Im" to "\u2111",
 )
 
-private enum class Stop { NONE, BRACE, RIGHT }
+private enum class Stop { NONE, BRACE, RIGHT, CELL }
 
 private class LatexParser(private val toks: List<Tok>) {
     private var i = 0
@@ -322,6 +399,17 @@ private class LatexParser(private val toks: List<Tok>) {
         val out = ArrayList<Node>()
         while (i < toks.size) {
             val t = toks[i]
+            // 单元格边界不消费: 交给 matrix() 判断换列还是换行
+            if (stop == Stop.CELL && (t is Tok.Amp || t is Tok.NewRow || t is Tok.End)) break
+            if (t is Tok.Amp) {
+                i++
+                continue
+            }
+            if (t is Tok.NewRow) {
+                i++
+                out.add(Node.Space(0.3f))
+                continue
+            }
             if (t is Tok.RB) {
                 i++
                 if (stop == Stop.BRACE) break else continue
@@ -414,7 +502,11 @@ private class LatexParser(private val toks: List<Tok>) {
                 i++
                 command(t.name)
             }
-            is Tok.Sub, is Tok.Sup -> {
+            is Tok.Begin -> {
+                i++
+                matrix(t.env)
+            }
+            is Tok.Sub, is Tok.Sup, is Tok.End, is Tok.Amp, is Tok.NewRow -> {
                 i++
                 null
             }
@@ -451,6 +543,33 @@ private class LatexParser(private val toks: List<Tok>) {
         }
     }
 
+    /** \begin{env} ... \end{env}: 列用 & 分隔, 行用 \\ 分隔。嵌套环境靠递归 atom() 处理。 */
+    private fun matrix(env: String): Node {
+        val rows = ArrayList<List<List<Node>>>()
+        var cells = ArrayList<List<Node>>()
+        var guard = 0
+        while (i < toks.size && guard++ < 100_000) {
+            cells.add(seq(Stop.CELL))
+            if (i >= toks.size) break
+            val t = toks[i]
+            if (t is Tok.Amp) {
+                i++
+            } else if (t is Tok.NewRow) {
+                i++
+                rows.add(cells.toList())
+                cells = ArrayList()
+            } else {
+                if (t is Tok.End) i++
+                break
+            }
+        }
+        // 收尾: \end 之前的最后一格; 已经因为换行结算过空尾行时不再补一行
+        if (cells.isNotEmpty() && !(rows.isNotEmpty() && cells.size == 1 && cells[0].isEmpty())) {
+            rows.add(cells.toList())
+        }
+        return Node.Matrix(env, rows)
+    }
+
     private fun charNode(c: Char): Node = when {
         c.isLetter() -> Node.Text(c.toString(), TextKind.ITALIC)
         else -> Node.Text(c.toString(), TextKind.ROMAN)
@@ -461,12 +580,15 @@ private class LatexParser(private val toks: List<Tok>) {
 // 排版
 // ---------------------------------------------------------------------------------------------
 
-private class LatexLayout(
-    private val measurer: TextMeasurer,
-    private val density: Density,
+/**
+ * 排版器。文字测量由 [textBoxOf] 注入: 生产路径走 TextMeasurer 实测, JVM 单测换成假测量器,
+ * 这样 parse/layout 在没有 Android 字体与 graphic 的环境里也能跑。
+ */
+internal class LatexLayout(
     private val color: Color,
     private val base: Float,
     private val display: Boolean,
+    private val textBoxOf: (text: String, italic: Boolean, sizePx: Float) -> MathBox,
 ) {
     fun layout(latex: String): MathBox {
         val nodes = LatexParser(tokenize(latex)).parse()
@@ -476,23 +598,7 @@ private class LatexLayout(
 
     fun plain(latex: String): MathBox = textBox(latex, italic = false, sizePx = base)
 
-    private fun styleFor(sizePx: Float, italic: Boolean): TextStyle = TextStyle(
-        color = color,
-        fontSize = with(density) { sizePx.toSp() },
-        fontFamily = FontFamily.Serif,
-        fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal,
-        platformStyle = PlatformTextStyle(includeFontPadding = false),
-    )
-
-    private fun textBox(s: String, italic: Boolean, sizePx: Float): MathBox {
-        if (s.isEmpty() || sizePx <= 0f) return EMPTY_BOX
-        val lr = measurer.measure(AnnotatedString(s), styleFor(sizePx, italic))
-        val w = lr.size.width.toFloat()
-        val h = lr.size.height.toFloat()
-        if (w <= 0f || h <= 0f) return EMPTY_BOX
-        val bl = lr.firstBaseline
-        return MathBox(w, h, bl) { x, y -> drawText(lr, topLeft = Offset(x, y)) }
-    }
+    private fun textBox(s: String, italic: Boolean, sizePx: Float): MathBox = textBoxOf(s, italic, sizePx)
 
     private fun nodeSeq(nodes: List<Node>?, sizePx: Float): MathBox {
         if (nodes.isNullOrEmpty()) return EMPTY_BOX
@@ -516,6 +622,11 @@ private class LatexLayout(
             sizePx,
         )
         is Node.BigOp -> textBox(n.sym, italic = false, sizePx = sizePx * (if (display) 1.3f else 1.18f))
+        is Node.Matrix -> {
+            val body = matrixBox(n.rows, sizePx)
+            val d = MATRIX_DELIMS[n.env]
+            if (d == null) body else delimited(d.first, d.second, body, sizePx)
+        }
         is Node.Script -> {
             val sub = nodeSeq(n.sub, sizePx * 0.7f)
             val sup = nodeSeq(n.sup, sizePx * 0.7f)
@@ -648,6 +759,52 @@ private class LatexLayout(
         }
     }
 
+    /**
+     * 矩阵排版: 每列取该列最大宽度、格子在列内水平居中; 每行按基线对齐后自上而下留 rowGap;
+     * 列间留 colGap。括号不在这一层画, 由 node(Node.Matrix) 用 delimited() 包一层。
+     */
+    private fun matrixBox(rows: List<List<List<Node>>>, sizePx: Float): MathBox {
+        if (rows.isEmpty()) return EMPTY_BOX
+        val colGap = sizePx * 0.55f
+        val rowGap = sizePx * 0.32f
+        val cols = rows.maxOf { it.size }
+        if (cols == 0) return EMPTY_BOX
+        val cells: List<List<MathBox>> = rows.map { r -> (0 until cols).map { j -> nodeSeq(r.getOrNull(j), sizePx) } }
+        val colW = FloatArray(cols)
+        for (r in cells) for (j in 0 until cols) colW[j] = max(colW[j], r[j].width)
+        val rowH = FloatArray(cells.size)
+        val rowBl = FloatArray(cells.size)
+        for (k in cells.indices) {
+            for (c in cells[k]) {
+                rowH[k] = max(rowH[k], c.height)
+                rowBl[k] = max(rowBl[k], c.baseline)
+            }
+        }
+        var w = colGap * (cols - 1)
+        for (j in 0 until cols) w += colW[j]
+        var h = -rowGap
+        for (k in cells.indices) h += rowH[k] + rowGap
+        if (w <= 0f || h <= 0f) return EMPTY_BOX
+        val rowTop = FloatArray(cells.size)
+        var y = 0f
+        for (k in cells.indices) {
+            rowTop[k] = y
+            y += rowH[k] + rowGap
+        }
+        return MathBox(w, h, rowBl[0]) { ox, oy ->
+            var x = ox
+            for (j in 0 until cols) {
+                for (k in cells.indices) {
+                    val c = cells[k][j]
+                    if (c.width > 0f && c.height > 0f) {
+                        c.draw(this, x + (colW[j] - c.width) / 2f, oy + rowTop[k] + (rowBl[k] - c.baseline))
+                    }
+                }
+                x += colW[j] + colGap
+            }
+        }
+    }
+
     /** \left( ... \right) : 括号按内容高度放大并垂直居中。 */
     private fun delimited(open: String, close: String, body: MathBox, sizePx: Float): MathBox {
         if (body.height <= 0f) {
@@ -668,6 +825,42 @@ private class LatexLayout(
     }
 }
 
+/** 生产路径的文字测量: 用 Compose TextMeasurer 实测宽高基线, 绘制时 drawText。 */
+private fun measuredTextBox(
+    measurer: TextMeasurer,
+    density: Density,
+    color: Color,
+    s: String,
+    italic: Boolean,
+    sizePx: Float,
+): MathBox {
+    if (s.isEmpty() || sizePx <= 0f) return EMPTY_BOX
+    val style = TextStyle(
+        color = color,
+        fontSize = with(density) { sizePx.toSp() },
+        fontFamily = FontFamily.Serif,
+        fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal,
+        platformStyle = PlatformTextStyle(includeFontPadding = false),
+    )
+    val lr = measurer.measure(AnnotatedString(s), style)
+    val w = lr.size.width.toFloat()
+    val h = lr.size.height.toFloat()
+    if (w <= 0f || h <= 0f) return EMPTY_BOX
+    val bl = lr.firstBaseline
+    return MathBox(w, h, bl) { x, y -> drawText(lr, topLeft = Offset(x, y)) }
+}
+
+/** 生产用排版器: 绑定 TextMeasurer。 */
+internal fun latexLayout(
+    measurer: TextMeasurer,
+    density: Density,
+    color: Color,
+    basePx: Float,
+    display: Boolean,
+): LatexLayout = LatexLayout(color, basePx, display) { s, italic, sizePx ->
+    measuredTextBox(measurer, density, color, s, italic, sizePx)
+}
+
 // ---------------------------------------------------------------------------------------------
 // 缓存 (LRU 32)
 // ---------------------------------------------------------------------------------------------
@@ -685,7 +878,7 @@ internal fun mathInlineSizePx(
     val key = latex + '|' + basePx
     return MathSizeCache.get(key) {
         try {
-            val box = LatexLayout(measurer, density, Color.Black, basePx, false).layout(latex)
+            val box = latexLayout(measurer, density, Color.Black, basePx, false).layout(latex)
             val cap = basePx * 2.6f
             val vScale = if (box.height > cap) cap / box.height else 1f
             Pair(

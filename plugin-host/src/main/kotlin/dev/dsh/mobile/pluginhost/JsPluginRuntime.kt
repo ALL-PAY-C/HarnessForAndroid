@@ -477,6 +477,16 @@ private class ModuleLoader(
             },
         )
         ScriptableObject.putProperty(moduleScope, "__interop", JsFn("__interop") { args -> interop(args.firstOrNull()) })
+        // import.meta.url：给模块自己真实的 file:// 地址，插件靠它 dirname 出包目录。
+        ScriptableObject.putProperty(moduleScope, "__metaUrl", "file://" + canonical.absolutePath)
+        // import.meta.resolve：本端没有模块解析图，抛错让插件自带的 catch 回落。
+        ScriptableObject.putProperty(
+            moduleScope,
+            "__metaResolve",
+            JsFn("__metaResolve") { args ->
+                throw RuntimeException("import.meta.resolve 本端不支持：" + args.firstOrNull()?.toString().orEmpty())
+            },
+        )
 
         val compiled = try {
             cx.compileString(transformed, rel(canonical), 1, null)

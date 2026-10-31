@@ -275,6 +275,8 @@ class SettingsViewModel(
     fun setNotifications(v: Boolean) = launch { settingsStore.setNotifications(v) }
     fun setDnd(v: Boolean) = launch { settingsStore.setDnd(v) }
     fun setAutoApprove(v: Boolean) = launch { settingsStore.setAutoApprove(v) }
+    /** 设置 → 拓展：拓展插件 UI 配置。 */
+    fun setPluginUiExtend(v: Boolean) = launch { settingsStore.setPluginUiExtend(v) }
 
     // ---- 通知（开关即时生效：NotificationCenter 每次发送前重建 channel） ----
     fun setNotifyOnComplete(v: Boolean) = launch { settingsStore.setNotifyOnComplete(v) }

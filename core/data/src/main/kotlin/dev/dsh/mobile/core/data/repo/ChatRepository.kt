@@ -16,8 +16,13 @@ import dev.dsh.mobile.core.model.SessionStatus
 import dev.dsh.mobile.core.model.TokenUsage
 import dev.dsh.mobile.core.model.ToolCall
 import dev.dsh.mobile.core.protocol.AcpTransport
+import dev.dsh.mobile.core.protocol.CompactResult
+import dev.dsh.mobile.core.protocol.Compactor
 import dev.dsh.mobile.core.protocol.DshEvent
 import dev.dsh.mobile.core.protocol.DshTransport
+import dev.dsh.mobile.core.protocol.LocalEngineTransport
+import dev.dsh.mobile.core.protocol.SessionProjection
+import dev.dsh.mobile.core.protocol.SessionProjections
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -156,6 +161,13 @@ internal fun escapeLike(raw: String): String = raw
 class ChatRepository(
     private val db: DshDatabase,
     private val scope: CoroutineScope,
+    /**
+     * 会话投影（待办 / 目标 / 上下文用量 / 压缩统计）。
+     *
+     * 归属权在 transport（它才是写入方），仓库只是只读出口，让 UI 不必知道 transport 长什么样。
+     * 默认空投影：只做持久化、不接模型的场景（部分单测）也能构造。
+     */
+    private val projections: SessionProjections = SessionProjections(),
 ) {
     private val _transport = MutableStateFlow<DshTransport?>(null)
     val transport: StateFlow<DshTransport?> = _transport.asStateFlow()
@@ -795,6 +807,32 @@ class ChatRepository(
             db.messageDao().deleteBySession(id)
         }
     }
+
+    // ------------------------------------------------------------ compaction / projection
+
+    /**
+     * P0-2：/compact 真入口。压缩在 transport 侧落地（要动模型、要读写摘要），仓库只做门面。
+     *
+     * 这里不用 sessionCritical：压缩不写消息库，和 persistAssistant / clearMessages 不争同一份状态。
+     */
+    suspend fun compact(sessionId: String, budgetTokens: Int = 0): CompactResult {
+        val t = requireTransport()
+        val compactor = t as? Compactor
+            ?: return CompactResult(compacted = false, message = "当前引擎不支持上下文压缩。")
+        return try {
+            compactor.compact(sessionId, budgetTokens)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            AppLog.w("compact failed: " + (e.message ?: e.javaClass.simpleName))
+            CompactResult(compacted = false, message = "压缩失败：" + (e.message ?: e.javaClass.simpleName))
+        }
+    }
+
+    /** P0-6：会话投影的只读流（待办 / 目标 / 用量 / 压缩统计）。 */
+    fun projection(sessionId: String): StateFlow<SessionProjection> =
+        (_transport.value as? LocalEngineTransport)?.projections?.observe(sessionId)
+            ?: projections.observe(sessionId)
 
     // ------------------------------------------------------------------- events
 

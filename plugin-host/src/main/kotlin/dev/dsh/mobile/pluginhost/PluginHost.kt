@@ -255,6 +255,13 @@ class PluginHost(
     fun placements(context: Context): SlotPlacementStore = placementStore
         ?: SlotPlacementStore(context.applicationContext).also { placementStore = it }
 
+    /**
+     * 装了这个位置还能放什么：插件注册过、但还没被摆到任何位置的组件。
+     * UI 编辑模式的「+」拉这一份，选中后走 [SlotPlacementStore.add]。
+     */
+    fun availableFor(context: android.content.Context, target: SlotId): List<SlotContribution> =
+        placements(context).available(registry.contributions)
+
     fun visibleSlots(context: android.content.Context, slot: SlotId): List<SlotContribution> {
         val placements = placements(context)
         placements.revision

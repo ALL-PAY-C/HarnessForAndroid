@@ -13,6 +13,7 @@ import { createContext, createLogger, listPlugins } from './host/cordis.js';
 import { createNativeBridge } from './host/native-bridge.js';
 import { installLlmRpc } from './host/llm.js';
 import { installSkillManager } from './host/skill-manager.js';
+import { installToolState } from './host/tool-state.js';
 import { ensureWritableHome, ensureWritableTemp, installModuleFallback, loadPlugin } from './host/loader.js';
 
 
@@ -275,6 +276,13 @@ async function main() {
     installLlmRpc(ctx, { logger });
   } catch (error) {
     process.stderr.write('dsh-engine: /llm RPC 注册失败: ' + (error?.message ?? error) + '\n');
+  }
+  // /tool-state + /commands：模型侧待办（todo_write）、目标（goal）、上下文压缩统计与 compact 命令。
+  // 与上面两条同一注册链（connection.rpc.handle）；失败只写 stderr，不阻断引擎启动。
+  try {
+    installToolState(ctx, { logger });
+  } catch (error) {
+    process.stderr.write('dsh-engine: /tool-state RPC 注册失败: ' + (error?.message ?? error) + '\n');
   }
   const state = {
     ctx,

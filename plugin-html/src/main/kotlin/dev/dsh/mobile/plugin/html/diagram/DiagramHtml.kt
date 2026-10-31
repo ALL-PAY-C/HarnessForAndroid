@@ -92,7 +92,13 @@ internal object DiagramHtml {
             append("#wrap{padding:2px 4px;}")
             append("#err{display:none;color:#ff6b6b;font:12px ui-monospace,monospace;white-space:pre-wrap;padding:6px;}")
             when (mode) {
-                Mode.SVG -> append("#out{width:100%;}#out svg{display:block;width:100%;height:auto;}")
+                // SVG：卡片高度由宿主按「容器宽度 × viewBox 高宽比」算死，页面只负责把整块视口交给图。
+                // 坑：html/body/#wrap/#out 一路 height:100% 时，WebView 里内层 <svg> 会算成 0 高 ——
+                // 卡片高度对但一个像素都不画。所以 #wrap 用绝对定位贴满视口拿确定的像素高度，
+                // <svg> 的像素宽高由 FITPX 按实测容器写死（见 COMMON），不再依赖百分比链。
+                // 另外去掉 #wrap 的 padding，否则视口比例与卡片比例差几像素，meet 会留边。
+                Mode.SVG -> append("html,body{height:100%;}#wrap{position:absolute;left:0;top:0;right:0;bottom:0;padding:0;}")
+                    .append("#out{width:100%;height:100%;}#out svg{display:block;}")
                 Mode.MERMAID -> append("html,body{background:").append(bg)
                     .append(";}#out{width:100%;padding:8px;box-sizing:border-box;}#out svg{max-width:100%;height:auto;}")
                 // graphviz 自己就是白底黑字，硬套深色主题会变成白字白底：给它一块固定白面板
@@ -114,21 +120,58 @@ internal object DiagramHtml {
         }
     }
 
-    // ---- 通用工具：S=源码 / O=输出容器 / F=错误卡 / D=上报高度 / FIT=SVG 自适应 ----
+    // ---- 通用工具：S=源码 / O=输出容器 / F=错误卡 / D=上报高度 / FIT=SVG 自适应 / AR=SVG 高宽比 ----
     private val COMMON = """
         var S=function(){var e=document.getElementById('src');return e?e.value:'';};
         var O=function(){return document.getElementById('out');};
         var F=function(m){var d=document.getElementById('err');if(!d)return;
           d.style.display='block';d.textContent='渲染失败：'+((m&&m.message)?m.message:String(m));};
-        var D=function(){try{if(window.DSH_BRIDGE)window.DSH_BRIDGE.postMessage('rendered');}catch(e){}};
-        var FIT=function(sv){
+        var D=function(why){try{if(window.DSH_BRIDGE)window.DSH_BRIDGE.postMessage(why||'rendered');}catch(e){}};
+        var FIT=function(sv,fill){
           if(!sv)return;
           if(!sv.getAttribute('viewBox')){
             var w=parseFloat(sv.getAttribute('width')),h=parseFloat(sv.getAttribute('height'));
             if(w&&h)sv.setAttribute('viewBox','0 0 '+w+' '+h);
           }
           sv.removeAttribute('height');sv.removeAttribute('width');
-          sv.style.display='block';sv.style.width='100%';sv.style.maxWidth='100%';sv.style.height='auto';
+          sv.style.display='block';
+          if(fill){
+            // fill=true：像素宽高由 FITPX 写死，这里不碰尺寸（height:100%/auto 都可能在 WebView 里塌成 0）
+            sv.style.maxWidth='none';
+          }else{
+            sv.style.width='100%';sv.style.maxWidth='100%';sv.style.height='auto';
+          }
+        };
+        // 给根 <svg> 下单确定的像素宽高：宽＝容器宽，高＝宽×比例，再被容器高夹一下
+        // （极扁的图只在下边留白，不会裁；极高的图等比缩小居中，也不会裁）。
+        // 容器/窗口尺寸变化时重算 —— 横竖屏、抽屉、气泡改宽都要跟着走。
+        var FITPX=function(sv,r){
+          if(!sv)return;
+          var lay=function(){
+            var host=O();
+            var w=Math.round((host&&host.clientWidth)||window.innerWidth||0);
+            var vh=Math.round((host&&host.clientHeight)||window.innerHeight||0);
+            var h=Math.round(w*r);
+            if(vh>0&&h>vh)h=vh;
+            if(w<1)w=1;if(h<1)h=1;
+            sv.setAttribute('width',w);sv.setAttribute('height',h);
+            sv.style.width=w+'px';sv.style.height=h+'px';
+          };
+          lay();
+          window.addEventListener('resize',lay);
+          if(window.ResizeObserver){try{new ResizeObserver(lay).observe(O()||document.documentElement);}catch(e){}}
+        };
+        // 高宽比 = 高/宽。先看 viewBox（FIT 会在缺 viewBox 时用 width/height 补齐），
+        // 再退到根节点的 width/height，都没有就按 4:3。
+        var AR=function(sv){
+          var vb=sv&&sv.getAttribute('viewBox');
+          if(vb){
+            var n=vb.trim().split(/[\s,]+/);
+            if(n.length===4){var vw=parseFloat(n[2]),vh=parseFloat(n[3]);if(vw>0&&vh>0)return vh/vw;}
+          }
+          var aw=parseFloat(sv&&sv.getAttribute('width')),ah=parseFloat(sv&&sv.getAttribute('height'));
+          if(aw>0&&ah>0)return ah/aw;
+          return 0.75;
         };
     """.trimIndent()
 
@@ -156,8 +199,13 @@ internal object DiagramHtml {
                 if(/^on/i.test(el.attributes[k].name))el.removeAttribute(el.attributes[k].name);
               }
             }
-            FIT(svg);
+            FIT(svg,true);
             O().appendChild(document.importNode(svg,true));
+            var ratio=AR(svg);
+            // 挂进文档后再量容器：尺寸要落在真实布局上（百分比/未挂载时都是 0）
+            FITPX(O().querySelector('svg'),ratio);
+            // 高度不再靠 WebView 量：把 viewBox 的高宽比交给宿主，由宿主按容器宽度定高
+            D('fit:'+ratio);
           }catch(e){F(e);}
           D();
         })();

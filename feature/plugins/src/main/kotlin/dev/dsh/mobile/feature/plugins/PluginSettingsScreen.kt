@@ -95,6 +95,8 @@ internal fun PluginSettingsDetail(
             }
         }
 
+        ExtraConfigSection(entry, onSave)
+
         if (page != null && entry.hasPage) {
             Text(
                 "插件界面",
@@ -285,5 +287,111 @@ private fun SelectBox(field: ConfigField, current: String, onSave: (String) -> U
                 )
             }
         }
+    }
+}
+
+/**
+ * 自定义配置：插件没声明 config 时，用户自己加键值。
+ *
+ * 写回走同一个 [PluginSettingsEntry.values] 存储，插件的 ctx.config.get(key, fallback)
+ * 立刻能读到；已存在的键用 ConfigFieldRow 直接改，新增走两段式输入 + 保存。
+ */
+@Composable
+private fun ExtraConfigSection(entry: PluginSettingsEntry, onSave: (key: String, value: String) -> Unit) {
+    val p = LocalQq.current
+    var adding by remember(entry.pluginId) { mutableStateOf(false) }
+    var draftKey by remember(entry.pluginId) { mutableStateOf("") }
+    var draftValue by remember(entry.pluginId) { mutableStateOf("") }
+    // 详情页拿到的是打开时的快照，存储写回不会重建这一页；本地存一份，改完立刻看得见。
+    var saved by remember(entry.pluginId) { mutableStateOf(entry.extraValues) }
+    GroupFrame {
+        GroupHeader(label = "自定义配置", count = saved.size, collapsible = false)
+        Column(Modifier.padding(vertical = 4.dp)) {
+            saved.forEach { (key, value) ->
+                ConfigFieldRow(ConfigField(key = key, label = key), value) { text ->
+                    saved = saved + (key to text)
+                    onSave(key, text)
+                }
+            }
+            if (adding) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 9.dp)) {
+                    SimpleInput("键名，例如 apiKey", draftKey) { draftKey = it }
+                    Spacer(Modifier.height(6.dp))
+                    SimpleInput("值", draftValue) { draftValue = it }
+                    Spacer(Modifier.height(9.dp))
+                    // 两个按钮各占一半宽度：贴在文本上的 clickable 命中区只有字形大小，
+                    // 手指点在字缝里就什么都不会发生。
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(p.bg)
+                                .clickable {
+                                    adding = false
+                                    draftKey = ""
+                                    draftValue = ""
+                                }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text("取消", color = p.t3, fontSize = 14.sp)
+                        }
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(p.bg)
+                                .clickable(enabled = draftKey.isNotBlank()) {
+                                    saved = saved + (draftKey.trim() to draftValue)
+                                    onSave(draftKey.trim(), draftValue)
+                                    adding = false
+                                    draftKey = ""
+                                    draftValue = ""
+                                }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                "保存",
+                                color = if (draftKey.isBlank()) p.t3 else p.accent,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                    }
+                }
+            } else {
+                GroupChild(onClick = { adding = true }) {
+                    Text("添加配置项", color = p.t1, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                    Text("+", color = p.t3, fontSize = 15.sp)
+                }
+            }
+        }
+    }
+}
+
+/** 自定义配置用的单行输入，样式与 ValueBox 对齐。 */
+@Composable
+private fun SimpleInput(placeholder: String, value: String, onChange: (String) -> Unit) {
+    val p = LocalQq.current
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(p.bg)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        if (value.isEmpty()) Text(placeholder, color = p.t3, fontSize = 13.sp)
+        BasicTextField(
+            value = value,
+            onValueChange = onChange,
+            singleLine = true,
+            textStyle = TextStyle(fontSize = 14.sp, color = p.t1),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }

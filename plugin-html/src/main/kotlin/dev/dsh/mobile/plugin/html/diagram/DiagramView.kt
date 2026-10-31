@@ -118,7 +118,7 @@ fun DiagramView(kind: String, source: String, modifier: Modifier = Modifier) {
         HorizontalDivider(color = line)
         val shown = doc
         if (shown != null && !showSource) {
-            PreviewBox(shown)
+            PreviewBox(shown, exactAspect = mode == DiagramHtml.Mode.SVG)
         } else {
             SourceCard(source, note)
         }
@@ -180,38 +180,55 @@ private class ZoomState {
 /**
  * 预览区：高度由页面回报（首次量完才定高，最少 96dp、最多 360dp）。
  * 缩放在 graphicsLayer 上做，深看靠全屏的原生缩放（那里是矢量重排，不糊）。
+ *
+ * exactAspect=true（SVG）时不吃页面量出来的高度：页面报的是 viewBox 高宽比，
+ * 高度＝容器宽度 × 比例 在 Compose 侧直接算 —— 量出来的像素高度会被首帧、密度和
+ * WebView 的默认尺寸带偏，等比图只能靠算。宽度变了（横竖屏、抽屉、气泡变宽）高度随之重算，
+ * 不用等页面再报一次。
  */
 @Composable
-private fun PreviewBox(doc: String) {
+private fun PreviewBox(doc: String, exactAspect: Boolean) {
     val density = LocalDensity.current
     var contentPx by remember(doc) { mutableFloatStateOf(0f) }
+    var aspect by remember(doc) { mutableFloatStateOf(0f) }
     val zoom = remember(doc) { ZoomState() }
-    val contentDp = with(density) { contentPx.toDp() }
-    BoxWithConstraints(
-        Modifier
-            .fillMaxWidth()
-            .height(contentDp.coerceIn(MIN_CARD_HEIGHT, MAX_CARD_HEIGHT))
-            .clipToBounds(),
-    ) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
         val viewW = constraints.maxWidth.toFloat()
-        val viewH = constraints.maxHeight.toFloat()
+        val ratio = if (aspect > 0f) aspect else DEFAULT_SVG_ASPECT
+        val cardHeight = if (exactAspect) {
+            // 比例定高的通道：上限放宽（360dp 会裁掉细高的图），下限仍用卡片最小高度
+            with(density) { (viewW * ratio).toDp() }.coerceIn(MIN_CARD_HEIGHT, MAX_ASPECT_CARD_HEIGHT)
+        } else {
+            with(density) { contentPx.toDp() }.coerceIn(MIN_CARD_HEIGHT, MAX_CARD_HEIGHT)
+        }
+        val viewH = with(density) { cardHeight.toPx() }
+        val contentH = if (exactAspect) viewH else contentPx
         Box(
             Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = zoom.scale
-                    scaleY = zoom.scale
-                    translationX = zoom.offset.x
-                    translationY = zoom.offset.y
-                }
-                .pinchPan(zoom, viewW = { viewW }, viewH = { viewH }, contentH = { contentPx }),
+                .fillMaxWidth()
+                .height(cardHeight)
+                .clipToBounds(),
         ) {
-            DiagramWeb(
-                doc = doc,
-                modifier = Modifier.fillMaxSize(),
-                // 高度只增不减：库是异步画的，先量到的小值不能被后来的中间态压回去
-                onHeight = { px -> if (px > contentPx) contentPx = px },
-            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = zoom.scale
+                        scaleY = zoom.scale
+                        translationX = zoom.offset.x
+                        translationY = zoom.offset.y
+                    }
+                    .pinchPan(zoom, viewW = { viewW }, viewH = { viewH }, contentH = { contentH }),
+            ) {
+                DiagramWeb(
+                    doc = doc,
+                    modifier = Modifier.fillMaxSize(),
+                    // 高度只增不减：库是异步画的，先量到的小值不能被后来的中间态压回去。
+                    // 比例定高的通道不算这条：它的高度是算出来的，横竖屏变小是正常结果。
+                    onHeight = { px -> if (!exactAspect && px > contentPx) contentPx = px },
+                    onAspect = { r -> if (exactAspect) aspect = r },
+                )
+            }
         }
     }
 }
@@ -308,5 +325,11 @@ private fun resetZoom(web: WebView?) {
 
 private val MIN_CARD_HEIGHT = 96.dp
 private val MAX_CARD_HEIGHT = 360.dp
+
+/** 比例定高的卡片（SVG）上限：360dp 会把细高的图裁掉，这里只留一个防爆高度的口子。 */
+private val MAX_ASPECT_CARD_HEIGHT = 720.dp
+
+/** 图既没有 viewBox 也没有 width/height 时的兜底比例（4:3，与页面里的 AR() 一致）。 */
+private const val DEFAULT_SVG_ASPECT = 0.75f
 private const val MIN_SCALE = 0.5f
 private const val MAX_SCALE = 4f

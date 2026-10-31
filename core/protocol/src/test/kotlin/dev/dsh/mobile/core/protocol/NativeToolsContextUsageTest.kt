@@ -43,11 +43,16 @@ class NativeToolsContextUsageTest {
         Fixture().use { f ->
             val history = (1..40).map { ChatMessage("$it", "session", ChatMessage.Role.ASSISTANT, "history-$it " + "x".repeat(2000)) }
             f.run("test-model", history)
-            val messages = f.requests.single()["messages"]!!.jsonArray
+            // 超预算时先发一次压缩摘要请求（P0-1），主请求是第二次 —— 前者不能再当「唯一请求」。
+            assertEquals(f.requests.toString(), 2, f.requests.size)
+            val compactSystem = f.requests.first()["messages"]!!.jsonArray.first().jsonObject["content"]!!.jsonPrimitive.content
+            assertTrue(compactSystem, compactSystem.contains("上下文压缩器"))
+            val messages = f.requests.last()["messages"]!!.jsonArray
             val used = messages.sumOf { it.jsonObject["content"]!!.jsonPrimitive.content.length }
             assertTrue(used < history.sumOf { it.text.length })
             assertTrue(used <= 2400)
-            assertTrue(messages.any { it.jsonObject["content"]!!.jsonPrimitive.content.contains("历史摘要") })
+            // 有 LLM 摘要时插的是「上下文摘要」段，不再是旧的本地节选「历史摘要」。
+            assertTrue(messages.any { it.jsonObject["content"]!!.jsonPrimitive.content.startsWith("上下文摘要") })
             assertEquals("question", messages.last().jsonObject["content"]!!.jsonPrimitive.content)
         }
     }

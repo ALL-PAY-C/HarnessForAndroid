@@ -27,8 +27,14 @@ class ToolExecutor(
     private val retries: Int = 1,
     private val retryDelayMs: Long = 500L,
     private val maxOutputChars: Int = 6_000,
+    /**
+     * 大输出落盘（P0-4）：给了它就不再硬截 6000 字符 —— 超阈值写 app 私有目录，
+     * 正文留头尾 + locator，模型用 read_output 按 offset/limit 读回全文。
+     */
+    private val spill: ToolOutputSpill? = null,
 ) {
-    suspend fun run(name: String, args: JsonObject): ToolExecResult {
+    /** [callId] 用于落盘文件名：同一轮里同名工具调两次不能互相覆盖输出。 */
+    suspend fun run(name: String, args: JsonObject, turnId: String? = null, callId: String? = null): ToolExecResult {
         val started = System.currentTimeMillis()
         var attempts = 0
         var last: String? = null
@@ -47,7 +53,7 @@ class ToolExecutor(
                     ?: throw java.util.concurrent.TimeoutException("执行超时（" + timeoutMs + "ms）")
                 return ToolExecResult(
                     ok = true,
-                    output = out.truncateForTool(maxOutputChars),
+                    output = spill?.present(out, turnId, callId ?: name) ?: out.truncateForTool(maxOutputChars),
                     error = null,
                     elapsedMs = System.currentTimeMillis() - started,
                     attempts = attempts,

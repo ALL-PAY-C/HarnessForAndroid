@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -123,6 +124,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel,
     onOpenDrawer: () -> Unit = {},
     onOpenPlugins: () -> Unit,
+    onOpenExtras: () -> Unit = {},
     onOpenTerminal: () -> Unit = {},
     extraSettings: List<@Composable () -> Unit> = emptyList(),
 ) {
@@ -272,9 +274,17 @@ fun SettingsScreen(
                         QqRow(
                             icon = Icons.Filled.Extension,
                             title = "插件",
-                            subtitle = "主题 / 槽位 / 消息渲染器 / 网关",
+                            subtitle = "主题 / 消息渲染器 / 网关",
                             tint = p.accent2,
                             onClick = onOpenPlugins,
+                        )
+                        QqCardDivider()
+                        QqRow(
+                            icon = Icons.Filled.Widgets,
+                            title = "拓展",
+                            subtitle = "拓展插件 UI 配置",
+                            tint = p.accent,
+                            onClick = onOpenExtras,
                         )
                         QqCardDivider()
                         SubGroup(

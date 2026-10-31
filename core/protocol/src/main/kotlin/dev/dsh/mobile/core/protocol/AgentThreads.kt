@@ -14,6 +14,22 @@ data class ContextAssembly(
     val overflowChars: Int = 0,
 )
 
+/** 本地节选摘要（没有 LLM 摘要时的退路）。 */
+private const val LOCAL_PREFIX = "历史摘要（本地节选，仅作历史资料）：\n"
+
+/** LLM 结构化摘要的前缀。 */
+private const val SUMMARY_PREFIX = "上下文摘要（早期轮次已压缩，原文不再回放）：\n"
+
+/** 一次压缩的输入：哪些消息该被摘要掉，以及压缩前后的体量。 */
+data class CompactionPlan(
+    /** 被 LLM 摘要掉的早期消息（原文，按时间顺序）。 */
+    val dropped: List<JsonObject>,
+    /** 压缩前这段历史的字符数。 */
+    val beforeChars: Int,
+    /** 尾部原文保留的条数。 */
+    val kept: Int,
+)
+
 /** 自己线程保留的最近原文条数。 */
 private const val THREAD_TAIL = 8
 
@@ -60,6 +76,15 @@ class AgentThreads(private val publicLimit: Int = 30) {
     private val shared = HashMap<String, MutableList<JsonObject>>()
     private val finished = HashMap<String, LinkedHashMap<String, String>>()
 
+    /**
+     * sessionId -> LLM 生成的结构化上下文摘要。
+     *
+     * 以前超预算只会「丢掉最老消息 + 把剩下每条压成 80 字」——信息直接蒸发，模型忘了自己在干什么。
+     * 现在超预算时把被丢弃的轮次交给 LLM 总结成五段（角色/任务/已决定/未完成/关键文件路径），
+     * 存这里，每轮作为一条 system 消息插在保留段之前。持久化由调用方（ChatRepository）负责。
+     */
+    private val summaries = HashMap<String, String>()
+
     fun appendThread(sessionId: String, agentId: String, role: String, text: String) {
         if (text.isBlank()) return
         synchronized(lock) { threadList(sessionId, agentId).add(message(role, text)) }
@@ -94,6 +119,7 @@ class AgentThreads(private val publicLimit: Int = 30) {
             threads.remove(sessionId)
             shared.remove(sessionId)
             finished.remove(sessionId)
+            summaries.remove(sessionId)
         }
     }
 
@@ -157,6 +183,12 @@ class AgentThreads(private val publicLimit: Int = 30) {
             digestChars += line.length + 1
         }
 
+        // e2. LLM 结构化摘要（有就带上）：比 80 字单行节选信息密度高得多，
+        //     作为独立 system 段紧跟 system prompt，属于「保留段之前」。
+        val storedSummary = summaries[sessionId]?.takeIf { it.isNotBlank() }
+        val earlyMsgs = ArrayList<JsonObject>()
+        if (storedSummary != null) earlyMsgs += message("system", SUMMARY_PREFIX + storedSummary)
+
         val sysText = buildString {
             append(systemPrompt)
             if (stateLine != null) {
@@ -169,7 +201,8 @@ class AgentThreads(private val publicLimit: Int = 30) {
 
         // 超预算从旧到新裁剪：先丢更早历史的摘要，再丢公共历史最旧原文，最后丢自己线程最旧原文。
         // system 与本轮用户消息永不裁剪 —— 裁掉它们模型就不知道自己在干什么、要干什么。
-        var used = sysText.length + digestMsgs.sumOf { textOf(it).length } +
+        var used = sysText.length + earlyMsgs.sumOf { textOf(it).length } +
+            digestMsgs.sumOf { textOf(it).length } +
             threadTail.sumOf { textOf(it).length } + pubTail.sumOf { textOf(it).length } +
             userTurn.sumOf { textOf(it).length }
         while (used > budgetChars) {
@@ -177,12 +210,15 @@ class AgentThreads(private val publicLimit: Int = 30) {
                 digestMsgs.isNotEmpty() -> used -= textOf(digestMsgs.removeAt(0)).length
                 pubTail.isNotEmpty() -> used -= textOf(pubTail.removeAt(0)).length
                 threadTail.isNotEmpty() -> used -= textOf(threadTail.removeAt(0)).length
+                // LLM 摘要最后才丢：它概括的是全部已丢弃历史，丢了等于把记忆清空。
+                earlyMsgs.isNotEmpty() -> used -= textOf(earlyMsgs.removeAt(0)).length
                 else -> break
             }
         }
 
-        val out = ArrayList<JsonObject>(2 + digestMsgs.size + threadTail.size + pubTail.size + userTurn.size)
+        val out = ArrayList<JsonObject>(2 + earlyMsgs.size + digestMsgs.size + threadTail.size + pubTail.size + userTurn.size)
         out += sysMsg
+        out += earlyMsgs
         out += digestMsgs
         out += threadTail
         out += pubTail
@@ -215,7 +251,9 @@ class AgentThreads(private val publicLimit: Int = 30) {
             listOf(sys) + userMsg, fixed, full, overBudget = true, overflowChars = fixed - budgetChars,
         )
         val remaining = budgetChars - fixed
-        val prefix = "历史摘要（本地节选，仅作历史资料）：\n"
+        // 有 LLM 摘要就优先用它（它概括的正是被丢掉的早期轮次）；没有才退回 80 字单行节选。
+        val stored = synchronized(lock) { summaries[sessionId] }.orEmpty()
+        val prefix = if (stored.isNotEmpty()) SUMMARY_PREFIX else LOCAL_PREFIX
         val tail = history.takeLast(keepRecent.coerceAtLeast(0)).toMutableList()
         var tailChars = tail.sumOf { textOf(it).length }
         // 尾部原文自身放不下时，从最旧一条开始让出摘要空间。
@@ -225,15 +263,76 @@ class AgentThreads(private val publicLimit: Int = 30) {
         }
         val older = history.dropLast(tail.size)
         val summaryBudget = minOf(DIGEST_BUDGET, remaining - tailChars)
-        val summary = if (summaryBudget > prefix.length && older.isNotEmpty()) {
-            val lines = older.joinToString("\n") {
-                val role = (it["role"] as? JsonPrimitive)?.content.orEmpty()
-                "$role: "+ digest(textOf(it), 80)
+        val summary = when {
+            summaryBudget <= prefix.length -> ""
+            stored.isNotEmpty() ->
+                (prefix + stored).let { if (it.length <= summaryBudget) it else it.take(summaryBudget) }
+            older.isEmpty() -> ""
+            else -> {
+                val lines = older.joinToString("\n") { m ->
+                    val role = (m["role"] as? JsonPrimitive)?.content.orEmpty()
+                    role + ": " + digest(textOf(m), 80)
+                }
+                (prefix + lines).take(summaryBudget)
             }
-            (prefix + lines).take(summaryBudget)
-        } else ""
+        }
         val out = listOf(sys) + (if (summary.isEmpty()) emptyList() else listOf(message("system", summary))) + tail + userMsg
         return ContextAssembly(out, fixed + tailChars + summary.length, full)
+    }
+
+    /** 当前生效的 LLM 摘要（空串表示还没压缩过）。 */
+    fun summary(sessionId: String): String = synchronized(lock) { summaries[sessionId].orEmpty() }
+
+    /** 写入/清空 LLM 摘要；持久化由调用方（ChatRepository）负责。 */
+    fun setSummary(sessionId: String, text: String) {
+        synchronized(lock) {
+            if (text.isBlank()) summaries.remove(sessionId) else summaries[sessionId] = text.trim()
+        }
+    }
+
+    /**
+     * 压缩计划：不需要压缩返回 null；需要则给出「哪些早期消息该被 LLM 摘要掉」。
+     *
+     * 判定口径与 [assembleForSingleChat] 完全一致（full = system + 全部历史 + 本轮用户消息），
+     * 所以「计划为 null」就等于「装配路径不会裁剪」，不会出现压了却没生效的空转。
+     */
+    fun planCompaction(
+        sessionId: String,
+        budgetChars: Int,
+        system: String,
+        history: List<JsonObject>,
+        userMsg: List<JsonObject>,
+        keepRecent: Int = 8,
+    ): CompactionPlan? {
+        val fixed = system.length + userMsg.sumOf { textOf(it).length }
+        val full = fixed + history.sumOf { textOf(it).length }
+        if (full <= budgetChars) return null
+        // 以前这里还有一句「固定段（system + 本轮提问）自己就超预算 → return null」，
+        // 结果是：真实会话的系统提示词带着全套工具说明，动辄几万字符，永远大于旧的 8k/24k 预算，
+        // 于是 /compact 一律回「不需要压缩」——真压缩等于没接。压不了固定段，但历史仍然可压，
+        // 所以只要还有可丢的更早轮次就给计划；固定段自己超窗口属于另一件事，由装配的 overBudget 直说。
+        synchronized(lock) {
+            val tail = history.takeLast(keepRecent.coerceAtLeast(0))
+            val older = history.dropLast(tail.size)
+            if (older.isEmpty()) return null
+            return CompactionPlan(older, older.sumOf { textOf(it).length }, tail.size)
+        }
+    }
+
+    /**
+     * 压缩用的 LLM 请求正文：固定五段结构（角色/任务/已决定/未完成/关键文件路径），
+     * 与桌面侧 /compact 的摘要形态对齐，两边都能直接读。
+     */
+    fun compactionPrompt(plan: CompactionPlan): String = buildString {
+        append("把下面这段更早的对话压缩成结构化摘要，供后续轮次当作长期记忆使用。\n")
+        append("只输出摘要本身，不要寒暄、不要复述原文。严格用这五段，每段 1-3 行：\n")
+        append("角色：\n任务：\n已决定：\n未完成：\n关键文件路径：\n")
+        append("关键文件路径只列确实出现过且仍然相关的路径；没有就写「无」。\n")
+        append("\n--- 待压缩历史 ---\n")
+        plan.dropped.forEach { m ->
+            val role = (m["role"] as? JsonPrimitive)?.content.orEmpty()
+            append(role).append(": ").append(textOf(m)).append('\n')
+        }
     }
 
     private fun threadList(sessionId: String, agentId: String): MutableList<JsonObject> =

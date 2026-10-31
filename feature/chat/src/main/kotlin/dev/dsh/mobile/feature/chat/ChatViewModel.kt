@@ -23,8 +23,12 @@ import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.Session
 import dev.dsh.mobile.core.model.SessionKind
 import dev.dsh.mobile.core.model.TokenUsage
+import dev.dsh.mobile.core.protocol.CompactResult
+import dev.dsh.mobile.core.protocol.SessionProjection
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -52,6 +56,8 @@ data class ChatUiState(
     val agentId: String? = null,
     val models: List<ModelProfile> = emptyList(),
     val usage: TokenUsage = TokenUsage.EMPTY,
+    /** 最近这条回复的 completion token（流式中为字符估算峰值，轮次结束后保持该轮峰值不归零）。 */
+    val completionTokens: Long = 0,
     val contextWindow: Int = 32_000,
     val group: String = "",
     val groups: List<String> = emptyList(),
@@ -86,18 +92,24 @@ data class ChatUiState(
 
     val sessionTotalTokens: Long get() = usage.sessionTotal
     val sessionTotalText: String get() = compact(sessionTotalTokens)
-    val contextPercent: Long get() = if (contextWindow > 0) usage.lastPrompt * 100 / contextWindow else 0
+    /**
+     * 当前上下文占用 = 最近一次请求的 prompt + 这条回复的 completion。
+     *
+     * 以前只取 usage.lastPrompt：长回答结束后百分比一动不动，看起来上下文压根没涨。
+     * completion 由 [ChatViewModel] 给（流式中按增量字符估算，结束后取落库用量）。
+     */
+    val contextUsed: Long get() = usage.lastPrompt + completionTokens
+    val contextPercent: Long get() = if (contextWindow > 0) contextUsed * 100 / contextWindow else 0
     val contextUsageText: String
-        get() = "${exactTokens(usage.lastPrompt)} / ${exactTokens(contextWindow.toLong())}（$contextPercent%）"
+        get() = "${compact(contextUsed)} / ${compact(contextWindow.toLong())}（$contextPercent%）"
 
     /** 累计消耗放右侧，标题下只显示最近请求的实际上下文。 */
     val tokenText: String
         get() {
-            val used = usage.lastPrompt
+            val used = contextUsed
             val pct = contextPercent
-            val speed = if (tokensPerSecond > 0.05) " · ${"%.1f".format(tokensPerSecond)} tok/s" else ""
-            val cache = if (usage.cached > 0) " · 缓存 ${usage.cachePercent}%" else ""
-            return "上下文 $pct% · ${exactTokens(used)} / ${exactTokens(contextWindow.toLong())}$speed$cache"
+            val speed = if (tokensPerSecond > 0.05) " · " + speedText(tokensPerSecond) else ""
+            return "上下文 $pct% · ${compact(used)} / ${compact(contextWindow.toLong())}$speed"
         }
     val isGroup: Boolean get() = kind == SessionKind.Group
     /** Name of the agent bound to a single chat (falls back to the default model). */
@@ -269,7 +281,10 @@ class ChatViewModel(
             }
         }
         val session = meta.session
-        val speed = measureSpeed(session?.usage ?: TokenUsage.EMPTY)
+        // 引擎整轮才发一次 usage（LocalEngineTransport.kt:699），流式期间只能靠增量估算，
+        // 所以两条路都算：窗口速度优先（正在输出时），没有增量才退回两次 usage 的差值。
+        val windowSpeed = streamSpeed(turn)
+        val usageSpeed = measureSpeed(session?.usage ?: TokenUsage.EMPTY)
         // 预设按会话取：面板上勾的开关要跟下一轮请求实际用的提示词一致。
         val preset = AgentPresets.builtinOf(settings.presetFor(sessionId)) ?: AgentPresets.standard
         val presetOn = AgentPresets.switchOn(preset, settings.switchOnFor(sessionId))
@@ -291,6 +306,7 @@ class ChatViewModel(
             agentId = session?.agentId,
             models = meta.models,
             usage = session?.usage ?: TokenUsage.EMPTY,
+            completionTokens = completion.current(turn, persisted),
             contextWindow = contextWindowOf(bound?.model ?: "", bound?.contextWindow ?: 0),
             group = session?.group.orEmpty(),
             queued = meta.queue.size,
@@ -299,7 +315,7 @@ class ChatViewModel(
             archived = session?.archived ?: false,
             cwd = session?.cwd.orEmpty(),
             persona = session?.persona.orEmpty(),
-            tokensPerSecond = speed,
+            tokensPerSecond = if (windowSpeed > 0.05) windowSpeed else usageSpeed,
             renderSpecial = settings.renderSpecialFor(sessionId),
             presetId = preset.id,
             presetSwitches = preset.switches,
@@ -308,6 +324,69 @@ class ChatViewModel(
     }.combine(agentsFlow) { state, agents ->
         if (agents.isEmpty()) state else state.copy(agents = agents)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState(sessionId))
+
+    // ------------------------------------------------- 投影 / 压缩（只读 UI 接线）
+
+    /**
+     * 会话只读投影：待办 / 目标 / 上下文用量 / 压缩统计。
+     *
+     * 写侧在运行时（core:protocol / core:data 共用同一个 SessionProjections 实例），
+     * 这里只订阅，不产生任何写入。
+     */
+    val projection: StateFlow<SessionProjection> = repo.projection(sessionId)
+
+    private val compactingState = MutableStateFlow(false)
+
+    /** /compact 正在跑：面板显进行中，重复触发直接吞掉（压缩要调模型，不能并发两次）。 */
+    val compacting: StateFlow<Boolean> = compactingState.asStateFlow()
+
+    private val notesState = MutableStateFlow<List<ChatMessage>>(emptyList())
+
+    /**
+     * 本地系统回执（/compact 结果）。
+     *
+     * 只活在页面里：仓库没有「插一条系统消息」的出口，写库要动 core:data（不在本任务边界）。
+     * 换页即消失，但同样的结果已经进了 [projection] 的压缩统计，顶栏徽标不会丢。
+     */
+    val systemNotes: StateFlow<List<ChatMessage>> = notesState.asStateFlow()
+
+    /**
+     * /compact 真入口：压缩在 transport 侧落地（要调模型、读写摘要），仓库只做门面。
+     * 结果回一条系统回执；没超预算 / 引擎不支持都如实透出，不假装压过。
+     */
+    fun compactContext() {
+        if (compactingState.value) return
+        compactingState.value = true
+        viewModelScope.launch {
+            try {
+                val result = try {
+                    repo.compact(sessionId)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    CompactResult(
+                        compacted = false,
+                        message = "压缩失败：" + (e.message ?: e.javaClass.simpleName),
+                    )
+                }
+                pushNote(compactNote(result))
+            } finally {
+                compactingState.value = false
+            }
+        }
+    }
+
+    private fun pushNote(text: String) {
+        val now = System.currentTimeMillis()
+        val note = ChatMessage(
+            id = "note-" + now + "-" + notesState.value.size,
+            sessionId = sessionId,
+            role = ChatMessage.Role.SYSTEM,
+            text = text,
+            at = now,
+        )
+        notesState.value = (notesState.value + note).takeLast(SYSTEM_NOTE_LIMIT)
+    }
 
     private var lastUsage: TokenUsage = TokenUsage.EMPTY
     private var lastUsageAt: Long = 0L
@@ -331,6 +410,62 @@ class ChatViewModel(
         lastSpeed = deltaTokens * 1000.0 / deltaMs
         return lastSpeed
     }
+
+    /** 流式速度的滑动窗口：(elapsedRealtime, 累计估算 token)。 */
+    private val speedWindow = ArrayDeque<Pair<Long, Int>>()
+    private var speedTurnStart = 0L
+    private var windowSpeed = 0.0
+
+    /**
+     * 流式瞬时速度（tok/s）。
+     *
+     * 口径：本地引擎整轮结束才发一次 usage（见 LocalEngineTransport 的 resp["usage"]），
+     * 流式期间没有真实 token 数，只能按「已经到达的正文 + 思维链字符」估算：
+     * CJK 字符 1 字符 ≈ 1 token，其余（英文/代码/空白）4 字符 ≈ 1 token。
+     * 采样 [SPEED_WINDOW_MS] 滑动窗口，最多每 [SPEED_REFRESH_MS] 刷新一次，
+     * 避免每个 chunk 都推一次 UI。轮次切换清窗口；流结束返回 0，让 usage 差值接管。
+     */
+    private fun streamSpeed(turn: TurnState): Double {
+        if (!turn.running) {
+            speedWindow.clear()
+            return 0.0
+        }
+        if (turn.startedAt != speedTurnStart) {
+            speedTurnStart = turn.startedAt
+            speedWindow.clear()
+            windowSpeed = 0.0
+        }
+        val now = android.os.SystemClock.elapsedRealtime()
+        val tokens = streamedTokens(turn)
+        speedWindow.addLast(now to tokens)
+        // 只留窗口内的样本；至少留 2 个，否则没东西可比。
+        while (speedWindow.size > 2 && now - speedWindow.first().first > SPEED_WINDOW_MS) {
+            speedWindow.removeFirst()
+        }
+        val base = speedWindow.first()
+        val span = now - base.first
+        if (span < SPEED_REFRESH_MS) return windowSpeed
+        val delta = tokens - base.second
+        if (delta > 0) windowSpeed = delta * 1000.0 / span
+        return windowSpeed
+    }
+
+    /** 本轮已到达的正文 + 思维链，折算成 token（与 [streamSpeed] 同一口径）。 */
+    private fun streamedTokens(turn: TurnState): Int {
+        val parts = turn.parts
+        val text = if (parts.isEmpty()) turn.text else parts.joinToString("") { it.text }
+        val thought = if (parts.isEmpty()) turn.thought else parts.joinToString("") { it.thought }
+        return estimateTokens(text) + estimateTokens(thought)
+    }
+
+    /**
+     * 当前上下文里的 completion 部分。
+     *
+     * 记账交给 [CompletionMeter]：流式中取「实时 usage 累计」与「字符估算」的较大者并留峰值，
+     * 整轮结束（running=false、TurnState 被 TurnLedger 换成新对象）时保持峰值不归零，
+     * 换轮才重置；重进会话没有任何一轮在跑，回落到最后一条已落库回复的用量。
+     */
+    private val completion = CompletionMeter { streamedTokens(it).toLong() }
 
     /**
      * 发消息。正在跑的时候：
@@ -431,6 +566,8 @@ class ChatViewModel(
         // 先清队列再清消息：队列 clear 会推进代际，让 drain 已经摘出但还没发出的条目失效，
         // 否则点「清空」后，一条正在排队/刚被摘出的消息还会在下一轮被发出去（N1）。
         sendQueue.clear(sessionId)
+        // 清空会话连本地回执一起清：那些「已压缩 N 条」说的是刚被删掉的历史。
+        notesState.value = emptyList()
         repo.clearMessages(sessionId)
     }
 
@@ -547,12 +684,70 @@ internal fun List<Participant>.nextFreeSlot(): Int = (maxOfOrNull { it.slot } ?:
 
 internal fun exactTokens(value: Long): String = String.format(java.util.Locale.US, "%,d", value)
 
-/** 1.2k / 64k 这种紧凑写法。 */
+/** 1.2k / 64k 这种紧凑写法；整数 k/M 不留 ".0"。 */
 internal fun compact(value: Long): String = when {
-    value >= 1_000_000 -> "%.1fM".format(value / 1_000_000.0)
-    value >= 1_000 -> "%.1fk".format(value / 1_000.0)
+    value >= 1_000_000 -> trimFraction(String.format(java.util.Locale.US, "%.1fM", value / 1_000_000.0))
+    value >= 1_000 -> trimFraction(String.format(java.util.Locale.US, "%.1fk", value / 1_000.0))
     else -> value.toString()
 }
+
+/** 32.0k → 32k；1.5k 原样。 */
+private fun trimFraction(text: String): String = when {
+    text.endsWith(".0k") -> text.dropLast(3) + "k"
+    text.endsWith(".0M") -> text.dropLast(3) + "M"
+    else -> text
+}
+
+/**
+ * completion token 记账。
+ *
+ * 流式中：取「本轮实时 usage 累计」与「字符估算」的较大者，并记住峰值（工具多轮 / 多人发言时
+ * 分段落库会让实时值回落，顶栏不该跟着掉）。
+ * 整轮结束：TurnLedger 把 TurnState 换成新对象、running=false，这里绝不能因此归零——
+ * 判据是自己记的 turnId，只有真的换了一轮（running 且 turnId 变了）才重置峰值。
+ * 重进会话：没有任何一轮在跑，回落到最后一条已落库回复的用量（DB 缺 outputTokens 就按字符估算）。
+ */
+internal class CompletionMeter(private val streamed: (TurnState) -> Long) {
+    private var turnId: String? = null
+    private var peak = 0L
+
+    fun current(turn: TurnState, persisted: List<ChatMessage>): Long {
+        if (turn.running && turn.turnId != turnId) {
+            turnId = turn.turnId
+            peak = 0L
+        }
+        val value = if (turn.running) {
+            val real = if (turn.parts.isEmpty()) turn.outputTokens else turn.parts.sumOf { it.outputTokens }
+            maxOf(real, streamed(turn))
+        } else {
+            settledTokens(persisted)
+        }
+        if (value > peak) peak = value
+        return peak
+    }
+}
+
+/** 最后一条已落库回复的输出 token；DB 里 outputTokens 缺失（0）时用该条消息字符估算兜底。 */
+internal fun settledTokens(persisted: List<ChatMessage>): Long =
+    persisted.lastOrNull { it.role == ChatMessage.Role.ASSISTANT }?.let { msg ->
+        if (msg.outputTokens > 0L) {
+            msg.outputTokens
+        } else {
+            (estimateTokens(msg.text) + estimateTokens(msg.thought)).toLong()
+        }
+    } ?: 0L
+
+/** 近似 token 数：CJK 1:1，其余 4 字符 1 个（DeepSeek 对中文大致 1 token/字）。 */
+internal fun estimateTokens(text: String): Int {
+    if (text.isEmpty()) return 0
+    var wide = 0
+    text.forEach { ch -> if (ch.code >= 0x2E80) wide++ }
+    return wide + (text.length - wide + 3) / 4
+}
+
+/** tok/s：>=10 取整，其余保留一位。 */
+internal fun speedText(tokensPerSecond: Double): String =
+    String.format(java.util.Locale.US, if (tokensPerSecond >= 10) "%.0f tok/s" else "%.1f tok/s", tokensPerSecond)
 
 /** 归一化文本 hash：空白折叠 + 去首尾，换行不同不算两条。 */
 private fun contentKey(authorId: String?, text: String): String =
@@ -562,6 +757,12 @@ private val WHITESPACE = Regex("\\s+")
 
 /** 相邻重复气泡的时间窗：超过它就不算重复，避免误杀正常重复发言。 */
 private const val DUP_WINDOW_MS = 3_000L
+
+/** 流式 tok/s 的采样窗口（毫秒）：窗口内的增量算瞬时速度。 */
+private const val SPEED_WINDOW_MS = 1_200L
+
+/** 流式 tok/s 的最小刷新间隔（毫秒）：chunk 很密时也要有节奏地更新顶栏。 */
+private const val SPEED_REFRESH_MS = 300L
 
 /**
  * 落库 + 实时两路拼完之后再扫一遍：同角色、同作者、归一化文本相同，

@@ -98,17 +98,18 @@ class BarePipeTableBoundaryTest {
 
     /**
      * 已知取舍：HTML 块里如果出现裸 pipe 行，HTML 块会在那行断掉、pipe 行变成表格。
-     * 以前这些行是 HTML 块的原始文本；现在切成 HtmlBlock + Table + HtmlBlock。
+     * 以前这些行是 HTML 块的原始文本；现在切成 HtmlBlock + Table。
+     * 末尾的 </div> 在这一切法里没有配对开标签，会被当成孤立闭标签剥掉（不再多出一个
+     * 只含 </div> 的 HtmlBlock——那条块原文会原样进 WebView 与复制文本）。
      * 只在「HTML 里手写 pipe 行」时可见，不属于正文渲染路径。
      */
     @Test
     fun htmlBlockSplitsAtBareTable() {
         val text = "<div>\n| a | b |\n| c | d |\n</div>"
         val b = blocks(text)
-        assertEquals(3, b.size)
+        assertEquals(2, b.size)
         assertTrue(b[0] is MdBlock.HtmlBlock)
         assertTrue(b[1] is MdBlock.Table)
-        assertTrue(b[2] is MdBlock.HtmlBlock)
     }
 
     // ------------------------------------------------- 没弄坏原来的 |---|---| 分支

@@ -1,6 +1,7 @@
 package dev.dsh.mobile.pluginhost
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
@@ -174,7 +175,28 @@ fun PluginSlotItem(
     tokens: HostThemeTokens,
     onAction: (SlotAction) -> Unit,
 ) {
-    val legacy: (@Composable () -> Unit) = contribution.content ?: { Text(contribution.label) }
+    // 没有自带 content 的贡献：用 label 生成一个可点的 chip。
+    // 以前这里只是 Text，节点不可点 —— 声明式插件（只有 plugin.json）的按钮摆到任何
+    // 槽位都点不动，Prompt 动作永远发不出去。
+    val action = contribution.action
+    val legacy: (@Composable () -> Unit) = contribution.content ?: {
+        val primary = MaterialTheme.colorScheme.primary
+        Text(
+            contribution.label,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier
+                .clip(MaterialTheme.shapes.small)
+                .background(MaterialTheme.colorScheme.surface)
+                .then(
+                    if (action != null) {
+                        Modifier.clickable { onAction(action) }
+                    } else {
+                        Modifier.border(1.dp, primary.copy(alpha = 0.35f), MaterialTheme.shapes.small)
+                    },
+                )
+                .padding(horizontal = 12.dp, vertical = 7.dp),
+        )
+    }
     PluginUiHost(contribution.ui, tokens, onAction, legacy = legacy, insets = false)
 }
 

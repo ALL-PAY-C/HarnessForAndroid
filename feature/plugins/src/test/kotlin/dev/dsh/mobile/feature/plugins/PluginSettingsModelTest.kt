@@ -134,4 +134,49 @@ class PluginSettingsModelTest {
         assertFalse(switchOn(""))
         assertFalse(switchOn("false"))
     }
+
+    // ---- extraValues / hasSettings 的四种取值组合 ----
+
+    @Test
+    fun emptyValuesAndNoFieldsMeansNoSettings() {
+        val entry = pluginSettingsEntries(listOf(manifest("x")), emptyList(), values = { emptyMap() }).single()
+        assertTrue(entry.extraValues.isEmpty())
+        assertFalse(entry.hasSettings)
+        assertEquals(NO_SETTINGS_TEXT, entry.rowSubtitle)
+    }
+
+    @Test
+    fun declaredValuesAreNotExtra() {
+        val entry = pluginSettingsEntries(
+            installed = listOf(manifest("x", config = listOf(ConfigSpec("base", "网关地址")))),
+            pages = emptyList(),
+            values = { mapOf("base" to "http://h") },
+        ).single()
+        assertTrue("声明过的键不进 extraValues", entry.extraValues.isEmpty())
+        assertTrue(entry.hasSettings)
+    }
+
+    @Test
+    fun undeclaredValueTurnsSettingsOn() {
+        val entry = pluginSettingsEntries(
+            installed = listOf(manifest("x")),
+            pages = emptyList(),
+            values = { mapOf("token" to "abc") },
+        ).single()
+        assertEquals(mapOf("token" to "abc"), entry.extraValues)
+        assertTrue("用户自己加的键也算有设置", entry.hasSettings)
+        assertNull(entry.emptyText)
+        assertEquals("插件自带设置界面", entry.rowSubtitle)
+    }
+
+    @Test
+    fun mixedValuesOnlyUndeclaredGoToExtra() {
+        val entry = pluginSettingsEntries(
+            installed = listOf(manifest("x", config = listOf(ConfigSpec("base", "网关地址")))),
+            pages = emptyList(),
+            values = { mapOf("base" to "http://h", "token" to "abc") },
+        ).single()
+        assertEquals(setOf("token"), entry.extraValues.keys)
+        assertEquals("http://h", entry.valueOf(entry.fields.single()))
+    }
 }

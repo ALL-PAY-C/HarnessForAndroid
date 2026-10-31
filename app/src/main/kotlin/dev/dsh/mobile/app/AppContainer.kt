@@ -14,6 +14,7 @@ import dev.dsh.mobile.core.data.repo.SendQueue
 import dev.dsh.mobile.core.data.repo.toModel
 import dev.dsh.mobile.core.data.settings.ModelProfile
 import dev.dsh.mobile.core.data.settings.ModelStore
+import dev.dsh.mobile.core.data.settings.contextWindowOf
 import dev.dsh.mobile.core.data.settings.SettingsStore
 import dev.dsh.mobile.core.data.settings.toWebSettings
 import dev.dsh.mobile.core.protocol.web.WebToolkit
@@ -32,6 +33,7 @@ import dev.dsh.mobile.core.model.ChatMessage
 import dev.dsh.mobile.core.protocol.AcpTransport
 import dev.dsh.mobile.core.protocol.LlmConfig
 import dev.dsh.mobile.core.protocol.GroupMember
+import dev.dsh.mobile.core.protocol.ContextBudget
 import dev.dsh.mobile.core.protocol.GroupPlan
 import dev.dsh.mobile.core.protocol.LocalEngineTransport
 import dev.dsh.mobile.core.protocol.DshTransport
@@ -89,7 +91,20 @@ class AppContainer(private val context: Context) {
 
     val db by lazy { DataModule.createDatabase(context) }
     val settings: SettingsStore by lazy { DataModule.createSettings(context) }
-    val repo: ChatRepository by lazy { DataModule.createChatRepository(db, scope) }
+    /**
+     * 会话投影（P0-6）：LocalEngineTransport 写、ChatRepository 读、UI 只读订阅。
+     * 必须是同一个实例 —— 分成两份就会出现「工具改了待办但界面不动」。
+     */
+    val projections by lazy { dev.dsh.mobile.core.protocol.SessionProjections() }
+    /** 压缩摘要持久化（P0-1）：SharedPreferences，不新建 Room 表。 */
+    val summaryStore by lazy {
+        dev.dsh.mobile.core.data.repo.SharedPrefsSummaryStore.from(context)
+    }
+    /** 大工具输出落盘根目录（P0-4）：app 私有目录下的 tools-output/。 */
+    val toolOutputSpill by lazy {
+        dev.dsh.mobile.core.protocol.ToolOutputSpill(rootProvider = { File(context.filesDir, "tools-output") })
+    }
+    val repo: ChatRepository by lazy { DataModule.createChatRepository(db, scope, projections) }
 
     /** 发送队列：活过页面，关掉会话再回来排队中的消息还在。 */
     val sendQueue: SendQueue by lazy { SendQueue(repo, scope) }
@@ -591,11 +606,18 @@ class AppContainer(private val context: Context) {
                             channelListExec = channelListExec,
                             bgExec = bgExec,
                             skillExec = skillExec,
-                            contextBudgetProvider = { settings.settings.first().groupContextBudget },
+                            // 压缩预算 = 会话模型窗口 * 0.8，和顶栏百分比同一口径（以前取 groupContextBudget 字符数，
+                            // 24000 字符 /4 = 6000 tokens，跟顶栏 32k 完全两套，于是 /compact 永远回「不需要压缩」）。
+                            contextBudgetProvider = { sid -> ContextBudget.budgetChars(contextWindowFor(sid)) },
+                            contextWindowProvider = { sid -> contextWindowFor(sid) },
                             // 引擎插件：baseUrl = engine://<模型 id> 时走 :node 的 /llm，不碰网络。
                             // nodeEngine 是 lazy，这里只是传闭包，真正碰引擎发生在发消息那一刻。
                             engineChat = { payload -> nodeEngine.rpc("/llm", "chat", payload) },
                             engineRpc = { path, endpoint, payload -> nodeEngine.rpc(path, endpoint, payload) },
+                            // P0-1/P0-4/P0-6：摘要持久化、大输出落盘、会话投影，都走同一实例给到仓库与 UI。
+                            spill = toolOutputSpill,
+                            projections = projections,
+                            summaryStore = summaryStore,
                         )
                     }
                     TransportKind.Loopback -> AcpTransport(
@@ -701,6 +723,23 @@ class AppContainer(private val context: Context) {
     /** engine:// 走本地引擎，密钥由插件自己管，空 Key 也算可用；其余仍要求填 Key。 */
     private fun ModelProfile.usable(): Boolean =
         model.isNotBlank() && (apiKey.isNotBlank() || baseUrl.trim().startsWith("engine://"))
+
+    /**
+     * 会话绑定的模型 → 上下文窗口（tokens）。解析顺序与 [activeLlmConfig] 一致：
+     * session.agentId 命中 → isDefault → 首个；都查不到就用 32k 兜底。
+     * 顶栏百分比、装配预算、压缩预算（窗口 * 0.8）全从这里取，避免再出现两套口径。
+     */
+    private suspend fun contextWindowFor(sessionId: String): Int {
+        val window = runCatching {
+            val list = models.models.first()
+            val bound = if (sessionId.isBlank()) null else repo.session(sessionId)?.agentId
+            val m = list.firstOrNull { it.id == bound }
+                ?: list.firstOrNull { it.isDefault }
+                ?: list.firstOrNull()
+            if (m == null) 0 else contextWindowOf(m.model, m.contextWindow)
+        }.getOrDefault(0)
+        return if (window > 0) window else ContextBudget.DEFAULT_WINDOW_TOKENS
+    }
 
     internal suspend fun activeLlmConfig(sessionId: String): LlmConfig? {
         val list = models.models.first()

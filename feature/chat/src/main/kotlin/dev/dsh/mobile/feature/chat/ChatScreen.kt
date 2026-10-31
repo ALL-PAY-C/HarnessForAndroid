@@ -1,5 +1,8 @@
+// 会话底部槽 + 折叠面板（面板三段默认收起，槽位渲染走 design/SlotEditUi）。
+// 改动后需重新产出 ChatScreenKt 门面类，勿只 touch。
 package dev.dsh.mobile.feature.chat
 
+import android.content.Intent
 import android.net.Uri
 import dev.dsh.mobile.core.data.preset.AgentPresets
 import dev.dsh.mobile.core.data.repo.SendQueue
@@ -37,38 +40,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.Create
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DriveFileMove
-import androidx.compose.material.icons.filled.Extension
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material.icons.filled.Unarchive
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.animation.AnimatedVisibility
-import dev.dsh.mobile.core.data.preset.PresetSwitch
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -105,12 +93,26 @@ import dev.dsh.mobile.design.Ava
 import dev.dsh.mobile.design.IconBtn
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.pluginapi.SlotContribution
+import dev.dsh.mobile.design.SlotEditFrame
+import dev.dsh.mobile.design.SlotEditItem
+import dev.dsh.mobile.design.SlotEditState
+import dev.dsh.mobile.design.SlotPickerDialog
+import dev.dsh.mobile.design.SlotPlusButton
+import dev.dsh.mobile.design.SlotStrip
+import dev.dsh.mobile.design.UiEditMode
+import dev.dsh.mobile.design.UiEditSlotPlusRow
+import dev.dsh.mobile.pluginhost.PluginSlotItem
+import dev.dsh.mobile.pluginhost.rememberHostThemeTokens
 import dev.dsh.mobile.design.MessageBubble
 import dev.dsh.mobile.design.EmptyState
 import dev.dsh.mobile.render.ChatContent
 import dev.dsh.mobile.design.QqTopBar
+import dev.dsh.mobile.design.ContextRing
 import dev.dsh.mobile.design.SessionStatusDot
 import dev.dsh.mobile.core.model.SessionStatus
+import dev.dsh.mobile.core.protocol.ProjectedTodo
+import dev.dsh.mobile.core.protocol.SessionProjection
+import androidx.compose.ui.text.style.TextDecoration
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -136,6 +138,8 @@ fun ChatScreen(
     onBack: () -> Unit,
     /** 打开左侧抽屉（Agent 预设面板就在里面）。 */
     onOpenDrawer: () -> Unit = {},
+    /** 打开整页的会话设置（原右侧边栏）。 */
+    onOpenSettings: () -> Unit = {},
     messageSlot: @Composable (ChatMessage) -> Boolean = { false },
     composerExtras: List<Pair<String, (String) -> String>> = emptyList(),
     /** Plugin buttons for the "+" panel and the "…" menu, translated from their manifests. */
@@ -144,25 +148,39 @@ fun ChatScreen(
     /** 插件贡献的智能体预设（装好插件即出现在「配置智能体」里）。 */
     presetSlots: List<SlotContribution> = emptyList(),
     onSlot: (SlotContribution) -> Unit = {},
+    /** 会话底部槽（SlotId.ChatBottom）已放置的插件组件，由 AppNav 绑定好后传进来。 */
+    slotPlaced: List<SlotContribution> = emptyList(),
+    /** 会话底部槽的可添加候选（编辑态点「+」时列出）。 */
+    slotCandidates: List<SlotEditItem> = emptyList(),
+    onSlotAdd: (SlotEditItem) -> Unit = {},
+    onSlotRemove: (SlotEditItem) -> Unit = {},
+    /** 选中智能体预设：AppNav 转成 setSessionPresetId，页面本身不碰存储。 */
+    onPickPreset: (String) -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // 只读投影：待办 / 目标 / 上下文用量 / 压缩统计，全部来自 runtime，页面只订阅不写。
+    val projection by viewModel.projection.collectAsStateWithLifecycle()
+    val compacting by viewModel.compacting.collectAsStateWithLifecycle()
+    val systemNotes by viewModel.systemNotes.collectAsStateWithLifecycle()
+    // 预设选择状态机：发出第一条消息前可选，之后锁定只读（与桌面 DSH 一致）。
+    val presetSelection = presetSelectionOf(state.presetId, state.messages.isNotEmpty())
     val listState = rememberLazyListState()
     val p = LocalQq.current
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val composerFocus = remember { FocusRequester() }
-    val exportSnackbar = remember { SnackbarHostState() }
-    var exportingImage by remember { mutableStateOf(false) }
 
     var input by remember { mutableStateOf(TextFieldValue("")) }
     var picking by remember { mutableStateOf(false) }
     var usageOpen by remember(state.sessionId) { mutableStateOf(false) }
+    // todo/goal 面板默认折叠（只露一行抬头），点开才铺开清单。
+    var projectionOpen by rememberSaveable(state.sessionId) { mutableStateOf(false) }
     var personaOpen by remember { mutableStateOf(false) }
+    // 智能体预设选择弹窗（锁定后点不开）。
+    var presetOpen by remember { mutableStateOf(false) }
     var panelOpen by remember { mutableStateOf(false) }
-    var menuOpen by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<String?>(null) }
-    var grouping by remember { mutableStateOf(false) }
     var confirmingClear by remember { mutableStateOf(false) }
     var editingWorkspace by remember { mutableStateOf<String?>(null) }
     var cameraUri by remember { mutableStateOf<Uri?>(null) }
@@ -284,12 +302,23 @@ fun ChatScreen(
     editingWorkspace?.let { current ->
         EditDialog(
             title = "修改工作区",
+            pickFolder = true,
             initial = current,
             hint = "例如 /sdcard/DSH 或 D:/work",
             onDismiss = { editingWorkspace = null },
         ) { value ->
             viewModel.setWorkspace(value.trim())
             editingWorkspace = null
+        }
+    }
+
+    if (presetOpen) {
+        PresetPickDialog(
+            currentId = state.presetId,
+            onDismiss = { presetOpen = false },
+        ) { id ->
+            onPickPreset(id)
+            presetOpen = false
         }
     }
 
@@ -302,17 +331,6 @@ fun ChatScreen(
         ) { value ->
             viewModel.setPersona(value)
             personaOpen = false
-        }
-    }
-
-    if (grouping) {
-        GroupPickDialog(
-            current = state.group,
-            known = state.groups,
-            onDismiss = { grouping = false },
-        ) { group ->
-            viewModel.setGroup(group)
-            grouping = false
         }
     }
 
@@ -356,56 +374,83 @@ fun ChatScreen(
             leadingExpanded = true,
             leading = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconBtn(Icons.Filled.Menu, "侧边栏", onOpenDrawer)
                     IconBtn(Icons.AutoMirrored.Filled.ArrowBack, "返回", onBack)
+                    // 最左侧仍是运行态圆点（思考/等待/结束/出错），呼吸动效保留。
+                    SessionStatusDot(
+                        when {
+                            state.error != null -> SessionStatus.Failed
+                            state.permission != null -> SessionStatus.WaitingPermission
+                            state.streaming -> SessionStatus.Running
+                            else -> SessionStatus.Idle
+                        },
+                    )
+                    Spacer(Modifier.width(6.dp))
                     Column(Modifier.weight(1f).clickable { usageOpen = true }, horizontalAlignment = Alignment.Start) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            SessionStatusDot(
-                                when {
-                                    state.error != null -> SessionStatus.Failed
-                                    state.permission != null -> SessionStatus.WaitingPermission
-                                    state.streaming -> SessionStatus.Running
-                                    else -> SessionStatus.Idle
-                                },
-                            )
-                            Spacer(Modifier.width(6.dp))
                             Text(
-                                state.title.ifBlank { "会话" },
+                                state.title.ifBlank { "新会话" },
                                 color = p.t1,
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.weight(1f, fill = false),
                             )
+                            // 压缩可见性：没压过（count=0）就整块不渲染，顶栏保持原样。
+                            compactionBadge(projection.compaction)?.let { badge ->
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    badge,
+                                    color = p.accent,
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(p.accent.copy(alpha = 0.12f))
+                                        .padding(horizontal = 5.dp, vertical = 1.dp),
+                                )
+                            }
                         }
-                        if (state.settings.showTokenUsage) Text(
-                            if (state.streaming) "正在输出 · ${state.tokenText}" else state.tokenText,
-                            color = p.t2,
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                        )
+                        if (state.settings.showTokenUsage) Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            // 上下文占用环：弧度即占比，挂在「上下文」文字左侧的小空里。
+                            // 占比优先读投影（装配字符预算口径），投影没数据退回 usage 口径。
+                            ContextRing(usagePercent(projection.usage) ?: state.contextPercent.toInt())
+                            Spacer(Modifier.width(5.dp))
+                            Text(
+                                if (state.streaming) "正在输出 · ${usageLine(state, projection.usage)}"
+                                else usageLine(state, projection.usage),
+                                color = p.t2,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
             },
             trailing = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (state.settings.showTokenUsage) Text(
-                        state.sessionTotalText,
-                        modifier = Modifier.clip(RoundedCornerShape(10.dp))
-                            .background(p.hover).clickable { usageOpen = true }
-                            .padding(horizontal = 9.dp, vertical = 6.dp),
-                        color = p.accent,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    // 智能体预设入口：未发过消息时可点（选中即生效，没有额外开关）；发过就只读展示。
                     Text(
-                        if (state.isGroup) "${state.participants.size} 位 Agent" else state.agentName,
-                        modifier = Modifier.widthIn(max = 72.dp).clickable { picking = true }.padding(horizontal = 6.dp),
-                        color = p.accent, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        if (presetSelection.locked) presetNameOf(state.presetId)
+                        else "预设：" + presetNameOf(state.presetId),
+                        color = if (presetSelection.locked) p.t3 else p.accent,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(enabled = !presetSelection.locked) { presetOpen = true }
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
                     )
-                    IconBtn(Icons.Filled.Menu, "右侧边栏") { menuOpen = true }
+                    IconBtn(Icons.Filled.Menu, "会话菜单") { onOpenSettings() }
                 }
             },
         ) {}
+
+        // UI 修改模式：会话顶栏 / 输入框区旁的可编辑「+」，两条都可左右滑动。
+        UiEditSlotPlusRow(slot = UiEditMode.Slot.ChatTopBar, onClick = { picking = true })
+        UiEditSlotPlusRow(slot = UiEditMode.Slot.Composer, onClick = { picking = true })
 
         if (usageOpen) AlertDialog(
             onDismissRequest = { usageOpen = false },
@@ -414,10 +459,10 @@ fun ChatScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     listOf(
-                        "输入（未命中）" to exactTokens(state.usage.input),
-                        "输入（缓存命中）" to exactTokens(state.usage.cached),
-                        "输出" to exactTokens(state.usage.output),
-                        "总计" to exactTokens(state.sessionTotalTokens),
+                        "输入（未命中）" to compact(state.usage.input),
+                        "输入（缓存命中）" to compact(state.usage.cached),
+                        "输出" to compact(state.usage.output),
+                        "总计" to compact(state.sessionTotalTokens),
                         "缓存命中率" to "${state.usage.cachePercent}%",
                         "当前上下文占用" to state.contextUsageText,
                     ).forEach { (label, value) ->
@@ -425,6 +470,11 @@ fun ChatScreen(
                             Text(label, color = p.t2, fontSize = 12.sp)
                             Text(value, color = p.t1, fontSize = 14.sp)
                         }
+                    }
+                    // 压缩明细也挂在同一个弹窗里：没压过就不加这两行。
+                    if (projection.compaction.count > 0) Column {
+                        Text("上下文压缩", color = p.t2, fontSize = 12.sp)
+                        Text(compactionDetail(projection.compaction), color = p.t1, fontSize = 14.sp)
                     }
                 }
             },
@@ -546,6 +596,15 @@ fun ChatScreen(
             }
         }
 
+        // 模型侧 todo / goal 只读面板：两样都空时整块不渲染（老会话一个像素都不变）。
+        if (projection.hasTodos || projection.goal != null) {
+            ProjectionPanel(
+                projection = projection,
+                expanded = projectionOpen,
+                onToggle = { projectionOpen = !projectionOpen },
+            )
+        }
+
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -555,6 +614,7 @@ fun ChatScreen(
                 item {
                     EmptyState(
                         icon = Icons.Filled.SmartToy,
+                        iconSize = 34.dp,
                         title = "有什么可以帮你的？",
                         subtitle = if (state.isGroup) "在下面 @ 一位 Agent 发任务；不 @ 时由最后发言的那位接着答。" else "消息会发给本地运行时，回复实时流式显示在这里。",
                     )
@@ -662,6 +722,10 @@ fun ChatScreen(
                     )
                 }
             }
+            // /compact 进行中：一条占位，别让按钮点了以后毫无反应（压缩要调模型，可能秒级）。
+            if (compacting) item(key = "compact-running") { SystemNoteRow(COMPACT_RUNNING_TEXT) }
+            // 系统回执（/compact 结果）：居中一条灰底小字，不占气泡位置、不带作者头像。
+            items(systemNotes, key = { it.id }) { note -> SystemNoteRow(note.text) }
         }
 
         QueueStrip(
@@ -678,8 +742,9 @@ fun ChatScreen(
             when (cmd) {
                 "/clear" -> { confirmingClear = true; true }
                 "/model" -> { picking = true; true }
-                "/compact" -> {
-                    notice = "上下文压缩由运行时按预算自动完成，无需手动触发"
+                // 真入口：走 repo.compact → transport，结果回一条系统回执（没超预算就如实说）。
+                "/compact", "/压缩" -> {
+                    viewModel.compactContext()
                     true
                 }
                 "/new" -> {
@@ -764,64 +829,156 @@ fun ChatScreen(
             drafts = drafts,
             onRemoveDraft = { path -> drafts = drafts - path },
             mentions = if (state.isGroup) state.participants.map { it.name }.distinct() else emptyList(),
-            presetSwitches = state.presetSwitches,
-            presetSwitchOn = state.presetSwitchOn,
-            onPresetSwitch = { id, on -> viewModel.setPresetSwitch(id, on) },
+            onSlot = onSlot,
+            slotPlaced = slotPlaced,
+            slotCandidates = slotCandidates,
+            onSlotAdd = onSlotAdd,
+            onSlotRemove = onSlotRemove,
         )
         }
 
-        // 右侧边栏：代替原来那个「⋯」下拉菜单。QQ 的会话右滑就是这个手感——
-        // 从右边推出来一整块，条目大字清楚，点空白处收起。
-        ChatSidebar(
-            open = menuOpen,
-            title = state.title.ifBlank { "会话" },
-            subtitle = if (state.isGroup) "群组 · " + state.participants.size + " 位 Agent" else state.agentName,
-            archived = state.archived,
-            workspace = state.cwd,
-            extras = overflowSlots.map { it.label },
-            renderSpecial = state.renderSpecial,
-            onRenderSpecial = viewModel::setRenderSpecial,
-            onClose = { menuOpen = false },
-            onRename = { menuOpen = false; renaming = state.title },
-            onWorkspace = { menuOpen = false; editingWorkspace = state.cwd },
-            onAgent = { menuOpen = false; personaOpen = true },
-            onMove = { menuOpen = false; grouping = true },
-            onArchive = { menuOpen = false; viewModel.setArchived(!state.archived) },
-            onExportImage = {
-                menuOpen = false
-                if (!exportingImage) {
-                    exportingImage = true
-                    val exportTitle = state.title
-                    val exportMessages = state.messages
-                    val agentName = state.agentName
-                    scope.launch {
-                        val result = try {
-                            withContext(Dispatchers.IO) {
-                                exportChatToPng(context, exportTitle, exportMessages.map { msg ->
-                                    ExportMsg(msg.authorName ?: when (msg.role) {
-                                        ChatMessage.Role.USER -> "我"
-                                        ChatMessage.Role.ASSISTANT -> agentName.ifBlank { "助手" }
-                                        ChatMessage.Role.SYSTEM -> "系统"
-                                        ChatMessage.Role.TOOL -> "工具"
-                                    }, msg.text)
-                                }) ?: error("相册未返回文件地址")
-                            }
-                            "已导出到相册 Pictures/DSH"
-                        } catch (error: kotlinx.coroutines.CancellationException) {
-                            throw error
-                        } catch (error: Exception) {
-                            "导出失败：" + (error.localizedMessage ?: error.javaClass.simpleName)
-                        } finally {
-                            exportingImage = false
-                        }
-                        exportSnackbar.showSnackbar(result)
+    }
+}
+
+/** 导出会话长图到相册；成功/失败都用一句可直接展示的话返回。 */
+internal suspend fun exportChatToGallery(
+    context: android.content.Context,
+    title: String,
+    messages: List<ChatMessage>,
+    agentName: String,
+): String = try {
+    withContext(Dispatchers.IO) {
+        exportChatToPng(context, title, messages.map { msg ->
+            ExportMsg(msg.authorName ?: when (msg.role) {
+                ChatMessage.Role.USER -> "我"
+                ChatMessage.Role.ASSISTANT -> agentName.ifBlank { "助手" }
+                ChatMessage.Role.SYSTEM -> "系统"
+                ChatMessage.Role.TOOL -> "工具"
+            }, msg.text)
+        }) ?: error("相册未返回文件地址")
+    }
+    "已导出到相册 Pictures/DSH"
+} catch (error: kotlinx.coroutines.CancellationException) {
+    throw error
+} catch (error: Exception) {
+    "导出失败：" + (error.localizedMessage ?: error.javaClass.simpleName)
+}
+
+/** /compact 等待期的占位文案（压缩要调模型，别让点击看起来没反应）。 */
+internal const val COMPACT_RUNNING_TEXT = "正在压缩上下文…"
+
+/**
+ * 一条系统回执：居中、灰底小字。
+ *
+ * 不套 [dev.dsh.mobile.design.MessageBubble]：系统回执没有作者、不该占一整张白卡，
+ * 排法跟上面的时间分割线同族（居中窄条），一眼能看出「这不是谁说的话」。
+ */
+@Composable
+private fun SystemNoteRow(text: String) {
+    val p = LocalQq.current
+    Box(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 3.dp), contentAlignment = Alignment.Center) {
+        Text(
+            text,
+            color = p.t2,
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .clip(RoundedCornerShape(9.dp))
+                .background(p.card)
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+        )
+    }
+}
+
+/**
+ * todo / goal 只读面板：抬头一行永远可见（进度一眼可读），点开铺开清单。
+ *
+ * 只用 design 现有的颜色 token 与圆角（p.card / p.accent / p.t1..t3），没有新造视觉语言；
+ * 三态用行首记号 + 已完成划线区分，不依赖颜色（弱视 / 深色下也读得出来）。
+ */
+@Composable
+private fun ProjectionPanel(
+    projection: SessionProjection,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    val p = LocalQq.current
+    val goal = projection.goal
+    Column(Modifier.fillMaxWidth().background(p.card)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable { onToggle() }
+                .padding(horizontal = 13.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                projectionHead(goal, projection.todos),
+                color = p.accent,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            goal?.objective?.takeIf { it.isNotBlank() }?.let { objective ->
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    objective,
+                    color = p.t2,
+                    fontSize = 11.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            if (goal?.objective.isNullOrBlank()) Spacer(Modifier.weight(1f))
+            Icon(
+                if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                contentDescription = if (expanded) "收起待办" else "展开待办",
+                tint = p.t3,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        if (!expanded) return@Column
+        Column(
+            Modifier.padding(start = 13.dp, end = 13.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            goal?.blockedReason?.takeIf { it.isNotBlank() }?.let { reason ->
+                Text("受阻：$reason", color = p.red, fontSize = 11.sp)
+            }
+            todoGroups(projection.todos).forEach { group ->
+                Text(
+                    group.title + " " + group.todos.size,
+                    color = p.t3,
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                group.todos.forEach { todo ->
+                    val done = todo.status == ProjectedTodo.STATUS_DONE
+                    Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            todoBullet(todo.status),
+                            color = if (done) p.t3 else p.accent,
+                            fontSize = 10.5.sp,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            todo.content,
+                            color = if (done) p.t3 else p.t1,
+                            fontSize = 11.5.sp,
+                            lineHeight = 16.sp,
+                            textDecoration = if (done) TextDecoration.LineThrough else null,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
-            },
-            onExtra = { i -> menuOpen = false; overflowSlots.getOrNull(i)?.let(onSlot) },
-            onClear = { menuOpen = false; confirmingClear = true },
-        )
-        SnackbarHost(exportSnackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
+            }
+        }
     }
 }
 
@@ -927,7 +1084,7 @@ private fun QueueStrip(
 private fun ActionChip(label: String, color: Color, onClick: () -> Unit) {
     Box(
         Modifier
-            .height(40.dp)
+            .height(48.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(color)
             .clickable { onClick() }
@@ -935,6 +1092,27 @@ private fun ActionChip(label: String, color: Color, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** 发送 / 停止共用：命中区 48dp，圆点视觉仍是 34dp，不挤输入区。 */
+@Composable
+private fun SendStopButton(
+    enabled: Boolean,
+    background: Color,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        Modifier
+            .size(48.dp)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier.size(34.dp).clip(CircleShape).background(background),
+            contentAlignment = Alignment.Center,
+        ) { content() }
     }
 }
 
@@ -969,12 +1147,20 @@ private fun Composer(
     queued: Int = 0,
     /** 群成员名字，用于 @ 自动补全。 */
     mentions: List<String> = emptyList(),
-    /** 当前会话预设暴露的开关；空 = 这个预设没有开关，面板不渲染这一块。 */
-    presetSwitches: List<PresetSwitch> = emptyList(),
-    presetSwitchOn: Set<String> = emptySet(),
-    onPresetSwitch: (String, Boolean) -> Unit = { _, _ -> },
+    /** 已放置到「会话底部」槽的插件组件；点一下沿用 onSlot 回到宿主。 */
+    slotPlaced: List<SlotContribution> = emptyList(),
+    /** 「会话底部」槽的候选清单，编辑态点「+」时弹出来。 */
+    slotCandidates: List<SlotEditItem> = emptyList(),
+    onSlotAdd: (SlotEditItem) -> Unit = {},
+    onSlotRemove: (SlotEditItem) -> Unit = {},
+    onSlot: (SlotContribution) -> Unit = {},
 ) {
     val p = LocalQq.current
+    // 折叠头默认全收起；picker 是「+」打开的候选弹窗。
+    var quickOpen by remember { mutableStateOf(false) }
+    var tplOpen by remember { mutableStateOf(false) }
+    var extraOpen by remember { mutableStateOf(false) }
+    var picker by remember { mutableStateOf(false) }
     // QQ 式 @ 补全：输入里最后一个 @ 之后还没空格，就当正在找人。
     val draft = input.text
     val atQuery = if (draft.contains('@')) draft.substringAfterLast('@') else null
@@ -1072,12 +1258,16 @@ private fun Composer(
                         Box(
                             Modifier
                                 .align(Alignment.TopEnd)
-                                .size(18.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xCC000000))
+                                // 命中区 32dp（角标视觉 18dp 抠在 62dp 缩略图上，再大就盖住缩略图本身）。
+                                .size(32.dp)
                                 .clickable { onRemoveDraft(path) },
                             contentAlignment = Alignment.Center,
-                        ) { Text("×", color = Color.White, fontSize = 11.sp) }
+                        ) {
+                            Box(
+                                Modifier.size(18.dp).clip(CircleShape).background(Color(0xCC000000)),
+                                contentAlignment = Alignment.Center,
+                            ) { Text("×", color = Color.White, fontSize = 11.sp) }
+                        }
                     }
                 }
             }
@@ -1088,7 +1278,7 @@ private fun Composer(
                 .fillMaxWidth()
                 .padding(horizontal = 10.dp, vertical = 8.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(p.bg),
+                .background(p.hover),
         ) {
             Box(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 11.dp)) {
                 if (input.text.isBlank()) {
@@ -1121,14 +1311,7 @@ private fun Composer(
                 }
                 if (streaming && input.text.isBlank()) {
                     // 没字且有任务在跑：这个圆按钮是「停止」。
-                    Box(
-                        Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(p.t1)
-                            .clickable { onStop() },
-                        contentAlignment = Alignment.Center,
-                    ) {
+                    SendStopButton(enabled = true, background = p.t1, onClick = onStop) {
                         Icon(
                             Icons.Filled.Stop,
                             contentDescription = "停止",
@@ -1138,19 +1321,11 @@ private fun Composer(
                     }
                     Spacer(Modifier.width(6.dp))
                 }
-                IconBtn(
-                    if (panelOpen) Icons.Filled.Close else Icons.Filled.Add,
-                    if (panelOpen) "收起" else "更多",
-                ) { onTogglePanel() }
-                Spacer(Modifier.width(4.dp))
                 val canSend = input.text.isNotBlank() || drafts.isNotEmpty()
-                Box(
-                    Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(if (canSend) p.accent else p.line)
-                        .clickable(enabled = canSend) { onSend() },
-                    contentAlignment = Alignment.Center,
+                SendStopButton(
+                    enabled = canSend,
+                    background = if (canSend) p.accent else p.line,
+                    onClick = onSend,
                 ) {
                     Icon(
                         Icons.Filled.ArrowUpward,
@@ -1162,7 +1337,7 @@ private fun Composer(
             }
         }
 
-        if (panelOpen) {
+        // 折叠行常驻在输入区下方（用户要的「底部那几行」），不再藏在「更多」后面。
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -1171,61 +1346,133 @@ private fun Composer(
                     .background(p.bg)
                     .padding(horizontal = 12.dp, vertical = 10.dp),
             ) {
-                if (presetSwitches.isNotEmpty()) {
-                    Text("本会话预设", color = p.t2, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
-                    presetSwitches.forEach { sw ->
-                        SideSwitch(
-                            label = sw.label,
-                            hint = sw.description,
-                            checked = sw.id in presetSwitchOn,
-                            onChange = { onPresetSwitch(sw.id, it) },
-                        )
-                    }
-                    Spacer(Modifier.height(14.dp))
-                }
+                // 三段都折叠成一行：先给目录，展开才出 chip。
                 if (quickCommands.isNotEmpty()) {
-                    Text("快捷指令", color = p.t2, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(6.dp))
-                    ChipFlow(quickCommands) { onQuickCommand(it) }
+                    PanelSection("快捷指令", quickOpen, { quickOpen = !quickOpen }) {
+                        ChipFlow(quickCommands) { onQuickCommand(it) }
+                    }
                 }
                 if (templates.isNotEmpty()) {
-                    Spacer(Modifier.height(14.dp))
-                    Text("提示词模板", color = p.t2, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(6.dp))
-                    ChipFlow(templates) { onTemplate(it) }
+                    PanelSection("提示词模板", tplOpen, { tplOpen = !tplOpen }) {
+                        ChipFlow(templates) { onTemplate(it) }
+                    }
                 }
                 if (extras.isNotEmpty()) {
-                    Spacer(Modifier.height(14.dp))
-                    Text("插件", color = p.t2, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(6.dp))
-                    ChipFlow(extras, onExtra)
+                    PanelSection("插件", extraOpen, { extraOpen = !extraOpen }) {
+                        ChipFlow(extras, onExtra)
+                    }
+                }
+
+                // 「会话底部」槽：已放置项横排，放不下横向滚；编辑态多一个「+」。
+                if (slotPlaced.isNotEmpty() || SlotEditState.enabled) {
+                    Spacer(Modifier.height(10.dp))
+                    SlotStrip(horizontal = true, modifier = Modifier.fillMaxWidth()) {
+                        slotPlaced.forEach { contribution ->
+                            SlotEditFrame(
+                                onRemove = {
+                                    onSlotRemove(
+                                        SlotEditItem(
+                                            contribution.pluginId,
+                                            contribution.id,
+                                            contribution.label,
+                                            contribution.subtitle,
+                                        ),
+                                    )
+                                },
+                            ) {
+                                PluginSlotItem(
+                                    contribution = contribution,
+                                    tokens = rememberHostThemeTokens(),
+                                    onAction = { onSlot(contribution) },
+                                )
+                            }
+                        }
+                        if (SlotEditState.enabled) {
+                            SlotPlusButton(label = "添加插件组件") { picker = true }
+                        }
+                    }
+                }
+
+                if (picker) {
+                    SlotPickerDialog(
+                        title = "添加到会话底部",
+                        items = slotCandidates,
+                        emptyHint = "没有可添加的插件组件，先去插件中心装插件",
+                        onPick = { onSlotAdd(it); picker = false },
+                        onDismiss = { picker = false },
+                    )
                 }
             }
+    }
+}
+
+/**
+ * 面板里的一段：一行折叠头（标题 + 箭头），点整行展开/收起。
+ * 内容只在展开时挂上，收起的段不占高度。
+ */
+@Composable
+private fun PanelSection(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val p = LocalQq.current
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onToggle)
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                title,
+                color = p.t2,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                contentDescription = if (expanded) "收起" else "展开",
+                tint = p.t3,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        if (expanded) {
+            Spacer(Modifier.height(4.dp))
+            content()
         }
     }
 }
 
 /** 简易自动换行 chip 容器（每行最多 4 个）。 */
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun ChipFlow(items: List<String>, onClick: (String) -> Unit) {
     val p = LocalQq.current
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        items.chunked(4).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                row.forEach { item ->
-                    Text(
-                        item,
-                        color = p.t1,
-                        fontSize = 12.5.sp,
-                        maxLines = 1,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(p.card)
-                            .clickable { onClick(item) }
-                            .padding(horizontal = 11.dp, vertical = 7.dp),
-                    )
-                }
-            }
+    // 按可用宽度换行，而不是写死每行 4 个：chip 文字长短差很多，写死会让长的那行
+    // 顶出屏幕右边缘（右侧被裁）。FlowRow 按实测宽度排，装不下自动下一行。
+    FlowRow(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        items.forEach { item ->
+            Text(
+                item,
+                color = p.t1,
+                fontSize = 12.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(p.card)
+                    .clickable { onClick(item) }
+                    .padding(horizontal = 11.dp, vertical = 7.dp),
+            )
         }
     }
 }
@@ -1247,15 +1494,29 @@ private fun ToolButton(label: String, icon: ImageVector, onClick: () -> Unit) {
 }
 
 @Composable
-private fun EditDialog(
+internal fun EditDialog(
     title: String,
     initial: String,
     hint: String,
+    pickFolder: Boolean = false,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
     val p = LocalQq.current
     var value by remember { mutableStateOf(initial) }
+    // 路径类输入框右侧挂一个文件夹选择器：选完直接把真实路径写回同一输入框。
+    val resolver = LocalContext.current.contentResolver
+    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            runCatching {
+                resolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+            treeUriToPath(uri)?.let { value = it }
+        }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -1266,10 +1527,15 @@ private fun EditDialog(
                     onValueChange = { value = it },
                     singleLine = true,
                     textStyle = TextStyle(fontSize = 15.sp, color = p.t1),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, end = if (pickFolder) 40.dp else 12.dp, top = 10.dp, bottom = 10.dp),
                 )
                 if (value.isBlank()) {
                     Text(hint, color = p.t3, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
+                }
+                if (pickFolder) Box(Modifier.align(Alignment.CenterEnd)) {
+                    IconBtn(Icons.Filled.Description, "选择文件夹") { folderPicker.launch(null) }
                 }
             }
         },
@@ -1364,54 +1630,6 @@ private fun PersonaDialog(
     }
 }
 
-@Composable
-private fun GroupPickDialog(
-    current: String,
-    known: List<String>,
-    onDismiss: () -> Unit,
-    onPick: (String) -> Unit,
-) {
-    val p = LocalQq.current
-    var custom by remember { mutableStateOf("") }
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(p.card).padding(16.dp),
-        ) {
-            Text("移动到分组", color = p.t1, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(10.dp))
-            (listOf("最近") + known.filter { it != "最近" }).distinct().forEach { name ->
-                Row(
-                    Modifier.fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable { onPick(name) }
-                        .padding(horizontal = 8.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(name, color = p.t1, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                    if (name == current) Text("✓", color = p.accent, fontSize = 14.sp)
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(p.bg)) {
-                BasicTextField(
-                    value = custom,
-                    onValueChange = { custom = it },
-                    singleLine = true,
-                    textStyle = TextStyle(fontSize = 14.sp, color = p.t1),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                )
-                if (custom.isBlank()) {
-                    Text("新建分组…", color = p.t3, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
-                }
-            }
-            Spacer(Modifier.height(14.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDismiss) { Text("取消") }
-                TextButton(onClick = { if (custom.isNotBlank()) onPick(custom.trim()) }) { Text("新建并移动") }
-            }
-        }
-    }
-}
 
 
 /**
@@ -1704,7 +1922,7 @@ private fun OptionBubbles(
 
 /** 右上角 Agent 面板：普通会话换绑 agent，群聊继续拉人 / 踢人。 */
 @Composable
-private fun AgentSheet(
+internal fun AgentSheet(
     state: ChatUiState,
     onDismiss: () -> Unit,
     onPickSingle: (String) -> Unit,
@@ -1897,158 +2115,6 @@ private fun RenameMemberDialog(
 }
 
 
-/**
- * 会话右侧边栏。
- *
- * 原来是顶栏「⋯」下拉菜单，条目挤在右上角一小块、手指很容易点错。
- * 改成从右侧推出来一整块面板：每条一个整行、图标 + 标题 + 副标题，
- * 危险操作（清空记录）单独放最下面、颜色区隔。点面板外的遮罩收起。
- */
-@Composable
-private fun ChatSidebar(
-    open: Boolean,
-    title: String,
-    subtitle: String,
-    archived: Boolean,
-    workspace: String,
-    extras: List<String>,
-    renderSpecial: Boolean,
-    onRenderSpecial: (Boolean) -> Unit,
-    onClose: () -> Unit,
-    onRename: () -> Unit,
-    onWorkspace: () -> Unit,
-    onAgent: () -> Unit,
-    onMove: () -> Unit,
-    onArchive: () -> Unit,
-    onExportImage: () -> Unit,
-    onExtra: (Int) -> Unit,
-    onClear: () -> Unit,
-) {
-    val p = LocalQq.current
-    AnimatedVisibility(
-        visible = open,
-        enter = fadeIn(tween(120)) + slideInHorizontally(tween(180)) { it },
-        exit = fadeOut(tween(120)) + slideOutHorizontally(tween(160)) { it },
-    ) {
-        Row(Modifier.fillMaxSize()) {
-            Box(
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .background(Color.Black.copy(alpha = 0.35f))
-                    .clickable(onClick = onClose),
-            )
-            Column(
-                Modifier
-                    .width(272.dp)
-                    .fillMaxHeight()
-                    .background(p.bg)
-                    .statusBarsPadding()
-                    .verticalScroll(rememberScrollState())
-                    .padding(vertical = 12.dp),
-            ) {
-                Text(
-                    title,
-                    color = p.t1,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-                Text(
-                    subtitle,
-                    color = p.t3,
-                    fontSize = 11.5.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 3.dp),
-                )
-                Spacer(Modifier.height(10.dp))
-                // 会话级开关：默认跟随「设置 → 会话 → 发送与显示」里的全局默认，
-                // 在这里切只写本会话的覆盖，不动全局、不影响别的会话。
-                SideSwitch(
-                    label = "特殊格式渲染",
-                    hint = if (renderSpecial) "HTML / LaTeX / Markdown / 代码块" else "已关闭 · 原样显示源码",
-                    checked = renderSpecial,
-                    onChange = onRenderSpecial,
-                )
-                SideItem("重命名会话", "改标题", Icons.Filled.Create, onRename)
-                SideItem("工作区", workspace.ifBlank { "默认目录" }, Icons.Filled.Folder, onWorkspace)
-                SideItem("配置智能体", "人格 / 模型绑定", Icons.Filled.SmartToy, onAgent)
-                SideItem("移动到文件夹", "会话分类", Icons.Filled.DriveFileMove, onMove)
-                SideItem(
-                    if (archived) "取消归档" else "归档会话",
-                    "",
-                    if (archived) Icons.Filled.Unarchive else Icons.Filled.Archive,
-                    onArchive,
-                )
-                SideItem("导出绘画", "会话转长图 PNG", Icons.Filled.Image, onExportImage)
-                extras.forEachIndexed { i, label ->
-                    SideItem(label, "", Icons.Filled.Extension, onClick = { onExtra(i) })
-                }
-                Spacer(Modifier.height(8.dp))
-                Box(Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(0.6.dp).background(p.line))
-                Spacer(Modifier.height(8.dp))
-                SideItem("清空聊天记录", "不可恢复", Icons.Filled.Delete, onClear, danger = true)
-            }
-        }
-    }
-}
-
-@Composable
-private fun SideItem(
-    label: String,
-    hint: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit,
-    danger: Boolean = false,
-) {
-    val p = LocalQq.current
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, null, tint = if (danger) p.red else p.t2, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(label, color = if (danger) p.red else p.t1, fontSize = 14.sp)
-            if (hint.isNotBlank()) {
-                Text(hint, color = p.t3, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
-
-/** 右侧边栏里的滑块条目：文字在左，[Switch] 在右。和 [SideItem] 同样的行高与内边距。 */
-@Composable
-private fun SideSwitch(
-    label: String,
-    hint: String,
-    checked: Boolean,
-    onChange: (Boolean) -> Unit,
-) {
-    val p = LocalQq.current
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(label, color = p.t1, fontSize = 14.sp)
-            if (hint.isNotBlank()) {
-                Text(hint, color = p.t3, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        Spacer(Modifier.width(8.dp))
-        Switch(checked = checked, onCheckedChange = onChange)
-    }
-}
-
 /** 关掉特殊格式渲染时的正文：逐字原样、等宽，超宽横向滚动，不解析任何标记（不会变空白）。 */
 @Composable
 private fun SourceText(text: String, color: Color) {
@@ -2064,3 +2130,57 @@ private fun SourceText(text: String, color: Color) {
     )
 }
 
+
+/**
+ * 智能体预设的选择状态：发出第一条消息后就锁定。
+ *
+ * 抽成不可变值 + 纯函数，是为了让「锁定」这条规则能被单测直接盯住——
+ * 界面只把 locked 翻成只读样式，不自己判 messages.size。
+ */
+internal data class PresetSelection(val presetId: String, val locked: Boolean) {
+    /** 锁定后再选无效：原样返回，调用方据此知道没换成。 */
+    fun select(id: String): PresetSelection = if (locked) this else copy(presetId = id)
+}
+
+internal fun presetSelectionOf(presetId: String, hasMessages: Boolean): PresetSelection =
+    PresetSelection(presetId, hasMessages)
+
+/** 预设 id → 展示名；未知 id 回落标准模式，不留空白。 */
+internal fun presetNameOf(presetId: String): String =
+    AgentPresets.builtinOf(presetId)?.name ?: AgentPresets.standard.name
+
+/** 智能体预设弹窗：六个内置预设一行一个，当前项标「当前」；选中即回传，没有额外开关。 */
+@Composable
+private fun PresetPickDialog(currentId: String, onDismiss: () -> Unit, onPick: (String) -> Unit) {
+    val p = LocalQq.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = p.card,
+        title = { Text("智能体预设", color = p.t1) },
+        text = {
+            Column {
+                Text("发出第一条消息后锁定，不能再改", color = p.t3, fontSize = 11.5.sp)
+                Spacer(Modifier.height(6.dp))
+                AgentPresets.builtins.forEach { preset ->
+                    val active = preset.id == currentId
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                            .clickable { onPick(preset.id) }
+                            .padding(horizontal = 8.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            preset.name,
+                            color = if (active) p.accent else p.t1,
+                            fontSize = 14.sp,
+                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (active) Text("当前", color = p.accent, fontSize = 11.5.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭", color = p.accent) } },
+    )
+}

@@ -116,8 +116,10 @@ data class QqPalette(
             line = Color(0xFFEAEEF4),
             hover = Color(0xFFF0F4F9),
             t1 = Color(0xFF0D1117),
-            t2 = Color(0xFF6B7684),
-            t3 = Color(0xFFA3ADBA),
+            // t2/t3 对比度按 WCAG 抬过：t2 从 6B7684（bg 上 4.30）提到 666F7D（4.73），
+            // t3 从 A3ADBA（bg 上 2.12，几乎看不见）提到 818B99（3.21，过非正文 3:1 线）。
+            t2 = Color(0xFF666F7D),
+            t3 = Color(0xFF818B99),
             accent = accent,
             accent2 = accent2,
             red = Color(0xFFFF3B30),
@@ -129,11 +131,13 @@ data class QqPalette(
         fun dark(accent: Color, accent2: Color) = QqPalette(
             bg = Color(0xFF0E1116),
             card = Color(0xFF171C24),
-            line = Color(0xFF232A35),
+            // line 从 232A35 提到 2E3746：原来和卡片（171C24）只差 1.18，暗色下分隔线等于没有。
+            line = Color(0xFF2E3746),
             hover = Color(0xFF1E242E),
             t1 = Color(0xFFE8EDF5),
             t2 = Color(0xFF8B96A6),
-            t3 = Color(0xFF5D6878),
+            // t3 从 5D6878（卡片上 3.03）提到 7C8899（4.75），过了正文 4.5:1。
+            t3 = Color(0xFF7C8899),
             accent = accent,
             accent2 = accent2,
             red = Color(0xFFFF453A),
@@ -233,6 +237,21 @@ private fun darkScheme(p: QqPalette) = darkColorScheme(
     outlineVariant = p.line,
     error = p.red,
 )
+
+/**
+ * 分角色的字号倍率：正文 / 代码 / 终端各一套，乘在主题既有字号上。
+ *
+ * 桌面 DSH 一直是三套独立字号，移动端此前只有全局 fontScale，代码块和终端只能跟着正文一起变。
+ * 这里只提供数值，不做存储（存盘在 [UiLayoutPrefs]），谁读它谁负责乘。
+ */
+data class FontRoles(
+    val body: Float = 1f,
+    val code: Float = 1f,
+    val terminal: Float = 1f,
+)
+
+/** 代码类文本（JsonBlock 等）读 code，终端页读 terminal；默认全 1f = 现状。 */
+val LocalFontRoles = staticCompositionLocalOf { FontRoles() }
 
 private fun typography(scale: Float) = Typography(
     headlineSmall = TextStyle(fontSize = 20.sp * scale, fontWeight = FontWeight.SemiBold),
@@ -345,8 +364,15 @@ fun DshTheme(
     val palette = (if (dark) QqPalette.dark(accent, accent2) else QqPalette.light(accent, accent2))
         .withAppearance(tokens, showWallpaper)
     val blurRadius = effectiveBlur(tokens, showWallpaper)
+    // 分角色字号：正文倍率并进主题全局字号，代码/终端各自单独暴露给需要的页面。
+    val fontRoles = FontRoles(
+        body = UiLayoutPrefs.fontBody,
+        code = UiLayoutPrefs.fontCode,
+        terminal = UiLayoutPrefs.fontTerminal,
+    )
     CompositionLocalProvider(
         LocalThemeTokens provides tokens.copy(dark = dark, accent = accent, accent2 = accent2),
+        LocalFontRoles provides fontRoles,
         LocalQq provides palette,
         LocalSurfaceStyle provides SurfaceStyle(
             borderWidth = tokens.borderWidth,
@@ -359,7 +385,7 @@ fun DshTheme(
     ) {
         MaterialTheme(
             colorScheme = if (dark) darkScheme(palette) else lightScheme(palette),
-            typography = typography(tokens.fontScale),
+            typography = typography(tokens.fontScale * fontRoles.body),
         ) {
             if (!showWallpaper) {
                 content()

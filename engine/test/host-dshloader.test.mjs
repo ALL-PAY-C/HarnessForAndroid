@@ -50,13 +50,25 @@ test('dshLoader.llm 的 3 个符号在，且 deepFreeze 真冻结', async () => 
   }
 });
 
-test('BasicCompactionEngine 可被继承且构造不抛，基类方法抛 DSH_UNSUPPORTED_MEMBER', async () => {
+test('BasicCompactionEngine 可被继承且构造不抛，基类方法是真摘要 + 真记账', async () => {
   const ctx = createContext({ home: await freshHome() });
   try {
     const Base = ctx.dshLoader.dsh.compaction.BasicCompactionEngine;
     const base = new Base({ log: console }, { enabled: true });
     assert.equal(base.config.enabled, true);
-    assert.throws(() => base.summarize(), (error) => error.code === 'DSH_UNSUPPORTED_MEMBER' && /summarize/.test(error.member));
+    // 不覆写也要能压：以前这里抛 DSH_UNSUPPORTED_MEMBER，compress 成员因此注册不上。
+    const summary = base.summarize([{ role: 'user', content: '把压缩做完' }]);
+    assert.match(summary, /上下文摘要/);
+    assert.match(summary, /任务：/);
+    const result = base.compactIfNeeded(
+      Array.from({ length: 12 }, (_, i) => ({ role: 'user', content: '第' + i + ' 轮：决定用 SQLite' }))
+        .concat([{ role: 'assistant', content: '下一步：写单测' }]),
+      { budgetTokens: 1, keepRecent: 4, sessionId: 's-compact' },
+    );
+    assert.equal(result.compacted, true);
+    assert.ok(result.beforeTokens > result.afterTokens);
+    assert.equal(result.stats.count, 1);
+    assert.ok(result.summaryChars > 0);
     // 插件真实用法：extends + super(ctx, config)，随后覆写
     class Impl extends Base {
       constructor(innerCtx, config) { super(innerCtx, config); this.ready = true; }

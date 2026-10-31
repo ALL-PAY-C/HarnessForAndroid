@@ -39,6 +39,7 @@ internal fun DiagramWeb(
     modifier: Modifier = Modifier,
     interactive: Boolean = false,
     onHeight: (Float) -> Unit = {},
+    onAspect: (Float) -> Unit = {},
     onCreated: (WebView?) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -70,7 +71,7 @@ internal fun DiagramWeb(
         AndroidView(
             modifier = modifier,
             factory = { ctx ->
-                buildDiagramWebView(ctx, interactive, url, onHeight).also {
+                buildDiagramWebView(ctx, interactive, url, onHeight, onAspect).also {
                     holder = it
                     onCreated(it)
                 }
@@ -94,6 +95,7 @@ private fun buildDiagramWebView(
     interactive: Boolean,
     base: String,
     onHeight: (Float) -> Unit,
+    onAspect: (Float) -> Unit,
 ): WebView = WebView(context).apply {
     settings.javaScriptEnabled = true
     // 离线库与页面都不联网；plantuml 的 SVG 是 Java 层下回来的，不进 WebView
@@ -116,7 +118,10 @@ private fun buildDiagramWebView(
     isHorizontalScrollBarEnabled = false
     overScrollMode = WebView.OVER_SCROLL_NEVER
     isLongClickable = false
-    addJavascriptInterface(HeightBridge { measure(this, onHeight) }, BRIDGE_NAME)
+    addJavascriptInterface(
+        HeightBridge(onPing = { measure(this, onHeight) }, onAspect = onAspect),
+        BRIDGE_NAME,
+    )
     webChromeClient = object : WebChromeClient() {
         override fun onConsoleMessage(msg: ConsoleMessage): Boolean {
             AppLog.w("dsh.diagram console " + msg.message() + " @" + msg.lineNumber())
@@ -139,12 +144,32 @@ private fun buildDiagramWebView(
     }
 }
 
-/** JS 只调 postMessage(为什么)，Java 侧只拿它当「再量一次」的信号。 */
-private class HeightBridge(private val onPing: () -> Unit) {
+/**
+ * JS 只调 postMessage(为什么)，Java 侧不回收任何页面内容：
+ * - 'rendered'（默认）当作「再量一次」的信号；
+ * - 'fit:<高宽比>' 是 SVG 页算出的 viewBox 高/宽（纯数字），宿主据此按容器宽度定高。
+ */
+private class HeightBridge(
+    private val onPing: () -> Unit,
+    private val onAspect: (Float) -> Unit,
+) {
     @JavascriptInterface
     fun postMessage(reason: String?) {
-        android.os.Handler(android.os.Looper.getMainLooper()).post(onPing)
+        val ratio = reason?.takeIf { it.startsWith(ASPECT_PREFIX) }
+            ?.substring(ASPECT_PREFIX.length)
+            ?.toFloatOrNull()
+        if (ratio != null && ratio > 0f) {
+            post { onAspect(ratio) }
+        } else {
+            post(onPing)
+        }
     }
+}
+
+private const val ASPECT_PREFIX = "fit:"
+
+private fun post(block: () -> Unit) {
+    android.os.Handler(android.os.Looper.getMainLooper()).post(block)
 }
 
 private fun measure(view: WebView, onHeight: (Float) -> Unit) {

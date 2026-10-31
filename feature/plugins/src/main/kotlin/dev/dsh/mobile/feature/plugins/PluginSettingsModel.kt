@@ -10,7 +10,7 @@ import dev.dsh.mobile.pluginhost.PluginManifestFile
 const val NO_SETTINGS_TEXT = "该插件没有设置项"
 
 /** 空态补充说明：告诉用户这不是 bug，而是插件自己没声明。 */
-const val NO_SETTINGS_HINT = "插件在 plugin.json 里声明 config 字段或 ui 界面后，这里会变成可操作的设置页。"
+const val NO_SETTINGS_HINT = "插件在 plugin.json（或 package.json 的 dsh.mobile.config）里声明字段后这里就是表单；没声明的也能在下面自己加键值，插件用 ctx.config.get 读到。"
 
 /**
  * 「插件设置」里的一行 = 一个插件的一项设置页。
@@ -34,8 +34,15 @@ data class PluginSettingsEntry(
     /** 有没有能画出来的插件自绘界面（ui 或 content 任一即可，都没有只剩 label 一行）。 */
     val hasPage: Boolean get() = page?.ui != null || page?.content != null
 
-    /** 有没有可操作的东西：config 字段或自绘界面。 */
-    val hasSettings: Boolean get() = fields.isNotEmpty() || hasPage
+    /**
+     * config 之外用户自己加的键值。插件读 ctx.config 时同样生效，
+     * 所以「插件没声明设置项」不该等于「这页没东西可改」。
+     */
+    val extraValues: Map<String, String>
+        get() = values.filterKeys { key -> fields.none { it.key == key } }
+
+    /** 有没有可操作的东西：config 字段、自绘界面，或用户自己加的键值。 */
+    val hasSettings: Boolean get() = fields.isNotEmpty() || hasPage || extraValues.isNotEmpty()
 
     /**
      * 列表副标题。顺序即优先级：没设置项时先喊空态（用户抱怨的就是「点进去是介绍页」），

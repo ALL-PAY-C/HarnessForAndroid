@@ -215,7 +215,19 @@ class LocalEngineTransport(
     private val engineChat: (suspend (JSONObject) -> JSONObject)? = null,
     /** 引擎通用 RPC（path, endpoint, payload）；用于 engineModels 探测，不与 engineChat 合并。 */
     private val engineRpc: (suspend (String, String, JSONObject) -> JSONObject)? = null,
-) : DshTransport {
+    /** 大工具输出落盘（P0-4）：超阈值写 app 私有目录，正文留头尾 + locator，可 read_output 读回。 */
+    private val spill: ToolOutputSpill = ToolOutputSpill(),
+    /** 会话投影（P0-6）：todo / goal / 上下文用量 / 压缩统计的只读来源，UI 直接 collect。 */
+    val projections: SessionProjections = SessionProjections(),
+    /** 摘要持久化（P0-1）：默认不落盘，宿主注入 SharedPrefsSummaryStore 才有跨进程记忆。 */
+    private val summaryStore: ContextSummaryStore = ContextSummaryStore.None,
+    /**
+     * 模型上下文窗口（tokens）。压缩预算 = 窗口 * [ContextBudget.COMPACT_RATIO]，
+     * 必须与顶栏 [dev.dsh.mobile.core.data.settings.contextWindowOf] 同一个来源，
+     * 否则又会出现「回执写预算 6000、顶栏写 / 32k」的两套口径。
+     */
+    private val contextWindowProvider: suspend (String) -> Int = { ContextBudget.DEFAULT_WINDOW_TOKENS },
+) : DshTransport, Compactor {
 
     private val _events = MutableSharedFlow<DshEvent>(extraBufferCapacity = 512)
     override val events: SharedFlow<DshEvent> = _events.asSharedFlow()
@@ -228,6 +240,17 @@ class LocalEngineTransport(
 
     /** 每会话起轮/取消锁：prompt 的「建档 + 挂 job」与 cancel 严格串行，取消不会误杀新轮。 */
     private val turnLocks = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
+
+    /**
+     * 每会话最近一次上游上报的上下文占用（prompt + completion，tokens）。
+     *
+     * 与顶栏 ChatUiState.contextUsed 同源（都来自 [DshEvent.Usage] 的 lastPrompt + output），
+     * /compact 回执里的「已用」直接取它，误差 0，不再拿字符数 /4 估一个对不上的数。
+     */
+    private val lastUsageTokens = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    /** 每会话已摘要掉的历史条数：超预算时别每轮重复压同一段（省一次 LLM 请求）。 */
+    private val summarizedCount = java.util.concurrent.ConcurrentHashMap<String, Int>()
 
     // ---- 工具防抖 / 执行器 / 每 Agent 线程 / 执行池（需求 A、B、D、E） ----
     private val loopGuard = ToolLoopGuard()
@@ -246,7 +269,17 @@ class LocalEngineTransport(
             "bg_kill" to { args -> bgExec("bg_kill", args) },
             "phone" to phoneExec,
             "skill" to { args -> skillExec(args) },
+            // P0-4：大输出回读。与其它工具同一条链路（toolsJson 声明 + toolRunner 执行）。
+            "read_output" to { args ->
+                spill.read(
+                    path = args["path"]?.jsonPrimitive?.contentOrNullSafe().orEmpty(),
+                    offset = args["offset"]?.jsonPrimitive?.contentOrNullSafe()?.toIntOrNull() ?: 0,
+                    limit = args["limit"]?.jsonPrimitive?.contentOrNullSafe()?.toIntOrNull() ?: 200,
+                )
+            },
         ) + web.toolHandlers(),
+        // 超阈值不再硬截 6000 字符：落盘 + 头尾 + locator，模型按需读回全文。
+        spill = spill,
     )
 
     /** 每个会话的插话队列，见 [interject]。 */
@@ -384,6 +417,11 @@ class LocalEngineTransport(
             throw IllegalStateException("未接入模型，请到 Agent 页添加 API Key")
         }
         val history = historyProvider(sessionId)
+        // P0-1：上次压缩出的摘要要能跨进程续用，否则重启后等于没压过。
+        runCatching {
+            val stored = summaryStore.read(sessionId)
+            if (stored.isNotBlank() && threads.summary(sessionId).isBlank()) threads.setSummary(sessionId, stored)
+        }.onFailure { AppLog.w("读取已存摘要失败：" + (it.message ?: it.javaClass.simpleName)) }
         val persona = if (group.isNullOrEmpty()) {
             runCatching { personaProvider(sessionId) }.getOrNull().orEmpty().trim()
         } else {
@@ -499,9 +537,14 @@ class LocalEngineTransport(
         }
 
         if (presetMessages == null) {
+            val budgetChars = contextBudgetProvider(sessionId)
+            // P0-1：超预算先把被丢弃的最老若干轮压成结构化摘要（摘要本身也是 system 风格消息，
+            // 排在保留段之前），再按预算装配 —— 不再只是「丢最老的 + 80 字截断」。
+            runCatching { maybeSummarize(sessionId, cfg, budgetChars, messages) }
+                .onFailure { AppLog.w("上下文压缩失败：" + (it.message ?: it.javaClass.simpleName)) }
             val assembly = threads.assembleForSingleChat(
                 sessionId = sessionId,
-                budgetChars = contextBudgetProvider(sessionId),
+                budgetChars = budgetChars,
                 system = messages.first()["content"]!!.jsonPrimitive.content,
                 history = messages.drop(1).dropLast(1),
                 userMsg = messages.takeLast(1),
@@ -509,6 +552,16 @@ class LocalEngineTransport(
             messages.clear()
             messages.addAll(assembly.messages)
             AppLog.w("single context usedChars=${assembly.usedChars} fullChars=${assembly.fullChars} overBudget=${assembly.overBudget} overflowChars=${assembly.overflowChars}")
+            // P0-6：上下文用量进会话投影，UI 只读展示（不再只躺在 ChatScreen 内存里）。
+            // 数值统一成 token：投影字段名沿用 usedChars/budgetChars，但里面装的是 token，
+            // ProjectionUi.usageLine 直接把它当 token 显示；分母用窗口（与顶栏同一个数），
+            // 压缩预算（窗口 * 0.8）只出现在 /compact 回执里，别混进顶栏。
+            projections.noteUsage(
+                sessionId = sessionId,
+                usedChars = ContextBudget.tokensOf(assembly.usedChars),
+                fullChars = ContextBudget.tokensOf(assembly.fullChars),
+                budgetChars = windowTokens(sessionId),
+            )
         }
 
         // 子代理继承的会话系统提示词：只取拼好的 system（含工具说明与 persona），
@@ -701,6 +754,8 @@ class LocalEngineTransport(
                 val cached = ((u["prompt_tokens_details"] as? JsonObject)?.get("cached_tokens") as? JsonPrimitive)?.contentOrNullSafe()?.toLongOrNull()
                     ?: (u["prompt_cache_hit_tokens"] as? JsonPrimitive)?.contentOrNullSafe()?.toLongOrNull() ?: 0L
                 val output = u["completion_tokens"]?.jsonPrimitive?.contentOrNullSafe()?.toIntOrNull() ?: 0
+                // 与顶栏同一口径：prompt（含缓存命中）+ 本轮 completion。
+                lastUsageTokens[sessionId] = prompt + output.toLong()
                 _events.tryEmit(
                     DshEvent.Usage(sessionId, TokenUsage(input = (prompt - cached).coerceAtLeast(0L), output = output.toLong(), cached = cached, lastPrompt = prompt), authorId, turnId = turnId),
                 )
@@ -797,7 +852,7 @@ class LocalEngineTransport(
                                 detail = verdict.detail + "\n" + verdict.cachedOutput.take(1_500),
                                 args = command,
                                 requestJson = requestJson,
-                                responseJson = verdict.cachedOutput.truncateForTool(),
+                                responseJson = spill.present(verdict.cachedOutput, turnId, id + "-ui"),
                             ),
                             authorId,
                             authorName,
@@ -852,7 +907,13 @@ class LocalEngineTransport(
                                 ),
                             )
                         }
-                        else -> toolRunner.run(name, args)
+                        // P0-5：模型侧待办与目标。写进会话投影（P0-6），UI 只读展示。
+                        // 桌面的 todo_write 是整表替换，这里语义一致 —— 不是增量修补。
+                        name == "todo_write" -> todoWriteTool(sessionId, args)
+                        name == "goal" -> goalTool(sessionId, args)
+                        // 带上 turnId + callId：落盘目录按轮次分组（tools-output/<turnId>/<callId>.txt），
+                        // 同名工具同一轮调多次也不会互相覆盖。
+                        else -> toolRunner.run(name, args, turnId, id)
                         }
                     }.getOrElse { e ->
                         if (e is kotlinx.coroutines.CancellationException) throw e
@@ -889,7 +950,7 @@ class LocalEngineTransport(
                                 requestJson = requestJson,
                                 // 失败时 output 为空，响应框会显示成「—」；把错误信息放进去，
                                 // 展开工具卡就能看到通道为什么没跑起来。
-                                responseJson = (result.output.ifBlank { result.error.orEmpty() }).truncateForTool(),
+                                responseJson = spill.present(result.output.ifBlank { result.error.orEmpty() }, turnId, id + "-ui"),
                                 elapsedMs = result.elapsedMs,
                                 attempts = result.attempts,
                             ),
@@ -903,7 +964,8 @@ class LocalEngineTransport(
                 messages += buildJsonObject {
                     put("role", "tool")
                     put("tool_call_id", id)
-                    put("content", output.truncateForTool())
+                    // 回灌给模型的是「头若干行 + locator + 尾若干行」，全文在 tools-output 下可 read_output 读回。
+                    put("content", spill.present(output, turnId, id + "-ctx"))
                 }
             }
         }
@@ -1456,6 +1518,81 @@ class LocalEngineTransport(
                 }
             },
         )
+        // P0-5：模型侧待办（整表替换，语义对齐桌面 dsh-tool-todo）。
+        add(buildJsonObject {
+            put("type", "function")
+            putJsonObject("function") {
+                put("name", "todo_write")
+                put("description", "更新本轮待办清单：整表替换（不是追加）。每条含 content 与 status，" +
+                    "status 只能是 pending / in_progress / completed。同一时刻最多一条 in_progress。")
+                putJsonObject("parameters") {
+                    put("type", "object")
+                    putJsonObject("properties") {
+                        putJsonObject("todos") {
+                            put("type", "array")
+                            put("description", "完整待办列表；空数组表示清空")
+                            putJsonObject("items") {
+                                put("type", "object")
+                                putJsonObject("properties") {
+                                    putJsonObject("content") { put("type", "string"); put("description", "一句话待办") }
+                                    putJsonObject("status") {
+                                        put("type", "string")
+                                        putJsonArray("enum") { add("pending"); add("in_progress"); add("completed") }
+                                    }
+                                }
+                                putJsonArray("required") { add("content"); add("status") }
+                            }
+                        }
+                    }
+                    putJsonArray("required") { add("todos") }
+                }
+            }
+        })
+        // P0-5：目标（get / create / update），update 带 revision 做乐观锁。
+        add(buildJsonObject {
+            put("type", "function")
+            putJsonObject("function") {
+                put("name", "goal")
+                put("description", "跨轮次的长期目标：get 读当前目标，create 新建，update 改状态。" +
+                    "update 必须带 revision（get 会返回），不匹配说明状态已被别处改过。")
+                putJsonObject("parameters") {
+                    put("type", "object")
+                    putJsonObject("properties") {
+                        putJsonObject("action") {
+                            put("type", "string")
+                            putJsonArray("enum") { add("get"); add("create"); add("update") }
+                        }
+                        putJsonObject("objective") { put("type", "string"); put("description", "目标正文（create 必填）") }
+                        putJsonObject("phase") {
+                            put("type", "string")
+                            put("description", "update 用")
+                            putJsonArray("enum") { add("active"); add("paused"); add("blocked"); add("complete") }
+                        }
+                        putJsonObject("max_rounds") { put("type", "integer"); put("description", "最多自动续跑轮数") }
+                        putJsonObject("revision") { put("type", "integer"); put("description", "期望的版本号（update 用）") }
+                        putJsonObject("blocked_reason") { put("type", "string"); put("description", "phase=blocked 时说明卡在哪") }
+                    }
+                    putJsonArray("required") { add("action") }
+                }
+            }
+        })
+        // P0-4：按 offset/limit 读回落盘的工具输出（只允许读 tools-output 目录下）。
+        add(buildJsonObject {
+            put("type", "function")
+            putJsonObject("function") {
+                put("name", "read_output")
+                put("description", "读回被落盘的大工具输出。path 用工具结果里 locator 给的路径，按行 offset/limit 分段读。")
+                putJsonObject("parameters") {
+                    put("type", "object")
+                    putJsonObject("properties") {
+                        putJsonObject("path") { put("type", "string"); put("description", "locator 里的 path") }
+                        putJsonObject("offset") { put("type", "integer"); put("description", "起始行（0 起）") }
+                        putJsonObject("limit") { put("type", "integer"); put("description", "最多返回行数，默认 200") }
+                    }
+                    putJsonArray("required") { add("path") }
+                }
+            }
+        })
         add(
             buildJsonObject {
                 put("type", "function")
@@ -1671,6 +1808,317 @@ class LocalEngineTransport(
     }
 
     /** subagent 工具说明：讲清「独立上下文 + 只回结论 + 看不到当前对话 + 不能嵌套」。 */
+    // ── P0-5 模型侧待办 / 目标 ──────────────────────────────────────────────
+
+    /**
+     * todo_write：整表替换（不是增量修补），语义对齐桌面 dsh-tool-todo。
+     *
+     * 两处落点：会话投影（UI 只读展示，P0-6）与 :node 引擎的 /tool-state（桌面同一份状态）。
+     * 引擎不在不影响本次调用 —— 移动端自己必须能用。
+     */
+    private suspend fun todoWriteTool(sessionId: String, args: JsonObject): ToolExecResult {
+        val started = System.currentTimeMillis()
+        val todos = parseTodos(args) ?: return ToolExecResult(
+            ok = false,
+            output = "",
+            error = "参数错误：todos 必须是数组，每项含 content（非空字符串）与 status（pending / in_progress / completed）。",
+            elapsedMs = System.currentTimeMillis() - started,
+        )
+        projections.writeTodos(sessionId, todos)
+        runCatching {
+            val rpc = engineRpc ?: return@runCatching
+            val list = org.json.JSONArray()
+            todos.forEach { list.put(JSONObject().put("content", it.content).put("status", it.status)) }
+            rpc("/tool-state", "todo-write", JSONObject().put("sessionId", sessionId).put("todos", list))
+        }.onFailure { AppLog.w("todo_write 同步引擎失败：" + (it.message ?: it.javaClass.simpleName)) }
+        val done = todos.count { it.status == ProjectedTodo.STATUS_DONE }
+        val text = buildString {
+            if (todos.isEmpty()) {
+                append("待办已清空。")
+            } else {
+                append("已更新待办（").append(todos.size).append(" 条，").append(done)
+                append("/").append(todos.size).append(" 完成）")
+                todos.forEach { t ->
+                    append("\n").append(
+                        when (t.status) {
+                            ProjectedTodo.STATUS_DONE -> "- [x] "
+                            ProjectedTodo.STATUS_DOING -> "- [~] "
+                            else -> "- [ ] "
+                        }
+                    ).append(t.content)
+                }
+            }
+        }
+        return ToolExecResult(ok = true, output = text, error = "", elapsedMs = System.currentTimeMillis() - started)
+    }
+
+    /**
+     * goal：get / create / update。update 用 revision 做乐观锁 —— 别处改过就明确报冲突，
+     * 而不是静默覆盖掉用户刚改的目标。
+     */
+    private suspend fun goalTool(sessionId: String, args: JsonObject): ToolExecResult {
+        val started = System.currentTimeMillis()
+        fun fail(text: String) = ToolExecResult(ok = false, output = "", error = text, elapsedMs = System.currentTimeMillis() - started)
+        fun ok(text: String) = ToolExecResult(ok = true, output = text, error = "", elapsedMs = System.currentTimeMillis() - started)
+        val action = args["action"]?.jsonPrimitive?.contentOrNullSafe()?.trim().orEmpty()
+        val current = projections.snapshot(sessionId).goal
+        return when (action) {
+            "get" -> ok(current?.let { describeGoal(it) } ?: "当前会话还没有目标。")
+            "create" -> {
+                val objective = args["objective"]?.jsonPrimitive?.contentOrNullSafe()?.trim().orEmpty()
+                if (objective.isEmpty()) return fail("参数错误：create 必须带 objective。")
+                val maxRounds = args["max_rounds"]?.jsonPrimitive?.contentOrNullSafe()?.toIntOrNull() ?: 0
+                val goal = ProjectedGoal(objective = objective, revision = 1, maxRounds = maxRounds)
+                projections.writeGoal(sessionId, goal)
+                runCatching {
+                    val rpc = engineRpc ?: return@runCatching
+                    rpc(
+                        "/tool-state", "goal-create",
+                        JSONObject().put("sessionId", sessionId).put("objective", objective).put("maxRounds", maxRounds),
+                    )
+                }.onFailure { AppLog.w("goal 同步引擎失败：" + (it.message ?: it.javaClass.simpleName)) }
+                ok("已创建目标（revision 1）：" + objective)
+            }
+            "update" -> {
+                if (current == null) return fail("还没有目标，先 action=create。")
+                val expect = args["revision"]?.jsonPrimitive?.contentOrNullSafe()?.toIntOrNull()
+                    ?: return fail("参数错误：update 必须带 revision（先 action=get 取当前值）。")
+                if (expect != current.revision) {
+                    return fail("版本冲突：当前 revision=" + current.revision + "，你手里的 " + expect + " 已过期，先 action=get 再改。")
+                }
+                val phase = args["phase"]?.jsonPrimitive?.contentOrNullSafe()?.trim()?.takeIf { it.isNotEmpty() }
+                if (phase != null && phase !in ProjectedGoal.PHASES) {
+                    return fail("参数错误：phase 只能是 " + ProjectedGoal.PHASES.joinToString(" / ") + "。")
+                }
+                val objective = args["objective"]?.jsonPrimitive?.contentOrNullSafe()?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: current.objective
+                val maxRounds = args["max_rounds"]?.jsonPrimitive?.contentOrNullSafe()?.toIntOrNull() ?: current.maxRounds
+                val next = current.copy(
+                    objective = objective,
+                    phase = phase ?: current.phase,
+                    revision = current.revision + 1,
+                    maxRounds = maxRounds,
+                    blockedReason = if (phaseIsBlocked(phase, current.phase)) {
+                        args["blocked_reason"]?.jsonPrimitive?.contentOrNullSafe()?.trim()?.takeIf { it.isNotEmpty() }
+                            ?: current.blockedReason
+                    } else {
+                        null
+                    },
+                )
+                projections.writeGoal(sessionId, next)
+                runCatching {
+                    val rpc = engineRpc ?: return@runCatching
+                    rpc(
+                        "/tool-state", "goal-update",
+                        JSONObject()
+                            .put("sessionId", sessionId)
+                            .put("action", next.phase)
+                            .put("revision", expect)
+                            .put("objective", objective)
+                            .put("maxRounds", maxRounds)
+                            .put("blockedReason", next.blockedReason.orEmpty()),
+                    )
+                }.onFailure { AppLog.w("goal 同步引擎失败：" + (it.message ?: it.javaClass.simpleName)) }
+                ok(describeGoal(next))
+            }
+            else -> fail("参数错误：action 只能是 get / create / update。")
+        }
+    }
+
+    /** 只有 blocked 才留卡点原因；离开 blocked 就清掉，免得旧原因一直挂着。 */
+    private fun phaseIsBlocked(phase: String?, current: String): Boolean =
+        (phase ?: current) == ProjectedGoal.PHASE_BLOCKED
+
+    private fun describeGoal(goal: ProjectedGoal): String = buildString {
+        append("目标（").append(goal.phase).append("，revision ").append(goal.revision)
+        if (goal.maxRounds > 0) append("，最多 ").append(goal.maxRounds).append(" 轮")
+        append("）：").append(goal.objective)
+        goal.blockedReason?.takeIf { it.isNotBlank() }?.let { append("\n卡点：").append(it) }
+    }
+
+    // ── P0-1 真压缩 ────────────────────────────────────────────────────────
+
+    /**
+     * 本会话模型的上下文窗口（tokens）。
+     *
+     * 与顶栏同一来源（宿主注入 [contextWindowProvider]，手机端接 ModelStore.contextWindowOf）；
+     * 取不到就按 32k 兜底，绝不回 0 —— 预算算成 0 会让每一次都判「超预算」。
+     */
+    private suspend fun windowTokens(sessionId: String): Int = ContextBudget.windowOr(
+        runCatching { contextWindowProvider(sessionId) }
+            .getOrDefault(ContextBudget.DEFAULT_WINDOW_TOKENS),
+    )
+
+    /**
+     * 装配前先压一次：超预算就把最老若干轮交 LLM 生成结构化摘要（角色/任务/已决定/未完成/关键路径）。
+     *
+     * 摘要是「有则更好」：模型不可用就退回本地节选，绝不能让一次摘要失败挡住整轮对话。
+     * 返回真正生效的摘要（没压缩返回 null）。
+     */
+    private suspend fun maybeSummarize(
+        sessionId: String,
+        cfg: LlmConfig?,
+        budgetChars: Int,
+        messages: List<JsonObject>,
+    ): String? {
+        if (messages.size < 2) return null
+        val system = messages.first()["content"]?.jsonPrimitive?.contentOrNullSafe().orEmpty()
+        val userMsg = messages.takeLast(1)
+        val history = messages.drop(1).dropLast(1)
+        val plan = threads.planCompaction(sessionId, budgetChars, system, history, userMsg) ?: return null
+        // 预算按新旧消息的字符数判定，重跑一轮还会得到同一个计划；已经压过这一段就不再花一次 LLM 请求。
+        if (threads.summary(sessionId).isNotEmpty() && plan.dropped.size <= (summarizedCount[sessionId] ?: 0)) return null
+        val summary = if (cfg == null) {
+            ""
+        } else {
+            runCatching { summarizeDropped(cfg, threads.compactionPrompt(plan)) }
+                .onFailure { AppLog.w("上下文摘要失败，退回本地节选：" + (it.message ?: it.javaClass.simpleName)) }
+                .getOrDefault("")
+                .trim()
+        }
+        val text = summary.ifBlank { localDigest(plan) }.trim()
+        if (text.isEmpty()) return null
+        applySummary(sessionId, text, plan.beforeChars)
+        summarizedCount[sessionId] = plan.dropped.size
+        return text
+    }
+
+    /** 让模型写结构化摘要：五段固定标题，避免它把历史又复述一遍。 */
+    private suspend fun summarizeDropped(cfg: LlmConfig, prompt: String): String {
+        val body = buildJsonObject {
+            put("model", cfg.model)
+            put("max_tokens", 800)
+            putJsonArray("messages") {
+                addJsonObject {
+                    put("role", "system")
+                    put(
+                        "content",
+                        "你是上下文压缩器。把给你的历史压成结构化摘要，只留后续继续干活必需的信息，" +
+                            "不要复述原文，不要加解释。严格用这五段标题输出：角色 / 任务 / 已决定 / 未完成 / 关键文件路径。",
+                    )
+                }
+                addJsonObject {
+                    put("role", "user")
+                    put("content", prompt)
+                }
+            }
+        }
+        val resp = postOnce(cfg, body)
+        val content = resp["choices"]?.jsonArray?.firstOrNull()?.jsonObject
+            ?.get("message")?.jsonObject?.get("content")
+            ?.jsonPrimitive?.contentOrNullSafe().orEmpty()
+        if (content.isBlank()) throw IOException("摘要为空")
+        return content
+    }
+
+    /** 摘要三处落点：进程内（装配立即生效）、持久存储（重启后回灌）、会话投影（UI 可见）。 */
+    private fun applySummary(sessionId: String, summary: String, beforeChars: Int) {
+        threads.setSummary(sessionId, summary)
+        runCatching { summaryStore.write(sessionId, summary) }
+            .onFailure { AppLog.w("摘要持久化失败：" + (it.message ?: it.javaClass.simpleName)) }
+        val before = ContextBudget.tokensOf(beforeChars)
+        val after = ContextBudget.tokensOf(summary.length)
+        projections.noteCompaction(sessionId, before, after, summary.length)
+        projections.noteSummaryChars(sessionId, summary.length)
+    }
+
+    /** LLM 不可用时的兜底摘要：只留最近若干条 80 字节选，比整段丢掉强。 */
+    private fun localDigest(plan: CompactionPlan): String = buildString {
+        append("（模型摘要不可用，以下为本地节选）\n")
+        plan.dropped.takeLast(12).forEach { m ->
+            val role = m["role"]?.jsonPrimitive?.contentOrNullSafe().orEmpty()
+            val text = m["content"]?.jsonPrimitive?.contentOrNullSafe().orEmpty().replace('\n', ' ').take(80)
+            append(role).append(": ").append(text).append("\n")
+        }
+    }.take(1_200)
+
+    /**
+     * P0-2：/compact 的真入口（UI 的 /compact 命令走这里）。
+     *
+     * 优先让 :node 引擎的 /commands compact 出手（与桌面同一实现）；引擎不在就本地走一次摘要。
+     * 没到压缩线时明确回报「不需要压缩」，不要假装压过。
+     *
+     * 口径（与顶栏同一套，硬要求）：
+     * - 窗口 = [windowTokens]（模型 contextWindow，默认 32k）；
+     * - 预算 = 窗口 * [ContextBudget.COMPACT_RATIO]（32k → 25600 tokens，留 20% 给回答）；
+     * - 已用优先取上游上报的 prompt+completion（与 ChatUiState.contextUsed 同源，误差 0），
+     *   从没上报过才退回字符数 /4 估算。
+     *
+     * 以前预算取 contextBudgetProvider 的字符数 /4（24000 字符 → 6000 tokens），跟顶栏的 32k
+     * 完全两套口径，于是任何会话都回「不需要压缩」——真压缩等于没接。
+     */
+    // Kotlin 不允许覆写函数再写默认值：默认值只留在 Compactor 接口上，调用方按接口签名用。
+    override suspend fun compact(sessionId: String, budgetTokens: Int): CompactResult {
+        val history = runCatching { historyProvider(sessionId) }.getOrDefault(emptyList())
+        val messages = history.map { m ->
+            buildJsonObject {
+                put("role", m.role.name.lowercase())
+                put("content", m.text)
+            }
+        }
+        val window = windowTokens(sessionId)
+        val budgetTok = if (budgetTokens > 0) budgetTokens else ContextBudget.budgetTokens(window)
+        val contentChars = messages.sumOf { m ->
+            (m["content"] as? JsonPrimitive)?.content?.length ?: 0
+        }
+        val reported = lastUsageTokens[sessionId]?.toInt()?.takeIf { it > 0 }
+        val usedTok = reported ?: ContextBudget.tokensOf(contentChars)
+        // 上游报的 token 比「字符 /4」更准：它说超了就把字符预算按同一比例收紧，
+        // 否则会出现「token 已超预算、字符还没超」→ 又一次空转回「不需要压缩」。
+        val planBudgetChars = if (reported != null && reported > budgetTok && contentChars > 0) {
+            (contentChars.toLong() * budgetTok / reported).toInt().coerceAtLeast(1)
+        } else {
+            ContextBudget.charsOf(budgetTok)
+        }
+        val system = messages.firstOrNull()?.get("content")?.jsonPrimitive?.contentOrNullSafe().orEmpty()
+        val plan = threads.planCompaction(sessionId, planBudgetChars, system, messages.drop(1).dropLast(1), messages.takeLast(1))
+            ?: return CompactResult(
+                compacted = false,
+                usedTokens = usedTok,
+                budgetTokens = budgetTok,
+                windowTokens = window,
+                message = "上下文还没到压缩线（已用 " + usedTok + " tokens，预算 " + budgetTok +
+                    " tokens，窗口 " + window + "），不需要压缩。",
+            )
+        val remoteSummary = runCatching {
+            val rpc = engineRpc ?: return@runCatching ""
+            val items = org.json.JSONArray()
+            plan.dropped.forEach { items.put(JSONObject(it.toString())) }
+            val payload = JSONObject()
+                .put("sessionId", sessionId)
+                .put("messages", items)
+                .put("options", JSONObject().put("keepRecent", 8).put("maxChars", 1_200))
+            val resp = rpc("/commands", "compact", payload)
+            ((resp.opt("value") as? JSONObject)?.optString("summary")).orEmpty()
+        }.getOrDefault("")
+        val cfg = runCatching { configProvider(sessionId) }.getOrNull()
+        val summary = remoteSummary.trim().ifBlank {
+            if (cfg == null) {
+                localDigest(plan)
+            } else {
+                runCatching { summarizeDropped(cfg, threads.compactionPrompt(plan)) }
+                    .onFailure { AppLog.w("compact 摘要失败，退回本地节选：" + (it.message ?: it.javaClass.simpleName)) }
+                    .getOrDefault("").trim().ifBlank { localDigest(plan) }
+            }
+        }
+        applySummary(sessionId, summary, plan.beforeChars)
+        summarizedCount[sessionId] = plan.dropped.size
+        // 压缩后的上下文粗估：原文减掉被摘要掉的部分，加上摘要本身；与「已用」同一套 token 口径。
+        val afterTok = ContextBudget.tokensOf((contentChars - plan.beforeChars).coerceAtLeast(0) + summary.length)
+        return CompactResult(
+            compacted = true,
+            summaryChars = summary.length,
+            beforeTokens = usedTok,
+            afterTokens = afterTok,
+            droppedMessages = plan.dropped.size,
+            usedTokens = usedTok,
+            budgetTokens = budgetTok,
+            windowTokens = window,
+            message = "已压缩 " + plan.dropped.size + " 条早期历史：" + usedTok + " → " + afterTok +
+                " tokens（预算 " + budgetTok + " / 窗口 " + window + "）。",
+        )
+    }
+
     private fun subagentHelp(): String = buildString {
         append("subagent 工具：把独立、可并行的子任务交给子代理。")
         append("子代理有自己的上下文和工具（shell / 文件 / phone），只把结论回给你，")
@@ -1729,6 +2177,7 @@ class LocalEngineTransport(
             tools = subagentToolsJson(),
             label = label,
             onStep = onStep,
+            spill = spill,
         ).run(prompt)
         return ToolExecResult(
             ok = outcome.ok,
@@ -2129,6 +2578,8 @@ internal class SubagentLoop(
     private val budgetMs: Long = SUBAGENT_BUDGET_MS,
     /** 每走一步的进度回调：父代理把它翻成 ToolCallEvent 的 detail。 */
     private val onStep: (String) -> Unit = {},
+    /** 大输出落盘（P0-4）：子代理读到大文件时同样只拿头尾 + locator。 */
+    private val spill: ToolOutputSpill? = null,
 ) {
     suspend fun run(userPrompt: String): SubagentOutcome {
         val messages = mutableListOf<JsonObject>(
@@ -2194,7 +2645,8 @@ internal class SubagentLoop(
                     messages += buildJsonObject {
                         put("role", "tool")
                         put("tool_call_id", id)
-                        put("content", resultReply(result).truncateForTool())
+                        // 子代理同样落盘：子任务里读大文件就不用把 6000 字硬截当上限了。
+                        put("content", spill?.present(resultReply(result), null, "sub-" + id) ?: resultReply(result).truncateForTool())
                     }
                 }
             }

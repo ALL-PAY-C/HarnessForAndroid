@@ -286,12 +286,18 @@ private fun PluginCard(
                         .clickable(enabled = !status.failed) { onToggle(!plugin.enabled) }
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                 )
-                Icon(
-                    Icons.Filled.Delete,
-                    contentDescription = "卸载",
-                    tint = p.t3,
-                    modifier = Modifier.size(18.dp).clickable(onClick = onUninstall),
-                )
+                // 图钉 18dp、命中区 48dp：行内危险操作不能靠手指祈祷。
+                Box(
+                    Modifier.size(48.dp).clickable(onClick = onUninstall),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = "卸载",
+                        tint = p.t3,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             },
         )
         if (status.failed) {
@@ -341,8 +347,18 @@ private fun PluginCard(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = p.accent,
                             )
-                            slots.take(3).forEach { slot ->
-                                PluginSlotItem(contribution = slot, tokens = tokens, onAction = onSlotAction)
+                            // 全部列出：注册了 5 个槽位却只给看 3 个，等于藏了两条。
+                            slots.forEach { slot ->
+                                // 页面类贡献的 ui 是只读卡片，光点卡片进不去；给一个明确的打开入口。
+                                val pageAction = slot.action
+                                if (pageAction is SlotAction.Page) {
+                                    Column {
+                                        PluginSlotItem(contribution = slot, tokens = tokens, onAction = onSlotAction)
+                                        TextButton(onClick = { onSlotAction(pageAction) }) { Text("打开页面") }
+                                    }
+                                } else {
+                                    PluginSlotItem(contribution = slot, tokens = tokens, onAction = onSlotAction)
+                                }
                             }
                         }
                     }

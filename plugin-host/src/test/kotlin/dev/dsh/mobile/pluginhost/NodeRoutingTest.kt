@@ -57,6 +57,22 @@ class NodeRoutingTest {
         assertEquals(PluginKind.Node, classifyPlugin(dir))
     }
 
+    @Test
+    fun `modern syntax entry routes to node`() {
+        val dir = tmp.newFolder()
+        dir.resolve("index.js")
+            .writeText("export function apply(c){ const a = c?.b ?? 1; return a }")
+        assertEquals(PluginKind.Node, classifyPlugin(dir))
+    }
+
+    @Test
+    fun `plain es6 entry stays on rhino`() {
+        val dir = tmp.newFolder()
+        dir.resolve("index.js")
+            .writeText("export function apply(c){ const a = c.b; return a }")
+        assertEquals(PluginKind.Rhino, classifyPlugin(dir))
+    }
+
     // ---- loadNodePlugins 编排回归：禁用不执行 / 取消上抛 / 引擎失败 / 正常应用 ----
 
     private class FakeNodeEngine(

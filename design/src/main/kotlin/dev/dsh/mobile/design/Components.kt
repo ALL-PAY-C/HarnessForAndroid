@@ -7,6 +7,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
@@ -16,6 +17,8 @@ import androidx.compose.foundation.border
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Box
@@ -61,6 +64,7 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -202,9 +206,10 @@ fun QqTopBar(
 @Composable
 fun IconBtn(icon: ImageVector, contentDescription: String?, onClick: () -> Unit) {
     val p = LocalQq.current
+    // 36dp 的视觉尺寸保留，节点本身走 48dp：IconBtn 不画背景，撑大只影响水波纹与命中区。
     Box(
         Modifier
-            .size(36.dp)
+            .size(48.dp)
             .clip(RoundedCornerShape(11.dp))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -286,7 +291,11 @@ fun ConvRow(
                 .fillMaxWidth()
                 .background(if (selected) p.accent.copy(alpha = 0.07f) else p.card)
                 .clickable(onClick = onClick)
-                .padding(horizontal = if (tokens.compact) 10.dp else 13.dp, vertical = if (tokens.compact) 8.dp else 10.dp),
+                // 「列表密度」滑块（tokens.density）以前只在设置里改数值、没有任何地方读它。
+                .padding(
+                    horizontal = if (tokens.compact) 10.dp else 13.dp,
+                    vertical = (if (tokens.compact) 8.dp else 10.dp) * tokens.density,
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (selectionMode) {
@@ -357,6 +366,39 @@ fun ConvRow(
         if (showDivider) {
             Box(Modifier.fillMaxWidth().padding(start = 71.dp).height(1.dp).background(p.line))
         }
+    }
+}
+
+/**
+ * 上下文占用环：灰底环 + 蓝色进度弧，弧长即上下文占比，0% 只留底环。
+ * 挂「上下文」那行文字左侧用，状态语义仍由 SessionStatusDot 负责。
+ */
+@Composable
+fun ContextRing(percent: Int, size: Dp = 12.dp) {
+    val p = LocalQq.current
+    val sweep = percent.coerceIn(0, 100) / 100f * 360f
+    androidx.compose.foundation.Canvas(Modifier.size(size)) {
+        val stroke = this.size.minDimension * 0.16f
+        val d = this.size.minDimension - stroke
+        val topLeft = Offset((this.size.width - d) / 2f, (this.size.height - d) / 2f)
+        drawArc(
+            color = p.line,
+            startAngle = 0f,
+            sweepAngle = 360f,
+            useCenter = false,
+            topLeft = topLeft,
+            size = Size(d, d),
+            style = Stroke(stroke),
+        )
+        if (sweep > 0f) drawArc(
+            color = p.accent,
+            startAngle = -90f,
+            sweepAngle = sweep,
+            useCenter = false,
+            topLeft = topLeft,
+            size = Size(d, d),
+            style = Stroke(stroke, cap = StrokeCap.Round),
+        )
     }
 }
 
@@ -461,7 +503,7 @@ fun MessageBubble(
     showDuration: Boolean = true,
     /** 作者名跟着头像渐变上色：群里多成员时一眼分得清谁在说话。 */
     colorizeAuthors: Boolean = false,
-    /** 保留调用兼容；思考历史统一默认收起，流式时自动展开。 */
+    /** 「思考默认展开」：历史消息按它展开/收起，流式中始终展开。 */
     expandThoughts: Boolean = false,
     /**
      * 富文本正文槽：feature:chat 传 :render 的 ChatContent。design 不依赖 :render，
@@ -681,37 +723,63 @@ fun EmptyState(title: String, subtitle: String) {
 data class TabSpec(val label: String, val icon: ImageVector)
 
 @Composable
-fun QqTabBar(tabs: List<TabSpec>, selected: Int, onSelect: (Int) -> Unit) {
+fun QqTabBar(
+    tabs: List<TabSpec>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    onEditPlus: (() -> Unit)? = null,
+) {
     val p = LocalQq.current
     Box(Modifier.fillMaxWidth().height(1.dp).background(p.line))
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(p.card)
-            .navigationBarsPadding()
-            .height(54.dp),
-    ) {
-        tabs.forEachIndexed { index, tab ->
-            val active = index == selected
-            Column(
-                Modifier.weight(1f).clickable { onSelect(index) }.padding(top = 7.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Icon(
-                    tab.icon,
-                    tab.label,
-                    tint = if (active) p.accent else p.t3,
-                    modifier = Modifier.size(23.dp),
-                )
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    tab.label,
-                    color = if (active) p.accent else p.t3,
-                    fontSize = 11.sp,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                )
-            }
+    // UI 修改模式：底部栏上方多一条可横滑的位置条 + 「+」，挑组件放到底部栏。
+    if (onEditPlus != null && UiEditMode.plusVisible(UiEditMode.Slot.BottomBar)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(p.card)
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                UiEditMode.Slot.BottomBar.label,
+                color = p.t2,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(end = 6.dp),
+            )
+            SlotPlusButton(label = "编辑底部 tab 栏", onClick = onEditPlus)
         }
+    }
+    Column(Modifier.fillMaxWidth().background(p.card).navigationBarsPadding()) {
+        // 4 个 tab 单行等宽（插件 tab 多了就一起挤压，不再分第二行）。
+        Row(Modifier.fillMaxWidth().height(54.dp)) {
+            tabs.forEachIndexed { index, tab -> TabItem(tab, index == selected) { onSelect(index) } }
+        }
+    }
+}
+
+/** 底部栏一格：图标 + 文字，宽度由外层 Row 的 weight(1f) 决定。 */
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.TabItem(tab: TabSpec, active: Boolean, onClick: () -> Unit) {
+    val p = LocalQq.current
+    Column(
+        Modifier.weight(1f).clickable(onClick = onClick).padding(top = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            tab.icon,
+            tab.label,
+            tint = if (active) p.accent else p.t3,
+            modifier = Modifier.size(23.dp),
+        )
+        Spacer(Modifier.height(3.dp))
+        Text(
+            tab.label,
+            color = if (active) p.accent else p.t3,
+            fontSize = 11.sp,
+            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+        )
     }
 }
 
@@ -728,11 +796,14 @@ fun QqRow(
     val p = LocalQq.current
     // 行级不画描边：QqRow 通常嵌在 SectionCard 里，行框会落在卡片描边内侧变成双层框。
     // 描边由 SectionCard / SurfaceCard 这类卡片级容器统一消费 LocalSurfaceStyle。
+    val tokens = LocalThemeTokens.current
     Row(
         Modifier
             .fillMaxWidth()
+            // 行高走 min：大字号下不裁字；纵向内边距跟「列表密度」滑块。
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 14.dp, vertical = 11.dp),
+            .heightIn(min = 48.dp)
+            .padding(horizontal = 14.dp, vertical = 11.dp * tokens.density),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -766,6 +837,7 @@ fun EmptyState(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    iconSize: Dp = 42.dp,
 ) {
     val p = LocalQq.current
     Column(
@@ -773,7 +845,7 @@ fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = p.t3, modifier = Modifier.size(42.dp))
+        Icon(icon, contentDescription = null, tint = p.t3, modifier = Modifier.size(iconSize))
         Spacer(Modifier.height(14.dp))
         Text(title, color = p.t1, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
         if (!subtitle.isNullOrBlank()) {
@@ -959,8 +1031,18 @@ fun SwipeableRow(
  * 顶部有字数与一键复制；工具调用按条折叠，入参/请求/响应分块。
  * [messageId] 用来记住展开状态（rememberSaveable），滚动出屏幕再回来不丢。
  */
-internal fun thoughtExpanded(live: Boolean, hasContent: Boolean, manual: Boolean?): Boolean =
-    manual ?: (live && hasContent)
+internal fun thoughtExpanded(
+    live: Boolean,
+    hasContent: Boolean,
+    manual: Boolean?,
+    /** 设置里的「思考默认展开」：历史消息按它展开/收起；流式中一律展开。 */
+    defaultOpen: Boolean = false,
+): Boolean = manual ?: when {
+    !hasContent -> false
+    // 流式中不折叠：推理正在长，收起来等于看不到过程。
+    live -> true
+    else -> defaultOpen
+}
 
 @Composable
 fun ActivitySummary(
@@ -974,7 +1056,7 @@ fun ActivitySummary(
     durationMs: Long = 0L,
     /** 记住展开状态用的键；空串时退化成跟随 live。 */
     messageId: String = "",
-    /** 保留调用兼容；历史默认收起。 */
+    /** 历史消息的默认展开态（设置项「思考默认展开」）；[live] 时忽略，始终展开。 */
     expandDefault: Boolean = false,
 ) {
     val p = LocalQq.current
@@ -982,7 +1064,7 @@ fun ActivitySummary(
     var manualOpen by rememberSaveable(messageId) { mutableStateOf<Boolean?>(null) }
     var toolsOpen by rememberSaveable(messageId + "#tools") { mutableStateOf(false) }
     val chars = thought.trim().length
-    val open = thoughtExpanded(live, chars > 0 || tools.isNotEmpty(), manualOpen)
+    val open = thoughtExpanded(live, chars > 0 || tools.isNotEmpty(), manualOpen, defaultOpen = expandDefault)
     // 折叠行只说「在干什么 / 干完了、用了多久 / 动了几个工具」。
     // 不再塞「1.2k 字」这种计数：字数对用户没有决策价值，还占掉一行里最显眼的位置。
     val steps = tools.size + if (chars > 0) 1 else 0
@@ -1273,7 +1355,7 @@ private fun JsonBlock(label: String, value: String) {
         Text(
             value.ifBlank { "—" },
             color = if (value.isBlank()) p.t3 else p.t2,
-            fontSize = 10.5.sp,
+            fontSize = 10.5.sp * LocalFontRoles.current.code,
             fontFamily = FontFamily.Monospace,
             softWrap = false,
             modifier = Modifier
@@ -1553,10 +1635,11 @@ fun GroupHeader(
     trailing: ( @Composable RowScope.() -> Unit )? = null,
 ) {
     val p = LocalQq.current
+    // 34dp 的固定高既戳不准也会在大字号下压字；改成 48dp 下限，命中区和字体缩放一起解决。
     Row(
         Modifier
             .fillMaxWidth()
-            .height(34.dp)
+            .heightIn(min = 48.dp)
             .background(p.hover)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 10.dp),

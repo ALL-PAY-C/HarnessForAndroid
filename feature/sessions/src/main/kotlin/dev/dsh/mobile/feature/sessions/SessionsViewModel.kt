@@ -94,7 +94,9 @@ class SessionsViewModel(
         viewModelScope.launch {
             val saved = runCatching { settingsStore.settings.first().collapsedGroups.toSet() }
                 .getOrElse { emptySet() }
-            if (saved.isNotEmpty()) collapsed.value = saved
+            // 「最近」是默认货架，不能带着上次的折叠状态启动：根分组一收起，整页就只剩
+            // 两条细标题条，用户读到的就是「会话全没了」——偶发空白页的一半来源。
+            if (saved.isNotEmpty()) collapsed.value = saved - Session.DEFAULT_GROUP
         }
     }
 

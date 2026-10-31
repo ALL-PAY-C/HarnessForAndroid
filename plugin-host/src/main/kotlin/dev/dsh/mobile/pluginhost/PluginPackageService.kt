@@ -688,39 +688,38 @@ class PluginPackageService(
         val title = pkg.optString("displayName").ifBlank { pkg.optString("name").substringAfterLast('/') }
         val version = pkg.optString("version").ifBlank { "0.0.0" }
         val description = pkg.optString("description")
-        val contributions = JSONArray()
-        if (description.isNotBlank()) {
-            val children = JSONArray()
-            children.put(JSONObject().put("type", "text").put("text", description))
-            contributions.put(
-                JSONObject()
-                    .put("slot", "settings.section")
-                    .put("id", "about")
-                    .put("label", title)
-                    .put("subtitle", version)
-                    .put(
-                        "ui",
-                        JSONObject()
-                            .put("width", "fill")
-                            .put(
-                                "root",
-                                JSONObject()
-                                    .put("type", "section")
-                                    .put("title", title)
-                                    .put("subtitle", description)
-                                    .put("children", children),
-                            ),
-                    ),
-            )
-        }
+        // 不再用 description 伪造一张 settings.section 卡片：身份卡已经显示过说明，
+        // 再画一遍只会让用户以为「点进去有设置，其实是介绍页」。
         return JSONObject()
             .put("id", id)
             .put("name", title)
             .put("version", version)
             .put("description", description)
             .put("author", pkg.optString("author"))
-            .put("contributions", contributions)
-            .put("config", JSONArray())
+            .put("contributions", JSONArray())
+            .put("config", declaredConfig(pkg))
+    }
+
+    /**
+     * package.json 里的设置项声明 → plugin.json 的 config 数组。
+     *
+     * npm 包没有 plugin.json，这里原来恒为空数组，于是所有 npm 插件在「插件设置」里
+     * 都只剩「该插件没有设置项」。现在认 `dsh.mobile.config`，没有再看 `dsh.config`；
+     * 数组（[{key,label,type,default,hint,options}]）与对象（{key: {type,...}}）两种写法都收。
+     */
+    private fun declaredConfig(pkg: JSONObject): JSONArray {
+        val dsh = pkg.optJSONObject("dsh") ?: return JSONArray()
+        val raw: Any = dsh.optJSONObject("mobile")?.opt("config") ?: dsh.opt("config") ?: return JSONArray()
+        val out = JSONArray()
+        when (raw) {
+            is JSONArray -> for (i in 0 until raw.length()) {
+                raw.optJSONObject(i)?.takeIf { it.optString("key").isNotBlank() }?.let { out.put(it) }
+            }
+            is JSONObject -> raw.keys().forEach { key ->
+                out.put((raw.optJSONObject(key) ?: JSONObject()).put("key", key))
+            }
+        }
+        return out
     }
 
     companion object {

@@ -36,8 +36,15 @@ class PluginsViewModel(
         }
     }
 
-    /** 某个插件注册的全部槽位贡献（异常时给空表，界面不崩）。 */
+    /**
+     * 某个插件注册的全部槽位贡献（异常时给空表，界面不崩）。
+     *
+     * plugin.page 贡献会被 DrawerEntryBridge 再桥接一份到抽屉，两者 pluginId + id 相同，
+     * 直接过滤会让详情里同一张卡片渲染两遍，所以按 id 去重。
+     */
     fun contributionsOf(pluginId: String): List<SlotContribution> = runCatching {
-        host.slots.contributions.filter { it.pluginId == pluginId }
+        host.slots.contributions
+            .filter { it.pluginId == pluginId }
+            .distinctBy { it.id }
     }.getOrDefault(emptyList())
 }

@@ -11,6 +11,7 @@ import dev.dsh.mobile.core.data.secret.shouldMigrate
 import dev.dsh.mobile.core.data.settings.SettingsStore
 import dev.dsh.mobile.core.model.Endpoint
 import dev.dsh.mobile.core.model.TransportKind
+import dev.dsh.mobile.core.protocol.SessionProjections
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -39,8 +40,15 @@ object DataModule {
 
     fun createSettings(context: Context): SettingsStore = SettingsStore(context)
 
-    fun createChatRepository(db: DshDatabase, scope: CoroutineScope): ChatRepository =
-        ChatRepository(db, scope)
+    /**
+     * [projections] 由 AppContainer 注入：同一个实例既给 LocalEngineTransport（写入方），
+     * 也给仓库（只读出口），UI 才能拿到同一份待办 / 用量 / 压缩统计。
+     */
+    fun createChatRepository(
+        db: DshDatabase,
+        scope: CoroutineScope,
+        projections: SessionProjections = SessionProjections(),
+    ): ChatRepository = ChatRepository(db, scope, projections)
 }
 
 class EndpointRepository(

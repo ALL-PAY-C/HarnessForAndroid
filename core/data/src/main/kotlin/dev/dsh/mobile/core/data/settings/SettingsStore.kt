@@ -61,6 +61,8 @@ data class AppSettings(
     ),
     val showThoughts: Boolean = true,
     val autoApproveTools: Boolean = false,
+    /** 设置 → 拓展：允许插件往宿主界面注入 UI（扩展插件 UI 配置）。默认关闭。 */
+    val pluginUiExtend: Boolean = false,
 
     // ---- 通知：基础四开关 ----
     val notifyOnComplete: Boolean = true,
@@ -233,6 +235,7 @@ class SettingsStore(private val context: Context) {
         val templates = stringPreferencesKey("prompt_templates")
         val showThoughts = booleanPreferencesKey("show_thoughts")
         val autoApprove = booleanPreferencesKey("auto_approve_tools")
+        val pluginUiExtend = booleanPreferencesKey("plugin_ui_extend")
         val cwdTreeUri = stringPreferencesKey("cwd_tree_uri")
         val notifyOnComplete = booleanPreferencesKey("notify_on_complete")
         val notifyOnPermission = booleanPreferencesKey("notify_on_permission")
@@ -318,6 +321,7 @@ class SettingsStore(private val context: Context) {
             promptTemplates = p[K.templates]?.split('\u0001')?.filter { it.isNotBlank() } ?: d.promptTemplates,
             showThoughts = p[K.showThoughts] ?: d.showThoughts,
             autoApproveTools = p[K.autoApprove] ?: d.autoApproveTools,
+            pluginUiExtend = p[K.pluginUiExtend] ?: d.pluginUiExtend,
             cwdTreeUri = p[K.cwdTreeUri] ?: d.cwdTreeUri,
             collapsedGroups = p[K.collapsedGroups]?.split('\u0001')?.filter { it.isNotBlank() } ?: d.collapsedGroups,
             customFolders = p[K.customFolders]?.split('\u0001')?.filter { it.isNotBlank() } ?: d.customFolders,
@@ -389,6 +393,7 @@ class SettingsStore(private val context: Context) {
     suspend fun setPromptTemplates(list: List<String>) = edit { it[K.templates] = list.joinToString("\u0001") }
     suspend fun setShowThoughts(v: Boolean) = edit { it[K.showThoughts] = v }
     suspend fun setAutoApprove(v: Boolean) = edit { it[K.autoApprove] = v }
+    suspend fun setPluginUiExtend(v: Boolean) = edit { it[K.pluginUiExtend] = v }
     suspend fun setCwdTreeUri(v: String) = edit { it[K.cwdTreeUri] = v }
     suspend fun setNotifyOnComplete(v: Boolean) = edit { it[K.notifyOnComplete] = v }
     suspend fun setNotifyOnPermission(v: Boolean) = edit { it[K.notifyOnPermission] = v }

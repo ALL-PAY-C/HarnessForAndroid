@@ -168,6 +168,56 @@ object HtmlRenderer {
     }
 
     /**
+     * 剥掉没有配对开标签的孤立闭标签（`</section>`）。
+     *
+     * 行式解析会把一个裸 HTML 块按行切碎，开标签留在上一块、闭标签自成一块，于是
+     * `</section>` 既没有配对的开标签、又不在同一个扫描里——它只会作为块的原文
+     * 流进 WebView / 复制文本，最后原样显示成源码。这里按标签栈做一次配对检查，
+     * 配对不上的闭标签直接丢掉；script/style/head 的正文原样复制（里面的 '<' 不是标签）。
+     */
+    internal fun stripOrphanClosers(html: String): String {
+        if (html.indexOf('<') < 0) return html
+        val open = HashMap<String, Int>()
+        val sb = StringBuilder(html.length)
+        var i = 0
+        val n = html.length
+        while (i < n) {
+            if (html[i] != '<') { sb.append(html[i]); i++; continue }
+            if (html.startsWith("<!--", i)) {
+                val end = html.indexOf("-->", i + 4)
+                val stop = if (end < 0) n else end + 3
+                sb.append(html, i, stop); i = stop; continue
+            }
+            val gt = html.indexOf('>', i + 1)
+            if (gt < 0) { sb.append(html, i, n); break }
+            val raw = html.substring(i + 1, gt)
+            val closing = raw.startsWith("/")
+            val body = (if (closing) raw.substring(1) else raw).trim()
+            val name = body.substringBefore(' ').substringBefore('\t').trimEnd('/').lowercase()
+            if (name.isEmpty()) { sb.append(html, i, gt + 1); i = gt + 1; continue }
+            if (closing) {
+                val depth = open[name] ?: 0
+                if (depth > 0) {
+                    open[name] = depth - 1
+                    sb.append(html, i, gt + 1)
+                }
+                i = gt + 1
+                continue
+            }
+            if (name in DROP_TAGS) {
+                val close = html.indexOf("</" + name, gt + 1, ignoreCase = true)
+                if (close < 0) { sb.append(html, i, n); break }
+                val g2 = html.indexOf('>', close)
+                val stop = if (g2 < 0) n else g2 + 1
+                sb.append(html, i, stop); i = stop; continue
+            }
+            if (name !in VOID_TAGS && !body.endsWith("/")) open[name] = (open[name] ?: 0) + 1
+            sb.append(html, i, gt + 1); i = gt + 1
+        }
+        return sb.toString()
+    }
+
+    /**
      * 只做实体解码（`&#1650;` / `&amp;` 之类）。折叠预览走 [stripTags]，那里也要解码，
      * 否则预览里全是 `&#1650;` 这种原样实体。
      */

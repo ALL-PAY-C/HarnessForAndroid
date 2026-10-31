@@ -1,13 +1,13 @@
 {
-  "versionCode": 94,
-  "versionName": "v0.07",
-  "apkUrl": "https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.07/HarnessForAndroid-release-v0.07.apk",
+  "versionCode": 95,
+  "versionName": "v0.08",
+  "apkUrl": "https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk",
   "apkMirrors": [
-    "https://gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.07/HarnessForAndroid-release-v0.07.apk",
-    "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.07/HarnessForAndroid-release-v0.07.apk",
-    "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.07/HarnessForAndroid-release-v0.07.apk"
+    "https://gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk",
+    "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk",
+    "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk"
   ],
-  "sha256": "3ed7869cb4866b522564c661469f6ea0ebb2999a937ec9cae33c93dd025c7401",
-  "notes": "v0.07（修订）：签名材料随仓库走，别处 clone 构建出的包与线上同证书，可覆盖升级；桌面宿主服务面补齐 llm / dshLoader（.dsh 模块符号、.llm、settings.installSection）/ credentials.resolve / systemPrompt.section，dsh-auxiliary、ollama-cloud 这类插件能在引擎里真正 apply；技能中心加了移除入口；插件路由按真实 import 判断，裸 npm 包不再错走 Rhino。带图提问会先把图缩到 1568px 再压 JPEG，图片过大不再静默丢图；「配置智能体」的预设按钮与「Agent 预设」页改为同一份内置预设。release 只打 arm64-v8a，Android 8.0 以上。",
-  "sizeBytes": 113313971
+  "sha256": "9c0ff87dbccda63b35581f52f1c4b89d52bbde5f89b0b6dd781c5d904db9060a",
+  "notes": "v0.08：补齐桌面 DSH 的上下文治理与任务骨架，修掉三处数据口径 bug，新增 UI 修改模式与智能体预设选择。\n\n- 上下文压缩真落地：超预算时把最老若干轮交给模型生成五段式结构化摘要（角色/任务/已决定/未完成/关键文件路径），摘要持久化并接回提示词；预算改由模型上下文窗口推导（窗口×0.8，默认 32k 窗口 → 25600 tokens），不再是固定的 8000 字符；`/compact` 变成真入口，回执里的「已用/预算/窗口」与顶栏同一口径。\n- 大工具输出不再硬截 6000 字符：超阈值落盘到应用私有目录 tools-output/，正文只留头尾各 40 行 + 一行 locator（路径/总行数/字节），新增 `read_output` 工具按 offset/limit 回读。\n- 模型侧待办：新增 `todo_write`（整表替换）与 `goal`（get/create/update，revision 乐观锁）工具，并补会话投影层（待办/目标/用量/压缩统计只读投影），会话页可折叠展示三态待办与目标阶段。\n- 顶栏用量三项修正：token 速度按 1.2s 滑窗实时估算（CJK 1 字≈1 token，其余 4 字符≈1），结束后不再回落成 0；上下文百分比计入 completion 并按轮次保持峰值；「思考默认展开」不再是死参数（历史消息按开关展开，流式中始终展开）。\n- UI 修改模式：设置里打开后，会话列表项、抽屉分组、会话顶栏、输入框区、底部栏旁出现「+」，可横向滑动挑选插件贡献的组件放上去；布局与三套字号（正文/代码/终端）持久化。\n- 智能体预设：发起前在会话顶栏选预设（六个内置，选中即生效，无额外开关），发出第一条消息后锁定为只读。\n- 版本 v0.08（versionCode 95）。",
+  "sizeBytes": 113432154
 }

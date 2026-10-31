@@ -29,6 +29,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -50,8 +52,11 @@ import androidx.compose.ui.unit.sp
 import dev.dsh.mobile.design.IconBtn
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqTopBar
+import dev.dsh.mobile.design.SlotEditState
 import dev.dsh.mobile.design.QqTabBar
 import dev.dsh.mobile.design.TabSpec
+import dev.dsh.mobile.design.UiLayoutPrefs
+import dev.dsh.mobile.design.UiLayoutSettingsCard
 import dev.dsh.mobile.feature.plugins.PluginHubScreen
 import dev.dsh.mobile.feature.plugins.pluginSettingsEntries
 import dev.dsh.mobile.feature.plugins.SkillCenterScreen
@@ -59,7 +64,6 @@ import java.io.File
 import dev.dsh.mobile.feature.plugins.PluginMarketScreen
 import dev.dsh.mobile.feature.plugins.PluginsScreen
 import dev.dsh.mobile.feature.plugins.PluginsViewModel
-import dev.dsh.mobile.feature.plugins.SlotManagerScreen
 import dev.dsh.mobile.pluginapi.DiagramRenderers
 import dev.dsh.mobile.pluginapi.HtmlBlockRenderers
 import androidx.compose.foundation.layout.padding
@@ -77,26 +81,34 @@ import dev.dsh.mobile.feature.plugins.drawerEntryResolver
 import dev.dsh.mobile.feature.agents.AgentsScreen
 import dev.dsh.mobile.feature.agents.AgentsViewModel
 import dev.dsh.mobile.feature.chat.ChatScreen
+import dev.dsh.mobile.feature.chat.ChatSettingsScreen
 import dev.dsh.mobile.feature.chat.ChatViewModel
 import dev.dsh.mobile.feature.chat.PresetDrawerPanel
 import dev.dsh.mobile.feature.chat.PresetDrawerViewModel
 import dev.dsh.mobile.feature.sessions.SessionsScreen
 import dev.dsh.mobile.feature.sessions.SessionsViewModel
+import dev.dsh.mobile.feature.settings.ExtrasScreen
 import dev.dsh.mobile.feature.settings.SettingsScreen
 import dev.dsh.mobile.feature.settings.SettingsViewModel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.map
 
 private object Routes {
     const val SESSIONS = "sessions"
     const val CHAT = "chat/{sessionId}"
+    const val CHAT_SETTINGS = "chat/{sessionId}/settings"
     const val AGENTS = "agents"
     const val SETTINGS = "settings"
     const val PLUGINS = "plugins"
     const val PLUGIN_HUB = "plugins/hub"
-    const val PLUGIN_SLOTS = "plugins/slots"
     const val TERMINAL = "terminal"
+    const val SEARCH = "search"
+    const val EXTRAS = "settings/extras"
+    const val PLUGIN_PAGE = "plugin-page/{pageId}"
     fun chat(id: String) = "chat/$id"
+    fun chatSettings(id: String) = "chat/$id/settings"
+    fun pluginPage(id: String) = "plugin-page/$id"
 }
 
 private val TABS = listOf(
@@ -123,6 +135,10 @@ fun AppNav(container: AppContainer) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val runtime: RuntimeState by container.runtime.collectAsStateWithLifecycle()
+    // 界面级偏好（UI 修改模式 / 底部栏布局 / 三套字号）从 SharedPreferences 装一次，
+    // 装完 UiEditMode 就已经是落盘时的值，首帧不会先空一帧再跳。
+    val appContext = LocalContext.current
+    LaunchedEffect(Unit) { UiLayoutPrefs.attach(appContext) }
 
     // 通知点击 → 直接进对应会话；消费一次就清空，返回键不会又被弹回来。
     val pendingSession by container.pendingSession.collectAsStateWithLifecycle()
@@ -164,6 +180,12 @@ fun AppNav(container: AppContainer) {
         },
     )
     val presetState by presetVm.uiState.collectAsStateWithLifecycle()
+    // 拓展插件 UI 配置 → 全应用可编辑态。开关是全局设置，界面各处只读这一个布尔。
+    val pluginUiExtend by container.settings.settings
+        .map { it.pluginUiExtend }
+        .collectAsStateWithLifecycle(initialValue = false)
+    LaunchedEffect(pluginUiExtend) { SlotEditState.enabled = pluginUiExtend }
+
     val pluginRevision by container.pluginHost.revision.collectAsStateWithLifecycle()
     val placementRevision = container.pluginHost.placements(drawerContext).revision
     val drawerEntries = remember(drawerContext, pluginRevision, placementRevision, presetState.defaultName) {
@@ -242,6 +264,8 @@ fun AppNav(container: AppContainer) {
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet {
+                // 抽屉槽：「常用」与「最近会话」之间那个「+」，以及已摆进抽屉的组件。
+                val drawerSlot = rememberSlotWiring(container, SlotId.Drawer)
                 AppDrawer(
                     runtime = runtime,
                     container = container,
@@ -258,13 +282,28 @@ fun AppNav(container: AppContainer) {
                         scope.launch { drawerState.close() }
                         nav.navigate(Routes.PLUGINS) { launchSingleTop = true }
                     },
+                    slotPlaced = drawerSlot.placed,
+                    slotCandidates = drawerSlot.candidates,
+                    onSlotAdd = drawerSlot.add,
+                    onSlotRemove = drawerSlot.remove,
                 )
             }
         },
     ) {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) {
-                NavHost(navController = nav, startDestination = Routes.SESSIONS) {
+                // 四个转场显式关掉：导航库默认给整页 fade in/out（700ms），一旦动画在
+                // 应用切后台/丢帧时被挂起，新目的地会停在不透明度的第 0 帧——整页空白，
+                // 而底部 tab（在 NavHost 外面）照常显示，就是「退出会话后偶发空白」。
+                // 页面切换瞬切即可，本应用的分屏切换本来也没有方向性观感收益。
+                NavHost(
+                    navController = nav,
+                    startDestination = Routes.SESSIONS,
+                    enterTransition = { EnterTransition.None },
+                    exitTransition = { ExitTransition.None },
+                    popEnterTransition = { EnterTransition.None },
+                    popExitTransition = { ExitTransition.None },
+                ) {
 
                     composable(Routes.SESSIONS) {
                         val vm: SessionsViewModel = viewModel(
@@ -274,11 +313,21 @@ fun AppNav(container: AppContainer) {
                                 }
                             },
                         )
+                        // 会话列表槽：右下角「+」与列表末尾的已放置组件都落在这个槽位上。
+                        val listContext = LocalContext.current
+                        val listSlot = rememberSlotWiring(container, SlotId.SessionList)
                         SessionsScreen(
                             viewModel = vm,
                             onOpenSession = { nav.navigate(Routes.chat(it)) { launchSingleTop = true } },
                             onOpenDrawer = { scope.launch { drawerState.open() } },
                             sessionRowExtras = container.pluginHost.slots.sessionRowExtras.toList(),
+                            slotPlaced = listSlot.placed,
+                            slotCandidates = listSlot.candidates,
+                            onSlotAdd = listSlot.add,
+                            onSlotRemove = listSlot.remove,
+                            onSlotAction = { action ->
+                                handleSlot(action, null, listContext, nav, scope)
+                            },
                         )
                     }
 
@@ -328,10 +377,15 @@ fun AppNav(container: AppContainer) {
                                 container.pluginHost.visibleSlots(slotContext, SlotId.AgentPreset),
                             )
                         }
+                        // 聊天底部槽：「+」与已放置组件都在输入框上方那一片。
+                        val bottomSlot = rememberSlotWiring(container, SlotId.ChatBottom)
                         ChatScreen(
                             viewModel = vm,
                             onBack = { nav.popBackStack() },
                             onOpenDrawer = { scope.launch { drawerState.open() } },
+                            onOpenSettings = {
+                                nav.navigate(Routes.chatSettings(id)) { launchSingleTop = true }
+                            },
                             messageSlot = { msg -> container.pluginHost.MessageSlot(msg) },
                             composerExtras = container.pluginHost.slots.composerButtons
                                 .map { it.label to it.transform },
@@ -341,6 +395,79 @@ fun AppNav(container: AppContainer) {
                             presetSlots = presetSlots,
                             onSlot = { slot ->
                                 handleSlot(slot.action, vm, slotContext, nav, scope)
+                            },
+                            slotPlaced = bottomSlot.placed,
+                            slotCandidates = bottomSlot.candidates,
+                            onSlotAdd = bottomSlot.add,
+                            onSlotRemove = bottomSlot.remove,
+                            // 智能体预设：只写本会话的覆盖；页面负责「首条消息后锁定」的显示。
+                            onPickPreset = { presetId ->
+                                scope.launch { container.settings.setSessionPresetId(id, presetId) }
+                            },
+                        )
+                    }
+
+                    // 会话设置整页：原来是从右边推出来的面板，现在有独立路由。
+                    // ViewModel 借聊天目的地的 Store、沿用同一个 key，改完返回聊天页
+                    // 看到的就是同一份状态，不会出现「设置改了、聊天页没变」。
+                    composable(
+                        route = Routes.CHAT_SETTINGS,
+                        arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
+                    ) { entry ->
+                        val id = entry.arguments?.getString("sessionId").orEmpty()
+                        val chatEntry = remember(id) { nav.getBackStackEntry(Routes.chat(id)) }
+                        val vm: ChatViewModel = viewModel(
+                            viewModelStoreOwner = chatEntry,
+                            key = "chat-$id",
+                            factory = viewModelFactory {
+                                initializer {
+                                    ChatViewModel(
+                                        container.repo,
+                                        container.settings,
+                                        container.models,
+                                        container.sendQueue,
+                                        id,
+                                        container.executionAgents,
+                                    ) { container.cwd() }
+                                }
+                            },
+                        )
+                        val slotContext = LocalContext.current
+                        val settingsPluginRevision by container.pluginHost.revision.collectAsStateWithLifecycle()
+                        val settingsPlacementRevision = container.pluginHost.placements(slotContext).revision
+                        val extras = remember(
+                            slotContext,
+                            settingsPluginRevision,
+                            settingsPlacementRevision,
+                        ) {
+                            container.pluginHost.visibleSlots(slotContext, SlotId.ChatOverflow)
+                        }
+                        // 会话设置槽（整页中部空白）：摆放与移除都落在这个类自己的目标槽位上。
+                        val settingsSlot = rememberSlotWiring(container, SlotId.ChatSettings)
+                        ChatSettingsScreen(
+                            viewModel = vm,
+                            onBack = { nav.popBackStack() },
+                            onSearch = { nav.navigate(Routes.SEARCH) { launchSingleTop = true } },
+                            extras = extras,
+                            onSlot = { slot -> handleSlot(slot.action, vm, slotContext, nav, scope) },
+                            presetViewModel = presetVm,
+                            slotPlaced = settingsSlot.placed,
+                            slotCandidates = settingsSlot.candidates,
+                            onSlotAdd = settingsSlot.add,
+                            onSlotRemove = settingsSlot.remove,
+                        )
+                    }
+
+                    // 整页搜索：结果点开就回会话。会话还在栈里就直接回退，
+                    // 不在栈里才压新目的地，免得来回点出一叠重复的 chat。
+                    composable(Routes.SEARCH) {
+                        SearchScreen(
+                            container = container,
+                            onBack = { nav.popBackStack() },
+                            onOpenSession = { hit ->
+                                if (!nav.popBackStack(Routes.chat(hit), inclusive = false)) {
+                                    nav.navigate(Routes.chat(hit)) { launchSingleTop = true }
+                                }
                             },
                         )
                     }
@@ -390,6 +517,8 @@ fun AppNav(container: AppContainer) {
                         // 这类外部槽位一律来自用户显式摆放（visibleSlots）。
                         val hubContext = LocalContext.current
                         val hubRegistry = container.pluginHost.slots
+                        // 插件页槽：中心内部那一层的「+」与已放置组件。
+                        val hubSlot = rememberSlotWiring(container, SlotId.PluginPage)
                         PluginHubScreen(
                             slotContributions = mergeHubSlots(
                                 hubRegistry.inSlot(SlotId.PluginPage),
@@ -401,6 +530,10 @@ fun AppNav(container: AppContainer) {
                             onAction = { action ->
                                 handleSlot(action, null, hubContext, nav, scope)
                             },
+                            slotPlaced = hubSlot.placed,
+                            slotCandidates = hubSlot.candidates,
+                            onSlotAdd = hubSlot.add,
+                            onSlotRemove = hubSlot.remove,
                             pages = container.pluginHost.slots.configPages + listOf(
                                 PluginConfigPage(
                                     id = "app.plugins.market",
@@ -439,16 +572,6 @@ fun AppNav(container: AppContainer) {
                                         )
                                     },
                                 ),
-                                // 需求 4：设置底部「插件槽位」此前没有落地页，点进去是空白。
-                                // 这里给出真正的槽位管理页，与消费点读同一份 SlotGate 开关。
-                                PluginConfigPage(
-                                    id = "app.plugins.slots",
-                                    label = "插件槽位",
-                                    subtitle = "每个界面位置单独启停",
-                                    icon = Icons.Filled.List,
-                                    pluginId = "app",
-                                    content = { SlotManagerScreen(onBack = {}, showTopBar = false) },
-                                ),
                             ),
                             pluginSettings = pluginSettingsEntries(
                                 installed = container.installedPlugins.all().values.toList(),
@@ -484,15 +607,23 @@ fun AppNav(container: AppContainer) {
                                 }
                             },
                         )
+                        // 界面修改一节放在设置页顶部：UI 修改模式开关、底部栏布局、三套字号。
+                        // feature:settings 不在本次改动范围，所以用宿主这一层把设计模块的卡片叠上去。
+                        Column(Modifier.fillMaxSize()) {
+                            UiLayoutSettingsCard(Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+                            Box(Modifier.weight(1f)) {
                         SettingsScreen(
                             viewModel = vm,
                             onOpenDrawer = { scope.launch { drawerState.open() } },
                             onOpenPlugins = { nav.navigate(Routes.PLUGINS) { launchSingleTop = true } },
+                            onOpenExtras = { nav.navigate(Routes.EXTRAS) { launchSingleTop = true } },
                             onOpenTerminal = { nav.navigate(Routes.TERMINAL) { launchSingleTop = true } },
                             extraSettings = container.pluginHost.slots.settingsItems.map { item ->
                                 { item.content() }
                             },
                         )
+                            }
+                        }
                     }
 
                     drawerEntries.forEach { entry ->
@@ -505,6 +636,38 @@ fun AppNav(container: AppContainer) {
                         composable("plugin/${tab.id}") { tab.content() }
                     }
 
+                    // 插件声明的独立页面（plugin.page 贡献）。声明式插件没有底部 tab，
+                    // 走 plugin/<id> 只会撞上不存在的路由，所以单开一条按贡献 id 找的通道。
+                    composable(
+                        Routes.PLUGIN_PAGE,
+                        arguments = listOf(navArgument("pageId") { type = NavType.StringType }),
+                    ) { entry ->
+                        val pageId = entry.arguments?.getString("pageId").orEmpty()
+                        val pageContext = LocalContext.current
+                        // 先按贡献 id 找；找不到再按贡献自己声明的 pageId 找 —— plugin.json 里
+                        // id 与 pageId 通常不同名（如 id=page、pageId=dsh.demo.slots）。
+                        val pages = container.pluginHost.slots.contributions.filter {
+                            it.slot == SlotId.PluginPage
+                        }
+                        val page = pages.firstOrNull { it.id == pageId }
+                            ?: pages.firstOrNull {
+                                (it.action as? SlotAction.Page)?.pageId == pageId
+                            }
+                        if (page == null) {
+                            DrawerPage("插件页面", onBack = { nav.popBackStack() }) {
+                                Box(Modifier.padding(16.dp)) {
+                                    Text("插件页面不存在：$pageId", color = LocalQq.current.t3, fontSize = 13.sp)
+                                }
+                            }
+                        } else {
+                            PluginContributionPage(
+                                contribution = page,
+                                onBack = { nav.popBackStack() },
+                                onAction = { action -> handleSlot(action, null, pageContext, nav, scope) },
+                            )
+                        }
+                    }
+
                     composable(Routes.TERMINAL) {
                         dev.dsh.mobile.feature.agents.TerminalScreen(
                             shell = container.shell,
@@ -512,8 +675,25 @@ fun AppNav(container: AppContainer) {
                         )
                     }
 
-                    composable(Routes.PLUGIN_SLOTS) {
-                        SlotManagerScreen(onBack = { nav.popBackStack() })
+                    composable(Routes.EXTRAS) {
+                        val extrasContext = LocalContext.current
+                        val vm: SettingsViewModel = viewModel(
+                            key = "settings-extras",
+                            factory = viewModelFactory {
+                                initializer {
+                                    SettingsViewModel(
+                                        settingsStore = container.settings,
+                                        secretStore = container.secretStore,
+                                        linuxActions = dev.dsh.mobile.app.LinuxSettingsController(extrasContext.applicationContext, container),
+                                        endpoints = container.endpoints,
+                                        runtime = RuntimeControlAdapter(container),
+                                        updater = dev.dsh.mobile.core.data.update.Updater(extrasContext),
+                                        onReconnect = { container.connectActive(force = true) },
+                                    )
+                                }
+                            },
+                        )
+                        ExtrasScreen(viewModel = vm, onBack = { nav.popBackStack() })
                     }
 
                     composable(Routes.PLUGINS) {
@@ -545,6 +725,10 @@ fun AppNav(container: AppContainer) {
                 QqTabBar(
                     tabs = tabs.map { it.first },
                     selected = tabIndex,
+                    // 底部栏的「+」：底部 tab 是插件声明式贡献，装载在插件页，
+                    // 这里直接把人送到那儿，不在底部栏里另造一套picker。
+                    // ponytail: 只做导航，没有在底部栏就地挑选组件。
+                    onEditPlus = { nav.navigate(Routes.PLUGIN_HUB) { launchSingleTop = true } },
                     onSelect = { i ->
                         nav.navigate(tabs[i].second) {
                             popUpTo(Routes.SESSIONS) { inclusive = false }
@@ -596,8 +780,7 @@ private fun handleSlot(
                 "sessions" -> Routes.SESSIONS
                 "agents" -> Routes.AGENTS
                 "plugins", "hub" -> Routes.PLUGIN_HUB
-                "slots" -> Routes.PLUGIN_SLOTS
-                else -> "plugin/${action.pageId}"
+                else -> Routes.pluginPage(action.pageId)
             }
             runCatching { nav.navigate(route) { launchSingleTop = true } }
                 .onFailure { toast(context, "插件指向的页面不存在：${action.pageId}") }

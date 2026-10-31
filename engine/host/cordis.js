@@ -19,10 +19,14 @@ import {
   createFsService,
   createJobsService,
   createSessionPersistenceService,
+  createSessionProjectionCacheService,
+  createSessionProjectionsService,
+  createSessionQueryService,
   createSessionsService,
   createSettingsService,
   createSystemPromptService,
   createTimerService,
+  createUserQuestionsService,
   createWorkspaceRegistryService,
   installCredentialResolve,
   installDshLoaderFacade,
@@ -101,8 +105,25 @@ function createConnectionService() {
 
 function createRegistryService(label, kind) {
   const items = new Map();
+  const guards = [];
   return {
     items,
+    guards,
+    /**
+     * 工具执行前的拦截钩子（dsh-sdr 这类插件用它拦「模型直接调用 send/approve」）。
+     * 移动端的工具执行在 Kotlin 侧，Node 没有可挂的执行点，所以这里只保留契约形状：
+     * 收下钩子、返回 disposer，不假装拦截已经生效（真正生效要在 Kotlin 执行器里接线）。
+     */
+    guard(fn) {
+      if (typeof fn !== 'function') {
+        throw Object.assign(new TypeError(label + '.guard 需要一个函数'), { stage: 'apply' });
+      }
+      guards.push(fn);
+      return () => {
+        const index = guards.indexOf(fn);
+        if (index >= 0) guards.splice(index, 1);
+      };
+    },
     register(definition) {
       if (!definition || typeof definition.name !== 'string' || definition.name === '') {
         throw Object.assign(new TypeError(label + '.register 需要带 name 的 ' + kind), { stage: 'apply' });
@@ -417,7 +438,15 @@ export function createContext(options = {}) {
   provide('systemPrompt', createSystemPromptService());
   provide('attachments', createAttachmentsService({ home }));
   provide('sessions', createSessionsService({ host }));
-  provide('sessionPersistence', createSessionPersistenceService({ host }));
+  provide('sessionPersistence', createSessionPersistenceService({ host }))
+  // dsh-context 这类插件 inject sessionProjections 并立即 register；缺它整包 apply 失败。
+  provide('sessionProjections', createSessionProjectionsService({ logger }));
+  // dsh-context 的查询层与投影缓存：桌面侧由会话库驱动，移动端要么反向查 Kotlin
+  // （sessionQuery），要么明确承认没有这层缓存（sessionProjectionCache 读写空心化）。
+  provide('sessionQuery', createSessionQueryService({ host }));
+  provide('sessionProjectionCache', createSessionProjectionCacheService({ logger }));
+  // dsh-sdr 的审批工具用 ctx.userQuestions.ask 等人类选择：转给原生提问面板。
+  provide('userQuestions', createUserQuestionsService({ host }));
   provide('workspaceRegistry', createWorkspaceRegistryService({ home, settings: settingsService, logger }));
   provide('jobs', createJobsService({ logger }));
   const timerService = provide('timer', createTimerService({ logger }));

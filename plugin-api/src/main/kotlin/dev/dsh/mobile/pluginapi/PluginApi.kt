@@ -232,6 +232,15 @@ enum class SlotId(val wire: String) {
 
     /** 会话「配置智能体」里的预设人设：插件装好即出现在预设列表。 */
     AgentPreset("agent.preset"),
+
+    /** 聊天页输入框上方（快捷指令 / 提示词模板那一带）。 */
+    ChatBottom("chat.bottom"),
+
+    /** 会话设置整页的空白区。 */
+    ChatSettings("chat.settings"),
+
+    /** 会话列表页贴边的浮动区。 */
+    SessionList("session.list"),
     ;
 
     companion object {

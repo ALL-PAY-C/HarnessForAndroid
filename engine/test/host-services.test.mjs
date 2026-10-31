@@ -49,6 +49,103 @@ test('插件 inject 点名十个服务后 apply 能进去', async () => {
   }
 });
 
+test('sessionProjections 服务可注册投影，restore/hydrate 明确返回 null', async () => {
+  const home = await freshHome();
+  const ctx = createContext({ home });
+  try {
+    const service = ctx.get('sessionProjections');
+    assert.ok(service, 'sessionProjections 没 provide');
+    assert.equal(typeof service.register, 'function');
+    const projection = { name: 'demo', project() {} };
+    const dispose = service.register(projection);
+    assert.deepEqual(service.list(), ['demo']);
+    assert.equal(service.get('demo'), projection);
+    assert.equal(service.restore(), null);
+    assert.equal(await service.hydrate(), null);
+    dispose();
+    assert.deepEqual(service.list(), []);
+    assert.throws(() => service.register(null), /需要一个投影对象/);
+  } finally {
+    await ctx.dispose();
+  }
+});
+
+test('sessionQuery 走原生反向通道，没接通时抛 stage=transport', async () => {
+  const home = await freshHome();
+  const ctx = createContext({ home });
+  try {
+    const service = ctx.get('sessionQuery');
+    assert.ok(service, 'sessionQuery 没 provide');
+    await assert.rejects(() => service.listSessions(), (error) => error.stage === 'transport' && /nativeCall/.test(error.message));
+    ctx.setNativeCall(async (method, payload) => {
+      if (method === 'dsh.sessions.list') return [{ id: 's1', title: '会话一' }];
+      if (method === 'dsh.sessions.observe') return { header: { id: payload.id }, events: [{ seq: 1 }] };
+      throw new Error('未实现 ' + method);
+    });
+    assert.deepEqual(await service.listSessions(), [{ id: 's1', title: '会话一' }]);
+    const detail = await service.observeSession('s1', { projectionMode: 'none', signal: new AbortController().signal });
+    assert.deepEqual(detail.header, { id: 's1' });
+    assert.deepEqual(detail.events, [{ seq: 1 }]);
+    assert.equal(detail.inheritedEventCount, 0);
+    await assert.rejects(() => service.observeSession(''), /需要非空会话 id/);
+  } finally {
+    await ctx.dispose();
+  }
+});
+
+test('sessionProjectionCache 读返回明确空值，写抛 notImplemented（不伪造缓存成功）', async () => {
+  const home = await freshHome();
+  const ctx = createContext({ home });
+  try {
+    const cache = ctx.get('sessionProjectionCache');
+    assert.ok(cache, 'sessionProjectionCache 没 provide');
+    assert.equal(cache.cachedSnapshot({ id: 's1' }, ['contextActivity']), null);
+    assert.equal(cache.stateOf({ id: 's1' }, 'contextTimeline'), undefined);
+    assert.throws(() => cache.coldSnapshot({ id: 's1' }, 0, []), (error) => error.notImplemented === true);
+    assert.throws(() => cache.write({}), (error) => error.notImplemented === true);
+  } finally {
+    await ctx.dispose();
+  }
+});
+
+test('userQuestions 转给原生提问面板，没接通时抛 stage=transport', async () => {
+  const home = await freshHome();
+  const ctx = createContext({ home });
+  try {
+    const service = ctx.get('userQuestions');
+    assert.ok(service, 'userQuestions 没 provide');
+    await assert.rejects(() => service.ask({ questions: [{ id: 'q1', question: '继续吗' }] }), (error) => error.stage === 'transport');
+    await assert.rejects(() => service.ask({}), /至少需要一个 question/);
+    ctx.setNativeCall(async (method, payload) => {
+      assert.equal(method, 'dsh.userQuestions.ask');
+      assert.deepEqual(payload.questions, [{ id: 'q1', question: '继续吗' }]);
+      return { answers: [{ id: 'q1', selected: ['是'] }] };
+    });
+    assert.deepEqual(await service.ask({ questions: [{ id: 'q1', question: '继续吗' }] }), { answers: [{ id: 'q1', selected: ['是'] }] });
+  } finally {
+    await ctx.dispose();
+  }
+});
+
+test('tools.guard 收下拦截钩子并给 disposer，非函数抛 apply 错', async () => {
+  const home = await freshHome();
+  const ctx = createContext({ home });
+  try {
+    const dispose = ctx.tools.guard((execution) => {
+      if (execution?.name === 'send_email') return '不允许模型直接发送';
+      return undefined;
+    });
+    assert.equal(ctx.tools.guards.length, 1);
+    assert.equal(ctx.tools.guards[0]({ name: 'send_email' }), '不允许模型直接发送');
+    assert.equal(ctx.tools.guards[0]({ name: 'read' }), undefined);
+    dispose();
+    assert.equal(ctx.tools.guards.length, 0);
+    assert.throws(() => ctx.tools.guard(null), (error) => error.stage === 'apply');
+  } finally {
+    await ctx.dispose();
+  }
+});
+
 test('fs 写入再读出，越出 home 的路径被拒', async () => {
   const home = await freshHome();
   const ctx = createContext({ home });

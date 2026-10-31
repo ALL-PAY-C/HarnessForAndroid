@@ -133,7 +133,7 @@ object MarkdownParser {
         // ponytail: 只认文档级开头；行内片段仍走下面的 HTML_OPEN 分支。
         val doc = text.trimStart()
         if ((doc.startsWith("<!doctype", true) || doc.startsWith("<html", true)) && looksLikeHtml(doc)) {
-            return listOf(MdBlock.HtmlBlock(doc.trimEnd()))
+            return listOf(MdBlock.HtmlBlock(HtmlRenderer.stripOrphanClosers(doc.trimEnd())))
         }
         val lines = normalizeInlineFences(text.replace("\r\n", "\n").replace('\r', '\n'))
         val tableProbe = BareTableProbe(lines)
@@ -341,7 +341,10 @@ object MarkdownParser {
                 while (i < lines.size && lines[i].isNotBlank() && !isBlockStartAt(lines, i, tableProbe)) {
                     body.add(lines[i]); i++
                 }
-                out.add(MdBlock.HtmlBlock(body.joinToString("\n").trim()))
+                // 块被按行切碎后闭标签可能自成一块：孤立闭标签不配对，剥掉它，
+                // 否则它会以块原文的形式进 WebView / 复制文本，原样显示成源码。
+                val raw = HtmlRenderer.stripOrphanClosers(body.joinToString("\n").trim())
+                if (raw.isNotBlank()) out.add(MdBlock.HtmlBlock(raw))
                 continue
             }
 
@@ -539,8 +542,13 @@ object MarkdownParser {
         val n = text.length
         val scan = NeedleScan(text)
 
+        // 正文文本叶子在这里落库：字符实体的解码只做这一次。
+        // 行内代码（MdInline.Code）走的是独立的 substring 分支，代码里的 &nbsp; 保持原样。
         fun flush() {
-            if (buf.isNotEmpty()) { out.add(MdInline.Text(buf.toString())); buf.setLength(0) }
+            if (buf.isNotEmpty()) {
+                out.add(MdInline.Text(HtmlRenderer.decodeEntities(buf.toString())))
+                buf.setLength(0)
+            }
         }
 
         while (i < n) {
@@ -645,7 +653,7 @@ object MarkdownParser {
                         flush()
                         out.add(
                             MdInline.Link(
-                                text.substring(i + 1, close),
+                                HtmlRenderer.decodeEntities(text.substring(i + 1, close)),
                                 text.substring(close + 2, paren).trim(),
                             )
                         )

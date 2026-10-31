@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -125,7 +126,13 @@ fun PresetDrawerPanel(viewModel: PresetDrawerViewModel) {
                         Text(preset.description, color = p.t3, fontSize = 11.sp)
                     }
                     if (preset.source.isNotBlank()) {
-                        Text(preset.source, color = p.t3, fontSize = 10.sp, maxLines = 1)
+                        Text(
+                            preset.source,
+                            color = p.t3,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
                 // 内置预设不可删（Store 会拒绝），导入的才给删除入口。

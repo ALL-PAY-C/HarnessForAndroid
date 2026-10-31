@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.GroupHeader
@@ -44,6 +45,11 @@ import dev.dsh.mobile.design.GroupFrame
 import dev.dsh.mobile.design.GroupChild
 import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.SectionChevron
+import dev.dsh.mobile.design.SlotEditFrame
+import dev.dsh.mobile.design.SlotEditItem
+import dev.dsh.mobile.design.SlotEditState
+import dev.dsh.mobile.design.SlotPickerDialog
+import dev.dsh.mobile.design.SlotPlusButton
 import dev.dsh.mobile.pluginapi.PluginConfigPage
 import dev.dsh.mobile.pluginapi.SlotAction
 import dev.dsh.mobile.pluginapi.SlotContribution
@@ -77,7 +83,13 @@ fun PluginHubScreen(
     /** 从设置详情返回列表时通知宿主重读插件（配置可能改了插件行为）。 */
     onSettingsClosed: () -> Unit = {},
     onOpenUrl: (String) -> Unit = {},
+    // 槽位接线（target = SlotId.PluginPage）：候选 + 加删回调由 AppNav 绑定。
+    slotPlaced: List<SlotContribution> = emptyList(),
+    slotCandidates: List<SlotEditItem> = emptyList(),
+    onSlotAdd: (SlotEditItem) -> Unit = {},
+    onSlotRemove: (SlotEditItem) -> Unit = {},
 ) {
+    var pickingSlot by remember { mutableStateOf(false) }
     var open by remember { mutableStateOf<PluginConfigPage?>(null) }
     var openSlot by remember { mutableStateOf<SlotContribution?>(null) }
     var openSettings by remember { mutableStateOf<PluginSettingsEntry?>(null) }
@@ -188,6 +200,10 @@ fun PluginHubScreen(
     val covered = pluginSettings.filter { it.hasSettings }.map { it.pluginId }.toSet()
     val extraRows = extras.filter { it.pluginId.isBlank() || it.pluginId !in covered }
     val slotRows = slotContributions.filter { it.pluginId !in covered }
+    // AppNav 也会把 PluginPage 的已放置项按 slotPlaced 传进来；已经在 slotRows 里的不重复画。
+    val placedExtra = slotPlaced.filter { c ->
+        slotContributions.none { it.pluginId == c.pluginId && it.id == c.id }
+    }
     val settingsCount = extraRows.size + slotRows.size + pluginSettings.size
 
     Column(Modifier.fillMaxSize().background(LocalQq.current.bg)) {
@@ -195,18 +211,38 @@ fun PluginHubScreen(
             Text(title, color = LocalQq.current.t1, fontWeight = FontWeight.SemiBold)
         })
         if (builtin.isEmpty() && settingsCount == 0) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Text("还没有插件提供页面", color = LocalQq.current.t3)
             }
-            return@Column
-        }
-        LazyColumn(
-            Modifier.fillMaxSize(),
+        } else LazyColumn(
+            Modifier.fillMaxWidth().weight(1f),
             contentPadding = PaddingValues(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(builtin, key = { it.id }) { page ->
                 PrimaryCardRow(page.label, page.subtitle, page.icon) { open = page }
+            }
+            // 已放置的 PluginPage 组件：AppNav 只按 slotPlaced 传进来的那些（editor 态带「−」）。
+            if (placedExtra.isNotEmpty()) {
+                item(key = "slot-placed") {
+                    Column(Modifier.fillMaxWidth()) {
+                        Text(
+                            "插件组件",
+                            color = LocalQq.current.t3,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
+                        )
+                        placedExtra.forEach { c ->
+                            SlotEditFrame(
+                                onRemove = { onSlotRemove(SlotEditItem(c.pluginId, c.id, c.label, c.subtitle)) },
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            ) {
+                                PluginSlotItem(c, rememberHostThemeTokens(), onAction)
+                            }
+                        }
+                    }
+                }
             }
             if (settingsCount > 0) {
                 item(key = "plugin-settings") {
@@ -226,9 +262,19 @@ fun PluginHubScreen(
                                     }
                                 }
                                 slotRows.forEach { slot ->
-                                    GroupChild(onClick = { openSlot = slot }) {
-                                        PluginChildText(slot.label, slot.subtitle.ifBlank { slot.pluginId })
-                                        SectionChevron(expanded = false)
+                                    // 编辑态右上角叠「−」：把这个插件组件从插件页拿掉。
+                                    SlotEditFrame(
+                                        onRemove = {
+                                            onSlotRemove(
+                                                SlotEditItem(slot.pluginId, slot.id, slot.label, slot.subtitle),
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        GroupChild(onClick = { openSlot = slot }) {
+                                            PluginChildText(slot.label, slot.subtitle.ifBlank { slot.pluginId })
+                                            SectionChevron(expanded = false)
+                                        }
                                     }
                                 }
                                 pluginSettings.forEach { entry ->
@@ -242,6 +288,22 @@ fun PluginHubScreen(
                     }
                 }
             }
+        }
+        // 列表区域下方：编辑态多一条「+」，挑插件组件摆进插件页。
+        if (SlotEditState.enabled) {
+            SlotPlusButton(
+                label = "添加插件组件",
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            ) { pickingSlot = true }
+        }
+        if (pickingSlot) {
+            SlotPickerDialog(
+                title = "添加到插件页",
+                items = slotCandidates,
+                emptyHint = "没有可添加的插件组件：先到插件页装一个带 PluginPage 槽位的插件",
+                onPick = { pickingSlot = false; onSlotAdd(it) },
+                onDismiss = { pickingSlot = false },
+            )
         }
     }
 }
@@ -311,7 +373,7 @@ private fun PrimaryCardRow(
 private fun BackChip(onBack: () -> Unit) {
     Box(
         Modifier
-            .size(40.dp)
+            .size(48.dp)
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onBack),
         contentAlignment = Alignment.Center,

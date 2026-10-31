@@ -7,9 +7,9 @@ import dev.dsh.mobile.pluginapi.SlotContribution
 import dev.dsh.mobile.pluginapi.SlotId
 
 /**
- * 当前 [PluginHost]。槽位管理页要列注册表，但它的入口签名固定是
- * `SlotManagerScreen(onBack)`，没有宿主参数，所以走 CompositionLocal；
- * 宿主没提供时退回 [PluginHostHolder]（AppContainer 里 set 一次即可）。
+ * 当前 [PluginHost]。插件 UI 的消费点要读注册表，但没有宿主参数，
+ * 所以走 CompositionLocal；宿主没提供时退回 [PluginHostHolder]
+ * （AppContainer 里 set 一次即可）。
  */
 val LocalPluginHost = staticCompositionLocalOf<PluginHost?> { null }
 

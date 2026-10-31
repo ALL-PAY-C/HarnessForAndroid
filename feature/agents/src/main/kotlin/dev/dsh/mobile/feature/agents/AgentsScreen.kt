@@ -410,7 +410,7 @@ private fun MetaPill(text: String) {
             .background(p.hover)
             .padding(horizontal = 6.dp, vertical = 2.dp),
     ) {
-        Text(text, color = p.t2, fontSize = 10.sp, maxLines = 1)
+        Text(text, color = p.t2, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -580,6 +580,7 @@ private fun AgentRow(card: AgentCard, onClick: () -> Unit) {
                 color = p.t3,
                 fontSize = 11.5.sp,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         RunPill(card.label)
@@ -600,7 +601,7 @@ private fun FlowChips(items: List<String>) {
                             .background(p.hover)
                             .padding(horizontal = 10.dp, vertical = 8.dp),
                     ) {
-                        Text(item, color = p.t2, fontSize = 12.sp, maxLines = 1)
+                        Text(item, color = p.t2, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
@@ -779,6 +780,7 @@ private fun ModelDialog(
                                     color = if (selected) p.accent else p.t2,
                                     fontSize = 12.sp,
                                     maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                         }

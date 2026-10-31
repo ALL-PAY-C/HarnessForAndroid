@@ -104,8 +104,13 @@ class EsmTransformTest {
     }
 
     @Test
-    fun importMetaUrlBecomesEmptyString() {
-        assertEquals("const u = '';", t("const u = import.meta.url;"))
+    fun importMetaUrlBecomesHostInjectedUrl() {
+        assertEquals("const u = __metaUrl;", t("const u = import.meta.url;"))
+    }
+
+    @Test
+    fun importMetaResolveBecomesHostHook() {
+        assertEquals("const r = __metaResolve('x');", t("const r = import.meta.resolve('x');"))
     }
 
     @Test
@@ -147,6 +152,22 @@ class EsmTransformTest {
         assertTrue(e is EsmTransform.UnsupportedException)
         assertEquals(2, (e as EsmTransform.UnsupportedException).line)
         assertTrue(e.message!!.contains("动态 import()"))
+    }
+
+    /** 打包产物会把多条 import 挤在同一行、后面紧跟正文：逐条消费，剩余原样保留。 */
+    @Test
+    fun minifiedImportsShareOneLine() {
+        val src = "import{createRequire as e}from\"node:module\";import{z as t}from\"zod\";const a=1;"
+        assertEquals(
+            "const { createRequire: e } = __require('node:module');" +
+                "const { z: t } = __require('zod');const a=1;",
+            t(src),
+        )
+    }
+
+    @Test
+    fun minifiedNamedWithoutSpaces() {
+        assertEquals("const { a } = __require('m');const b=2;", t("import{a}from'm';const b=2;"))
     }
 
     @Test
