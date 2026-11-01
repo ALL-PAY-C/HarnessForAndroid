@@ -47,8 +47,6 @@ app/keystore/*.jks
 # ---------- 6. 安装包与发布产物 ----------
 *.apk
 *.aab
-dist/*.apk
-dist/*.zip
 
 # ---------- 7. 超限二进制：构建期下载 / 生成 ----------
 # node 运行时：112MB / 117MB，单文件超 GitHub 100MB 硬限
@@ -73,3 +71,4 @@ app/src/main/assets/runtime/engine.zip
 
 # 引擎跑起来后在这里落技能库与状态，不进版本库
 engine/skill-manager/
+dist/

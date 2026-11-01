@@ -231,10 +231,10 @@ fun SettingsScreen(
                             icon = Icons.Filled.Link,
                             title = "更新源",
                             subtitle = when {
-                                state.updateSource.isBlank() -> "内置 · GitHub v0.01（点这里可自定义）"
+                                state.updateSource.isBlank() -> "内置 · GitHub（多镜像，点这里可自定义）"
                                 state.updateSource in dev.dsh.mobile.core.data.update.Updater.DEFAULT_SOURCES ||
                                     state.updateSource == dev.dsh.mobile.core.data.update.Updater.DEFAULT_SOURCE ->
-                                    "内置 · GitHub v0.01（点这里可自定义）"
+                                    "内置 · GitHub（多镜像，点这里可自定义）"
                                 else -> state.updateSource
                             },
                             tint = p.t2,

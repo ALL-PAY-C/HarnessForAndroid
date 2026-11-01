@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
@@ -1116,6 +1117,31 @@ private fun SendStopButton(
     }
 }
 
+/** 输入区右下角的「+」：点开才把工具行与底部栏位（文件/图片/拍照、快捷指令、插件槽）展开。 */
+@Composable
+private fun PlusToggleButton(active: Boolean, onClick: () -> Unit) {
+    val p = LocalQq.current
+    Box(
+        Modifier.size(44.dp).clip(CircleShape).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(if (active) p.accent.copy(alpha = 0.16f) else p.hover),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.Add,
+                contentDescription = if (active) "收起工具面板" else "展开工具面板",
+                tint = if (active) p.accent else p.t2,
+                modifier = Modifier.size(19.dp),
+            )
+        }
+    }
+}
+
 /**
  * 输入区。`+` 展开后（QQ 式）输入框整体上移，下方出现工具面板：
  * 文件 / 图片 / 拍照 + 快捷指令 + 插件按钮。
@@ -1156,6 +1182,7 @@ private fun Composer(
     onSlot: (SlotContribution) -> Unit = {},
 ) {
     val p = LocalQq.current
+    val focusManager = LocalFocusManager.current
     // 折叠头默认全收起；picker 是「+」打开的候选弹窗。
     var quickOpen by remember { mutableStateOf(false) }
     var tplOpen by remember { mutableStateOf(false) }
@@ -1297,9 +1324,11 @@ private fun Composer(
                 Modifier.fillMaxWidth().padding(start = 6.dp, end = 8.dp, top = 2.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ToolButton("文件", Icons.Filled.AttachFile, onPickFile)
-                ToolButton("图片", Icons.Filled.Image, onPickImage)
-                ToolButton("拍照", Icons.Filled.PhotoCamera, onTakePhoto)
+                if (panelOpen) {
+                    ToolButton("文件", Icons.Filled.AttachFile, onPickFile)
+                    ToolButton("图片", Icons.Filled.Image, onPickImage)
+                    ToolButton("拍照", Icons.Filled.PhotoCamera, onTakePhoto)
+                }
                 Spacer(Modifier.weight(1f))
                 if (streaming && input.text.isNotBlank()) {
                     // 正在跑的时候有字：右下角仍然是「发送」，按设置里的三档策略处理
@@ -1321,6 +1350,10 @@ private fun Composer(
                     }
                     Spacer(Modifier.width(6.dp))
                 }
+                PlusToggleButton(active = panelOpen) {
+                    if (!panelOpen) focusManager.clearFocus()
+                    onTogglePanel()
+                }
                 val canSend = input.text.isNotBlank() || drafts.isNotEmpty()
                 SendStopButton(
                     enabled = canSend,
@@ -1337,7 +1370,8 @@ private fun Composer(
             }
         }
 
-        // 折叠行常驻在输入区下方（用户要的「底部那几行」），不再藏在「更多」后面。
+        // 底部栏位默认收起，点输入区右下角的「+」才展开（QQ 式）。
+        AnimatedVisibility(visible = panelOpen) {
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -1403,6 +1437,7 @@ private fun Composer(
                     )
                 }
             }
+        }
     }
 }
 

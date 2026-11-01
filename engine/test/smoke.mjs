@@ -1,6 +1,7 @@
 // 最小可运行检查：起 bin.js → 走通 apply→registerProvider→rpc handler → 坏目录/缺服务不弄死进程。
 // 用法: node test/smoke.mjs [--plugin <dir>] [--home <dir>]
 import { spawn } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { connect, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -15,8 +16,25 @@ function arg(name, fallback) {
   return index >= 0 && process.argv[index + 1] ? resolve(process.argv[index + 1]) : fallback;
 }
 
+// 夹具：在 os.tmpdir() 下现造一个 engine 之外的插件目录，node_modules/skills 用目录联接指回引擎自带的
+// skills 包 —— 不再假设仓库里有 .mock/npmpkg。写到 test/fixtures/ 会多出一个测试文件，所以就地造。
+const fixtureRoot = mkdtempSync(join(tmpdir(), 'dsh-skills-plugin-'));
+const pluginDir = join(fixtureRoot, 'plugin');
+mkdirSync(join(pluginDir, 'node_modules'), { recursive: true });
+writeFileSync(join(pluginDir, 'package.json'), JSON.stringify({ name: 'dsh-skills-manager', version: '0.0.0-fixture', private: true, type: 'module', main: 'index.js' }, null, 2) + '\n', 'utf8');
+writeFileSync(join(pluginDir, 'index.js'), 'export const name = "dsh-skills-manager";\nexport const inject = ["skills"];\nexport function apply() {}\n', 'utf8');
+// 一条 patch 记录：下面用 plugins.list 断言 patch.entries。
+writeFileSync(join(pluginDir, 'cordis.patch.yml'), '- id: dsh-skills-manager\n  name: dsh-skills-manager\n', 'utf8');
+// Windows 的 junction 不需要管理员权限；删链接不会跟着删 target。
+symlinkSync(join(engineRoot, 'node_modules', 'skills'), join(pluginDir, 'node_modules', 'skills'), process.platform === 'win32' ? 'junction' : 'dir');
+// 失败路径也会走到 exit 事件：先删链接（只删链接），再删整棵临时目录。
+process.once('exit', () => {
+  try { rmSync(join(pluginDir, 'node_modules', 'skills'), { force: true }); } catch { /* 链接已不在 */ }
+  try { rmSync(fixtureRoot, { recursive: true, force: true }); } catch { /* 占用中留给系统清理 */ }
+});
+
 const home = arg('--home', join(tmpdir(), 'dsh-engine-smoke'));
-const plugin = arg('--plugin', resolve(engineRoot, '..', '.mock', 'npmpkg', 'dsh-skills-manager', 'package'));
+const plugin = arg('--plugin', pluginDir);
 const portFile = join(home, 'engine.port');
 
 const SKILLS = {
