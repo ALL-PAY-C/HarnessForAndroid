@@ -1,6 +1,7 @@
 package dev.dsh.mobile.app
 
 import android.content.Context
+import dev.dsh.mobile.app.gateway.GatewayManager
 import dev.dsh.mobile.core.common.AppLog
 import dev.dsh.mobile.core.common.ProxyEnv
 import dev.dsh.mobile.core.common.AppScope
@@ -49,6 +50,7 @@ import kotlinx.coroutines.withContext
 import dev.dsh.mobile.pluginhost.PluginHost
 import dev.dsh.mobile.pluginhost.PluginHostHolder
 import dev.dsh.mobile.pluginhost.PluginConfigBridge
+import dev.dsh.mobile.pluginhost.SessionPersonaBridge
 import dev.dsh.mobile.pluginhost.NodeBackedPlugin
 import dev.dsh.mobile.pluginhost.PluginStore
 import dev.dsh.mobile.pluginhost.ExternalPluginStore
@@ -81,6 +83,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.io.File
 
 /**
@@ -114,6 +117,9 @@ class AppContainer(private val context: Context) {
     val secretStore: EndpointSecretStore by lazy { EndpointSecretStore(context) }
     val endpoints: EndpointRepository by lazy { EndpointRepository(db, settings, secretStore) }
     val models by lazy { ModelStore(context) }
+
+    /** 内置 CLIProxyAPI 网关：解压二进制、生成 config.yaml、起子进程都在这里，插件只认 baseUrl。 */
+    val gateway by lazy { GatewayManager(context) }
     val presetStore by lazy { dev.dsh.mobile.core.data.preset.AgentPresetStore(context) }
 
     /**
@@ -359,6 +365,8 @@ class AppContainer(private val context: Context) {
             onModel = { id, endpoint -> seedPluginModel(id, endpoint) },
             // 插件 ctx.sessionId()：读取口，装载/重载的那一刻读前台会话。
             sessionId = { activePluginSession },
+            // 插件 ctx.setSessionPersona()：写的也是那一刻的前台会话人设。
+            onSessionPersona = { text -> writeSessionPersona(text) },
         )
     }
 
@@ -409,6 +417,12 @@ class AppContainer(private val context: Context) {
         scope.launch(Dispatchers.IO) { runCatching { endpoints.migrateLegacyTokens() } }
         // 冷启动自愈：上次进程被杀时残留的 Running 会让会话列表一直转圈、通知一直算它「运行中」。
         scope.launch(Dispatchers.IO) { runCatching { repo.resetStaleStatuses() } }
+        // 内置网关：协议层（LocalEngineTransport）连 127.0.0.1 失败时会调 LoopbackGateway.ensure()，
+        // 把启动器注册上去，模型请求自带「按需拉起」；冷启动再主动起一次，省得首条消息等解压 66MB。
+        dev.dsh.mobile.core.common.LoopbackGateway.install { gateway.ensureRunning() }
+        scope.launch(Dispatchers.IO) {
+            if (gateway.autoStart) runCatching { gateway.ensureRunning() }
+        }
         // The app is not a daemon: a missed 05:00 backup is caught up here.
         runCatching { BackupScheduler.schedule(context, backupManager) }
         scope.launch(Dispatchers.IO) {
@@ -429,7 +443,7 @@ class AppContainer(private val context: Context) {
 
     val pluginHost: PluginHost by lazy {
         pluginStore.beginBoot()
-        PluginHost(pluginStore, configBridge = pluginConfigBridge, onUninstall = { id ->
+        PluginHost(pluginStore, configBridge = pluginConfigBridge, personaBridge = sessionPersonaBridge, onUninstall = { id ->
             pluginInstaller.uninstall(id).getOrThrow()
             externalPlugins.remove(id)
             pluginHost.placements(context).removePlugin(id)
@@ -529,6 +543,47 @@ class AppContainer(private val context: Context) {
             }
 
             override fun reload() = reloadPlugins()
+        }
+    }
+
+    /**
+     * 「破甲注入」一键开关的落库口（[SlotAction.SetPersona] 与插件 ctx.setSessionPersona 共用）。
+     *
+     * 写的会话永远是导航层此刻报上来的那个，过期会话 id 一律不写 —— 在会话列表点插件开关时
+     * 应该什么都不发生，而不是悄悄改上一个会话。人设空串 = 清除，注入包装整段消失。
+     */
+    private fun writeSessionPersona(text: String): Boolean {
+        val sessionId = activePluginSession ?: return false
+        return runCatching {
+            runBlocking { repo.setPersona(sessionId, text.trim()) }
+            true
+        }.onFailure {
+            AppLog.w("写会话人设失败 " + sessionId + "：" + it.message)
+        }.getOrDefault(false)
+    }
+
+    /**
+     * 会话人设读写口（[SlotAction.SetPersona]）：与 [pluginConfigBridge] 分开，
+     * 一份写插件自己的 config，一份写宿主会话表。
+     */
+    private val sessionPersonaBridge: SessionPersonaBridge by lazy {
+        object : SessionPersonaBridge {
+            override fun sessionId(): String? = activePluginSession
+
+            override fun readPersona(sessionId: String): String = runCatching {
+                runBlocking { db.sessionDao().byId(sessionId)?.persona.orEmpty() }
+            }.getOrDefault("")
+
+            override fun writePersona(sessionId: String, text: String): Boolean {
+                val before = readPersona(sessionId)
+                if (before == text) return true
+                return runCatching {
+                    runBlocking { repo.setPersona(sessionId, text.trim()) }
+                    true
+                }.onFailure {
+                    AppLog.w("写会话人设失败 " + sessionId + "：" + it.message)
+                }.getOrDefault(false)
+            }
         }
     }
 

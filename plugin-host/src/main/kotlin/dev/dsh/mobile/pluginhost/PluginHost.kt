@@ -80,11 +80,30 @@ interface PluginConfigBridge {
     fun reload()
 }
 
+/**
+ * 会话人设的读改写口：[SlotAction.SetPersona] 点击时宿主用它把「破甲注入」落到 session.persona。
+ *
+ * 与 [PluginConfigBridge] 分开：那份写插件自己的 config，这份写宿主的会话表 —— 插件连存储长什么样
+ * 都不该知道。读写必须一起提供，只给写会让「开关取反」退化成「每次都写同一份」。
+ */
+interface SessionPersonaBridge {
+    /** 此刻前台会话；没有打开的会话就是 null，点击方据此如实提示。 */
+    fun sessionId(): String?
+
+    /** 该会话现有 persona，用来判定开关方向；读不到返回空串。 */
+    fun readPersona(sessionId: String): String
+
+    /** 写入并返回是否成功；空串表示清除。 */
+    fun writePersona(sessionId: String, text: String): Boolean
+}
+
 class PluginHost(
     private val store: PluginStore? = null,
     private val onUninstall: (String) -> Unit = {},
     /** 没接线时 [applySlotConfig] 一律返回 false，点击方据此给用户如实提示。 */
     private val configBridge: PluginConfigBridge? = null,
+    /** 没接线时 [applySlotPersona] 一律返回 false（同上）。 */
+    private val personaBridge: SessionPersonaBridge? = null,
 ) {
 
     private val registry = PluginRegistry()
@@ -302,7 +321,14 @@ class PluginHost(
     fun visibleSlots(context: android.content.Context, slot: SlotId): List<SlotContribution> {
         val placements = placements(context)
         placements.revision
-        return placements.visible(slot, registry.contributions)
+        val visible = placements.visible(slot, registry.contributions)
+        // 会话设置槽默认摆上插件贡献：装完插件就能直接点开关，不必先进「编辑会话设置」手动添加。
+        // 用户在这个槽里显式摆过至少一项时，仍以摆放结果为准，不自作主张。
+        if (visible.isNotEmpty() || slot != SlotId.ChatSettings) return visible
+        val placed = placements.all().map { it.pluginId to it.contributionId }.toSet()
+        return registry.contributions.filter {
+            it.slot == SlotId.ChatSettings && (it.pluginId to it.id) !in placed
+        }
     }
 
     /**
@@ -329,6 +355,28 @@ class PluginHost(
             runCatching { AppLog.w("插件 config 写入失败 " + action.pluginId + "." + action.key + "：" + it.message) }
             false
         }
+    }
+
+    /**
+     * 应用一次「一键写会话人设」：toggle 时按当前 persona 取反，否则照写。
+     *
+     * 不重载插件：人设是宿主会话表里的东西，插件界面上的开关状态本来就不该由它推。
+     * 返回是否真的改了 —— 没接线 / 没有前台会话 / 写失败 / 结果与原值相同 都是 false。
+     */
+    fun applySlotPersona(action: SlotAction.SetPersona): Boolean {
+        val bridge = personaBridge ?: return false
+        val sessionId = bridge.sessionId() ?: return false
+        val current = bridge.readPersona(sessionId)
+        val next = if (action.toggle) {
+            if (current.isNotBlank()) "" else action.text
+        } else {
+            action.text
+        }
+        // 词包正文缺失时 toggle 会算出「写入空串」，与现状一样：如实返回 false，别报成功。
+        if (next == current) return false
+        return runCatching { bridge.writePersona(sessionId, next) }
+            .onFailure { AppLog.w("插件写会话人设失败 " + sessionId + "：" + it.message) }
+            .getOrDefault(false)
     }
 
     /** Render a message through the plugin renderer if one exists; null -> built-in. */

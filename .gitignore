@@ -72,3 +72,10 @@ app/src/main/assets/runtime/engine.zip
 # 引擎跑起来后在这里落技能库与状态，不进版本库
 engine/skill-manager/
 dist/
+
+# ---------- 7. 大体积二进制：构建期下载 ----------
+# 内置网关 CLIProxyAPI 静态二进制（解压后 66.8MB / 73.6MB，超 50MB 红线），用 tools/fetch-gateway.mjs 取。
+app/src/main/jniLibs/*/libgateway.so
+
+# 网关 OAuth 凭据（含 refresh token，禁止入库；构建时从本机 assets 目录打进去）
+app/src/main/assets/gateway/auth/

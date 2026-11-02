@@ -47,6 +47,11 @@ class JsPluginRuntime(
      * 默认空实现 = 老插件看到空串，行为与没有这个 API 时一致。
      */
     private val sessionId: () -> String? = { null },
+    /**
+     * 插件写会话人设（ctx.setSessionPersona）：写的是宿主 DB 里的 session.persona，插件碰不到存储。
+     * 返回是否真写进去了 —— 没有前台会话、落库失败都是 false，JS 侧据此给话。
+     */
+    private val onSessionPersona: (String) -> Boolean = { false },
 ) {
 
     /**
@@ -81,7 +86,7 @@ class JsPluginRuntime(
         var loader: ModuleLoader? = null
         try {
             val scope = cx.initSafeStandardObjects()
-            val collector = Collector(pluginId, entry.path, config, onSetConfig, onModel, sessionId)
+            val collector = Collector(pluginId, entry.path, config, onSetConfig, onModel, sessionId, onSessionPersona)
             // 先装宿主对象再执行：脚本一进来就要能看见 dsh/ctx。
             collector.install(scope, cx)
 
@@ -212,6 +217,7 @@ class JsPluginRuntime(
         private val onSetConfig: (String, String) -> Unit,
         private val onModel: (JsModelEndpoint) -> Unit,
         private val sessionId: () -> String?,
+        private val onSessionPersona: (String) -> Boolean,
     ) {
 
         private val contributions = mutableListOf<ContributionSpec>()
@@ -260,6 +266,10 @@ class JsPluginRuntime(
                 val value = args.getOrNull(1)?.toString().orEmpty()
                 if (key.isBlank()) fail(STAGE_HOST_API, "setConfig 缺少 key") else onSetConfig(key, value)
                 undefined()
+            }
+            // 会话人设：空串 = 清除。返回 true 只在宿主真的写进去时给，插件据此回报而不猜。
+            fn("setSessionPersona") { args ->
+                onSessionPersona(args.getOrNull(0)?.toString().orEmpty())
             }
             fn("model") { args ->
                 val o = args.firstOrNull() as? Scriptable

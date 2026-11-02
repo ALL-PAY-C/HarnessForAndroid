@@ -215,6 +215,15 @@ object PluginUiJson {
             "link", "uri", "open" -> SlotAction.Link(json.optString("uri").ifBlank { json.optString("url") })
             "page", "navigate" -> SlotAction.Page(json.optString("pageId").ifBlank { json.optString("id") })
             "custom" -> SlotAction.Custom(json.optString("custom").ifBlank { json.optString("id") })
+            // 一键写会话人设：与 plugin.json / JS 侧同一个 kind，换界面形态不改行为。
+            "setpersona", "set_persona" -> SlotAction.SetPersona(
+                text = json.optString("text").ifBlank { json.optString("value") },
+                toggle = true,
+            )
+            "persona" -> SlotAction.SetPersona(
+                text = json.optString("text").ifBlank { json.optString("value") },
+                toggle = false,
+            )
             else -> null
         }
     }

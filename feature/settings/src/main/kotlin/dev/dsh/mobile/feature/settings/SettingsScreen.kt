@@ -126,6 +126,7 @@ fun SettingsScreen(
     onOpenExtras: () -> Unit = {},
     onOpenTerminal: () -> Unit = {},
     extraSettings: List<@Composable () -> Unit> = emptyList(),
+    gatewayCard: (@Composable () -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val linux by viewModel.linuxState.collectAsStateWithLifecycle()
@@ -206,6 +207,9 @@ fun SettingsScreen(
                 contentPadding = PaddingValues(SectionSpacing.cardGap),
                 verticalArrangement = Arrangement.spacedBy(SectionSpacing.cardGap),
             ) {
+
+                // ---------- 0. 宿主内置网关（没有就不占位） ----------
+                gatewayCard?.let { card -> item { card() } }
 
                 // ---------- 1. 应用与更新 ----------
                 item {

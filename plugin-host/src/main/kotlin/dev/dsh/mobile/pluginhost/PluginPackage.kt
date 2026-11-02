@@ -111,6 +111,21 @@ internal fun ActionSpec.configAction(pluginId: String): SlotAction.SetConfig? {
     )
 }
 
+/**
+ * 「一键写会话人设」的 action：kind = setpersona / set_persona / persona。
+ *
+ * 与 [configAction] 同一条理由分出来：三个消费点必须同一套语义。setpersona / set_persona 是开关
+ * （点一下取反），persona 是照写（[ActionSpec.text] 为空串即清除）。
+ */
+internal fun ActionSpec.personaAction(): SlotAction.SetPersona? {
+    val k = kind.lowercase()
+    return when (k) {
+        "setpersona", "set_persona" -> SlotAction.SetPersona(text = text, toggle = true)
+        "persona" -> SlotAction.SetPersona(text = text, toggle = false)
+        else -> null
+    }
+}
+
 data class ConfigSpec(
     val key: String,
     val label: String,

@@ -178,7 +178,7 @@ class JsBackedPlugin(
     )
 
     private fun ActionSpec.toSlotAction(pluginId: String): SlotAction =
-        configAction(pluginId) ?: when (kind) {
+        configAction(pluginId) ?: personaAction() ?: when (kind) {
             "http" -> SlotAction.Http(method = method, url = url, body = body)
             "link" -> SlotAction.Link(uri)
             "page" -> SlotAction.Page(pageId)

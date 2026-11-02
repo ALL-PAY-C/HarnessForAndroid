@@ -159,7 +159,7 @@ val hasReleaseKeystore = releaseKeystoreProps.getProperty("storeFile")
 
 // 版本单一来源：defaultConfig 与 APK 文件名都读这里，改一处即可。
 val appVersionName = "v0.08"
-val appVersionCode = 101
+val appVersionCode = 102
 // 文件名只取版本号本身（"v0.01" 无空格，取到的就是 "v0.01"），中文与空格不进文件名。
 val apkVersionTag = appVersionName.substringBefore(' ')
 
@@ -174,6 +174,15 @@ android {
         versionCode = appVersionCode
         versionName = appVersionName
         vectorDrawables { useSupportLibrary = true }
+    }
+
+    // 内置网关的二进制以 jniLibs/libgateway.so 形式随包：exec 只能发生在 nativeLibraryDir，
+    // 而 useLegacyPackaging=false 时 AGP 默认不把它解压到磁盘。开老式打包让 PackageManager
+    // 安装时解压出可执行的 libgateway.so（Android 10+ 禁止 exec filesDir 里的文件）。
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     signingConfigs {

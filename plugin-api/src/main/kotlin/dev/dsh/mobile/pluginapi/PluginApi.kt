@@ -283,6 +283,14 @@ sealed interface SlotAction {
         val value: String = "",
         val toggle: Boolean = false,
     ) : SlotAction
+
+    /**
+     * 一键写会话人设：点一下就把当前会话的 session.persona 写成 [text]，不发消息、也不再要一次确认。
+     *
+     * [toggle] 为真时按「当前 persona 有没有内容」取反 —— 有就清空、空就写入 [text]，
+     * 于是同一枚开关来回都能用，插件不必自己记状态；[text] 为空串表示只做清除。
+     */
+    data class SetPersona(val text: String, val toggle: Boolean = false) : SlotAction
 }
 
 /**

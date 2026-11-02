@@ -421,6 +421,8 @@ fun AppNav(container: AppContainer) {
                         arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
                     ) { entry ->
                         val id = entry.arguments?.getString("sessionId").orEmpty()
+                        // 会话设置是独立路由：这一页上的插件开关也要能定位到本会话。
+                        LaunchedEffect(id) { container.setActivePluginSession(id) }
                         val chatEntry = remember(id) { nav.getBackStackEntry(Routes.chat(id)) }
                         val vm: ChatViewModel = viewModel(
                             viewModelStoreOwner = chatEntry,
@@ -455,7 +457,11 @@ fun AppNav(container: AppContainer) {
                             onBack = { nav.popBackStack() },
                             onSearch = { nav.navigate(Routes.SEARCH) { launchSingleTop = true } },
                             extras = extras,
-                            onSlot = { slot -> handleSlot(slot.action, vm, slotContext, nav, scope) },
+                            // 点插件项时再同步落一次会话 id，别依赖上面的 effect 已经跑过。
+                            onSlot = { slot ->
+                                container.setActivePluginSession(id)
+                                handleSlot(slot.action, vm, slotContext, nav, scope)
+                            },
                             presetViewModel = presetVm,
                             slotPlaced = settingsSlot.placed,
                             slotCandidates = settingsSlot.candidates,
@@ -621,6 +627,7 @@ fun AppNav(container: AppContainer) {
                             extraSettings = container.pluginHost.slots.settingsItems.map { item ->
                                 { item.content() }
                             },
+                            gatewayCard = { dev.dsh.mobile.app.gateway.GatewayCard(container) },
                         )
                     }
 
@@ -769,6 +776,14 @@ private fun handleSlot(
         is SlotAction.SetConfig -> {
             val ok = PluginHostHolder.instance?.applySlotConfig(action) == true
             if (!ok) toast(context, "插件配置没改成：" + action.key)
+        }
+        // 破甲注入一键开关：一次点击直接写会话 persona（再点清空），不发消息、不再过确认框。
+        is SlotAction.SetPersona -> {
+            val ok = PluginHostHolder.instance?.applySlotPersona(action) == true
+            toast(
+                context,
+                if (ok) "本会话人设已更新，下一条消息起生效" else "没写成人设：先打开一个会话再点",
+            )
         }
         is SlotAction.Link -> runCatching {
             context.startActivity(

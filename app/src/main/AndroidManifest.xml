@@ -78,6 +78,17 @@
             android:stopWithTask="false" />
 
         <!--
+          内置 CLIProxyAPI 网关：子进程挂在 dataSync 型前台服务下，App 退到后台时不被系统回收。
+          网关二进制解压到 filesDir/gateway/ 后由 GatewayManager 用 ProcessBuilder 拉起。
+        -->
+        <service
+            android:name=".gateway.GatewayService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:stopWithTask="false" />
+
+        <!--
           Node 引擎独立进程：libnode 不能被启动两次、也不能被杀，引擎里的 process.exit
           会带走整个进程 —— 放在 :node 里，主进程只会看到一次 binder 断开。
         -->

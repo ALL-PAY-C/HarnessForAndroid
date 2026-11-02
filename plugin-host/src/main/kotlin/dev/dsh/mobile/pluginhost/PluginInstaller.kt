@@ -99,6 +99,11 @@ class PluginInstaller(
      * 插件因改配置重载时读到的就是那一刻的前台会话。默认空实现 = 老行为（空串）。
      */
     private val sessionId: () -> String? = { null },
+    /**
+     * 插件写会话人设（ctx.setSessionPersona）。与 [sessionId] 成对：写的就是那一刻的前台会话，
+     * 写什么由调用方决定（AppContainer → ChatRepository.setPersona）。默认空实现 = 老行为。
+     */
+    private val onSessionPersona: (String) -> Boolean = { false },
 ) {
 
     /**
@@ -266,6 +271,7 @@ class PluginInstaller(
             log = { AppLog.d(it) },
             onModel = { endpoint -> onModel(id, endpoint) },
             sessionId = sessionId,
+            onSessionPersona = onSessionPersona,
         )
         val entry = JsPluginRuntime.resolveEntry(dir)
         if (entry == null) {

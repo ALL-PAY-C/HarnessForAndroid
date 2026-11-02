@@ -4,7 +4,17 @@
 
 ## v0.08
 
-`versionName` v0.08、`versionCode` 101。
+`versionName` v0.08、`versionCode` 102。
+
+### 覆盖更新（第六次重打包，versionCode 101 → 102）
+
+- 新增：内置模型网关。CLIProxyAPI v8.0.51（linux arm64 静态构建）随包装进 `jniLibs/arm64-v8a/libgateway.so`，冷启动自起在 `127.0.0.1:8317`，设置页「内置模型网关」卡片可启动/停止/查看状态并复制 baseUrl 与 key。Android 上没有 `/etc/resolv.conf` 与 `/etc/ssl/certs` 两个坑已在 App 内闭环（proot 绑 resolv、拼装 ca.pem 走 SSL_CERT_FILE），模型调用不再依赖电脑。
+- 新增：槽位动作 `SlotAction.SetPersona` 与 `ctx.setSessionPersona`，插件一次点击即可写入或清空当前会话的人设（system 层），不发消息。
+- 新增：会话设置槽默认摆放插件贡献——装完插件直接能在「会话设置」里看到开关，不必先进「编辑会话设置」手动添加。
+- 修复：远端 transport 清空人设后再开同一份人设不生效——清空时没有连带清掉注入缓存。
+- 修复：会话设置是独立路由时拿不到会话 id，插件开关点下去只提示「先打开一个会话」。
+
+### 覆盖更新（第五次重打包，versionCode 100 → 101）
 
 ### 覆盖更新（第五次重打包，versionCode 100 → 101）
 

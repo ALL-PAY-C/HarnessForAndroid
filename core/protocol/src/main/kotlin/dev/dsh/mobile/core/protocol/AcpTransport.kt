@@ -411,7 +411,12 @@ class AcpTransport(
      */
     private suspend fun personaWrapped(sessionId: String, text: String): String {
         val persona = runCatching { personaProvider(sessionId) }.getOrNull().orEmpty().trim()
-        if (persona.isEmpty() || personaInjected[sessionId] == persona) return text
+        if (persona.isEmpty()) {
+            // 人设被清空：顺手丢掉「已注入」的记账，否则同一份人设再打开时会被当成已注入而跳过。
+            personaInjected.remove(sessionId)
+            return text
+        }
+        if (personaInjected[sessionId] == persona) return text
         personaInjected[sessionId] = persona
         return "用户为这个会话设定的人设与规则，请始终遵守：\n" + persona + "\n\n" + text
     }

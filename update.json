@@ -1,5 +1,5 @@
 {
-  "versionCode": 101,
+  "versionCode": 102,
   "versionName": "v0.08",
   "apkUrl": "https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk",
   "apkMirrors": [
@@ -7,7 +7,7 @@
     "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk",
     "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk"
   ],
-  "sha256": "bf4f7c0b5abdcc9b0acf1da0b0782fc10b543189c96a4c003ba9782f39c82189",
-  "notes": "v0.08（覆盖更新 · versionCode 101）：\n\n- 修复：新会话发出消息后转圈结束却什么都没有——发送前置失败（运行时未连接 / 闸门拦截）与整轮零产出现在都会落一条可见提示，不再静默。\n- 修复：会话设置里组件区过高，把底部的清空 / 归档 / 导出长图与「+ 编辑会话设置」挤出屏幕；组件区限高并在卡内滚动，右侧删除键不再被内容挤走。\n- 修复：竖排组件区里的「+ 添加新组件」被推到屏幕外。\n- 修复：详情页正文字号被二次缩放，大小回到统一阶梯。\n- 修复：外部装入的插件在「插件管理」里行不出现（重装应用或首次进入不重扫）；现在进页面与回前台都会重扫，注册表按磁盘双向对齐。\n- 修复：插件行内没有启停开关，只能进详情页开关。\n- 修复：插件启停状态两处各写一份，出现「列表说已停用、插件照常运行」；现在只认一份。",
-  "sizeBytes": 113452363
+  "sha256": "c10bc03918c6a7ae8e763419abb8d54e89cd99a63d4f09dba3c9f2311e7d995d",
+  "notes": "v0.08（覆盖更新 · versionCode 102）：\n\n- 新增：内置模型网关。CLIProxyAPI v8.0.51 静态二进制随包内置，冷启动自起在 127.0.0.1:8317；设置页「内置模型网关」卡片可启动 / 停止 / 查看状态并复制接口地址与密钥。没有 /etc/resolv.conf 与 /etc/ssl/certs 两个 Android 平台缺口已在应用内闭环。不接电脑也能直接用模型。\n- 新增：槽位动作 SetPersona 与脚本接口 setSessionPersona，插件点一次即可写入或清空当前会话的人设（system 层），不发消息、不污染会话记录。\n- 新增：会话设置槽默认摆放插件贡献，装完插件直接就能看到开关，不必先进「编辑会话设置」手动添加。\n- 修复：远端通道清空人设后再开同一份人设不生效（清空时没连带清注入缓存）。\n- 修复：会话设置是独立路由时拿不到会话 id，点开关只提示「先打开一个会话」。\n- 安装包体积：release 只带 arm64-v8a，135 MB。",
+  "sizeBytes": 135485374
 }
