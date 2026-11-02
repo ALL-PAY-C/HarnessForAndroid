@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import dev.dsh.mobile.pluginapi.DrawerEntry
 import dev.dsh.mobile.pluginapi.PluginConfigPage
 import dev.dsh.mobile.pluginapi.SlotId
+import dev.dsh.mobile.pluginhost.PluginHostHolder
 import dev.dsh.mobile.pluginhost.PluginSlotItem
 import dev.dsh.mobile.pluginhost.rememberHostThemeTokens
 import dev.dsh.mobile.pluginapi.SlotContribution
@@ -357,7 +358,12 @@ fun AppNav(container: AppContainer) {
                         val notify = container.notificationCenter
                         DisposableEffect(id) {
                             notify.setForegroundSession(id)
-                            onDispose { notify.setForegroundSession(null) }
+                            // 插件 ctx.sessionId() 的唯一来源：进/出会话页时改写。
+                            container.setActivePluginSession(id)
+                            onDispose {
+                                notify.setForegroundSession(null)
+                                container.setActivePluginSession(null)
+                            }
                         }
                         // 完成 / 待确认提醒统一由 OngoingCenter 跟踪仓储流发出——离开聊天页、
                         // 甚至按 Home 之后也照发；这里只负责登记「用户正在看哪个会话」。
@@ -757,6 +763,12 @@ private fun handleSlot(
             val target = vm
             if (target != null) target.send(action.text)
             else toast(context, "没有打开的会话，插件动作「${action.text}」无处发送")
+        }
+        // 只切状态、不发消息：插件点一下改自己的 config 并重建界面，会话里不会多一条消息。
+        // 走进程级 holder 而不是多加一路参数：9 个调用点都没有「插件实例」在手，只有宿主有。
+        is SlotAction.SetConfig -> {
+            val ok = PluginHostHolder.instance?.applySlotConfig(action) == true
+            if (!ok) toast(context, "插件配置没改成：" + action.key)
         }
         is SlotAction.Link -> runCatching {
             context.startActivity(

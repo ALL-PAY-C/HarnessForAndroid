@@ -7,6 +7,9 @@ plugins {
 
 android {
     namespace = "dev.dsh.mobile.core.data"
+    // JVM 单测里 android.util.Log 是桩，AppLog.w/e 一调用就抛「not mocked」——
+    // 失败收尾路径必然打日志，不给默认值就测不到那些分支。
+    testOptions { unitTests.isReturnDefaultValues = true }
 }
 
 ksp {

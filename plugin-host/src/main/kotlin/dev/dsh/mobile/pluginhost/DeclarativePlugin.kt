@@ -80,7 +80,7 @@ class DeclarativePlugin(
 
     fun setValue(key: String, value: String) = onConfigChange(key, value)
 
-    private fun ActionSpec.toSlotAction(): SlotAction = when (kind) {
+    private fun ActionSpec.toSlotAction(): SlotAction = configAction(spec.id) ?: when (kind) {
         "http" -> SlotAction.Http(method = method, url = url, body = body)
         "link" -> SlotAction.Link(uri)
         "page" -> SlotAction.Page(pageId)

@@ -1,5 +1,6 @@
 package dev.dsh.mobile.pluginhost
 
+import dev.dsh.mobile.pluginapi.SlotAction
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -85,7 +86,30 @@ data class ActionSpec(
     val uri: String = "",
     val pageId: String = "",
     val custom: String = "",
+    /** SetConfig 用：写哪个 config 键、写什么值、是否取反。 */
+    val key: String = "",
+    val value: String = "",
+    val toggle: Boolean = false,
 )
+
+/**
+ * 「只切状态、不发消息」的 action：kind = setconfig / set_config / config / toggle。
+ *
+ * 单列一个函数，是因为三个消费点（[JsBackedPlugin] / [DeclarativePlugin] / [PluginUiJson]）
+ * 必须同一套语义 —— 否则同一个插件换个安装形态，点下去的行为就变了。
+ * [pluginId] 由宿主在装配时填，插件没有机会改成别人的 config。
+ */
+internal fun ActionSpec.configAction(pluginId: String): SlotAction.SetConfig? {
+    val k = kind.lowercase()
+    if (k != "setconfig" && k != "set_config" && k != "config" && k != "toggle") return null
+    if (key.isBlank()) return null
+    return SlotAction.SetConfig(
+        pluginId = pluginId,
+        key = key,
+        value = value,
+        toggle = toggle || k == "toggle",
+    )
+}
 
 data class ConfigSpec(
     val key: String,
@@ -118,6 +142,9 @@ private fun JSONObject.toContribution(): ContributionSpec = ContributionSpec(
             uri = a.optString("uri"),
             pageId = a.optString("pageId"),
             custom = a.optString("custom"),
+            key = a.optString("key"),
+            value = a.optString("value"),
+            toggle = a.optBoolean("toggle", false),
         )
     },
 )

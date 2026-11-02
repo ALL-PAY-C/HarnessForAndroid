@@ -537,6 +537,13 @@ class ChatRepository(
         // 失败收尾：ensure 补建失败/代际切换/网络异常都落这里，seed 的轮次与 Running 状态不挂住。
         // 只有「本轮仍是当前在跑轮」且「连接未切换」才回写 Failed：旧 gen/新轮已起时，状态由新连接接管，不被旧回写覆盖。
         val stillCurrentTurn = ledger.current(sessionId)?.turnId == turnId
+        // 本轮一个字都没产出时（远端会话补建失败、代际切换、网关异常）finalizeTurn 不落气泡，
+        // 界面就只剩「转圈结束、什么都没有」。失败必须在会话里看得见。
+        val hadContent = ledger.current(sessionId)?.let {
+            it.text.isNotBlank() || it.parts.isNotEmpty() || it.tools.isNotEmpty()
+        } ?: false
+        // 先落气泡再结算：finalizeTurn 里的幂等/代际判定不该影响这条失败写回。
+        if (!hadContent) persistFailureBubble(sessionId, e, turnId)
         finalizeTurn(sessionId, turnId)
         if (stillCurrentTurn && sessionIds.isCurrent(gen)) setStatus(sessionId, SessionStatus.Failed)
         throw e
@@ -593,11 +600,19 @@ class ChatRepository(
     ): DshResult<Unit> = runCatchingDsh {
         val gen = sessionIds.currentGeneration
         val endpointId = sessionIds.currentEndpointId
-        val t = requireTransport()
+        // 发送前置条件（运行时/收尾屏障）失败时以前什么都不落：库里连 USER 行都没有、会话里没有气泡，
+        // 用户只看到转圈几秒后一片空白。统一先落一条失败气泡，再原样抛给上层横幅。
+        val t = try {
+            requireTransport().also {
+                // N-1 quarantine：仅 ACP 有旧 chunk 越屏障污染问题；本地模式无 turnId 合成 marker、无归属，不使用屏障。
+                // 上一轮终态未被 collector 消费前绝不进 DB/seed。断连不自动放行，故不提示「切换连接」可解除。
+                if (it is AcpTransport && barriers.isBlocked(sessionId)) error("上一轮回复仍在收尾，请稍后重试")
+            }
+        } catch (e: Throwable) {
+            persistFailureBubble(sessionId, e)
+            throw e
+        }
         val isRemote = t is AcpTransport
-        // N-1 quarantine：仅 ACP 有旧 chunk 越屏障污染问题；本地模式无 turnId 合成 marker、无归属，不使用屏障。
-        // 上一轮终态未被 collector 消费前绝不进 DB/seed。断连不自动放行，故不提示「切换连接」可解除。
-        if (isRemote && barriers.isBlocked(sessionId)) error("上一轮回复仍在收尾，请稍后重试")
         val now = System.currentTimeMillis()
         val attachmentsJson = org.json.JSONArray().apply { images.forEach { put(it) } }.toString()
         db.messageDao().upsert(
@@ -962,6 +977,9 @@ class ChatRepository(
         /** 被用户中断的那一轮留下的占位正文。 */
         const val PARTIAL_MARK = "（已停止 · 这条回复被中途打断）"
 
+        /** 一整轮什么都没产出时落的占位正文（以前是静默空白）。 */
+        const val EMPTY_TURN_MARK = "（本轮没有产生任何回复，请重试）"
+
         /**
          * 正文不截断：原文必须整条落库（T4）。CursorWindow 默认 2MB 的保护挪到读侧——
          * 列表 / 历史查询只取 MESSAGE_COLUMNS 里的 substr 前缀，全文走 MessageDao.textById。
@@ -1071,11 +1089,37 @@ class ChatRepository(
                 outputTokens = part.outputTokens,
             )
         }
+        // 零正文兜底：正文/parts/工具/思维链全空的一轮以前什么都不落 —— 转圈结束后会话里没有任何痕迹。
+        if (state.parts.isEmpty() && body.isEmpty() && state.tools.isEmpty() && state.thought.isBlank()) {
+            persistAssistant(
+                sessionId, EMPTY_TURN_MARK, "", emptyList(),
+                durationMs = System.currentTimeMillis() - state.startedAt,
+                turnId = state.turnId,
+            )
+        }
         ledger.seal(sessionId)
         db.sessionDao().byId(sessionId)?.let {
             db.sessionDao().upsert(it.copy(updatedAt = System.currentTimeMillis()))
         }
         setStatus(sessionId, SessionStatus.Idle)
+    }
+
+    /**
+     * 把一次「连 USER 都没来得及落库」的失败落成一条 assistant 气泡。
+     * 前置条件阻塞（运行时未连接 / 上一轮收尾 / 补建失败）以前是纯静默：
+     * 用户只看到转圈和一条容易被忽略的横幅，重开会话更是查无此事。
+     */
+    private suspend fun persistFailureBubble(sessionId: String, e: Throwable, turnId: String? = null) {
+        val reason = (e.message ?: e::class.simpleName ?: "未知错误").trim().ifEmpty { "未知错误" }
+        runCatchingDsh {
+            persistAssistant(
+                sessionId,
+                "（发送失败 · $reason）",
+                "",
+                emptyList(),
+                turnId = turnId ?: "failed-" + UUID.randomUUID(),
+            )
+        }
     }
 
     private fun requireTransport(): DshTransport =

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -144,7 +143,9 @@ fun SlotEditFrame(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        content()
+        // 内容先让位给「−」：卡片比可用宽度还宽时（Fill/Clamp 的插件 UI），
+        // 不设权重会把删除键挤出屏幕，用户就没法移除组件了。
+        Box(Modifier.weight(1f, fill = false)) { content() }
         if (SlotEditState.enabled) SlotRemoveBadge(onClick = onRemove)
     }
 }
@@ -218,15 +219,20 @@ fun SlotPickerDialog(
 fun SlotStrip(
     horizontal: Boolean = true,
     modifier: Modifier = Modifier,
-    content: @Composable RowScope.() -> Unit,
+    content: @Composable () -> Unit,
 ) {
-    Row(
-        modifier = modifier
-            .then(
-                if (horizontal) Modifier.horizontalScroll(rememberScrollState()) else Modifier,
-            ),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        content = content,
-    )
+    // 竖向槽（会话设置整页）以前也是 Row：卡片一宽，右边的「+ 添加新组件」直接被挤出屏幕。
+    // 这里按方向真的换容器，竖向不再和卡片并排。
+    if (horizontal) {
+        Row(
+            modifier = modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) { content() }
+    } else {
+        Column(
+            modifier = modifier,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) { content() }
+    }
 }

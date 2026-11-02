@@ -48,6 +48,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import dev.dsh.mobile.pluginhost.PluginHost
 import dev.dsh.mobile.pluginhost.PluginHostHolder
+import dev.dsh.mobile.pluginhost.PluginConfigBridge
 import dev.dsh.mobile.pluginhost.NodeBackedPlugin
 import dev.dsh.mobile.pluginhost.PluginStore
 import dev.dsh.mobile.pluginhost.ExternalPluginStore
@@ -356,6 +357,8 @@ class AppContainer(private val context: Context) {
             installed = installedPlugins,
             onBeforeInstall = { id -> withContext(Dispatchers.IO) { backupManager.snapshotBeforeInstall(id) } },
             onModel = { id, endpoint -> seedPluginModel(id, endpoint) },
+            // 插件 ctx.sessionId()：读取口，装载/重载的那一刻读前台会话。
+            sessionId = { activePluginSession },
         )
     }
 
@@ -426,7 +429,7 @@ class AppContainer(private val context: Context) {
 
     val pluginHost: PluginHost by lazy {
         pluginStore.beginBoot()
-        PluginHost(pluginStore, onUninstall = { id ->
+        PluginHost(pluginStore, configBridge = pluginConfigBridge, onUninstall = { id ->
             pluginInstaller.uninstall(id).getOrThrow()
             externalPlugins.remove(id)
             pluginHost.placements(context).removePlugin(id)
@@ -492,6 +495,36 @@ class AppContainer(private val context: Context) {
         .flatMapLatest { t -> (t as? LocalEngineTransport)?.agentStates ?: flowOf(emptyMap()) }
         .map { states -> states.values.sortedBy { it.since } }
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+    /**
+     * 前台会话 id：插件 ctx.sessionId() 的唯一来源。
+     *
+     * 导航层在进/出聊天页时写（AppNav 的 DisposableEffect），插件只读。用 @Volatile 而不是
+     * StateFlow：插件在装配线程上同步读一次，没有任何 Compose 需要观察它。
+     */
+    @Volatile
+    private var activePluginSession: String? = null
+
+    /** 导航层告知「用户现在看着哪个会话」；null / 空串表示离开了会话页。 */
+    fun setActivePluginSession(sessionId: String?) {
+        activePluginSession = sessionId?.takeIf { it.isNotBlank() }
+    }
+
+    /**
+     * 插件 config 读写口（SlotAction.SetConfig）：写的是 installedPlugins 里那份存储，
+     * 写完走 [reloadPlugins] 重建插件实例 —— 与设置页改完配置后的处理完全一致。
+     */
+    private val pluginConfigBridge: PluginConfigBridge by lazy {
+        object : PluginConfigBridge {
+            override fun read(pluginId: String): Map<String, String> = installedPlugins.config(pluginId)
+
+            override fun write(pluginId: String, key: String, value: String) {
+                installedPlugins.setConfig(pluginId, key, value)
+            }
+
+            override fun reload() = reloadPlugins()
+        }
+    }
 
     /** 通知点击带过来的会话 id：导航层消费一次后清空，避免旋转屏幕重复跳转。 */
     private val _pendingSession = MutableStateFlow<String?>(null)
@@ -606,6 +639,7 @@ class AppContainer(private val context: Context) {
                             kind = TransportKind.InProcess,
                             scope = scope,
                             defaultCwd = { cwd() },
+                            personaProvider = { id -> db.sessionDao().byId(id)?.persona.orEmpty() },
                         )
                     } else {
                         // 没内置 Node 时用纯 Kotlin 本地引擎：同一套 DshTransport，UI 无感。
@@ -662,6 +696,7 @@ class AppContainer(private val context: Context) {
                         kind = TransportKind.Loopback,
                         scope = scope,
                         defaultCwd = { cwd() },
+                        personaProvider = { id -> db.sessionDao().byId(id)?.persona.orEmpty() },
                     )
                     TransportKind.Remote -> AcpTransport(
                         channelProvider = {
@@ -670,6 +705,7 @@ class AppContainer(private val context: Context) {
                         kind = TransportKind.Remote,
                         scope = scope,
                         defaultCwd = { endpoint.cwd.ifBlank { cwd() } },
+                        personaProvider = { id -> db.sessionDao().byId(id)?.persona.orEmpty() },
                     )
                 }
                 _transport.value = t

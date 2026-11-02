@@ -41,6 +41,12 @@ class JsPluginRuntime(
      * 默认空实现 = 没有这个能力的旧行为。
      */
     private val onModel: (JsModelEndpoint) -> Unit = {},
+    /**
+     * 当前会话 id 的来源（ctx.sessionId）。用 lambda 而不是 String：插件在装载期执行，
+     * 那时用户可能还停在会话列表，宿主只要握着一个读取口就能永远给出「此刻」的会话。
+     * 默认空实现 = 老插件看到空串，行为与没有这个 API 时一致。
+     */
+    private val sessionId: () -> String? = { null },
 ) {
 
     /**
@@ -75,7 +81,7 @@ class JsPluginRuntime(
         var loader: ModuleLoader? = null
         try {
             val scope = cx.initSafeStandardObjects()
-            val collector = Collector(pluginId, entry.path, config, onSetConfig, onModel)
+            val collector = Collector(pluginId, entry.path, config, onSetConfig, onModel, sessionId)
             // 先装宿主对象再执行：脚本一进来就要能看见 dsh/ctx。
             collector.install(scope, cx)
 
@@ -205,6 +211,7 @@ class JsPluginRuntime(
         private val config: Map<String, String>,
         private val onSetConfig: (String, String) -> Unit,
         private val onModel: (JsModelEndpoint) -> Unit,
+        private val sessionId: () -> String?,
     ) {
 
         private val contributions = mutableListOf<ContributionSpec>()
@@ -241,6 +248,8 @@ class JsPluginRuntime(
                 logs += args.firstOrNull()?.toString().orEmpty()
                 undefined()
             }
+            // 当前会话 id：拿不到就是空串（JS 侧只需判 falsy，不必分 null/undefined）。
+            fn("sessionId") { _ -> sessionId()?.trim().orEmpty() }
             fn("config") { args ->
                 val key = args.getOrNull(0)?.toString().orEmpty()
                 val fallback = args.getOrNull(1)?.toString().orEmpty()
@@ -672,4 +681,7 @@ private fun Scriptable.toActionSpec(): ActionSpec = ActionSpec(
     uri = str("uri"),
     pageId = str("pageId"),
     custom = str("custom"),
+    key = str("key"),
+    value = str("value"),
+    toggle = bool("toggle"),
 )

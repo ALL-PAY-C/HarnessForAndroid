@@ -94,6 +94,11 @@ class PluginInstaller(
      * 实际落库由调用方决定怎么落（AppContainer → ModelStore）。默认空实现。
      */
     private val onModel: (pluginId: String, endpoint: JsModelEndpoint) -> Unit = { _, _ -> },
+    /**
+     * 当前会话 id，透给插件 ctx.sessionId()。装载期执行 → 必须是读取口而非快照，
+     * 插件因改配置重载时读到的就是那一刻的前台会话。默认空实现 = 老行为（空串）。
+     */
+    private val sessionId: () -> String? = { null },
 ) {
 
     /**
@@ -260,6 +265,7 @@ class PluginInstaller(
             onSetConfig = { key, value -> installed.setConfig(id, key, value) },
             log = { AppLog.d(it) },
             onModel = { endpoint -> onModel(id, endpoint) },
+            sessionId = sessionId,
         )
         val entry = JsPluginRuntime.resolveEntry(dir)
         if (entry == null) {

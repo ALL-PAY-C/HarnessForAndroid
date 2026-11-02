@@ -44,6 +44,11 @@ class AcpTransport(
     private val scope: CoroutineScope,
     private val reconnectPolicy: ReconnectPolicy = ReconnectPolicy(),
     private val defaultCwd: () -> String = { "/" },
+    /**
+     * 会话人设 / 额外系统提示。远程会话没有 LocalEngineTransport 的 extraSystem 字段，
+     * 只能在首条用户文本上补一次（见 [personaWrapped]）。默认空实现 = 老行为：原文照发。
+     */
+    private val personaProvider: suspend (String) -> String = { "" },
 ) : DshTransport {
 
     private val _events = MutableSharedFlow<DshEvent>(
@@ -61,6 +66,8 @@ class AcpTransport(
     private val pendingPermissions = ConcurrentHashMap<String, Long>()
     /** P5 barrier：prompt 响应后合成的终态 marker 由 collector 消费完再 ACK，保证旧 chunk 全部消费后才放 sendGate。 */
     private val turnAcks = ConcurrentHashMap<String, CompletableDeferred<Unit>>()
+    /** 已注入过人设的会话 → 那次注入的原文。人设没变就不重复注入，别每轮都往历史里塞一遍。 */
+    private val personaInjected = ConcurrentHashMap<String, String>()
 
     @Volatile private var channel: LineChannel? = null
     private var readJob: Job? = null
@@ -358,15 +365,18 @@ class AcpTransport(
     }
 
     override suspend fun closeSession(sessionId: String) {
+        // 会话关了，人设注入记录跟着作废：同名重建时要能重新注入一次。
+        personaInjected.remove(sessionId)
         callInternal("session/close", buildJsonObject { put("sessionId", sessionId) }, 20_000L)
     }
 
     override suspend fun prompt(sessionId: String, text: String, images: List<String>, turnId: String?): String {
+        val body = personaWrapped(sessionId, text)
         val res = callInternal(
             "session/prompt",
             buildJsonObject {
                 put("sessionId", sessionId)
-                put("prompt", buildJsonArray { add(buildJsonObject { put("type", "text"); put("text", text) }) })
+                put("prompt", buildJsonArray { add(buildJsonObject { put("type", "text"); put("text", body) }) })
             },
             timeoutMs = 30 * 60_000L,
         )
@@ -391,6 +401,19 @@ class AcpTransport(
             }
         }
         return stopReason
+    }
+
+    /**
+     * 把会话人设前置到本轮文本上，同一人设只注入一次（改过之后下一轮重新注入）。
+     *
+     * 远程 transport 的 session/prompt 没有「系统提示」字段，ACPP 端也不会替我们拼 persona，
+     * 所以只能借第一条用户消息带过去：让它出现在远端历史里一次，而不是每轮重复一遍。
+     */
+    private suspend fun personaWrapped(sessionId: String, text: String): String {
+        val persona = runCatching { personaProvider(sessionId) }.getOrNull().orEmpty().trim()
+        if (persona.isEmpty() || personaInjected[sessionId] == persona) return text
+        personaInjected[sessionId] = persona
+        return "用户为这个会话设定的人设与规则，请始终遵守：\n" + persona + "\n\n" + text
     }
 
     override suspend fun cancel(sessionId: String) {

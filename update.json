@@ -1,5 +1,5 @@
 {
-  "versionCode": 99,
+  "versionCode": 100,
   "versionName": "v0.08",
   "apkUrl": "https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk",
   "apkMirrors": [
@@ -7,7 +7,7 @@
     "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk",
     "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk"
   ],
-  "sha256": "7fca545a39fde71fb3f5b86abf35707cc4cfc61d56581c8bec65f890d1336bad",
-  "notes": "v0.08（覆盖更新 · versionCode 99）：\n\n- 新增：插件宿主 ctx.model() —— JS 插件可把外部 OpenAI 兼容网关的模型直接注册进「Agent → 模型接入」，条目 id 固定 plugin.<插件id>.<模型>，不覆盖手填条目，默认标记只在无其它可用默认时打。\n- 配套：CLIProxyAPI 网关插件 dev.dsh.cliproxy（独立 zip），装上即在 Agent 页出现 gemini-3.8-flash-high / gemini-3.5-flash-lite / claude-opus-4-6-thinking / claude-sonnet-4-6 / gpt-oss-120b-medium 五个模型，网关 Key 已预置。\n\n- 修复：槽位编辑「+」入口去重，会话列表项 / 抽屉分组 / 输入区各留一个，抽屉分组入口回到抽屉，文案统一「编辑<槽位名>」。\n- 修复：「UI 修改模式」与拓展页「拓展插件 UI」两套开关合并为唯一状态，卡片移入拓展页，默认关闭。\n- 修复：破甲插件词包——LilCode 不再泄漏 <antmlThinking>、包装注释不回显、收口三行在 claude/gemini 均生效，体积压至原 11%；App 版把词包正文生成进 packs.js 随组件注入。\n- 优化：应用内更新多镜像并行探测 + 6 路 Range 分段 + 失败切镜像与断点续传，落盘前校验 sha256。\n- 修复：输入区「文件 / 图片 / 拍照」常显，「+」只开关底部菜单并按会话重置收起。\n- 修复：设置页顶部区块压住状态栏与标题。",
-  "sizeBytes": 113444535
+  "sha256": "9e8aef61eb2262447262f5849c4aa8248b3d52d56a27c23c0b91d9dd033a532b",
+  "notes": "v0.08（覆盖更新 · versionCode 100）：\n\n- 修复：新会话发出消息后转圈结束却什么都没有——发送前置失败（运行时未连接 / 闸门拦截）与整轮零产出现在都会落一条可见提示，不再静默。\n- 修复：会话设置里组件区过高，把底部的清空 / 归档 / 导出长图与「+ 编辑会话设置」挤出屏幕；组件区限高并在卡内滚动，右侧删除键不再被内容挤走。\n- 修复：竖排组件区里的「+ 添加新组件」被推到屏幕外。\n- 修复：详情页正文字号被二次缩放（主题已按字体缩放乘过一次），大小回到统一阶梯。\n- 修复：没有设置项的数据包在详情页给出说明，不再只剩一行空态文案。",
+  "sizeBytes": 113450592
 }

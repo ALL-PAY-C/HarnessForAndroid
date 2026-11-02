@@ -129,7 +129,7 @@ class JsBackedPlugin(
             subtitle = subtitle,
             icon = icon,
             pluginId = pluginId,
-            action = action?.toSlotAction(),
+            action = action?.toSlotAction(pluginId),
             content = null,
             ui = ui?.let { PluginUiJson.spec(it) },
         )
@@ -177,13 +177,14 @@ class JsBackedPlugin(
         ),
     )
 
-    private fun ActionSpec.toSlotAction(): SlotAction = when (kind) {
-        "http" -> SlotAction.Http(method = method, url = url, body = body)
-        "link" -> SlotAction.Link(uri)
-        "page" -> SlotAction.Page(pageId)
-        "custom" -> SlotAction.Custom(custom)
-        else -> SlotAction.Prompt(text, submit = true)
-    }
+    private fun ActionSpec.toSlotAction(pluginId: String): SlotAction =
+        configAction(pluginId) ?: when (kind) {
+            "http" -> SlotAction.Http(method = method, url = url, body = body)
+            "link" -> SlotAction.Link(uri)
+            "page" -> SlotAction.Page(pageId)
+            "custom" -> SlotAction.Custom(custom)
+            else -> SlotAction.Prompt(text, submit = true)
+        }
 }
 
 /**

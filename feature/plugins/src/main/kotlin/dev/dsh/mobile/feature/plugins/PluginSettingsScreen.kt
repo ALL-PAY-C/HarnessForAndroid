@@ -18,6 +18,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,14 +29,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.dsh.mobile.design.GroupChild
 import dev.dsh.mobile.design.GroupFrame
 import dev.dsh.mobile.design.GroupHeader
@@ -73,12 +72,12 @@ internal fun PluginSettingsDetail(
         entry.failureText?.let { failure ->
             GroupFrame {
                 Column(Modifier.padding(horizontal = 13.dp, vertical = 11.dp)) {
-                    Text(failure, color = p.accent2, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text(failure, color = p.accent2, fontSize = MaterialTheme.typography.bodyMedium.fontSize, fontWeight = FontWeight.Medium)
                     Spacer(Modifier.height(3.dp))
                     Text(
                         "插件代码没能加载，下面只剩声明式部分。检查插件目录或重新安装该插件。",
                         color = p.t3,
-                        fontSize = 11.5.sp,
+                        fontSize = MaterialTheme.typography.bodySmall.fontSize,
                     )
                 }
             }
@@ -101,7 +100,7 @@ internal fun PluginSettingsDetail(
             Text(
                 "插件界面",
                 color = p.t3,
-                fontSize = 11.5.sp,
+                fontSize = MaterialTheme.typography.bodySmall.fontSize,
                 modifier = Modifier.padding(start = 4.dp),
             )
             GroupFrame {
@@ -118,10 +117,10 @@ internal fun PluginSettingsDetail(
                     Text(
                         "在浏览器打开",
                         color = p.t1,
-                        fontSize = 15.sp,
+                        fontSize = MaterialTheme.typography.bodyLarge.fontSize,
                         modifier = Modifier.weight(1f),
                     )
-                    Text("↗", color = p.t3, fontSize = 14.sp)
+                    Text("↗", color = p.t3, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
                 }
             }
         }
@@ -129,9 +128,9 @@ internal fun PluginSettingsDetail(
         entry.emptyText?.let { empty ->
             GroupFrame {
                 Column(Modifier.padding(horizontal = 13.dp, vertical = 14.dp)) {
-                    Text(empty, color = p.t2, fontSize = 14.sp)
+                    Text(empty, color = p.t2, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
                     Spacer(Modifier.height(4.dp))
-                    Text(NO_SETTINGS_HINT, color = p.t3, fontSize = 11.5.sp)
+                    Text(NO_SETTINGS_HINT, color = p.t3, fontSize = MaterialTheme.typography.bodySmall.fontSize)
                 }
             }
         }
@@ -148,20 +147,20 @@ private fun IdentityCard(entry: PluginSettingsEntry) {
                 Text(
                     entry.name,
                     color = p.t1,
-                    fontSize = 15.sp,
+                    fontSize = MaterialTheme.typography.bodyLarge.fontSize,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text("v" + entry.version, color = p.t3, fontSize = 11.5.sp)
+                Text("v" + entry.version, color = p.t3, fontSize = MaterialTheme.typography.bodySmall.fontSize)
             }
             if (entry.description.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))
-                Text(entry.description, color = p.t3, fontSize = 12.sp)
+                Text(entry.description, color = p.t3, fontSize = MaterialTheme.typography.labelMedium.fontSize)
             }
             Spacer(Modifier.height(4.dp))
-            Text(entry.pluginId, color = p.t3, fontSize = 11.sp)
+            Text(entry.pluginId, color = p.t3, fontSize = MaterialTheme.typography.labelSmall.fontSize)
         }
     }
 }
@@ -176,9 +175,9 @@ private fun ConfigFieldRow(field: ConfigField, current: String, onSave: (String)
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(field.label, color = p.t1, fontSize = 15.sp)
+                Text(field.label, color = p.t1, fontSize = MaterialTheme.typography.bodyLarge.fontSize)
                 if (field.hint.isNotBlank()) {
-                    Text(field.hint, color = p.t3, fontSize = 11.5.sp)
+                    Text(field.hint, color = p.t3, fontSize = MaterialTheme.typography.bodySmall.fontSize)
                 }
             }
             // 同 ValueBox：写回存储后列表快照不会重组，开关状态要留在本地才即时可见。
@@ -188,9 +187,9 @@ private fun ConfigFieldRow(field: ConfigField, current: String, onSave: (String)
         return
     }
     Column(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 9.dp)) {
-        Text(field.label, color = p.t1, fontSize = 15.sp)
+        Text(field.label, color = p.t1, fontSize = MaterialTheme.typography.bodyLarge.fontSize)
         if (field.hint.isNotBlank()) {
-            Text(field.hint, color = p.t3, fontSize = 11.5.sp)
+            Text(field.hint, color = p.t3, fontSize = MaterialTheme.typography.bodySmall.fontSize)
         }
         Spacer(Modifier.height(6.dp))
         if (field.type == ConfigFieldType.Select) {
@@ -221,7 +220,7 @@ private fun ValueBox(field: ConfigField, initial: String, onSave: (String) -> Un
             Text(
                 field.default.ifBlank { "未设置" },
                 color = p.t3,
-                fontSize = 13.sp,
+                fontSize = MaterialTheme.typography.bodyMedium.fontSize,
             )
         }
         BasicTextField(
@@ -234,7 +233,7 @@ private fun ValueBox(field: ConfigField, initial: String, onSave: (String) -> Un
                 }
             },
             singleLine = true,
-            textStyle = TextStyle(fontSize = 14.sp, color = p.t1),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(color = p.t1),
             visualTransformation = if (field.type == ConfigFieldType.Secret) {
                 PasswordVisualTransformation()
             } else {
@@ -270,10 +269,10 @@ private fun SelectBox(field: ConfigField, current: String, onSave: (String) -> U
             Text(
                 shown.ifBlank { "未设置" },
                 color = p.t1,
-                fontSize = 14.sp,
+                fontSize = MaterialTheme.typography.bodyMedium.fontSize,
                 modifier = Modifier.weight(1f),
             )
-            if (field.options.isNotEmpty()) Text("▾", color = p.t3, fontSize = 13.sp)
+            if (field.options.isNotEmpty()) Text("▾", color = p.t3, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             field.options.forEach { option ->
@@ -338,7 +337,7 @@ private fun ExtraConfigSection(entry: PluginSettingsEntry, onSave: (key: String,
                                 .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text("取消", color = p.t3, fontSize = 14.sp)
+                            Text("取消", color = p.t3, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
                         }
                         Box(
                             Modifier
@@ -358,7 +357,7 @@ private fun ExtraConfigSection(entry: PluginSettingsEntry, onSave: (key: String,
                             Text(
                                 "保存",
                                 color = if (draftKey.isBlank()) p.t3 else p.accent,
-                                fontSize = 14.sp,
+                                fontSize = MaterialTheme.typography.bodyMedium.fontSize,
                                 fontWeight = FontWeight.Medium,
                             )
                         }
@@ -366,8 +365,8 @@ private fun ExtraConfigSection(entry: PluginSettingsEntry, onSave: (key: String,
                 }
             } else {
                 GroupChild(onClick = { adding = true }) {
-                    Text("添加配置项", color = p.t1, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                    Text("+", color = p.t3, fontSize = 15.sp)
+                    Text("添加配置项", color = p.t1, fontSize = MaterialTheme.typography.bodyLarge.fontSize, modifier = Modifier.weight(1f))
+                    Text("+", color = p.t3, fontSize = MaterialTheme.typography.bodyLarge.fontSize)
                 }
             }
         }
@@ -385,12 +384,12 @@ private fun SimpleInput(placeholder: String, value: String, onChange: (String) -
             .background(p.bg)
             .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
-        if (value.isEmpty()) Text(placeholder, color = p.t3, fontSize = 13.sp)
+        if (value.isEmpty()) Text(placeholder, color = p.t3, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
         BasicTextField(
             value = value,
             onValueChange = onChange,
             singleLine = true,
-            textStyle = TextStyle(fontSize = 14.sp, color = p.t1),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(color = p.t1),
             modifier = Modifier.fillMaxWidth(),
         )
     }

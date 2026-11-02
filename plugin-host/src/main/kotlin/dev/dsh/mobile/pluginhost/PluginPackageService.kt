@@ -687,17 +687,21 @@ class PluginPackageService(
         val id = "npm." + name.removePrefix("@").replace('/', '.')
         val title = pkg.optString("displayName").ifBlank { pkg.optString("name").substringAfterLast('/') }
         val version = pkg.optString("version").ifBlank { "0.0.0" }
-        val description = pkg.optString("description")
+        val config = declaredConfig(pkg)
+        // config 为空 = 这个包没打算做 App 插件（典型是给 :node 引擎用的资源包 /
+        // 纯 npm 包）。不提示的话用户装完只会看到「该插件没有设置项」，以为是坏了。
+        val description = pkg.optString("description") +
+            if (config.length() == 0) " " + RESOURCE_ONLY_HINT else ""
         // 不再用 description 伪造一张 settings.section 卡片：身份卡已经显示过说明，
         // 再画一遍只会让用户以为「点进去有设置，其实是介绍页」。
         return JSONObject()
             .put("id", id)
             .put("name", title)
             .put("version", version)
-            .put("description", description)
+            .put("description", description.trim())
             .put("author", pkg.optString("author"))
             .put("contributions", JSONArray())
-            .put("config", declaredConfig(pkg))
+            .put("config", config)
     }
 
     /**
@@ -724,6 +728,10 @@ class PluginPackageService(
 
     companion object {
         /** 包里既没有 plugin.json 也没有 package.json。zip 是正常分发格式，旧 .apk 也收。 */
+        /** 没有 config 的包在详情页补一句，区分「插件坏了」和「这包本来就不是 App 插件」。 */
+        internal const val RESOURCE_ONLY_HINT: String =
+            "（这是资源/Node 包：没有 App 插件设置，装上不会产生开关）"
+
         internal const val NO_MANIFEST_MESSAGE: String =
             "包里没有 plugin.json 或 package.json：插件包请用 .zip（里面放 package.json + 入口，或 plugin.json）；旧 .apk 插件包也收"
 

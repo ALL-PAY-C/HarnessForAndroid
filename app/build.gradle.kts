@@ -159,7 +159,7 @@ val hasReleaseKeystore = releaseKeystoreProps.getProperty("storeFile")
 
 // 版本单一来源：defaultConfig 与 APK 文件名都读这里，改一处即可。
 val appVersionName = "v0.08"
-val appVersionCode = 99
+val appVersionCode = 100
 // 文件名只取版本号本身（"v0.01" 无空格，取到的就是 "v0.01"），中文与空格不进文件名。
 val apkVersionTag = appVersionName.substringBefore(' ')
 

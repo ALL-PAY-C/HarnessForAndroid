@@ -63,9 +63,28 @@ internal fun shouldStartBackgroundPlugin(
  * plugin, and rendering is wrapped in an error boundary so a bad composable cannot
  * take down the host screen.
  */
+/**
+ * 插件 config 的读写口：[SlotAction.SetConfig] 点击时宿主用它写值、重建插件实例。
+ *
+ * 放在 plugin-host 而不是 plugin-api：写的是宿主自己的存储，插件连地址都不该知道。
+ * 留成接口而不是三个 lambda，是因为读、写、重载必须一起提供 —— 只给一半会让
+ * 「点了开关界面不动」变成默认行为。
+ */
+interface PluginConfigBridge {
+    /** 该插件当前全部 config（键 → 值）；没有就是空表。 */
+    fun read(pluginId: String): Map<String, String>
+
+    fun write(pluginId: String, key: String, value: String)
+
+    /** 写完重建插件：JS 重新执行，槽位与界面读到新值。 */
+    fun reload()
+}
+
 class PluginHost(
     private val store: PluginStore? = null,
     private val onUninstall: (String) -> Unit = {},
+    /** 没接线时 [applySlotConfig] 一律返回 false，点击方据此给用户如实提示。 */
+    private val configBridge: PluginConfigBridge? = null,
 ) {
 
     private val registry = PluginRegistry()
@@ -266,6 +285,32 @@ class PluginHost(
         val placements = placements(context)
         placements.revision
         return placements.visible(slot, registry.contributions)
+    }
+
+    /**
+     * 应用一次「只切状态」的槽位点击：写插件自己的 config，再让宿主重建插件。
+     *
+     * 为什么要重载整个宿主而不是就地改一条：JS 插件的槽位内容是执行期算好的静态结果，
+     * 只有重新执行一遍才读得到新 config。重载怎么做由 [PluginConfigBridge.reload] 决定，
+     * 宿主不必知道插件装在哪。
+     *
+     * 返回是否真的改了（没接线 / 写失败 / 重载失败都是 false），调用方据此提示。
+     */
+    fun applySlotConfig(action: SlotAction.SetConfig): Boolean {
+        val bridge = configBridge ?: return false
+        val next = if (action.toggle) {
+            if (bridge.read(action.pluginId)[action.key] == "true") "false" else "true"
+        } else {
+            action.value
+        }
+        return runCatching {
+            bridge.write(action.pluginId, action.key, next)
+            bridge.reload()
+            true
+        }.getOrElse {
+            runCatching { AppLog.w("插件 config 写入失败 " + action.pluginId + "." + action.key + "：" + it.message) }
+            false
+        }
     }
 
     /** Render a message through the plugin renderer if one exists; null -> built-in. */

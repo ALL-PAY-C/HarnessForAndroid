@@ -66,7 +66,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -146,14 +145,18 @@ fun PluginUiHost(
     onAction: (SlotAction) -> Unit,
     legacy: (@Composable () -> Unit)? = null,
     insets: Boolean = true,
+    /** 宿主给的高度上限：嵌进设置页时压住插件自报的高度，超出改成卡片内部滚动。 */
+    maxHeightDp: Int? = null,
 ) {
     if (spec == null && legacy == null) return
+    // 插件自报 cap 与宿主 cap 取更严的那个，谁小听谁的；有 cap 就一定要能滚，否则内容被裁一半。
+    val cap = listOfNotNull(maxHeightDp, spec?.maxHeightDp).minOrNull()
     ThemedSurface(tokens) {
         HostContainer(
             tokens = tokens,
             modifier = widthModifier(spec?.widthPolicy ?: WidthPolicy.Wrap),
-            scrollable = spec?.scrollable ?: false,
-            maxHeightDp = spec?.maxHeightDp,
+            scrollable = (spec?.scrollable ?: false) || cap != null,
+            maxHeightDp = cap,
             insets = insets,
         ) {
             when {
@@ -174,6 +177,7 @@ fun PluginSlotItem(
     contribution: SlotContribution,
     tokens: HostThemeTokens,
     onAction: (SlotAction) -> Unit,
+    maxHeightDp: Int? = PLUGIN_SLOT_MAX_HEIGHT_DP,
 ) {
     // 没有自带 content 的贡献：用 label 生成一个可点的 chip。
     // 以前这里只是 Text，节点不可点 —— 声明式插件（只有 plugin.json）的按钮摆到任何
@@ -197,8 +201,21 @@ fun PluginSlotItem(
                 .padding(horizontal = 12.dp, vertical = 7.dp),
         )
     }
-    PluginUiHost(contribution.ui, tokens, onAction, legacy = legacy, insets = false)
+    PluginUiHost(
+        contribution.ui,
+        tokens,
+        onAction,
+        legacy = legacy,
+        insets = false,
+        maxHeightDp = maxHeightDp,
+    )
 }
+
+/**
+ * 槽位卡片的高度上限：plugin.ui 有多长就画多高会把所在页的页脚按钮顶出屏幕，
+ * 所以卡片本身限高，超出部分在卡片内部滚动。240–280 之间取中。
+ */
+const val PLUGIN_SLOT_MAX_HEIGHT_DP = 260
 
 /** 从当前 MaterialTheme + 系统密度提取宿主主题变量；读不到就退回默认值。 */
 @Composable
@@ -247,7 +264,9 @@ private fun ThemedSurface(tokens: HostThemeTokens, content: @Composable () -> Un
             outline = Color(tokens.outline),
             error = Color(tokens.error),
         ),
-        typography = scaledTypography(MaterialTheme.typography, tokens.fontScale),
+        // 字号不再二次乘 fontScale：sp→px 本身已经吃了一次系统 fontScale，
+        // 再乘一次插件的字就比同页宿主文字大一圈（用户反馈的「有的字明显偏大」）。
+        typography = MaterialTheme.typography,
         shapes = hostShapes(tokens.cornerRadiusDp),
     ) {
         CompositionLocalProvider(LocalContentColor provides Color(tokens.onSurface)) {
@@ -264,28 +283,6 @@ private fun hostShapes(radiusDp: Float): Shapes {
         medium = RoundedCornerShape(r),
         large = RoundedCornerShape(r * 1.5f),
         extraLarge = RoundedCornerShape(r * 2),
-    )
-}
-
-private fun scaledTypography(base: Typography, fontScale: Float): Typography {
-    if (fontScale <= 0f || fontScale == 1f) return base
-    fun TextStyle.scaled(): TextStyle = copy(fontSize = fontSize * fontScale)
-    return Typography(
-        displayLarge = base.displayLarge.scaled(),
-        displayMedium = base.displayMedium.scaled(),
-        displaySmall = base.displaySmall.scaled(),
-        headlineLarge = base.headlineLarge.scaled(),
-        headlineMedium = base.headlineMedium.scaled(),
-        headlineSmall = base.headlineSmall.scaled(),
-        titleLarge = base.titleLarge.scaled(),
-        titleMedium = base.titleMedium.scaled(),
-        titleSmall = base.titleSmall.scaled(),
-        bodyLarge = base.bodyLarge.scaled(),
-        bodyMedium = base.bodyMedium.scaled(),
-        bodySmall = base.bodySmall.scaled(),
-        labelLarge = base.labelLarge.scaled(),
-        labelMedium = base.labelMedium.scaled(),
-        labelSmall = base.labelSmall.scaled(),
     )
 }
 

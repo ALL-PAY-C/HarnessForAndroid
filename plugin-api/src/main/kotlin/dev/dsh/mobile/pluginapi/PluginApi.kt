@@ -270,6 +270,19 @@ sealed interface SlotAction {
 
     /** A code plugin can render/do anything; used by in-APK plugins only. */
     data class Custom(val id: String) : SlotAction
+
+    /**
+     * 只改插件自己的 config，不发消息：点一下 = 写配置 + 重载插件界面。
+     *
+     * [toggle] 为真时把 [key] 现有的 "true"/"false" 取反，[value] 被忽略（会话级一键开关
+     * 用这一种）；插件不声明 [pluginId] 之外的权限，宿主只写它自己那一条 config。
+     */
+    data class SetConfig(
+        val pluginId: String,
+        val key: String,
+        val value: String = "",
+        val toggle: Boolean = false,
+    ) : SlotAction
 }
 
 /**
