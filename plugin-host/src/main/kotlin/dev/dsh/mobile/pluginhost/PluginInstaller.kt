@@ -89,6 +89,11 @@ class PluginInstaller(
     private val context: Context,
     private val installed: InstalledPlugins,
     private val onBeforeInstall: suspend (pluginId: String) -> Unit = {},
+    /**
+     * 插件声明的模型端点（ctx.model）落到宿主的回调。装配阶段同步触发，
+     * 实际落库由调用方决定怎么落（AppContainer → ModelStore）。默认空实现。
+     */
+    private val onModel: (pluginId: String, endpoint: JsModelEndpoint) -> Unit = { _, _ -> },
 ) {
 
     /**
@@ -254,6 +259,7 @@ class PluginInstaller(
             config = config,
             onSetConfig = { key, value -> installed.setConfig(id, key, value) },
             log = { AppLog.d(it) },
+            onModel = { endpoint -> onModel(id, endpoint) },
         )
         val entry = JsPluginRuntime.resolveEntry(dir)
         if (entry == null) {

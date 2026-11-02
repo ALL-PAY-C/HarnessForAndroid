@@ -35,6 +35,12 @@ class JsPluginRuntime(
     private val config: Map<String, String> = emptyMap(),
     private val onSetConfig: (key: String, value: String) -> Unit = { _, _ -> },
     private val log: (String) -> Unit = {},
+    /**
+     * 插件声明的模型端点（ctx.model）。插件只给内容（名称/地址/Key/模型名），
+     * 落库与 id 由宿主决定 —— 同 id 前缀隔离，插件动不到用户手填的条目。
+     * 默认空实现 = 没有这个能力的旧行为。
+     */
+    private val onModel: (JsModelEndpoint) -> Unit = {},
 ) {
 
     /**
@@ -69,7 +75,7 @@ class JsPluginRuntime(
         var loader: ModuleLoader? = null
         try {
             val scope = cx.initSafeStandardObjects()
-            val collector = Collector(pluginId, entry.path, config, onSetConfig)
+            val collector = Collector(pluginId, entry.path, config, onSetConfig, onModel)
             // 先装宿主对象再执行：脚本一进来就要能看见 dsh/ctx。
             collector.install(scope, cx)
 
@@ -198,6 +204,7 @@ class JsPluginRuntime(
         private val entryPath: String,
         private val config: Map<String, String>,
         private val onSetConfig: (String, String) -> Unit,
+        private val onModel: (JsModelEndpoint) -> Unit,
     ) {
 
         private val contributions = mutableListOf<ContributionSpec>()
@@ -243,6 +250,29 @@ class JsPluginRuntime(
                 val key = args.getOrNull(0)?.toString().orEmpty()
                 val value = args.getOrNull(1)?.toString().orEmpty()
                 if (key.isBlank()) fail(STAGE_HOST_API, "setConfig 缺少 key") else onSetConfig(key, value)
+                undefined()
+            }
+            fn("model") { args ->
+                val o = args.firstOrNull() as? Scriptable
+                if (o == null) {
+                    fail(STAGE_HOST_API, "model 需要对象参数")
+                } else {
+                    val baseUrl = o.str("baseUrl").trim()
+                    val model = o.str("model").trim()
+                    if (baseUrl.isEmpty() || model.isEmpty()) {
+                        fail(STAGE_HOST_API, "model 需要 baseUrl 和 model")
+                    } else {
+                        onModel(
+                            JsModelEndpoint(
+                                name = o.str("name").trim().ifEmpty { model },
+                                baseUrl = baseUrl,
+                                apiKey = o.str("apiKey").trim(),
+                                model = model,
+                                makeDefault = o.bool("makeDefault"),
+                            ),
+                        )
+                    }
+                }
                 undefined()
             }
             fn("registerContribution") { args ->
@@ -360,6 +390,18 @@ class JsPluginRuntime(
 // ----------------------------------------------------------------- 结果模型
 
 /** 一次 JS 执行收集到的全部注册物。宿主侧由 [JsBackedPlugin] 消费。 */
+/**
+ * 插件声明的模型端点（ctx.model）。字段全是内容，没有 id —— 落库 id 由宿主拼
+ * （plugin.<pluginId>.<model>），插件之间、插件与手填条目之间互不覆盖。
+ */
+data class JsModelEndpoint(
+    val name: String = "",
+    val baseUrl: String = "",
+    val apiKey: String = "",
+    val model: String = "",
+    val makeDefault: Boolean = false,
+)
+
 data class JsRunResult(
     val pluginId: String,
     val entryPath: String = "",
@@ -587,6 +629,11 @@ private fun Scriptable.str(key: String): String {
 
 private fun Scriptable.obj(key: String): Scriptable? =
     ScriptableObject.getProperty(this, key) as? Scriptable
+
+private fun Scriptable.bool(key: String): Boolean {
+    val v = ScriptableObject.getProperty(this, key)
+    return v != Scriptable.NOT_FOUND && v != null && Context.toBoolean(v)
+}
 
 /** JS 对象 → JSONObject；只服务 ui / action 两个结构化字段。 */
 private fun Scriptable.toJsonObject(): JSONObject {

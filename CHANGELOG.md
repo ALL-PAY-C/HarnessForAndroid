@@ -4,7 +4,12 @@
 
 ## v0.08
 
-`versionName` v0.08、`versionCode` 98。
+`versionName` v0.08、`versionCode` 99。
+
+### 覆盖更新（第三次重打包，versionCode 98 → 99）
+
+- 新增：插件宿主 `ctx.model({name, baseUrl, apiKey, model, makeDefault})`——JS 插件可把外部 OpenAI 兼容网关的模型直接注册进「设置 → Agent → 模型接入」，条目 id 固定 `plugin.<插件id>.<模型>`，不覆盖用户手填条目，默认标记只在无其它可用默认时打（JsPluginRuntime.kt / PluginInstaller.kt / AppContainer.kt）。
+- 配套：CLIProxyAPI 网关插件 `dev.dsh.cliproxy`（独立 zip，装上即在 Agent 页出现 5 个网关模型，Key 已预置）。
 
 ### 覆盖更新（第二次重打包，versionCode 97 → 98）
 
