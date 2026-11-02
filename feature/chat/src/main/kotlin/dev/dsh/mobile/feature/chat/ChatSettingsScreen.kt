@@ -216,7 +216,7 @@ fun ChatSettingsScreen(
                                 }
                             }
                             if (SlotEditState.enabled) {
-                                SlotPlusButton(label = "添加插件组件") { pickingSlot = true }
+                                SlotPlusButton(label = "编辑会话设置") { pickingSlot = true }
                             }
                         }
                     }

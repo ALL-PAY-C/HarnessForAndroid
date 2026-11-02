@@ -292,7 +292,7 @@ fun PluginHubScreen(
         // 列表区域下方：编辑态多一条「+」，挑插件组件摆进插件页。
         if (SlotEditState.enabled) {
             SlotPlusButton(
-                label = "添加插件组件",
+                label = "编辑插件页",
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             ) { pickingSlot = true }
         }

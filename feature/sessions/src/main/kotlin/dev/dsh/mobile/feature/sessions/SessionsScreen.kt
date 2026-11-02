@@ -75,11 +75,9 @@ import dev.dsh.mobile.design.SlotEditFrame
 import dev.dsh.mobile.design.SlotEditItem
 import dev.dsh.mobile.design.SlotEditState
 import dev.dsh.mobile.design.SlotPickerDialog
-import dev.dsh.mobile.design.SlotPlusButton
 import dev.dsh.mobile.design.SwipeAction
 import dev.dsh.mobile.design.SwipeableRow
 import dev.dsh.mobile.design.TokenPill
-import dev.dsh.mobile.design.UiEditMode
 import dev.dsh.mobile.design.UiEditSlotPlusRow
 import dev.dsh.mobile.pluginapi.SlotAction
 import dev.dsh.mobile.pluginapi.SlotContribution
@@ -190,10 +188,9 @@ fun SessionsScreen(
             }
         }
 
-        // UI 修改模式：会话列表项 / 抽屉分组旁各多一个可横滑的「+」，
-        // 点开就是既有候选弹窗（插件组件摆进来）。关着时这两行完全不渲染。
-        UiEditSlotPlusRow(slot = UiEditMode.Slot.SessionList, onClick = { pickingSlot = true })
-        UiEditSlotPlusRow(slot = UiEditMode.Slot.DrawerGroup, onClick = { pickingSlot = true })
+        // UI 修改模式：会话列表项旁多一个可横滑的「+」，点开就是既有候选弹窗。
+        // 抽屉分组的位置在抽屉里（AppDrawer），这里不再放第二个入口。
+        UiEditSlotPlusRow(slot = SlotEditState.Slot.SessionList, onClick = { pickingSlot = true })
 
         if (searching) {
             Row(
@@ -242,13 +239,7 @@ fun SessionsScreen(
             } else {
                 LazyColumn(
                     Modifier.fillMaxSize(),
-                    // 编辑态右下角浮着「+」：底部多留 72dp，最后一行不被它压住。
-                    contentPadding = PaddingValues(
-                        start = 10.dp,
-                        top = 10.dp,
-                        end = 10.dp,
-                        bottom = if (SlotEditState.enabled) 82.dp else 10.dp,
-                    ),
+                    contentPadding = PaddingValues(10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     val depthOf = state.folders.associate {
@@ -474,12 +465,6 @@ fun SessionsScreen(
                             }
                         }
                     }
-                }
-            }
-            // 右下角贴边「+」：只在编辑态出现，不压新建会话（它在上方顶栏）。
-            if (SlotEditState.enabled) {
-                Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
-                    SlotPlusButton(label = "添加插件组件") { pickingSlot = true }
                 }
             }
         }

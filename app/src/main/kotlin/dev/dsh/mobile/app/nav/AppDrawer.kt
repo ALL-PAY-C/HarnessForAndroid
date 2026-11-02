@@ -68,9 +68,7 @@ import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.SlotEditItem
 import dev.dsh.mobile.design.SlotEditState
 import dev.dsh.mobile.design.SlotPickerDialog
-import dev.dsh.mobile.design.SlotPlusButton
 import dev.dsh.mobile.design.SlotRemoveBadge
-import dev.dsh.mobile.design.UiEditMode
 import dev.dsh.mobile.design.UiEditSlotPlusRow
 import dev.dsh.mobile.pluginapi.DrawerEntry
 import dev.dsh.mobile.pluginapi.SlotContribution
@@ -206,10 +204,10 @@ private fun BrowsePane(
     LazyColumn(Modifier.fillMaxSize().padding(vertical = 4.dp)) {
         item { SectionLabel("常用") }
         // 编辑态：分组标题下方给一个「+」，点开复用本页已有的挑组件弹窗（加到抽屉）。
-        if (UiEditMode.plusVisible(UiEditMode.Slot.DrawerGroup)) {
+        if (SlotEditState.plusVisible(SlotEditState.Slot.DrawerGroup)) {
             item {
                 UiEditSlotPlusRow(
-                    slot = UiEditMode.Slot.DrawerGroup,
+                    slot = SlotEditState.Slot.DrawerGroup,
                     onClick = { pickingSlot = true },
                 )
             }
@@ -235,17 +233,6 @@ private fun BrowsePane(
             )
         }
         item { DrawerItem(Icons.Filled.Extension, "插件", onPlugins) }
-        // 「常用」与「最近会话」之间：编辑态多一条「+」，挑插件组件摆进抽屉。
-        if (SlotEditState.enabled) {
-            item {
-                SlotPlusButton(
-                    label = "添加插件组件",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 6.dp),
-                ) { pickingSlot = true }
-            }
-        }
         item {
             Box(
                 Modifier.padding(horizontal = 14.dp, vertical = 8.dp)

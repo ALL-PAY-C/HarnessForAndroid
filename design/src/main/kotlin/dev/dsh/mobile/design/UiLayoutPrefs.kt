@@ -7,7 +7,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 /**
- * 界面级偏好：UI 修改模式 / 正文·代码·终端三套字号。
+ * 界面级偏好：正文·代码·终端三套字号。
+ *
+ * 开关（UI 修改模式 / 拓展插件 UI 配置）不在这里：那两个布尔已并成 settings.pluginUiExtend
+ * 一个 key，默认关闭，这里只留字号。
  *
  * 为什么不用 core:data 的 DataStore：那层的 AppSettings 是「连哪个引擎、用哪个模型」
  * 这类运行配置，界面排版不属于它；再往 core 加字段会把排版语义漏进领域模型。
@@ -19,8 +22,6 @@ object UiLayoutPrefs {
     private const val FILE = "dsh.ui.prefs"
     private var sp: SharedPreferences? = null
 
-    var uiEditEnabled: Boolean by mutableStateOf(false)
-        private set
     var fontBody: Float by mutableStateOf(1f)
         private set
     var fontCode: Float by mutableStateOf(1f)
@@ -33,18 +34,9 @@ object UiLayoutPrefs {
         if (sp != null) return
         val p = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         sp = p
-        uiEditEnabled = p.getBoolean("uiEdit", false)
         fontBody = p.getFloat("fontBody", 1f)
         fontCode = p.getFloat("fontCode", 1f)
         fontTerminal = p.getFloat("fontTerminal", 1f)
-        // 落盘的开关直接写进全局编辑态，首帧就一致。
-        UiEditMode.setEditEnabled(uiEditEnabled)
-    }
-
-    fun enableUiEdit(on: Boolean) {
-        uiEditEnabled = on
-        UiEditMode.setEditEnabled(on)
-        write { putBoolean("uiEdit", on) }
     }
 
     fun setBodyFont(v: Float) {

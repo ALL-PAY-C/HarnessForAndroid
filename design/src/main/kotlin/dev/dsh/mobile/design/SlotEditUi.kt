@@ -39,14 +39,32 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 
 /**
- * 拓展插件 UI 配置打开时的可编辑态。
+ * 「拓展」页那张卡片的总开关在全应用里的可编辑态，也是「+」出现的唯一判定入口。
  *
  * 只做插件组件这一层：内置 UI 一律不可动，各界面只多出「+」（挑插件组件放这里）
- * 和已放置项的「−」（拿掉）。AppNav 按 settings.pluginUiExtend 把它写进
- * [SlotEditState]；关着的时候所有位置渲染跟平时完全一样。
+ * 和已放置项的「−」（拿掉）。AppNav 按 settings.pluginUiExtend 把它写进这里，
+ * 那张卡片改的也是同一个 key；关着的时候所有位置渲染跟平时完全一样。
+ *
+ * 这里原来还并着一个 UiEditMode（自己另存一份 enabled）。两个布尔驱动同一批「+」，
+ * 关一个另一个还开着，所以并成一个：状态只有 [enabled]，判定只有 [plusVisible]。
  */
 object SlotEditState {
+    /** 界面上可编辑的位置。顺序即界面里展示的顺序。 */
+    enum class Slot(val label: String) {
+        SessionList("会话列表项"),
+        ChatTopBar("会话顶栏"),
+        Composer("输入框区"),
+        BottomBar("底部 tab 栏"),
+        DrawerGroup("抽屉分组"),
+    }
+
+    /** 默认关闭：装完即用的界面不该一上手就能被改。 */
     var enabled by mutableStateOf(false)
+
+    /** 这个位置此刻是否显示「+」。 */
+    fun plusVisible(slot: Slot): Boolean = enabled
+
+    val slots: List<Slot> get() = Slot.values().toList()
 }
 
 /** 一个可摆放的插件组件。 */
@@ -64,7 +82,7 @@ data class SlotEditItem(
 @Composable
 fun SlotPlusButton(
     modifier: Modifier = Modifier,
-    label: String = "添加插件组件",
+    label: String,
     onClick: () -> Unit,
 ) {
     val p = LocalQq.current

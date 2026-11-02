@@ -56,7 +56,6 @@ import dev.dsh.mobile.design.SlotEditState
 import dev.dsh.mobile.design.QqTabBar
 import dev.dsh.mobile.design.TabSpec
 import dev.dsh.mobile.design.UiLayoutPrefs
-import dev.dsh.mobile.design.UiLayoutSettingsCard
 import dev.dsh.mobile.feature.plugins.PluginHubScreen
 import dev.dsh.mobile.feature.plugins.pluginSettingsEntries
 import dev.dsh.mobile.feature.plugins.SkillCenterScreen
@@ -135,10 +134,11 @@ fun AppNav(container: AppContainer) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val runtime: RuntimeState by container.runtime.collectAsStateWithLifecycle()
-    // 界面级偏好（UI 修改模式 / 底部栏布局 / 三套字号）从 SharedPreferences 装一次，
-    // 装完 UiEditMode 就已经是落盘时的值，首帧不会先空一帧再跳。
+    // 界面级偏好（三套字号）从 SharedPreferences 装一次。
     val appContext = LocalContext.current
-    LaunchedEffect(Unit) { UiLayoutPrefs.attach(appContext) }
+    LaunchedEffect(Unit) {
+        UiLayoutPrefs.attach(appContext)
+    }
 
     // 通知点击 → 直接进对应会话；消费一次就清空，返回键不会又被弹回来。
     val pendingSession by container.pendingSession.collectAsStateWithLifecycle()
@@ -607,18 +607,14 @@ fun AppNav(container: AppContainer) {
                                 }
                             },
                         )
-                        // 界面修改一节放在设置页顶部：UI 修改模式开关、底部栏布局、三套字号。
-                        // 走 header 插槽进页面的 LazyColumn 第一项，标题栏与状态栏由页面自己排。
                         SettingsScreen(
                             viewModel = vm,
                             onOpenDrawer = { scope.launch { drawerState.open() } },
-                            onOpenPlugins = { nav.navigate(Routes.PLUGINS) { launchSingleTop = true } },
                             onOpenExtras = { nav.navigate(Routes.EXTRAS) { launchSingleTop = true } },
                             onOpenTerminal = { nav.navigate(Routes.TERMINAL) { launchSingleTop = true } },
                             extraSettings = container.pluginHost.slots.settingsItems.map { item ->
                                 { item.content() }
                             },
-                            header = { UiLayoutSettingsCard() },
                         )
                     }
 

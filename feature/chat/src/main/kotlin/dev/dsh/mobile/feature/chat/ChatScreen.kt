@@ -100,7 +100,6 @@ import dev.dsh.mobile.design.SlotEditState
 import dev.dsh.mobile.design.SlotPickerDialog
 import dev.dsh.mobile.design.SlotPlusButton
 import dev.dsh.mobile.design.SlotStrip
-import dev.dsh.mobile.design.UiEditMode
 import dev.dsh.mobile.design.UiEditSlotPlusRow
 import dev.dsh.mobile.pluginhost.PluginSlotItem
 import dev.dsh.mobile.pluginhost.rememberHostThemeTokens
@@ -450,9 +449,9 @@ fun ChatScreen(
             },
         ) {}
 
-        // UI 修改模式：会话顶栏 / 输入框区旁的可编辑「+」，两条都可左右滑动。
-        UiEditSlotPlusRow(slot = UiEditMode.Slot.ChatTopBar, onClick = { picking = true })
-        UiEditSlotPlusRow(slot = UiEditMode.Slot.Composer, onClick = { picking = true })
+        // UI 修改模式：会话顶栏旁的可编辑「+」。
+        // 输入框区的「+」贴在输入区那条槽位上（见 SlotStrip），这里不再重复一个。
+        UiEditSlotPlusRow(slot = SlotEditState.Slot.ChatTopBar, onClick = { picking = true })
 
         if (usageOpen) AlertDialog(
             onDismissRequest = { usageOpen = false },
@@ -1423,7 +1422,7 @@ private fun Composer(
                             }
                         }
                         if (SlotEditState.enabled) {
-                            SlotPlusButton(label = "添加插件组件") { picker = true }
+                            SlotPlusButton(label = "编辑" + SlotEditState.Slot.Composer.label) { picker = true }
                         }
                     }
                 }

@@ -732,7 +732,7 @@ fun QqTabBar(
     val p = LocalQq.current
     Box(Modifier.fillMaxWidth().height(1.dp).background(p.line))
     // UI 修改模式：底部栏上方多一条可横滑的位置条 + 「+」，挑组件放到底部栏。
-    if (onEditPlus != null && UiEditMode.plusVisible(UiEditMode.Slot.BottomBar)) {
+    if (onEditPlus != null && SlotEditState.plusVisible(SlotEditState.Slot.BottomBar)) {
         Row(
             Modifier
                 .fillMaxWidth()
@@ -742,13 +742,13 @@ fun QqTabBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                UiEditMode.Slot.BottomBar.label,
+                SlotEditState.Slot.BottomBar.label,
                 color = p.t2,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(end = 6.dp),
             )
-            SlotPlusButton(label = "编辑底部 tab 栏", onClick = onEditPlus)
+            SlotPlusButton(label = "编辑" + SlotEditState.Slot.BottomBar.label, onClick = onEditPlus)
         }
     }
     Column(Modifier.fillMaxWidth().background(p.card).navigationBarsPadding()) {
