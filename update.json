@@ -1,13 +1,13 @@
 {
-  "versionCode": 96,
-  "versionName": "v0.09",
-  "apkUrl": "https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.09/HarnessForAndroid-release-v0.09.apk",
+  "versionCode": 97,
+  "versionName": "v0.08",
+  "apkUrl": "https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk",
   "apkMirrors": [
-    "https://gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.09/HarnessForAndroid-release-v0.09.apk",
-    "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.09/HarnessForAndroid-release-v0.09.apk",
-    "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.09/HarnessForAndroid-release-v0.09.apk"
+    "https://gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk",
+    "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk",
+    "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk"
   ],
-  "sha256": "1fd5322c5db2ae332928b0c75dd91a631424f940f9a3420da0308381aa2868e7",
-  "notes": "v0.09：输入区三个工具按钮改为常显，底部菜单改为按会话重置。\n\n- 修复：输入区「文件 / 图片 / 拍照」三个按钮改为常显，不再随「+」隐藏；「+」现在只负责展开/收起下方菜单（快捷指令 / 提示词模板 / 插件槽 / 会话底部槽）。\n- 修复：底部菜单跨会话残留，改为按会话重置并默认收起，进入会话时底部只有输入框、三个工具按钮、发送键与「+」。",
-  "sizeBytes": 113431986
+  "sha256": "98d334787c249e9ab046d7f0236c7c75e48bf4028508a260db96a2de230b9dc4",
+  "notes": "v0.08（覆盖更新）：\n\n- 修复：输入区「文件 / 图片 / 拍照」按钮常显；「+」只负责开关底部菜单，并按会话重置默认收起。\n- 修复：设置页顶部「UI 修改模式」区块压住状态栏与「设置」标题，现放进标题栏下方的滚动内容。\n- 优化：应用内更新改为多镜像并行探测 + 6 路 Range 分段下载 + 失败切镜像与断点续传，落盘前校验 sha256。\n- 新增：破甲插件改为 App 原生插件（plugin.json + index.js），冷咖啡破甲 / LilCode 破甲 / 自动激活回复 / 注入预设 四个开关，向输入框「+」与会话设置贡献组件。\n\n- 修复：输入区「文件 / 图片 / 拍照」三个按钮改为常显，不再随「+」隐藏；「+」现在只负责展开/收起下方菜单（快捷指令 / 提示词模板 / 插件槽 / 会话底部槽）。\n- 修复：底部菜单跨会话残留，改为按会话重置并默认收起，进入会话时底部只有输入框、三个工具按钮、发送键与「+」。",
+  "sizeBytes": 113444574
 }

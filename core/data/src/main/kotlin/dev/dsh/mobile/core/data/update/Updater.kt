@@ -30,11 +30,16 @@ data class UpdateInfo(
     val notes: String = "",
     /** 清单可选提供的备用下载地址，按顺序在直连失败后尝试。 */
     val apkMirrors: List<String> = emptyList(),
+    /** 清单可选的资产 sha256（hex），给了就在下载完成后校验；没给就跳过。 */
+    val sha256: String = "",
 )
 
 class Updater(private val context: Context) {
 
     private val prefs by lazy { context.getSharedPreferences("dsh.update", Context.MODE_PRIVATE) }
+
+    /** 多连接分段下载器（默认 6 条 Range 连接 + 多镜像并行探测）。 */
+    private val downloader = SegmentedDownloader()
 
     /** 更新源（清单 URL）。没手动配就走内置默认源（GitHub 仓库里的 update.json）。 */
     fun sourceUrl(): String = prefs.getString(KEY_SOURCE, "").orEmpty().ifBlank { DEFAULT_SOURCES.first() }
@@ -91,6 +96,7 @@ class Updater(private val context: Context) {
                 apkUrl = json.optString("apkUrl", ""),
                 notes = json.optString("notes", ""),
                 apkMirrors = mirrors,
+                sha256 = json.optString("sha256", ""),
             )
             require(info.versionCode > 0) { "清单里没有有效的 versionCode" }
             require(info.apkUrl.isNotBlank()) { "清单里没有 apkUrl" }
@@ -101,22 +107,25 @@ class Updater(private val context: Context) {
 
     /**
      * 下载到 cacheDir。返回的 File 已经是可安装的 APK。
+     *
+     * 实际的并发是 [SegmentedDownloader] 干的：多镜像并行探测 → 多段 Range 并发 → 段内断点续传。
+     * onProgress 仍然按「已下载字节 / 总长度」给 0..100，语义与旧的单连接实现一致，回调在 IO 线程。
      */
     suspend fun download(info: UpdateInfo, onProgress: (Int) -> Unit = {}): Result<File> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val target = File(context.cacheDir, "update-${info.versionName.ifBlank { info.versionCode.toString() }}.apk")
-                var lastError = ""
-                for (url in downloadCandidates(info)) {
-                    if (target.exists()) target.delete()
-                    val r = runCatching { downloadOne(url, target, onProgress) }
-                    if (r.isSuccess && target.length() > 1_000_000) {
-                        onProgress(100)
-                        return@runCatching target
-                    }
-                    lastError = r.exceptionOrNull()?.message ?: "文件不完整（${target.length()} 字节）"
-                }
-                throw IllegalStateException(lastError.ifBlank { "下载失败：没有可用地址" })
+                val candidates = downloadCandidates(info)
+                require(candidates.isNotEmpty()) { "下载失败：没有可用地址" }
+                downloader.download(
+                    candidates = candidates,
+                    target = target,
+                    expectedSha256 = info.sha256.ifBlank { null },
+                    onProgress = onProgress,
+                )
+                require(target.length() > 1_000_000) { "文件不完整（${target.length()} 字节）" }
+                onProgress(100)
+                target
             }
         }
 
@@ -139,35 +148,6 @@ class Updater(private val context: Context) {
             out.add(info.apkUrl)
         }
         return out.toList()
-    }
-
-    private fun downloadOne(url: String, target: File, onProgress: (Int) -> Unit) {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 15_000
-            readTimeout = 60_000
-            instanceFollowRedirects = true
-            setRequestProperty("User-Agent", "dsh-mobile-updater")
-        }
-        try {
-            val code = conn.responseCode
-            require(code in 200..299) { "下载失败：HTTP $code" }
-            val total = conn.contentLengthLong
-            var read = 0L
-            conn.inputStream.use { input ->
-                target.outputStream().use { out ->
-                    val buf = ByteArray(64 * 1024)
-                    while (true) {
-                        val n = input.read(buf)
-                        if (n <= 0) break
-                        out.write(buf, 0, n)
-                        read += n
-                        if (total > 0) onProgress(((read * 100) / total).toInt())
-                    }
-                }
-            }
-        } finally {
-            conn.disconnect()
-        }
     }
 
     private fun httpGet(url: String): String {

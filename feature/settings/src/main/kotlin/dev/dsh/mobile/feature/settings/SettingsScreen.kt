@@ -127,6 +127,9 @@ fun SettingsScreen(
     onOpenExtras: () -> Unit = {},
     onOpenTerminal: () -> Unit = {},
     extraSettings: List<@Composable () -> Unit> = emptyList(),
+    // 宿主（app 模块）在页面顶部插一块卡片时走这里：必须是列表第一项，
+    // 放列表外面会绕开 QqTopBar 的 statusBarsPadding，直接压到状态栏和标题上。
+    header: (@Composable () -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val linux by viewModel.linuxState.collectAsStateWithLifecycle()
@@ -207,6 +210,11 @@ fun SettingsScreen(
                 contentPadding = PaddingValues(SectionSpacing.cardGap),
                 verticalArrangement = Arrangement.spacedBy(SectionSpacing.cardGap),
             ) {
+
+                // ---------- 0. 宿主插入的顶部区块 ----------
+                if (header != null) {
+                    item { header() }
+                }
 
                 // ---------- 1. 应用与更新 ----------
                 item {

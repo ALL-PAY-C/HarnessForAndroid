@@ -608,10 +608,7 @@ fun AppNav(container: AppContainer) {
                             },
                         )
                         // 界面修改一节放在设置页顶部：UI 修改模式开关、底部栏布局、三套字号。
-                        // feature:settings 不在本次改动范围，所以用宿主这一层把设计模块的卡片叠上去。
-                        Column(Modifier.fillMaxSize()) {
-                            UiLayoutSettingsCard(Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
-                            Box(Modifier.weight(1f)) {
+                        // 走 header 插槽进页面的 LazyColumn 第一项，标题栏与状态栏由页面自己排。
                         SettingsScreen(
                             viewModel = vm,
                             onOpenDrawer = { scope.launch { drawerState.open() } },
@@ -621,9 +618,8 @@ fun AppNav(container: AppContainer) {
                             extraSettings = container.pluginHost.slots.settingsItems.map { item ->
                                 { item.content() }
                             },
+                            header = { UiLayoutSettingsCard() },
                         )
-                            }
-                        }
                     }
 
                     drawerEntries.forEach { entry ->
