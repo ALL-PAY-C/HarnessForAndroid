@@ -273,6 +273,26 @@ class GatewayManager(private val context: Context) {
         }
     }
 
+    /** auth/ 里已有的凭据点（*.json）：设置页显示「已导入 N 份」。 */
+    fun authNames(): List<String> =
+        authDir.listFiles()?.filter { it.isFile && it.name.endsWith(".json") }?.map { it.name }.orEmpty()
+
+    /**
+     * 导入凭据。发布包不再内置 OAuth json（内置等于把 refresh token 打进公开 APK），
+     * 由用户在设置页粘贴，落进 files/gateway/auth/ 后重启网关生效。
+     */
+    fun importAuth(json: String, name: String = "auth.json"): String {
+        val obj = runCatching { JSONObject(json) }.getOrElse { throw IOException("不是合法的 JSON：${it.message}") }
+        if (!obj.has("refresh_token") && !obj.has("access_token")) throw IOException("缺 refresh_token / access_token 字段")
+        val safe = name.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "auth.json" }
+            .let { if (it.endsWith(".json")) it else "$it.json" }
+        if (!authDir.exists()) authDir.mkdirs()
+        val dst = File(authDir, safe)
+        dst.writeText(obj.toString(2))
+        AppLog.i("gateway auth imported $safe ${dst.length()}B")
+        return safe
+    }
+
     private fun writeConfig() {
         val authPath = authDir.absolutePath
         val yaml = """
