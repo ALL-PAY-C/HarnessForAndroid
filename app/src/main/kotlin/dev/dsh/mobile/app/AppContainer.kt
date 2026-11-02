@@ -43,7 +43,6 @@ import dev.dsh.mobile.core.data.backup.BackupManager
 import dev.dsh.mobile.core.data.backup.BackupScheduler
 import dev.dsh.mobile.plugin.html.HtmlPlugin
 import dev.dsh.mobile.pluginhost.InstalledPlugins
-import dev.dsh.mobile.pluginhost.JsModelEndpoint
 import dev.dsh.mobile.pluginhost.PluginInstaller
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -362,45 +361,12 @@ class AppContainer(private val context: Context) {
             context = context,
             installed = installedPlugins,
             onBeforeInstall = { id -> withContext(Dispatchers.IO) { backupManager.snapshotBeforeInstall(id) } },
-            onModel = { id, endpoint -> seedPluginModel(id, endpoint) },
+            // 插件不再往模型库自动塞条目（用户要求模型全部手填）：onModel 走默认空实现。
             // 插件 ctx.sessionId()：读取口，装载/重载的那一刻读前台会话。
             sessionId = { activePluginSession },
             // 插件 ctx.setSessionPersona()：写的也是那一刻的前台会话人设。
             onSessionPersona = { text -> writeSessionPersona(text) },
         )
-    }
-
-    /**
-     * 插件声明的模型端点落库（ctx.model）。id 固定前缀 plugin.<pluginId>.，
-     * 只覆盖自己那一条：用户手填的模型条目、别的插件的条目都不会被改写。
-     * 默认标记只在「还没有任何可用默认模型」时打，用户自己选过的默认不会被抢。
-     * ponytail: 插件卸载/关开关后不回收已写入的条目（用户可在 Agent 页手动删）。
-     */
-    private fun seedPluginModel(pluginId: String, endpoint: JsModelEndpoint) {
-        val baseUrl = endpoint.baseUrl.trim().trimEnd('/')
-        val model = endpoint.model.trim()
-        if (baseUrl.isEmpty() || model.isEmpty()) return
-        val base = ModelProfile(
-            id = "plugin." + pluginId + "." + model,
-            name = endpoint.name.trim().ifEmpty { model },
-            providerId = "openai-compatible",
-            baseUrl = baseUrl,
-            apiKey = endpoint.apiKey.trim(),
-            model = model,
-        )
-        scope.launch(Dispatchers.IO) {
-            runCatching {
-                val list = models.models.first()
-                val existing = list.firstOrNull { it.id == base.id }
-                val hasUsableDefault = list.any {
-                    it.id != base.id && it.isDefault && it.apiKey.isNotBlank() && it.model.isNotBlank()
-                }
-                val isDefault = existing?.isDefault
-                    ?: (endpoint.makeDefault && base.apiKey.isNotBlank() && !hasUsableDefault)
-                val profile = base.copy(isDefault = isDefault)
-                if (existing != profile) models.save(profile)
-            }.onFailure { AppLog.w("插件模型落库失败：" + pluginId + " · " + it.message) }
-        }
     }
 
     /**
@@ -417,6 +383,8 @@ class AppContainer(private val context: Context) {
         scope.launch(Dispatchers.IO) { runCatching { endpoints.migrateLegacyTokens() } }
         // 冷启动自愈：上次进程被杀时残留的 Running 会让会话列表一直转圈、通知一直算它「运行中」。
         scope.launch(Dispatchers.IO) { runCatching { repo.resetStaleStatuses() } }
+        // 模型自愈：老版本插件自动注册的 plugin.* 条目升级后清掉，列表里只剩用户自己填的。
+        scope.launch(Dispatchers.IO) { runCatching { models.purgeAutoRegistered() } }
         // 内置网关：协议层（LocalEngineTransport）连 127.0.0.1 失败时会调 LoopbackGateway.ensure()，
         // 把启动器注册上去，模型请求自带「按需拉起」；冷启动再主动起一次，省得首条消息等解压 66MB。
         dev.dsh.mobile.core.common.LoopbackGateway.install { gateway.ensureRunning() }
@@ -898,6 +866,12 @@ class AppContainer(private val context: Context) {
         temperature = m.temperature,
         topP = m.topP,
         supportsTools = m.supportsTools,
+        // 破甲重试的第二跳：同 baseUrl 的其它可用模型（换模型才可能躲过整类拒答）。
+        fallbackModels = models.models.first()
+            .filter { it.model != m.model && it.baseUrl == m.baseUrl && it.usable() }
+            .map { it.model }
+            .distinct()
+            .take(2),
     )
 
     /** 群组会话 → 每个席位一份配置（同一模型可以出现多次，各自并行）。 */

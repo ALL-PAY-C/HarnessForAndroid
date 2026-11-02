@@ -80,6 +80,12 @@ interface ModelProvider {
     val defaultBaseUrl: String
     val defaultModel: String
     val hint: String
+
+    /** 模板自带的 Key（本机网关这类不需要用户手填的端点用）；空串 = 留空由用户填。 */
+    val defaultApiKey: String get() = ""
+
+    /** 表单「名称」默认值；默认与 label 一致，本地网关那种带后缀的显示名可以单独给。 */
+    val defaultName: String get() = label
 }
 
 object ModelProviders {
@@ -149,11 +155,25 @@ object ModelProviders {
             override val defaultModel = "qwen2.5:7b"
             override val hint = "本地 Ollama / vLLM / 第三方中转"
         },
+        // 本机 CLIProxyAPI 网关：模型不再由插件自动注册，用户在这里选模板后「拉取模型列表」自己挑。
+        object : ModelProvider {
+            override val id = "cliproxy"
+            override val label = "CLIProxy（本地网关）"
+            override val defaultBaseUrl = "http://127.0.0.1:8317/v1"
+            override val defaultModel = ""
+            override val defaultApiKey = "sk-cpa-local-dsh-android"
+            override val defaultName = "CLIProxy"
+            override val hint = "本机 CLIProxyAPI 网关；点「拉取模型列表」挑模型，可一次存多条"
+        },
     )
 
     fun all(): List<ModelProvider> = builtin + extra
 
-    fun byId(id: String): ModelProvider = all().firstOrNull { it.id == id } ?: builtin.last()
+    // 未知 id 回落到「自定义」而不是列表最后一项：最后一项是 CLIProxy 模板，
+    // 拿它兜底会把别人的 baseUrl/apiKey 顶到未知配置上。
+    fun byId(id: String): ModelProvider = all().firstOrNull { it.id == id }
+        ?: builtin.firstOrNull { it.id == "custom" }
+        ?: builtin.last()
 
     fun register(provider: ModelProvider) {
         if (all().none { it.id == provider.id }) extra += provider
@@ -168,6 +188,18 @@ private val Context.modelStore: androidx.datastore.core.DataStore<androidx.datas
             androidx.datastore.preferences.core.emptyPreferences()
         },
     )
+
+/**
+ * 插件自动注册条目的 id 前缀（ctx.model → ModelStore 那条路已经删掉）。
+ *
+ * 手填条目的 id 是 "m-<时间戳>"，插件条目是 "plugin.<pluginId>.<model>"，
+ * 所以这个前缀只可能来自旧版本的自动注册。
+ */
+const val AUTO_REGISTERED_MODEL_PREFIX = "plugin."
+
+/** 纯函数：把历史遗留的插件自动条目摘掉；手填条目原样保留（含用户改动过的顺序）。 */
+fun pruneAutoRegistered(list: List<ModelProfile>): List<ModelProfile> =
+    list.filterNot { it.id.startsWith(AUTO_REGISTERED_MODEL_PREFIX) }
 
 /** 模型配置持久化：重启后仍在，Key 只落在应用私有目录。 */
 class ModelStore(private val context: Context) {
@@ -187,6 +219,28 @@ class ModelStore(private val context: Context) {
                 for (i in list.indices) list[i] = list[i].copy(isDefault = list[i].id == profile.id)
             }
             prefs[key] = encode(list)
+        }
+    }
+
+    /**
+     * 升级自愈：删掉旧版本插件自动塞进来的模型条目。
+     *
+     * 自动注册路径已经移除，但这些条目还躺在 DataStore 里；留着就是「装完新包列表里还冒 11 条」。
+     * 有一条被清掉的行恰好是默认模型时，把默认位让给第一条可用条目，免得聊天直接失联。
+     */
+    suspend fun purgeAutoRegistered() {
+        context.modelStore.edit { prefs ->
+            val list = decode(prefs[key].orEmpty())
+            val kept = pruneAutoRegistered(list)
+            if (kept.size == list.size) return@edit
+            val next = if (kept.none { it.isDefault }) {
+                kept.firstOrNull { it.apiKey.isNotBlank() && it.model.isNotBlank() }
+                    ?.let { first -> kept.map { it.copy(isDefault = it.id == first.id) } }
+                    ?: kept
+            } else {
+                kept
+            }
+            prefs[key] = encode(next)
         }
     }
 

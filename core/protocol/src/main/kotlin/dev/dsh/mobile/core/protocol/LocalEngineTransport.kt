@@ -80,6 +80,11 @@ data class LlmConfig(
     val topP: Float = -1f,
     /** 模型是否支持 function calling；false 时不发 tools，避免 400。 */
     val supportsTools: Boolean = true,
+    /**
+     * 兜底模型链（默认空）：人设会话被拒答时，第 2 次重试用这里的下一个模型。
+     * 留空就只用主模型重试 —— 上游只有一把 Key/一个模型时什么都不用配。
+     */
+    val fallbackModels: List<String> = emptyList(),
 ) {
     companion object {
         val DEFAULT_SYSTEM = """
@@ -580,6 +585,9 @@ class LocalEngineTransport(
         var streamRetried = false
         // 本轮已经真正执行过的工具数：只有在这之前没有任何副作用，才允许重发同一请求。
         var toolRunsThisTurn = 0
+        // 人设会话（extraSystem 非空）才管拒答重试：普通聊天的「抱歉」是正常回答。
+        val personaActive = extraSystem.isNotBlank()
+        val refusalRetry = RefusalRetry(fallbackModels = cfg.fallbackModels)
 
         /**
          * 收尾留痕：异常收尾时若本轮没有任何正文，补一条 MessageChunk 再发 TurnEnd。
@@ -652,9 +660,15 @@ class LocalEngineTransport(
             }
             // 正文里混着的工具调用标记在流里就要吞掉：先显示再删会闪一坨 DSML 给用户看。
             val dsmlGate = DsmlStreamFilter()
+            // 人设会话：拒答只在 180 字以内的短文本里成立，所以这一轮的前 180 字先押住不上屏。
+            // 判出来是拒答就整轮重发，用户永远不会先看到一句「我不能」，库里也只剩最终那一条；
+            // 超过 180 字说明正文在写，立刻放开闸门恢复真流式。
+            var holdForRefusal = personaActive && emitted.isEmpty()
             fun pushVisible(text: String) {
                 if (text.isEmpty()) return
                 streamedText += text
+                if (holdForRefusal && streamedText.length <= RefusalGuard.MAX_REFUSAL_CHARS) return
+                holdForRefusal = false
                 val newDelta = incrementalDelta(emitted, streamedText)
                 if (newDelta.isNotEmpty()) {
                     emitted = streamedText
@@ -715,6 +729,12 @@ class LocalEngineTransport(
             // 送进来的正文都没经过流式闸门，先发后删就是让用户看见一屏 markup。
             val dsml = stripDsmlToolCalls(split.first)
             var content = dsml.first
+            // 工具调用先算出来：下面要不要重发（重发会丢掉这一轮的 tool_calls）由它决定。
+            var toolCalls = msg?.get("tool_calls")?.jsonArray
+            // 非流式整包（postOnce 的 plain 分支）不经过上面的兜底，正文里混的标记在这里再兜一次。
+            if (toolCalls.isNullOrEmpty() && dsml.second.isNotEmpty()) {
+                toolCalls = JsonArray(dsml.second.map { it.toToolCallJson() })
+            }
             // 思维链：字段名各家用得不一样，逐个认（reasoning_content / reasoning / thinking / …）。
             val reasoning = buildString {
                 reasoningOf(msg)?.let { if (it.isNotBlank()) append(it) }
@@ -728,6 +748,33 @@ class LocalEngineTransport(
                 streamedReasoning += reasoningDelta
                 _events.tryEmit(DshEvent.ThoughtChunk(sessionId, reasoningDelta, authorId, authorName, turnId))
             }
+            // 人设会话被拒答、或者干脆一个字都没回：押住的正文还没上屏，直接整轮重发。
+            // 只在「没有工具调用、本轮没执行过工具、不是断流」时重试：有副作用的重发是错的。
+            var refusalExhausted: RefusalRetry.Outcome? = null
+            if (holdForRefusal && toolCalls.isNullOrEmpty() && toolRunsThisTurn == 0 && resp.bool("dsh_eof_without_done") != true) {
+                val outcome = refusalRetry.run(content, cfg.model) { _, retryModel ->
+                    AppLog.w("persona retry: model=" + retryModel)
+                    val framed = frameUserMessage(body, PERSONA_FRAME)
+                    // 换模型的兜底重试：思考参数只有 DeepSeek 系认，别的上游会直接 400。
+                    val retryBody = if (retryModel == cfg.model) framed
+                    else JsonObject(framed.filterKeys { it != "thinking" && it != "reasoning_effort" })
+                    val retryResp = post(cfg.copy(model = retryModel), retryBody)
+                    val retryRaw = retryResp["choices"]?.jsonArray?.firstOrNull()?.jsonObject
+                        ?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.contentOrNullSafe().orEmpty()
+                    stripDsmlToolCalls(splitThinking(retryRaw).first).first
+                }
+                if (outcome.attempts > 1) {
+                    AppLog.w(
+                        "persona retry: attempts=" + outcome.attempts + " accepted=" + outcome.accepted +
+                            " hit=" + outcome.refusalHit.orEmpty(),
+                    )
+                }
+                content = outcome.text
+                streamedText = content
+                if (!outcome.accepted) refusalExhausted = outcome
+            }
+            holdForRefusal = false
+
             if (content.isNotBlank()) {
                 val clean = if (roster.isEmpty()) content else sanitizeGroupText(content, authorName ?: "", roster)
                 if (clean.isNotBlank()) {
@@ -740,6 +787,22 @@ class LocalEngineTransport(
                     // onFinal 给的是「本轮累计正文」，群聊侧据此整段替换而不是追加。
                     onFinal(clean)
                 }
+            }
+            // 重试用尽仍是拒答：正文照常上屏，再补一句为什么 —— 不能静默成「空回复」。
+            refusalExhausted?.let { out ->
+                val why = out.refusalHit?.let { "命中「" + it + "」" } ?: "几次都是空回复"
+                AppLog.w("persona retry: gave up after " + out.attempts + " attempts, reason=" + why)
+                val note = "（人设已带上，但模型连续 " + out.attempts + " 次拒答：" + why + "）"
+                _events.tryEmit(
+                    DshEvent.MessageChunk(
+                        sessionId,
+                        (if (visibleChars > 0) "\n\n" else "") + note,
+                        authorId,
+                        authorName,
+                        turnId,
+                    ),
+                )
+                visibleChars += note.length
             }
 
             // 断流：上游在 [DONE] 之前就关了连接。正文已流式发出，补一句标注并落到终态（不再 Running）。
@@ -761,11 +824,6 @@ class LocalEngineTransport(
                 )
             }
 
-            var toolCalls = msg?.get("tool_calls")?.jsonArray
-            // 非流式整包（postOnce 的 plain 分支）不经过上面的兜底，正文里混的标记在这里再兜一次。
-            if (toolCalls.isNullOrEmpty() && dsml.second.isNotEmpty()) {
-                toolCalls = JsonArray(dsml.second.map { it.toToolCallJson() })
-            }
             if (toolCalls.isNullOrEmpty()) {
                 // 上游这一轮什么都没给（error 字段 / choices 为空 / 被长度截断 / 纯空正文）时，
                 // 以前直接 TurnEnd("stop")：界面一片空白，用户只能猜是不是网断了。
@@ -2213,7 +2271,7 @@ class LocalEngineTransport(
             .post(streamed.toString().toRequestBody(JSON))
             .build()
         return http.newCall(req).await().use { r ->
-            if (!r.isSuccessful) throw IOException("HTTP " + r.code + ": " + r.body?.string().orEmpty().take(300))
+            if (!r.isSuccessful) throw UpstreamHttpException(r.code, r.body?.string().orEmpty())
             val content = StringBuilder()
             val reasoning = StringBuilder()
             val toolCalls = mutableMapOf<Int, JsonObject>()
@@ -2484,8 +2542,43 @@ class LocalEngineTransport(
 
     private fun JsonPrimitive.contentOrNullSafe(): String? = if (this is JsonNull) null else content
 
+    /**
+     * 把重试请求里最后一条 user 消息的正文前置一段框架提示（见 [PERSONA_FRAME]）。
+     *
+     * 带图时 content 是 parts 数组：框架作为第一个 text 段插进去，图片段原样保留。
+     */
+    private fun frameUserMessage(body: JsonObject, frame: String): JsonObject {
+        val messages = (body["messages"] as? JsonArray)?.toMutableList() ?: return body
+        val index = messages.indexOfLast {
+            (it as? JsonObject)?.get("role")?.jsonPrimitive?.contentOrNullSafe() == "user"
+        }
+        if (index < 0) return body
+        val message = messages[index] as? JsonObject ?: return body
+        val framed: JsonElement = when (val content = message["content"]) {
+            null -> JsonPrimitive(frame)
+            is JsonPrimitive -> JsonPrimitive(frame + "\n\n" + content.contentOrNullSafe().orEmpty())
+            is JsonArray -> JsonArray(
+                listOf(buildJsonObject {
+                    put("type", "text")
+                    put("text", frame)
+                }) + content,
+            )
+            else -> content
+        }
+        messages[index] = buildJsonObject {
+            message.forEach { (key, value) -> if (key != "content") put(key, value) }
+            put("content", framed)
+        }
+        return buildJsonObject {
+            body.forEach { (key, value) -> if (key != "messages") put(key, value) }
+            put("messages", JsonArray(messages))
+        }
+    }
+
     /** 把连接类错误翻成人话：本机网关没起来时，用户根本不知道要去哪点一下。 */
     private fun friendlyRequestError(e: Throwable, baseUrl: String, hasImages: Boolean = false): String {
+        // 上游给了明确状态码：文案已经是「谁的问题、去哪改」，别再叠一层。
+        if (e is UpstreamHttpException) return e.message ?: httpFailureReason(e.status, e.body)
         val raw = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
         val uri = runCatching { java.net.URI(baseUrl.trim()) }.getOrNull()
         val host = uri?.host ?: ""

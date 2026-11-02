@@ -133,6 +133,11 @@ data class ConfigSpec(
     val default: String = "",
     val hint: String = "",
     val options: List<String> = emptyList(),
+    /**
+     * 仅 type = "action"（重置行）用：指向本插件 config 里另一行的 key，
+     * 点一下把那行写回它的 [default]。
+     */
+    val target: String = "",
 )
 
 private fun <T> JSONArray?.mapObjects(block: (JSONObject) -> T): List<T> {
@@ -173,4 +178,5 @@ private fun JSONObject.toConfig(): ConfigSpec = ConfigSpec(
     options = optJSONArray("options")?.let { arr ->
         (0 until arr.length()).map { arr.optString(it) }.filter { it.isNotBlank() }
     }.orEmpty(),
+    target = optString("target"),
 )

@@ -7,7 +7,11 @@
     "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk",
     "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk"
   ],
-  "sha256": "4249c606a71c1776d6735b37101e20a8f7e2b1e320d6131787f11703ecc9ca9e",
-  "notes": "v0.08（覆盖更新 · versionCode 102）：\n\n- 新增：内置模型网关。CLIProxyAPI v8.0.51 静态二进制随包内置，冷启动自起在 127.0.0.1:8317；设置页「内置模型网关」卡片可启动 / 停止 / 查看状态并复制接口地址与密钥。没有 /etc/resolv.conf 与 /etc/ssl/certs 两个 Android 平台缺口已在应用内闭环。\n- 新增：网关凭据改为应用内导入（粘贴 OAuth JSON），发布包不再内置任何凭据文件。\n- 新增：槽位动作 SetPersona 与脚本接口 setSessionPersona，插件点一次即可写入或清空当前会话的人设（system 层），不发消息、不污染会话记录。\n- 新增：会话设置槽默认摆放插件贡献，装完插件直接就能看到开关，不必先进「编辑会话设置」手动添加。\n- 修复：远端通道清空人设后再开同一份人设不生效（清空时没连带清注入缓存）。\n- 修复：会话设置是独立路由时拿不到会话 id，点开关只提示「先打开一个会话」。\n- 安装包体积：release 只带 arm64-v8a，135 MB。",
-  "sizeBytes": 135489939
+  "sha256": "77bffa109212d6b2d4c625d66aaafe2abf003950efafb61f5bd709b3a9411dd5",
+  "notes": "v0.08（覆盖更新 · versionCode 102）：\n\n- 新增：内置模型网关。CLIProxyAPI v8.0.51 静态二进制随包内置，冷启动自起在 127.0.0.1:8317；设置页「内置模型网关」卡片可启动 / 停止 / 查看状态并复制接口地址与密钥。没有 /etc/resolv.conf 与 /etc/ssl/certs 两个 Android 平台缺口已在应用内闭环。\n- 新增：网关凭据改为应用内导入（粘贴 OAuth JSON），发布包不再内置任何凭据文件。\n- 新增：槽位动作 SetPersona 与脚本接口 setSessionPersona，插件点一次即可写入或清空当前会话的人设（system 层），不发消息、不污染会话记录。\n- 新增：会话设置槽默认摆放插件贡献，装完插件直接就能看到开关，不必先进「编辑会话设置」手动添加。\n- 修复：远端通道清空人设后再开同一份人设不生效（清空时没连带清注入缓存）。\n- 修复：会话设置是独立路由时拿不到会话 id，点开关只提示「先打开一个会话」。
+- 修复：网关只要端口起来就算运行中（凭据没导入不再误报「启动失败」），启动超过 20 秒自动判失败并把日志尾当原因。
+- 修复：上游 401/429/5xx 直接显示「鉴权失败（API Key 无效或已过期）」等真实原因，不再统一报「本轮没有产生任何回复」。
+- 新增：破甲会话遇模型拒答或空回复自动重发（最多 2 次，第二次换同网关的另一个模型），拒答文本不上屏也不入库。
+- 调整：设置页「内置模型网关」卡片移到页面最底部并默认收起，收起态不显示 API Key。\n- 安装包体积：release 只带 arm64-v8a，135 MB。",
+  "sizeBytes": 135512435
 }

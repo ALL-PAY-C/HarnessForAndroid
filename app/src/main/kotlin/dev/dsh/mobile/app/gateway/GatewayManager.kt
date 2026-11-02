@@ -14,6 +14,8 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.net.URL
 import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
@@ -41,6 +43,9 @@ class GatewayManager(private val context: Context) {
          * 作用只是让「插件装完即可用」不必让用户复制粘贴。
          */
         const val PLUGIN_KEY = "sk-cpa-local-dsh-android"
+
+        /** Starting 状态的最长容忍时间：超了就判 Failed 并把日志尾当原因。 */
+        const val START_TIMEOUT_MS = 20_000L
 
         private val FALLBACK_DNS = listOf("8.8.8.8", "1.1.1.1")
         private const val PREFS = "dsh_gateway"
@@ -77,6 +82,10 @@ class GatewayManager(private val context: Context) {
 
     @Volatile
     private var process: Process? = null
+
+    /** 进入 Starting 的时刻，给 [selfHeal] 判超时用。 */
+    @Volatile
+    private var startingAt = 0L
 
     /** 客户端 key：首次随机生成后固定，config.yaml 与模型配置都用它。 */
     val apiKey: String
@@ -117,23 +126,27 @@ class GatewayManager(private val context: Context) {
             return@withLock true
         }
         _state.value = State.Starting
+        startingAt = System.currentTimeMillis()
         try {
             withContext(Dispatchers.IO) {
                 prepare()
                 spawn()
             }
             val p = process
-            val models = waitForModels()
-            if (models <= 0) {
+            // 判活只看端口：/v1/models 需要凭据，凭据没导入时它返回 0，不能据此说网关没起来。
+            if (!waitForReady()) {
                 val tail = logTail()
                 runCatching { p?.destroy() }
                 process = null
-                _state.value = State.Failed("端口 ${PORT} 未就绪" + if (tail.isEmpty()) "" else "：${tail}")
+                _state.value = State.Failed(
+                    "端口 ${PORT} ${START_TIMEOUT_MS / 1000}s 内未监听" + if (tail.isEmpty()) "" else "：${tail}",
+                )
                 return@withLock false
             }
-            _state.value = State.Running(models)
+            // 模型数是锦上添花：拿不到（凭据未导入）也照样是 Running。
+            _state.value = State.Running(probeModels())
             watch(p)
-            AppLog.i("gateway up, models=${models} log=${logFile.absolutePath}")
+            AppLog.i("gateway up, port=${PORT} models=${(state.value as? State.Running)?.models ?: -1} log=${logFile.absolutePath}")
             true
         } catch (e: Exception) {
             AppLog.e("gateway start failed: ${e.message}", e)
@@ -354,16 +367,55 @@ class GatewayManager(private val context: Context) {
         AppLog.i("gateway spawn(proot=$useProot): ${binary.absolutePath} -config ${configFile.absolutePath}")
     }
 
-    private suspend fun waitForModels(timeoutMs: Long = 25_000): Int {
+    /**
+     * 端口探活：TCP 连上 8317 就算网关活着。
+     * 刻意不探 /v1/models —— 那个要 Authorization 和已导入的凭据，凭据空时永远返回 0。
+     */
+    suspend fun probePort(timeoutMs: Int = 600): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            Socket().use { it.connect(InetSocketAddress(HOST, PORT), timeoutMs) }
+            true
+        }.getOrDefault(false)
+    }
+
+    /** 等端口进入监听；子进程提前退出就直接判失败，不空等满 ${START_TIMEOUT_MS}。 */
+    private suspend fun waitForReady(timeoutMs: Long = START_TIMEOUT_MS): Boolean {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
-            val p = process ?: return 0
-            if (!p.isAlive) return 0
-            val n = probeModels()
-            if (n > 0) return n
-            delay(500)
+            val p = process ?: return false
+            if (!p.isAlive) return false
+            if (probePort()) return true
+            delay(300)
         }
-        return 0
+        return false
+    }
+
+    /**
+     * 状态自愈，UI 每秒调一次：
+     * - 端口已经在监听，但状态还停在 Starting（进程是上一次拉起来的/启动协程丢了）→ Running；
+     * - Starting 超过 ${START_TIMEOUT_MS} 仍未监听 → Failed，并带上日志尾当原因。
+     * 只处理 Starting，Running/Stopped 不被覆盖。
+     */
+    suspend fun selfHeal(): State {
+        val cur = _state.value
+        if (cur !is State.Starting) return cur
+        if (probePort()) {
+            val healed = State.Running(probeModels())
+            _state.value = healed
+            AppLog.i("gateway self-healed to running (port ${PORT} listening, models=${healed.models})")
+            return healed
+        }
+        val since = startingAt
+        if (since > 0 && System.currentTimeMillis() - since > START_TIMEOUT_MS) {
+            val tail = logTail()
+            val failed = State.Failed(
+                "启动超时 ${START_TIMEOUT_MS / 1000}s 未监听 ${PORT}" + if (tail.isEmpty()) "" else "：${tail}",
+            )
+            _state.value = failed
+            AppLog.w("gateway starting timeout -> failed")
+            return failed
+        }
+        return cur
     }
 
     /** 子进程一退出就把「运行中」改掉，免得 UI 一直显示假的绿灯。 */

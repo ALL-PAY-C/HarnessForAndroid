@@ -29,12 +29,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import android.widget.Toast
 import dev.dsh.mobile.design.GroupChild
 import dev.dsh.mobile.design.GroupFrame
 import dev.dsh.mobile.design.GroupHeader
@@ -60,6 +63,13 @@ internal fun PluginSettingsDetail(
 ) {
     val p = LocalQq.current
     val page = entry.page
+    val context = LocalContext.current
+    // 重置时先收键盘：输入框还focus着的话，IME 会把旧内容顶回来，覆盖刚写回的默认值。
+    val focusManager = LocalFocusManager.current
+    // 重置写回存储后这一页的快照不会重建；本地覆盖让输入框立刻显示默认值。
+    var overrides by remember(entry.pluginId) { mutableStateOf<Map<String, String>>(emptyMap()) }
+    // 重置计数器：本地覆盖值可能和快照里的旧值相同，只有换 key 才能把输入框里的草稿换掉。
+    var resetTick by remember(entry.pluginId) { mutableStateOf(0) }
     Column(
         Modifier
             .fillMaxSize()
@@ -83,12 +93,37 @@ internal fun PluginSettingsDetail(
             }
         }
 
-        if (entry.fields.isNotEmpty()) {
+        if (entry.fields.isNotEmpty() || entry.actions.isNotEmpty()) {
             GroupFrame {
-                GroupHeader(label = "设置项", count = entry.fields.size, collapsible = false)
+                GroupHeader(
+                    label = "设置项",
+                    count = entry.fields.size + entry.actions.size,
+                    collapsible = false,
+                )
                 Column(Modifier.padding(vertical = 4.dp)) {
                     entry.fields.forEach { field ->
-                        ConfigFieldRow(field, entry.valueOf(field)) { value -> onSave(field.key, value) }
+                        ConfigFieldRow(field, overrides[field.key] ?: entry.valueOf(field), resetTick) { value ->
+                            onSave(field.key, value)
+                        }
+                    }
+                    // type = "action" 的行：点一下就把它 target 那项写回默认值。
+                    entry.actions.forEach { action ->
+                        ActionRow(action) {
+                            val fallback = action.default
+                            if (fallback == null) {
+                                Toast.makeText(
+                                    context,
+                                    "找不到要重置的设置项：" + action.target,
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            } else {
+                                focusManager.clearFocus()
+                                overrides = overrides + (action.target to fallback)
+                                resetTick++
+                                onSave(action.target, fallback)
+                                Toast.makeText(context, "已重置为默认", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }
                 }
             }
@@ -165,9 +200,37 @@ private fun IdentityCard(entry: PluginSettingsEntry) {
     }
 }
 
+/** 重置按钮行：一行字 + 落点，点一下把 target 写回默认。默认值拿不到时置灰不可点。 */
+@Composable
+private fun ActionRow(action: ConfigAction, onReset: () -> Unit) {
+    val p = LocalQq.current
+    val enabled = action.default != null
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled) { onReset() }
+            .padding(horizontal = 13.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                action.label,
+                color = if (enabled) p.t1 else p.t3,
+                fontSize = MaterialTheme.typography.bodyLarge.fontSize,
+            )
+            Text(
+                if (enabled) "写回默认值：" + action.target else "找不到 " + action.target + "，无法重置",
+                color = p.t3,
+                fontSize = MaterialTheme.typography.bodySmall.fontSize,
+            )
+        }
+        Text("↺", color = if (enabled) p.accent else p.t3, fontSize = MaterialTheme.typography.bodyLarge.fontSize)
+    }
+}
+
 /** 一行设置项：开关单独一行，其余字段用「标签 + 输入框」两段式。 */
 @Composable
-private fun ConfigFieldRow(field: ConfigField, current: String, onSave: (String) -> Unit) {
+private fun ConfigFieldRow(field: ConfigField, current: String, resetKey: Int, onSave: (String) -> Unit) {
     val p = LocalQq.current
     if (field.type == ConfigFieldType.Switch) {
         Row(
@@ -181,7 +244,7 @@ private fun ConfigFieldRow(field: ConfigField, current: String, onSave: (String)
                 }
             }
             // 同 ValueBox：写回存储后列表快照不会重组，开关状态要留在本地才即时可见。
-            var on by remember(field.key, current) { mutableStateOf(switchOn(current)) }
+            var on by remember(field.key, current, resetKey) { mutableStateOf(switchOn(current)) }
             Switch(checked = on, onCheckedChange = { on = it; onSave(it.toString()) })
         }
         return
@@ -193,9 +256,9 @@ private fun ConfigFieldRow(field: ConfigField, current: String, onSave: (String)
         }
         Spacer(Modifier.height(6.dp))
         if (field.type == ConfigFieldType.Select) {
-            SelectBox(field, current, onSave)
+            SelectBox(field, current, resetKey, onSave)
         } else {
-            ValueBox(field, current, onSave)
+            ValueBox(field, current, resetKey, onSave)
         }
     }
 }
@@ -206,9 +269,10 @@ private fun ConfigFieldRow(field: ConfigField, current: String, onSave: (String)
  * 受控输入需要本地草稿：初值只认打开本页时的快照，避免写回存储后又被外部刷新打断输入。
  */
 @Composable
-private fun ValueBox(field: ConfigField, initial: String, onSave: (String) -> Unit) {
+private fun ValueBox(field: ConfigField, initial: String, resetKey: Int, onSave: (String) -> Unit) {
     val p = LocalQq.current
-    var text by remember(field.key, field.label) { mutableStateOf(initial) }
+    // initial 也参与 key：重置把默认值写回来时，输入框跟着换掉旧内容。
+    var text by remember(field.key, field.label, initial, resetKey) { mutableStateOf(initial) }
     Box(
         Modifier
             .fillMaxWidth()
@@ -232,7 +296,10 @@ private fun ValueBox(field: ConfigField, initial: String, onSave: (String) -> Un
                     onSave(next)
                 }
             },
-            singleLine = true,
+            // type=text（例如破甲注入词）按多行编辑：单行输入框既看不到全文也换不了行。
+            singleLine = field.type != ConfigFieldType.Text,
+            minLines = if (field.type == ConfigFieldType.Text) 2 else 1,
+            maxLines = if (field.type == ConfigFieldType.Text) 8 else 1,
             textStyle = MaterialTheme.typography.bodyMedium.copy(color = p.t1),
             visualTransformation = if (field.type == ConfigFieldType.Secret) {
                 PasswordVisualTransformation()
@@ -251,10 +318,10 @@ private fun ValueBox(field: ConfigField, initial: String, onSave: (String) -> Un
 
 /** 下拉选择：空值时显示插件声明的第一个选项，点开由宿主画菜单，不依赖插件代码。 */
 @Composable
-private fun SelectBox(field: ConfigField, current: String, onSave: (String) -> Unit) {
+private fun SelectBox(field: ConfigField, current: String, resetKey: Int, onSave: (String) -> Unit) {
     val p = LocalQq.current
     var expanded by remember { mutableStateOf(false) }
-    var picked by remember(field.key, field.label) { mutableStateOf(current) }
+    var picked by remember(field.key, field.label, resetKey) { mutableStateOf(current) }
     val shown = picked.ifBlank { field.options.firstOrNull().orEmpty() }
     Box {
         Row(
@@ -307,7 +374,7 @@ private fun ExtraConfigSection(entry: PluginSettingsEntry, onSave: (key: String,
         GroupHeader(label = "自定义配置", count = saved.size, collapsible = false)
         Column(Modifier.padding(vertical = 4.dp)) {
             saved.forEach { (key, value) ->
-                ConfigFieldRow(ConfigField(key = key, label = key), value) { text ->
+                ConfigFieldRow(ConfigField(key = key, label = key), value, 0) { text ->
                     saved = saved + (key to text)
                     onSave(key, text)
                 }

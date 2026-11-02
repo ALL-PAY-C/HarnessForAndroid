@@ -347,7 +347,7 @@ fun AgentsScreen(
                 editing = null
             },
             onSave = {
-                viewModel.saveModel(it)
+                viewModel.saveModels(it)
                 adding = false
                 editing = null
             },
@@ -616,16 +616,19 @@ private fun ModelDialog(
     existing: ModelProfile?,
     providers: List<ModelProvider>,
     onDismiss: () -> Unit,
-    onSave: (ModelProfile) -> Unit,
+    onSave: (List<ModelProfile>) -> Unit,
     /** engine:// 端点的模型列表来源；默认空表，纯 HTTP 端点用不到。 */
     loadEngineModels: suspend () -> List<String> = { emptyList() },
 ) {
     val p = LocalQq.current
+    val firstTemplate = templateOf(providers.first())
     var provider by remember { mutableStateOf(providers.first()) }
     var name by remember { mutableStateOf(existing?.name ?: "") }
-    var baseUrl by remember { mutableStateOf(existing?.baseUrl ?: providers.first().defaultBaseUrl) }
-    var apiKey by remember { mutableStateOf(existing?.apiKey ?: "") }
-    var model by remember { mutableStateOf(existing?.model ?: providers.first().defaultModel) }
+    var baseUrl by remember { mutableStateOf(existing?.baseUrl ?: firstTemplate.baseUrl) }
+    var apiKey by remember { mutableStateOf(existing?.apiKey ?: firstTemplate.apiKey) }
+    var model by remember { mutableStateOf(existing?.model ?: firstTemplate.model) }
+    // 勾多个模型 = 一次保存多条 profile；空表时退回上面那个单条输入框。
+    var picked by remember { mutableStateOf<List<String>>(emptyList()) }
     var available by remember { mutableStateOf<List<String>>(emptyList()) }
     var fetching by remember { mutableStateOf(false) }
     var contextWindow by remember {
@@ -666,9 +669,13 @@ private fun ModelDialog(
                                 .background(if (prov.id == provider.id) p.accent.copy(alpha = 0.14f) else p.hover)
                                 .clickable {
                                     provider = prov
-                                    baseUrl = prov.defaultBaseUrl
-                                    model = prov.defaultModel
-                                    if (name.isBlank()) name = prov.label
+                                    val template = templateOf(prov)
+                                    baseUrl = template.baseUrl
+                                    model = template.model
+                                    // 模板自带 Key（本地网关）就填上；没有的话保留用户已经输入的。
+                                    if (template.apiKey.isNotBlank()) apiKey = template.apiKey
+                                    picked = emptyList()
+                                    if (name.isBlank()) name = template.name
                                 }
                                 .padding(horizontal = 10.dp, vertical = 6.dp),
                         ) {
@@ -713,11 +720,48 @@ private fun ModelDialog(
                         Text(if (fetching) "拉取中…" else "拉取模型列表", color = p.accent, fontSize = 12.sp)
                     }
                     if (available.isNotEmpty()) {
-                        Text("共 ${available.size} 个", color = p.t3, fontSize = 11.sp)
+                        Text(
+                            if (picked.isEmpty()) "共 ${available.size} 个 · 可多选" else "已选 ${picked.size} 个",
+                            color = p.t3,
+                            fontSize = 11.sp,
+                        )
                     }
                 }
                 fetchError?.let { Text("拉取失败：$it", color = p.red, fontSize = 11.sp) }
                 engineNote?.let { Text(it, color = p.t3, fontSize = 11.sp) }
+                if (available.isNotEmpty()) {
+                    // 列表紧跟「拉取模型列表」，勾选就在眼前。
+                    Column(Modifier.heightIn(max = 150.dp).verticalScroll(rememberScrollState())) {
+                        available.forEach { item ->
+                            val selected = item == model || item in picked
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (selected) p.accent.copy(alpha = 0.14f) else p.hover)
+                                    // 点一下 = 勾选/取消；多勾几个保存时一次落成多条 profile。
+                                    .clickable {
+                                        picked = if (item in picked) picked - item else picked + item
+                                        model = item
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        item,
+                                        color = if (selected) p.accent else p.t2,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    if (selected) Text("✓", color = p.accent, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
                 DialogField("上下文窗口 tokens（留空自动判断）", contextWindow) { input ->
                     contextWindow = input.filter { ch -> ch.isDigit() }
                 }
@@ -762,30 +806,6 @@ private fun ModelDialog(
                     }
                     Switch(checked = supportsTools, onCheckedChange = { supportsTools = it })
                 }
-                if (available.isNotEmpty()) {
-                    Column(Modifier.heightIn(max = 150.dp).verticalScroll(rememberScrollState())) {
-                        available.forEach { item ->
-                            val selected = item == model
-                            Box(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 2.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (selected) p.accent.copy(alpha = 0.14f) else p.hover)
-                                    .clickable { model = item }
-                                    .padding(horizontal = 10.dp, vertical = 7.dp),
-                            ) {
-                                Text(
-                                    item,
-                                    color = if (selected) p.accent else p.t2,
-                                    fontSize = 12.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                    }
-                }
                 Text(provider.hint, color = p.t3, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
             }
         },
@@ -793,22 +813,27 @@ private fun ModelDialog(
             TextButton(onClick = {
                 // engine:// 走本地引擎，密钥由插件自己管；空 API Key 也算填好，否则点了没反应。
                 val keyless = baseUrl.trim().startsWith("engine://")
-                if ((keyless || apiKey.isNotBlank()) && model.isNotBlank()) {
+                // 勾了多条就一次存多条；没勾就存上面那个模型名输入框里的单条。
+                val chosen = picked.ifEmpty { listOf(model.trim()) }.filter { it.isNotBlank() }
+                if ((keyless || apiKey.isNotBlank()) && chosen.isNotEmpty()) {
                     onSave(
-                        ModelProfile(
-                            id = existing?.id ?: "m-${System.currentTimeMillis()}",
-                            name = name.ifBlank { provider.label },
-                            providerId = provider.id,
-                            baseUrl = baseUrl.trim(),
-                            apiKey = apiKey.trim(),
-                            model = model.trim(),
-                            isDefault = existing?.isDefault ?: false,
-                            contextWindow = contextWindow.trim().toIntOrNull()?.takeIf { it > 0 } ?: 0,
-                            reasoningEffort = sanitizeReasoningEffort(effort),
-                            maxOutputTokens = maxOutput.trim().toIntOrNull()?.takeIf { it > 0 } ?: 0,
-                            temperature = temperature.trim().toFloatOrNull()?.takeIf { it >= 0f } ?: -1f,
-                            topP = topP.trim().toFloatOrNull()?.takeIf { it >= 0f } ?: -1f,
-                            supportsTools = supportsTools,
+                        buildProfiles(
+                            draft = ModelDraft(
+                                name = name,
+                                providerId = provider.id,
+                                baseUrl = baseUrl,
+                                apiKey = apiKey,
+                                contextWindow = contextWindow.trim().toIntOrNull()?.takeIf { it > 0 } ?: 0,
+                                reasoningEffort = effort,
+                                maxOutputTokens = maxOutput.trim().toIntOrNull()?.takeIf { it > 0 } ?: 0,
+                                temperature = temperature.trim().toFloatOrNull()?.takeIf { it >= 0f } ?: -1f,
+                                topP = topP.trim().toFloatOrNull()?.takeIf { it >= 0f } ?: -1f,
+                                supportsTools = supportsTools,
+                                isDefault = existing?.isDefault ?: false,
+                            ),
+                            models = chosen,
+                            existingId = existing?.id,
+                            nowMs = System.currentTimeMillis(),
                         ),
                     )
                 }

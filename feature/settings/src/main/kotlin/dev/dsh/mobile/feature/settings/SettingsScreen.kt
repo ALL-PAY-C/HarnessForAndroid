@@ -208,9 +208,6 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(SectionSpacing.cardGap),
             ) {
 
-                // ---------- 0. 宿主内置网关（没有就不占位） ----------
-                gatewayCard?.let { card -> item { card() } }
-
                 // ---------- 1. 应用与更新 ----------
                 item {
                     ExpandableSection(
@@ -965,6 +962,9 @@ fun SettingsScreen(
                         }
                     }
                 }
+
+                // ---------- 宿主内置网关：靠下、默认收起（没有就不占位） ----------
+                gatewayCard?.let { card -> item { card() } }
 
                 // ---------- 插件自带的设置项 ----------
                 if (extraSettings.isNotEmpty()) {

@@ -107,9 +107,15 @@ class AgentsViewModel(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AgentsUiState())
 
-    fun saveModel(profile: ModelProfile) = viewModelScope.launch {
-        modelStore.save(profile)
-        message.value = "已保存模型 ${profile.name}"
+    /** 一次保存多条（「拉取模型列表」里勾了 N 个）：同一个 baseUrl / apiKey，只是 model 不同。 */
+    fun saveModels(profiles: List<ModelProfile>) = viewModelScope.launch {
+        if (profiles.isEmpty()) return@launch
+        profiles.forEach { modelStore.save(it) }
+        message.value = if (profiles.size == 1) {
+            "已保存模型 ${profiles.first().name}"
+        } else {
+            "已保存 ${profiles.size} 个模型"
+        }
     }
 
     fun deleteModel(id: String) = viewModelScope.launch {

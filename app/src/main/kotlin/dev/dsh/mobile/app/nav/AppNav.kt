@@ -782,7 +782,12 @@ private fun handleSlot(
             val ok = PluginHostHolder.instance?.applySlotPersona(action) == true
             toast(
                 context,
-                if (ok) "本会话人设已更新，下一条消息起生效" else "没写成人设：先打开一个会话再点",
+                when {
+                    ok -> "本会话人设已更新，下一条消息起生效"
+                    // 清除类动作（text 为空）在人设本来就是空的时候什么也没改，不该报「没写成」。
+                    action.text.isBlank() -> "本会话本来就没设人设"
+                    else -> "没写成人设：先打开一个会话再点"
+                },
             )
         }
         is SlotAction.Link -> runCatching {

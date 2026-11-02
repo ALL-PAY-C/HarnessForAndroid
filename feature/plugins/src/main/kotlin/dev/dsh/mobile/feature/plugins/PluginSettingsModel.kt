@@ -25,6 +25,8 @@ data class PluginSettingsEntry(
     val version: String,
     val description: String,
     val fields: List<ConfigField>,
+    /** type = "action" 的行（重置按钮）：不占输入框，点一下把 [ConfigAction.target] 写回默认。 */
+    val actions: List<ConfigAction> = emptyList(),
     val values: Map<String, String>,
     /** 插件自己声明的整页界面（声明式 ui 或 HTML 面板），没有就是 null。 */
     val page: SlotContribution?,
@@ -37,12 +39,21 @@ data class PluginSettingsEntry(
     /**
      * config 之外用户自己加的键值。插件读 ctx.config 时同样生效，
      * 所以「插件没声明设置项」不该等于「这页没东西可改」。
+     *
+     * 插件自己声明了 config（fields 或 actions 非空）时一律返回空：那些没被声明的存储键
+     * 必然是旧版本遗留（改名/删除的字段），平铺出来就是噪声。数据仍留在存储里，插件
+     * ctx.config 照旧读得到。
      */
     val extraValues: Map<String, String>
-        get() = values.filterKeys { key -> fields.none { it.key == key } }
+        get() = if (fields.isNotEmpty() || actions.isNotEmpty()) {
+            emptyMap()
+        } else {
+            values.filterKeys { key -> fields.none { it.key == key } }
+        }
 
     /** 有没有可操作的东西：config 字段、自绘界面，或用户自己加的键值。 */
-    val hasSettings: Boolean get() = fields.isNotEmpty() || hasPage || extraValues.isNotEmpty()
+    val hasSettings: Boolean
+        get() = fields.isNotEmpty() || actions.isNotEmpty() || hasPage || extraValues.isNotEmpty()
 
     /**
      * 列表副标题。顺序即优先级：没设置项时先喊空态（用户抱怨的就是「点进去是介绍页」），
@@ -52,7 +63,7 @@ data class PluginSettingsEntry(
         get() = when {
             !hasSettings -> NO_SETTINGS_TEXT
             description.isNotBlank() -> description
-            fields.isNotEmpty() -> "共 " + fields.size + " 项设置"
+            fields.isNotEmpty() || actions.isNotEmpty() -> "共 " + (fields.size + actions.size) + " 项设置"
             else -> "插件自带设置界面"
         }
 
@@ -91,7 +102,9 @@ fun pluginSettingsEntries(
             name = manifest.name,
             version = manifest.version,
             description = manifest.description,
-            fields = manifest.config.map { it.toConfigField() },
+            // action 行不是输入框：留在这里会画出一个叫「重置」的文本框，和按钮重复。
+            fields = manifest.config.filterNot { isActionRow(it.type) }.map { it.toConfigField() },
+            actions = configActions(manifest.config),
             values = values(manifest.id),
             // 优先取带 ui 的那条：没有 ui 的只剩 label，画不出设置界面。
             page = mine.firstOrNull { it.ui != null } ?: mine.firstOrNull(),
@@ -115,6 +128,45 @@ internal fun fieldTypeOf(raw: String): ConfigFieldType = when (raw.trim().lowerc
     "number", "int", "integer", "float", "double" -> ConfigFieldType.Number
     "select", "enum", "choice", "radio" -> ConfigFieldType.Select
     else -> ConfigFieldType.Text
+}
+
+/**
+ * 「重置」行：plugin.json 里 { "type": "action", "target": "entryText" } 那一条。
+ *
+ * [default] 是同插件 config 里 [target] 那行声明的默认值；target 缺失或找不到对应行时为 null，
+ * 界面据此降级成不可点（不写脏值、不崩）。
+ */
+data class ConfigAction(
+    val key: String,
+    val label: String,
+    val target: String,
+    val default: String?,
+)
+
+internal fun isActionRow(raw: String): Boolean = raw.trim().lowercase() == "action"
+
+/** 纯函数：把 config 声明里的 action 行摘出来，顺手解析各自的默认值。 */
+fun configActions(config: List<ConfigSpec>): List<ConfigAction> = config
+    .filter { isActionRow(it.type) }
+    .map { spec ->
+        val target = spec.target.trim()
+        ConfigAction(
+            key = spec.key,
+            label = spec.label.ifBlank { spec.key },
+            target = target,
+            default = target.takeIf { it.isNotBlank() }
+                ?.let { t -> config.firstOrNull { it.key == t }?.default },
+        )
+    }
+
+/**
+ * 纯函数：一次「重置」之后的配置快照。
+ *
+ * 默认值拿不到就原样返回 —— 调用方据此提示「找不到要重置的设置项」，存储里不会多一个空值。
+ */
+fun applyReset(values: Map<String, String>, action: ConfigAction): Map<String, String> {
+    val fallback = action.default ?: return values
+    return values + (action.target to fallback)
 }
 
 /** 字符串 → 开关状态。插件存的是字符串，这里集中解释，避免各调用点各写一套。 */

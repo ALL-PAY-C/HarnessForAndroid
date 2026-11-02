@@ -170,13 +170,14 @@ class PluginSettingsModelTest {
     }
 
     @Test
+    // 声明了 config 的插件，未声明的存储键视为旧版本遗留：不再平铺成自定义配置（用户要求去掉噪声）。
     fun mixedValuesOnlyUndeclaredGoToExtra() {
         val entry = pluginSettingsEntries(
             installed = listOf(manifest("x", config = listOf(ConfigSpec("base", "网关地址")))),
             pages = emptyList(),
             values = { mapOf("base" to "http://h", "token" to "abc") },
         ).single()
-        assertEquals(setOf("token"), entry.extraValues.keys)
+        assertEquals(emptyMap<String, String>(), entry.extraValues)
         assertEquals("http://h", entry.valueOf(entry.fields.single()))
     }
 }

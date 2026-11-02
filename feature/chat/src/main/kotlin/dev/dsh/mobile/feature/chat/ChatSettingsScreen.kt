@@ -63,6 +63,7 @@ import dev.dsh.mobile.design.SlotEditState
 import dev.dsh.mobile.design.SlotPickerDialog
 import dev.dsh.mobile.design.SlotPlusButton
 import dev.dsh.mobile.design.SlotStrip
+import dev.dsh.mobile.pluginapi.SlotAction
 import dev.dsh.mobile.pluginapi.SlotContribution
 import dev.dsh.mobile.pluginhost.PluginSlotItem
 import dev.dsh.mobile.pluginhost.rememberHostThemeTokens
@@ -112,6 +113,11 @@ fun ChatSettingsScreen(
     val agentLabel = (if (presetViewModel != null) presetState.defaultName else "")
         .ifBlank { state.agentName }
         .ifBlank { "未选择 Agent" }
+
+    // 会话设置槽里 kind = setpersona 的那一条就是「破甲注入」开关：渲染成开关行放在
+    // 「特殊格式渲染」下面，不再当 chip 出现。checked 读会话真实 persona，不存本地临时值。
+    val personaSlot = remember(slotPlaced) { personaSlotOf(slotPlaced) }
+    val personaOn = state.persona.isNotBlank()
 
     Box(Modifier.fillMaxSize().background(p.bg)) {
         Column(Modifier.fillMaxSize().navigationBarsPadding()) {
@@ -185,6 +191,25 @@ fun ChatSettingsScreen(
                         Spacer(Modifier.width(8.dp))
                         Switch(checked = state.renderSpecial, onCheckedChange = viewModel::setRenderSpecial)
                     }
+                    // 破甲注入：与上面同卡片同排版，点一下走既有的 SetPersona（有则清、无则写）。
+                    personaSlot?.let { slot ->
+                        Box(
+                            Modifier.fillMaxWidth().padding(vertical = 10.dp).height(0.6.dp).background(p.line),
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(personaLabelOf(slot.label), color = p.t1, fontSize = 14.sp)
+                                Text(
+                                    if (personaOn) "已开启，下一条消息起生效" else "关闭状态，点一下写入本会话人设",
+                                    color = p.t3,
+                                    fontSize = 11.5.sp,
+                                    modifier = Modifier.padding(top = 2.dp),
+                                )
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Switch(checked = personaOn, onCheckedChange = { onSlot(slot) })
+                        }
+                    }
                 }
 
                 // 会话设置槽（SlotId.ChatSettings）：插件组件摆在这一段。
@@ -199,7 +224,8 @@ fun ChatSettingsScreen(
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                     ) {
                         SlotStrip(horizontal = false, modifier = Modifier.fillMaxWidth()) {
-                            slotPlaced.forEach { slot ->
+                            // setpersona 已经在上面渲染成开关，这里跳过它，避免同一条贡献出现两次。
+                            slotPlaced.filter { it.action !is SlotAction.SetPersona }.forEach { slot ->
                                 val item = SlotEditItem(
                                     pluginId = slot.pluginId,
                                     contributionId = slot.id,
@@ -536,3 +562,18 @@ private fun AgentPresetDialog(
         }
     }
 }
+
+/**
+ * 会话设置槽里代表「破甲注入」开关的那一条：只认 kind = setpersona（落成 [SlotAction.SetPersona]）。
+ *
+ * 纯函数：插件重复注册多条时只取第一条，渲染层绝不会因此画出一排开关。
+ */
+internal fun personaSlotOf(slots: List<SlotContribution>): SlotContribution? =
+    slots.firstOrNull { it.action is SlotAction.SetPersona }
+
+/**
+ * 开关标题：插件给的 label 里可能嵌了它自己记的状态（「破甲注入：开（本会话）」），
+ * 状态由本行的 Switch 表达，再显示一遍就会在关掉时自相矛盾 —— 取冒号前的部分。
+ */
+internal fun personaLabelOf(label: String): String =
+    label.substringBefore("：").trim().ifBlank { "破甲注入（本会话）" }

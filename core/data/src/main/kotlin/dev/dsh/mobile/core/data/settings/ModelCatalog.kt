@@ -85,6 +85,12 @@ object ModelCatalog {
         }
     }
 
+    /**
+     * 解析入口（纯函数，JVM 单测直接打这里）：一次 /models 响应 → 模型 id 列表。
+     * 与 [fetch] 走的是同一段解析，界面上的「拉取模型列表」不会出现两种口径。
+     */
+    fun parseIds(body: String): List<String> = parse(body)
+
     /** Accepts `{data:[{id}]}`, `{models:[...]}` and `{models:[{id|name}]}`. */
     private fun parse(body: String): List<String> {
         val json = JSONObject(body)
