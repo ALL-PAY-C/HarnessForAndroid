@@ -268,6 +268,24 @@ class PluginHost(
         bump()
     }
 
+    /**
+     * 重新扫描之后，磁盘上已经不存在的插件连行带实例一起摘掉。
+     *
+     * [load] 只会往上加/覆盖，从不删 —— 于是「包被删了，列表还挂着一条幽灵行」只能在这里收口。
+     */
+    fun keepOnly(ids: Collection<String>) {
+        val keep = ids.toSet()
+        val gone = instances.keys.filterNot { it in keep }
+        if (gone.isEmpty()) return
+        gone.forEach {
+            registry.clearPlugin(it)
+            instances.remove(it)
+            runtimeFailures.remove(it)
+        }
+        _plugins.update { list -> list.filter { it.manifest.id in keep } }
+        bump()
+    }
+
     /** All slot consumers receive only components explicitly placed by the user. */
     private var placementStore: SlotPlacementStore? = null
 

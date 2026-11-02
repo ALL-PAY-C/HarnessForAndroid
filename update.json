@@ -1,5 +1,5 @@
 {
-  "versionCode": 100,
+  "versionCode": 101,
   "versionName": "v0.08",
   "apkUrl": "https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk",
   "apkMirrors": [
@@ -7,7 +7,7 @@
     "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk",
     "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk"
   ],
-  "sha256": "9e8aef61eb2262447262f5849c4aa8248b3d52d56a27c23c0b91d9dd033a532b",
-  "notes": "v0.08（覆盖更新 · versionCode 100）：\n\n- 修复：新会话发出消息后转圈结束却什么都没有——发送前置失败（运行时未连接 / 闸门拦截）与整轮零产出现在都会落一条可见提示，不再静默。\n- 修复：会话设置里组件区过高，把底部的清空 / 归档 / 导出长图与「+ 编辑会话设置」挤出屏幕；组件区限高并在卡内滚动，右侧删除键不再被内容挤走。\n- 修复：竖排组件区里的「+ 添加新组件」被推到屏幕外。\n- 修复：详情页正文字号被二次缩放（主题已按字体缩放乘过一次），大小回到统一阶梯。\n- 修复：没有设置项的数据包在详情页给出说明，不再只剩一行空态文案。",
-  "sizeBytes": 113450592
+  "sha256": "bf4f7c0b5abdcc9b0acf1da0b0782fc10b543189c96a4c003ba9782f39c82189",
+  "notes": "v0.08（覆盖更新 · versionCode 101）：\n\n- 修复：新会话发出消息后转圈结束却什么都没有——发送前置失败（运行时未连接 / 闸门拦截）与整轮零产出现在都会落一条可见提示，不再静默。\n- 修复：会话设置里组件区过高，把底部的清空 / 归档 / 导出长图与「+ 编辑会话设置」挤出屏幕；组件区限高并在卡内滚动，右侧删除键不再被内容挤走。\n- 修复：竖排组件区里的「+ 添加新组件」被推到屏幕外。\n- 修复：详情页正文字号被二次缩放，大小回到统一阶梯。\n- 修复：外部装入的插件在「插件管理」里行不出现（重装应用或首次进入不重扫）；现在进页面与回前台都会重扫，注册表按磁盘双向对齐。\n- 修复：插件行内没有启停开关，只能进详情页开关。\n- 修复：插件启停状态两处各写一份，出现「列表说已停用、插件照常运行」；现在只认一份。",
+  "sizeBytes": 113452363
 }

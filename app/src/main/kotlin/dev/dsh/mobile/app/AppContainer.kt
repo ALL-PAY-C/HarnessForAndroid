@@ -471,9 +471,15 @@ class AppContainer(private val context: Context) {
      */
     fun reloadPlugins() {
         runCatching {
+            // 先拿磁盘对齐注册表：重装、删包、只恢复了一半数据，都在这一步自愈。
+            // 少这一趟，「行不出现 / 行不消失」只能靠用户去插件设置页兜一圈。
+            runCatching { pluginInstaller.packages.resync() }
             val jsPlugins = externalPlugins.load() + pluginInstaller.loadablePlugins()
             val nodePlugins = pluginInstaller.loadableNodePlugins()
-            pluginHost.loadAll(listOf(HtmlPlugin()) + jsPlugins + nodePlugins, force = true)
+            val all = listOf(HtmlPlugin()) + jsPlugins + nodePlugins
+            pluginHost.loadAll(all, force = true)
+            // load 只加不删，幽灵行（目录已删）要靠 keepOnly 收口。
+            pluginHost.keepOnly(all.map { it.manifest.id })
             pluginHost.startBackgroundPlugins(context, scope)
             if (nodePlugins.isNotEmpty()) {
                 scope.launch(Dispatchers.IO) {

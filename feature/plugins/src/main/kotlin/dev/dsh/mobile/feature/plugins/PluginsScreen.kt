@@ -31,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -47,6 +48,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.GroupHeader
@@ -82,6 +84,12 @@ fun PluginsScreen(
     val scope = rememberCoroutineScope()
     // 待确认卸载的插件：点删除先弹二次确认，确认后才真正移除。
     var pending by remember { mutableStateOf<LoadedPlugin?>(null) }
+    // 插件是外部装进来的：进页面、回到前台、重装 APK 之后都必须重扫一次。
+    // 以前这一趟只在「插件设置」页触发，于是重装后第一次进来整行缺失，得绕去设置页才看得见。
+    LifecycleResumeEffect(Unit) {
+        onRescan()
+        onPauseOrDispose { }
+    }
     // 顶部小字：说明「已移除」是持久的，重装即恢复。
     val hint: @Composable () -> Unit = {
         Text(
@@ -281,10 +289,15 @@ private fun PluginCard(
                         else -> p.t3
                     },
                     style = MaterialTheme.typography.labelMedium,
-                    // 失败行点开关没有意义（启用意图已经写在配置里，失败来自加载），别给它假的可操作感。
-                    modifier = Modifier
-                        .clickable(enabled = !status.failed) { onToggle(!plugin.enabled) }
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    maxLines = 1,
+                    modifier = Modifier.padding(start = 8.dp, end = 4.dp),
+                )
+                // 开关是唯一的启停入口：它和上面这行文字读同一个 enabled，写同一个 values.<id>.enabled。
+                // 失败行不给开关：启用意图已经写进存储，失败来自加载，可点只会给假的可操作感。
+                Switch(
+                    checked = plugin.enabled,
+                    onCheckedChange = onToggle,
+                    enabled = !status.failed,
                 )
                 // 图钉 18dp、命中区 48dp：行内危险操作不能靠手指祈祷。
                 Box(

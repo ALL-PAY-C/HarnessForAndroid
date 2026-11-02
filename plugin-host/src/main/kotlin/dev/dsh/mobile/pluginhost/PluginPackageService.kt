@@ -229,6 +229,36 @@ class PluginPackageService(
         return (registry.ids() + fromDisk).distinct().sorted()
     }
 
+    /**
+     * 以磁盘为准对齐注册表，可重复调用：目录没了就摘登记，盘上有包而注册表缺了就补登记。
+     *
+     * 「装上了列表里却看不到」和「删了还留一条幽灵行」是同一件事的两端——注册表与磁盘不一致。
+     * 打开插件管理时调一次即可，不必要求用户先去插件设置页兜一圈。
+     */
+    fun resync(): Int {
+        var changed = 0
+        // 摘：登记还在，活动目录已经没了（删包、只恢复了 prefs）。
+        registry.ids().toList().forEach { id ->
+            if (activeDir(id) == null) {
+                registry.remove(id)
+                changed++
+            }
+        }
+        // 补：盘上有包，注册表里没有（重装、只恢复了 files/plugins）。
+        root.listFiles().orEmpty()
+            .filter { it.isDirectory && !it.name.startsWith(".") }
+            .forEach { dir ->
+                // 读活动版本那一份清单：整个包目录里躺着所有历史版本，随便挑一个会把旧版本号写进列表。
+                val active = activeDir(dir.name) ?: return@forEach
+                val text = runCatching { findManifest(active)?.first }.getOrNull() ?: return@forEach
+                val id = runCatching { JSONObject(text).optString("id") }.getOrNull().orEmpty()
+                if (id.isBlank() || registry.raw(id) != null) return@forEach
+                registry.put(id, text)
+                changed++
+            }
+        return changed
+    }
+
     private fun latestVersionDir(versions: File): File? =
         versions.listFiles().orEmpty()
             .filter { it.isDirectory && !it.name.startsWith(".") }
