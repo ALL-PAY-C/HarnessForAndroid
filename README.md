@@ -8,7 +8,7 @@ DeepSeek Harness 的 Android 客户端。会话、模型接入、设备工具、
 
 | 项 | 值 |
 | --- | --- |
-| 文件名 | `HarnessForAndroid-release-v0.08.apk` |
+| 文件名 | `HarnessForAndroid-release-v0.09.apk` |
 | 最低系统 | Android 8.0（API 26） |
 | CPU | `arm64-v8a`（release 只打这一个 ABI；`x86_64` 只在 debug 包里，给模拟器用） |
 | 签名 | 签名材料随仓库走（`app/keystore/app-release.jks` + `app/keystore.properties`），任何机器构建出的证书都是 SHA-256 `767bc8b4bcac50fa01f6f4372638aa45dcbdc4024791cf9faf92671aa549c623` |

@@ -180,7 +180,8 @@ fun ChatScreen(
     var personaOpen by remember { mutableStateOf(false) }
     // 智能体预设选择弹窗（锁定后点不开）。
     var presetOpen by remember { mutableStateOf(false) }
-    var panelOpen by remember { mutableStateOf(false) }
+    // 底部菜单（快捷指令/模板/插件槽/会话底部槽）默认收起，按会话重置。
+    var panelOpen by remember(state.sessionId) { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<String?>(null) }
     var confirmingClear by remember { mutableStateOf(false) }
     var editingWorkspace by remember { mutableStateOf<String?>(null) }
@@ -1117,7 +1118,7 @@ private fun SendStopButton(
     }
 }
 
-/** 输入区右下角的「+」：点开才把工具行与底部栏位（文件/图片/拍照、快捷指令、插件槽）展开。 */
+/** 输入区右下角的「+」：只开关底部菜单（快捷指令/模板/插件槽/会话底部槽），不管文件/图片/拍照。 */
 @Composable
 private fun PlusToggleButton(active: Boolean, onClick: () -> Unit) {
     val p = LocalQq.current
@@ -1143,8 +1144,8 @@ private fun PlusToggleButton(active: Boolean, onClick: () -> Unit) {
 }
 
 /**
- * 输入区。`+` 展开后（QQ 式）输入框整体上移，下方出现工具面板：
- * 文件 / 图片 / 拍照 + 快捷指令 + 插件按钮。
+ * 输入区。文件 / 图片 / 拍照常显在输入行左侧；`+` 只开关下方菜单
+ * （快捷指令 / 提示词模板 / 插件 / 会话底部槽），默认收起。
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -1324,11 +1325,10 @@ private fun Composer(
                 Modifier.fillMaxWidth().padding(start = 6.dp, end = 8.dp, top = 2.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (panelOpen) {
-                    ToolButton("文件", Icons.Filled.AttachFile, onPickFile)
-                    ToolButton("图片", Icons.Filled.Image, onPickImage)
-                    ToolButton("拍照", Icons.Filled.PhotoCamera, onTakePhoto)
-                }
+                // 常显：不受「+」与面板开关影响。
+                ToolButton("文件", Icons.Filled.AttachFile, onPickFile)
+                ToolButton("图片", Icons.Filled.Image, onPickImage)
+                ToolButton("拍照", Icons.Filled.PhotoCamera, onTakePhoto)
                 Spacer(Modifier.weight(1f))
                 if (streaming && input.text.isNotBlank()) {
                     // 正在跑的时候有字：右下角仍然是「发送」，按设置里的三档策略处理
@@ -1351,7 +1351,8 @@ private fun Composer(
                     Spacer(Modifier.width(6.dp))
                 }
                 PlusToggleButton(active = panelOpen) {
-                    if (!panelOpen) focusManager.clearFocus()
+                    // 收起面板时顺手清焦点；工具按钮常显，不受焦点影响。
+                    if (panelOpen) focusManager.clearFocus()
                     onTogglePanel()
                 }
                 val canSend = input.text.isNotBlank() || drafts.isNotEmpty()
@@ -1370,7 +1371,7 @@ private fun Composer(
             }
         }
 
-        // 底部栏位默认收起，点输入区右下角的「+」才展开（QQ 式）。
+        // 底部菜单默认收起，只由输入区右下角的「+」开关（QQ 式）。
         AnimatedVisibility(visible = panelOpen) {
             Column(
                 Modifier
