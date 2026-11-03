@@ -15,9 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -33,7 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.dsh.mobile.core.data.settings.ThemeMode
@@ -41,6 +37,9 @@ import dev.dsh.mobile.core.model.BackMaterial
 import dev.dsh.mobile.design.AppIconBadge
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider
+import dev.dsh.mobile.design.SectionHeading
+import dev.dsh.mobile.design.SectionSpacing
+import dev.dsh.mobile.design.qqFontBody
 import dev.dsh.mobile.design.startup.StartupAnimations
 import dev.dsh.mobile.design.startup.StartupSpec
 import java.util.Locale
@@ -112,7 +111,10 @@ fun AppearanceSectionBody(state: SettingsUiState, vm: SettingsViewModel) {
 
         // ---------- 图标 ----------
         ApGroup("图标")
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = SectionSpacing.horizontal, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             AppIconBadge(56.dp)
             Spacer(Modifier.width(12.dp))
             Text(
@@ -321,16 +323,20 @@ fun AppearanceSectionBody(state: SettingsUiState, vm: SettingsViewModel) {
     }
 }
 
-/** 分组小标题：比 SettingsScreen 的一级标题更轻，避免和折叠卡片抢层级。 */
+/**
+ * 分组小标题：与设置页卡片内的分节标题是**同一个组件**（[SectionHeading]：t1 / 15sp / Medium），
+ * 左边距也走同一个 [SectionSpacing.horizontal]，不再自绘一层更淡的小字。
+ */
 @Composable
 private fun ApGroup(title: String) {
-    val p = LocalQq.current
-    Text(
-        title,
-        color = p.t3,
-        fontSize = 11.5.sp,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.fillMaxWidth().padding(start = 13.dp, end = 13.dp, top = 10.dp, bottom = 4.dp),
+    SectionHeading(
+        title = title,
+        modifier = Modifier.padding(
+            start = SectionSpacing.horizontal,
+            end = SectionSpacing.horizontal,
+            top = 10.dp,
+            bottom = 4.dp,
+        ),
     )
 }
 
@@ -339,9 +345,11 @@ private fun ApHint(text: String) {
     val p = LocalQq.current
     Text(
         text,
-        color = p.t3,
-        fontSize = 11.sp,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 4.dp),
+        // 12sp/18sp 是卡片副文案的字号；颜色用 t2（浅色主题 t3 只有 3.21:1，11sp 下基本读不出来）。
+        color = p.t2,
+        fontSize = qqFontBody(12.sp),
+        lineHeight = 18.sp,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = SectionSpacing.horizontal, vertical = 4.dp),
     )
 }
 
@@ -355,7 +363,7 @@ private fun ApSegment(
 ) {
     val p = LocalQq.current
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 11.dp),
+        Modifier.fillMaxWidth().padding(horizontal = SectionSpacing.horizontal, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, color = p.t1, fontSize = 15.sp, modifier = Modifier.weight(1f))
@@ -431,7 +439,7 @@ private fun ApChips(
 @Composable
 private fun ApSlider(label: String, value: String, content: @Composable () -> Unit) {
     val p = LocalQq.current
-    Column(Modifier.padding(horizontal = 13.dp, vertical = 6.dp)) {
+    Column(Modifier.padding(horizontal = SectionSpacing.horizontal, vertical = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(label, color = p.t1, fontSize = 15.sp, modifier = Modifier.weight(1f))
             Text(value, color = p.t3, fontSize = 12.5.sp)
@@ -444,7 +452,7 @@ private fun ApSlider(label: String, value: String, content: @Composable () -> Un
 private fun ApSwitch(label: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val p = LocalQq.current
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 9.dp),
+        Modifier.fillMaxWidth().padding(horizontal = SectionSpacing.horizontal, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -464,12 +472,10 @@ private fun ApAction(text: String, enabled: Boolean = true, onClick: () -> Unit)
         Modifier
             .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 13.dp, vertical = 10.dp),
+            .padding(horizontal = SectionSpacing.horizontal, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Start,
     ) {
-        Box(Modifier.size(5.dp).clip(CircleShape).background(if (enabled) p.accent else p.t3))
-        Spacer(Modifier.width(8.dp))
         Text(text, color = if (enabled) p.accent else p.t3, fontSize = 14.sp)
     }
 }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,12 +39,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.GroupHeader
 import dev.dsh.mobile.design.GroupFrame
 import dev.dsh.mobile.design.GroupChild
-import dev.dsh.mobile.design.QqTopBar
+import dev.dsh.mobile.design.QqScreenTopBar
 import dev.dsh.mobile.design.SectionChevron
 import dev.dsh.mobile.design.SlotEditFrame
 import dev.dsh.mobile.design.SlotEditItem
@@ -88,6 +88,8 @@ fun PluginHubScreen(
     slotCandidates: List<SlotEditItem> = emptyList(),
     onSlotAdd: (SlotEditItem) -> Unit = {},
     onSlotRemove: (SlotEditItem) -> Unit = {},
+    // 汉堡按钮打开抽屉：与会话 / Agent / 设置三个一级页同一路回调。
+    onOpenDrawer: () -> Unit = {},
 ) {
     var pickingSlot by remember { mutableStateOf(false) }
     var open by remember { mutableStateOf<PluginConfigPage?>(null) }
@@ -120,20 +122,13 @@ fun PluginHubScreen(
 
     val currentSettings = openSettings
     if (currentSettings != null) {
-        Column(Modifier.fillMaxSize().background(LocalQq.current.bg)) {
-            QqTopBar(
-                leading = {
-                    BackChip {
-                        openSettings = null
-                        onSettingsClosed()
-                    }
-                },
-                content = {
-                    Text(
-                        currentSettings.name,
-                        color = LocalQq.current.t1,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+        Column(Modifier.fillMaxSize().imePadding().background(LocalQq.current.bg)) {
+            QqScreenTopBar(
+                title = currentSettings.name,
+                isBack = true,
+                onNavigationClick = {
+                    openSettings = null
+                    onSettingsClosed()
                 },
             )
             PluginSettingsDetail(
@@ -148,16 +143,11 @@ fun PluginHubScreen(
 
     val current = open
     if (current != null) {
-        Column(Modifier.fillMaxSize().background(LocalQq.current.bg)) {
-            QqTopBar(
-                leading = { BackChip { open = null } },
-                content = {
-                    Text(
-                        current.label,
-                        color = LocalQq.current.t1,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                },
+        Column(Modifier.fillMaxSize().imePadding().background(LocalQq.current.bg)) {
+            QqScreenTopBar(
+                title = current.label,
+                isBack = true,
+                onNavigationClick = { open = null },
             )
             Box(Modifier.fillMaxSize()) { current.content() }
         }
@@ -166,16 +156,11 @@ fun PluginHubScreen(
 
     val currentSlot = openSlot
     if (currentSlot != null) {
-        Column(Modifier.fillMaxSize().background(LocalQq.current.bg)) {
-            QqTopBar(
-                leading = { BackChip { openSlot = null } },
-                content = {
-                    Text(
-                        currentSlot.label,
-                        color = LocalQq.current.t1,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                },
+        Column(Modifier.fillMaxSize().imePadding().background(LocalQq.current.bg)) {
+            QqScreenTopBar(
+                title = currentSlot.label,
+                isBack = true,
+                onNavigationClick = { openSlot = null },
             )
             // 整屏交给渲染器：有声明式 ui 走翻译，没有就用 content / label 兜底。
             val native = drawerResolver?.resolve(currentSlot)
@@ -206,10 +191,9 @@ fun PluginHubScreen(
     }
     val settingsCount = extraRows.size + slotRows.size + pluginSettings.size
 
-    Column(Modifier.fillMaxSize().background(LocalQq.current.bg)) {
-        QqTopBar(content = {
-            Text(title, color = LocalQq.current.t1, fontWeight = FontWeight.SemiBold)
-        })
+    Column(Modifier.fillMaxSize().imePadding().background(LocalQq.current.bg)) {
+        // 顶栏用全项目统一骨架：左侧汉堡接抽屉，标题正中对齐（QqScreenTopBar 内部委托 QqTopBar）。
+        QqScreenTopBar(title = title, onNavigationClick = onOpenDrawer)
         if (builtin.isEmpty() && settingsCount == 0) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Text("还没有插件提供页面", color = LocalQq.current.t3)
@@ -368,20 +352,3 @@ private fun PrimaryCardRow(
     }
 }
 
-
-@Composable
-private fun BackChip(onBack: () -> Unit) {
-    Box(
-        Modifier
-            .size(48.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onBack),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            Icons.AutoMirrored.Filled.ArrowBack,
-            contentDescription = "返回",
-            tint = LocalQq.current.t1,
-        )
-    }
-}

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -146,7 +147,8 @@ fun SessionsScreen(
     // 这些才是真正会渲染出列表行的分组。
     val contentRows = state.groups.filterNot { hiddenByAncestor(it.first) }
 
-    Column(Modifier.fillMaxSize().background(p.bg)) {
+    // 键盘弹起时按 ime 收缩整页（同 ChatScreen.kt:375 的写法），否则搜索框与列表尾部被键盘盖住。
+    Column(Modifier.fillMaxSize().imePadding().background(p.bg)) {
         QqScreenTopBar(
             navigationIcon = Icons.Filled.Menu,
             navigationDescription = "侧边栏",

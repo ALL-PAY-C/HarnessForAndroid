@@ -551,6 +551,8 @@ fun AppNav(container: AppContainer) {
                             slotCandidates = hubSlot.candidates,
                             onSlotAdd = hubSlot.add,
                             onSlotRemove = hubSlot.remove,
+                            // 汉堡 → 抽屉：与会话/Agent/设置三个一级页同一行回调。
+                            onOpenDrawer = { scope.launch { drawerState.open() } },
                             pages = container.pluginHost.slots.configPages + listOf(
                                 PluginConfigPage(
                                     id = "app.plugins.market",

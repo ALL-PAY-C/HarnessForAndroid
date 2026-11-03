@@ -1,5 +1,7 @@
 package dev.dsh.mobile.app.gateway
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,11 +11,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,12 +27,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.dsh.mobile.app.AppContainer
+import dev.dsh.mobile.design.LocalQq
+import dev.dsh.mobile.design.QqCardDivider
+import dev.dsh.mobile.design.QqShape
+import dev.dsh.mobile.design.SectionCard
+import dev.dsh.mobile.design.SectionSpacing
+import dev.dsh.mobile.design.qqFontBody
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -74,15 +80,13 @@ fun GatewayCard(container: AppContainer) {
     val key = gateway.apiKey
     val shownKey = if (revealed) key else "••••" + key.takeLast(4)
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-    ) {
+    val p = LocalQq.current
+    SectionCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { expanded = !expanded }
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = SectionSpacing.horizontal, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -93,18 +97,29 @@ fun GatewayCard(container: AppContainer) {
                     if (credentialMissing) append(" · 凭据未导入")
                 },
                 modifier = Modifier.weight(1f),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp,
+                color = p.t1,
+                fontSize = qqFontBody(15.sp),
+                fontWeight = FontWeight.Medium,
             )
             if (credentialMissing) {
-                TextButton(onClick = { importing = true }) { Text("导入凭据", fontSize = 12.sp) }
+                GatewayChip("导入凭据", primary = true) { importing = true }
             }
-            Text(if (expanded) "收起 ▴" else "展开 ▾", fontSize = 12.sp)
+            Text(
+                if (expanded) "收起 ▴" else "展开 ▾",
+                color = p.t3,
+                fontSize = qqFontBody(12.sp),
+            )
         }
 
         if (expanded) {
+            QqCardDivider()
             Column(
-                Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                Modifier.padding(
+                    start = SectionSpacing.horizontal,
+                    end = SectionSpacing.horizontal,
+                    top = 10.dp,
+                    bottom = SectionSpacing.horizontal,
+                ),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
@@ -116,33 +131,50 @@ fun GatewayCard(container: AppContainer) {
                             "启动中…（超过 ${GatewayManager.START_TIMEOUT_MS / 1000}s 判失败）"
                         GatewayManager.State.Stopped -> "未运行"
                     },
-                    fontSize = 12.sp,
+                    color = p.t2,
+                    fontSize = qqFontBody(12.sp),
+                    lineHeight = 18.sp,
                 )
                 Text(
                     if (credentialMissing) "凭据：未导入（没有凭据出不了模型）"
                     else "凭据：${authNames.size} 份 · ${authNames.joinToString()}",
-                    fontSize = 12.sp,
+                    color = p.t2,
+                    fontSize = qqFontBody(12.sp),
+                    lineHeight = 18.sp,
                 )
                 SelectionContainer {
                     Text(
                         "${gateway.baseUrl}\nkey ${shownKey}",
-                        fontSize = 11.sp,
+                        color = p.t1,
+                        fontSize = qqFontBody(12.sp),
+                        lineHeight = 18.sp,
                         fontFamily = FontFamily.Monospace,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(QqShape.field())
+                            .background(p.bg)
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
                     )
                 }
-                TextButton(onClick = { revealed = !revealed }) {
-                    Text(if (revealed) "隐藏 Key" else "显示 Key", fontSize = 12.sp)
-                }
+                Text(
+                    if (revealed) "隐藏 Key" else "显示 Key",
+                    color = p.accent,
+                    fontSize = qqFontBody(13.sp),
+                    modifier = Modifier
+                        .clip(QqShape.chip())
+                        .clickable { revealed = !revealed }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = {
+                    GatewayChip("启动网关", primary = true) {
                         GatewayService.start(ctx)
                         scope.launch { gateway.start() }
-                    }) { Text("启动网关") }
-                    OutlinedButton(onClick = {
+                    }
+                    GatewayChip("停止网关", primary = false) {
                         gateway.stop()
                         GatewayService.stop(ctx)
-                    }) { Text("停止网关") }
-                    OutlinedButton(onClick = { importing = true }) { Text("导入凭据") }
+                    }
+                    GatewayChip("导入凭据", primary = false) { importing = true }
                 }
             }
         }
@@ -187,4 +219,26 @@ fun GatewayCard(container: AppContainer) {
             dismissButton = { TextButton(onClick = { importing = false }) { Text("取消") } },
         )
     }
+}
+
+/**
+ * 卡片里的动作按钮。design 没有公开的 button 组件，样式按 SettingsScreen.kt:1148 的
+ * AccentChip 复刻：主按钮 accent 填充 + 白字，次按钮 p.card 底 + p.line 描边 + t1 字，
+ * 两者都是 QqShape.chip() + 14/7dp 内边距 + 13sp，与全项目一致。
+ */
+@Composable
+private fun GatewayChip(label: String, primary: Boolean, onClick: () -> Unit) {
+    val p = LocalQq.current
+    Text(
+        label,
+        color = if (primary) Color.White else p.t1,
+        fontSize = qqFontBody(13.sp),
+        modifier = Modifier
+            .clip(QqShape.chip())
+            .background(if (primary) p.accent else p.card)
+            // 次按钮：1dp p.line 描边，同 Components.kt:1695 的 chip 描边写法（qqBorder() 默认 0dp，画不出边）。
+            .then(if (primary) Modifier else Modifier.border(1.dp, p.line, QqShape.chip()))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+    )
 }

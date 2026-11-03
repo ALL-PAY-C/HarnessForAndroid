@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -120,7 +121,8 @@ fun AgentsScreen(
     }
 
     Box(Modifier.fillMaxSize().background(p.bg)) {
-        Column(Modifier.fillMaxSize()) {
+        // 键盘弹起时按 ime 收缩整页（同 ChatScreen.kt:375 的写法），列表尾部不再被键盘盖住。
+        Column(Modifier.fillMaxSize().imePadding()) {
             QqScreenTopBar(
                 title = "Agent",
                 navigationIcon = Icons.Filled.Menu,
