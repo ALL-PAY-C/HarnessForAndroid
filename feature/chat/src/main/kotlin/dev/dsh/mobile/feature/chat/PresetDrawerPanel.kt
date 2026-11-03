@@ -38,6 +38,7 @@ import dev.dsh.mobile.core.data.preset.AgentPreset
 import dev.dsh.mobile.core.data.preset.IdentityCard
 import dev.dsh.mobile.core.data.preset.IdentityCards
 import dev.dsh.mobile.design.LocalQq
+import dev.dsh.mobile.design.QqIdentityCardEditor
 
 /**
  * 会话页左侧抽屉里的「Agent 预设」面板：列预设 + 设默认 + 导入 + 删除。
@@ -173,122 +174,18 @@ fun PresetDrawerPanel(viewModel: PresetDrawerViewModel) {
                     }
                 }
                 if (editing == preset.id) {
-                    IdentityCardEditor(
-                        preset = preset,
+                    // 编辑器已上移到 design（IdentityCardUi.kt），与群聊角色卡共用同一份表单。
+                    QqIdentityCardEditor(
                         initial = card ?: IdentityCard(),
-                        legacyPersona = if (selected) state.legacyPersona else "",
                         busy = state.busy,
                         onSave = { viewModel.saveCard(preset.id, it) },
+                        legacyPersona = if (selected) state.legacyPersona else "",
                         onAdopt = { viewModel.adoptLegacyPersona(preset, state.legacyPersona) },
+                        hint = if (preset.builtin) "内置预设的卡存在本机覆盖层里，不修改内置本体。" else null,
                     )
                 }
             }
         }
     }
 }
-
-/**
- * 身份卡编辑区：八个字段 + 预览 + 清空，全部用现有 OutlinedTextField 范式与调色板。
- *
- * 列表字段（职责/禁区/准则/示例）在 UI 里是「一行一条」的多行文本，保存时才拆成 List，
- * 这样敲换行不会被立刻吃掉。预览直接渲染卡本体，所见即注入内容。
- */
-@Composable
-private fun IdentityCardEditor(
-    preset: AgentPreset,
-    initial: IdentityCard,
-    legacyPersona: String,
-    busy: Boolean,
-    onSave: (IdentityCard?) -> Unit,
-    onAdopt: () -> Unit,
-) {
-    val p = LocalQq.current
-    // 换预设时整块重建：remember 的 key 是 initial，展开另一张卡不会串内容。
-    var name by remember(initial) { mutableStateOf(initial.name) }
-    var identity by remember(initial) { mutableStateOf(initial.identity) }
-    var duties by remember(initial) { mutableStateOf(initial.duties.joinToString("\n")) }
-    var boundaries by remember(initial) { mutableStateOf(initial.boundaries.joinToString("\n")) }
-    var rules by remember(initial) { mutableStateOf(initial.rules.joinToString("\n")) }
-    var tone by remember(initial) { mutableStateOf(initial.tone) }
-    var examples by remember(initial) { mutableStateOf(initial.examples.joinToString("\n")) }
-    var freeform by remember(initial) { mutableStateOf(initial.freeform) }
-
-    val current = IdentityCard(
-        name = name.trim(),
-        identity = identity.trim(),
-        duties = duties.toItems(),
-        boundaries = boundaries.toItems(),
-        rules = rules.toItems(),
-        tone = tone.trim(),
-        examples = examples.toItems(),
-        freeform = freeform.trim(),
-    )
-    val preview = current.render()
-
-    Column(
-        Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        CardField("卡名", name, { name = it }, singleLine = true)
-        CardField("你是谁（一句话身份）", identity, { identity = it })
-        CardField("职责（一行一条）", duties, { duties = it })
-        CardField("禁区（一行一条，优先级最高）", boundaries, { boundaries = it })
-        CardField("准则（一行一条）", rules, { rules = it })
-        CardField("口吻", tone, { tone = it }, singleLine = true)
-        CardField("示例（一行一条）", examples, { examples = it })
-        CardField("自由补充", freeform, { freeform = it })
-
-        Text("预览", color = p.t3, fontSize = 11.sp)
-        Text(
-            preview.ifBlank { "（空卡：保存后不注入任何内容）" },
-            color = p.t2,
-            fontSize = 11.5.sp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(p.t3.copy(alpha = 0.08f))
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-        )
-
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            if (legacyPersona.isNotBlank() && current.freeform.isBlank() && initial.freeform.isBlank()) {
-                TextButton(enabled = !busy, onClick = onAdopt) { Text("转为身份卡", fontSize = 12.sp) }
-            }
-            TextButton(enabled = !busy, onClick = { onSave(null) }) { Text("清空", color = p.red, fontSize = 12.sp) }
-            TextButton(enabled = !busy && current.hasContent(), onClick = { onSave(current) }) {
-                Text(if (busy) "保存中…" else "保存", fontSize = 12.sp)
-            }
-        }
-        Text(
-            "清空只清这张卡；会话里已有的旧人设文本保持不动，会重新作为只读卡出现。",
-            color = p.t3,
-            fontSize = 10.sp,
-        )
-        if (preset.builtin) {
-            Text("内置预设的卡存在本机覆盖层里，不修改内置本体。", color = p.t3, fontSize = 10.sp)
-        }
-    }
-}
-
-@Composable
-private fun CardField(
-    label: String,
-    value: String,
-    onChange: (String) -> Unit,
-    singleLine: Boolean = false,
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        label = { Text(label, fontSize = 12.sp) },
-        singleLine = singleLine,
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(if (singleLine) Modifier else Modifier.heightIn(min = 72.dp, max = 160.dp)),
-    )
-}
-
-/** 多行文本 → 列表：去掉空行与首尾空白，顺序保持用户敲的顺序。 */
-private fun String.toItems(): List<String> =
-    splitToSequence('\n').map { it.trim() }.filter { it.isNotEmpty() }.toList()
 

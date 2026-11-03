@@ -84,6 +84,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import dev.dsh.mobile.core.data.preset.AgentPresetStore
 import dev.dsh.mobile.core.data.settings.SendMode
 import dev.dsh.mobile.core.data.settings.ThemeMode
 import dev.dsh.mobile.core.model.TransportKind
@@ -157,6 +158,8 @@ fun SettingsScreen(
     onOpenCapability: () -> Unit = {},
     /** null = 根列表；否则是当前子页的分类 id。 */
     section: String? = null,
+    /** 群聊角色卡仓库（T9.7a）；null 时整个「群聊角色卡」分组不渲染。 */
+    roleCardStore: AgentPresetStore? = null,
     /** 宿主是否已经为底部 tab 栏单独留过位置（根页 true，子页 false）。 */
     tabBarVisible: Boolean = true,
     onOpenSection: (String) -> Unit = {},
@@ -597,6 +600,21 @@ fun SettingsScreen(
                                     onValueChange = { viewModel.setGroupContextBudget((it / 4000f).toInt() * 4000) },
                                     valueRange = 8000f..80000f,
                                 )
+                            }
+                        }
+                        if (roleCardStore != null) {
+                            QqCardDivider()
+                            SubGroup(
+                                title = "群聊角色卡",
+                                subtitle = "监督 / 规划 / 检测 / 执行 + 自定义",
+                            ) {
+                                Text(
+                                    "角色卡只决定「告诉模型它是谁」；怎么排队开工由上面的群组编排决定。",
+                                    color = p.t3,
+                                    fontSize = qqFontBody(11.5.sp),
+                                )
+                                Spacer(Modifier.height(7.dp))
+                                GroupRoleCardsSection(roleCardStore)
                             }
                         }
                         QqCardDivider()

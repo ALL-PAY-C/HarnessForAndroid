@@ -8,10 +8,12 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import dev.dsh.mobile.core.data.group.GroupRole
 
 private val Context.presetDataStore by preferencesDataStore(
     name = "dsh_presets",
@@ -27,6 +29,11 @@ class AgentPresetStore(private val dataStore: DataStore<Preferences>) {
     private val key = stringPreferencesKey("presets")
     /** 身份卡覆盖表：presetId -> IdentityCard。单独一条 key 是为了让内置预设也能挂卡（本体不可覆盖）。 */
     private val cardsKey = stringPreferencesKey("preset_cards")
+    /**
+     * 群聊角色卡覆盖表（T9.7a）：roleId -> IdentityCard，与 [cardsKey] 同一套范式。
+     * 默认卡写死在 [GroupRole.defaultCard]，这里只存用户改过的；清空即回落到默认卡。
+     */
+    private val roleCardsKey = stringPreferencesKey("group_role_cards")
     private val json = Json { ignoreUnknownKeys = true }
 
     /** 标准预设 + 导入的预设；内置预设不在这个列表里（用 [AgentPresets.builtins]）。 */
@@ -60,6 +67,22 @@ class AgentPresetStore(private val dataStore: DataStore<Preferences>) {
             val map = decodeCards(prefs[cardsKey].orEmpty()).toMutableMap()
             if (card == null || !card.hasContent()) map.remove(resolved) else map[resolved] = card
             prefs[cardsKey] = json.encodeToString(map)
+        }
+    }
+
+    /** 角色卡覆盖表（roleId -> 卡），设置页直接 collect 回显。 */
+    val roleCards: Flow<Map<String, IdentityCard>> =
+        dataStore.data.map { decodeCards(it[roleCardsKey].orEmpty()) }
+
+    /** 角色当前生效的卡：覆盖表优先，没有就回落到 [GroupRole.defaultCard]。 */
+    suspend fun roleCard(role: GroupRole): IdentityCard = roleCards.first()[role.id] ?: role.defaultCard()
+
+    /** 写 / 清空一张角色卡（null 或空卡 = 清空覆盖，读侧回到默认卡）。 */
+    suspend fun setRoleCard(role: GroupRole, card: IdentityCard?) {
+        dataStore.edit { prefs ->
+            val map = decodeCards(prefs[roleCardsKey].orEmpty()).toMutableMap()
+            if (card == null || !card.hasContent()) map.remove(role.id) else map[role.id] = card
+            prefs[roleCardsKey] = json.encodeToString(map)
         }
     }
 

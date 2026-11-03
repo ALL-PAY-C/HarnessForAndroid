@@ -124,6 +124,9 @@ class AppContainer(private val context: Context) {
     val gateway by lazy { GatewayManager(context) }
     val presetStore by lazy { dev.dsh.mobile.core.data.preset.AgentPresetStore(context) }
 
+    /** 群聊规划书（T9.7a）：一个会话一本，DataStore 单条 JSON，不建表不迁移。 */
+    val groupLedger by lazy { dev.dsh.mobile.core.data.group.GroupLedgerStore(context) }
+
     /**
      * 本会话实际生效的系统提示词：预设按会话取（会话内切过就用会话的，否则跟随全局默认），
      * 开关也按会话取（没动过的会话按预设自带的默认），所以下一轮请求自动用新选择。

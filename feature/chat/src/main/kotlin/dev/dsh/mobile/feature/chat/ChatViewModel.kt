@@ -3,6 +3,10 @@ package dev.dsh.mobile.feature.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.dsh.mobile.core.common.DshResult
+import dev.dsh.mobile.core.data.group.GroupLedger
+import dev.dsh.mobile.core.data.group.GroupLedgerStore
+import dev.dsh.mobile.core.data.group.LedgerEntry
+import dev.dsh.mobile.core.data.group.LedgerStatus
 import dev.dsh.mobile.core.data.repo.ChatRepository
 import dev.dsh.mobile.core.data.repo.SendQueue
 import dev.dsh.mobile.core.data.preset.AgentPresets
@@ -135,6 +139,8 @@ class ChatViewModel(
     /** 发送队列（活过页面销毁，见 [SendQueue]）。 */
     private val sendQueue: SendQueue,
     private val sessionId: String,
+    /** 群聊规划书仓库（T9.7a）：一个会话一本，DataStore 单条 JSON，与房间账本不是同一份数据。 */
+    private val ledgerStore: GroupLedgerStore,
     /** 执行池的 Agent 快照（core:protocol ExecutionPool.agents）；拿不到就传 null。 */
     executionAgents: StateFlow<List<AgentRuntimeState>>? = null,
     // 放在最后：调用方（app/AppNav）用尾随 lambda 传 cwd，尾随 lambda 只认最后一个参数。
@@ -143,6 +149,39 @@ class ChatViewModel(
 
 
     private val error = MutableStateFlow<String?>(null)
+
+    /**
+     * 群聊规划书（T9.7a）：人写的项目清单，跟引擎写的房间账本 [LedgerSnapshot] 是两件事——
+     * 前者是「谁负责哪条、到哪一步」，后者是运行时状态。UI 单独 collect，不塞进 ChatUiState，
+     * 免得往已经五路的 combine 里再加一路。
+     */
+    val groupLedger: StateFlow<GroupLedger> = ledgerStore.ledger(sessionId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GroupLedger.EMPTY)
+
+    /** 改条目状态；不存在的 id 由账本侧忽略。 */
+    fun setLedgerStatus(id: String, status: LedgerStatus) {
+        viewModelScope.launch { ledgerStore.updateStatus(sessionId, id, status) }
+    }
+
+    /** 新增一条（标题必填，空标题由账本侧拒绝，不会长出空行）。 */
+    fun addLedgerEntry(title: String, owner: String = "") {
+        val text = title.trim()
+        if (text.isEmpty()) return
+        viewModelScope.launch {
+            ledgerStore.upsert(
+                sessionId,
+                LedgerEntry(id = UUID.randomUUID().toString().take(8), title = text, owner = owner.trim()),
+            )
+        }
+    }
+
+    fun appendLedgerNote(id: String, note: String) {
+        viewModelScope.launch { ledgerStore.appendNote(sessionId, id, note) }
+    }
+
+    fun removeLedgerEntry(id: String) {
+        viewModelScope.launch { ledgerStore.remove(sessionId, id) }
+    }
 
     init {
         // 预设抽屉是另一个 VM，靠这个共享 id 判断「切的是本会话」还是「改全局默认」。

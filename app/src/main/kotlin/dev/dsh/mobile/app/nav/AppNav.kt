@@ -363,6 +363,7 @@ fun AppNav(container: AppContainer) {
                                         container.models,
                                         container.sendQueue,
                                         id,
+                                        container.groupLedger,
                                         container.executionAgents,
                                     ) { container.cwd() }
                                 }
@@ -451,6 +452,7 @@ fun AppNav(container: AppContainer) {
                                         container.models,
                                         container.sendQueue,
                                         id,
+                                        container.groupLedger,
                                         container.executionAgents,
                                     ) { container.cwd() }
                                 }
@@ -651,6 +653,7 @@ fun AppNav(container: AppContainer) {
                             onOpenAppearance = { nav.navigate(Routes.SETTINGS_APPEARANCE) { launchSingleTop = true } },
                             onOpenCapability = { nav.navigate(Routes.SETTINGS_CAPABILITY) { launchSingleTop = true } },
                             onOpenSection = { id -> nav.navigate(Routes.settingsSection(id)) { launchSingleTop = true } },
+                            roleCardStore = container.presetStore,
                             tabBarVisible = true,
                         )
                     }
@@ -669,6 +672,7 @@ fun AppNav(container: AppContainer) {
                                 { item.content() }
                             },
                             section = section,
+                            roleCardStore = container.presetStore,
                             tabBarVisible = false,
                             onBack = { nav.popBackStack() },
                         )

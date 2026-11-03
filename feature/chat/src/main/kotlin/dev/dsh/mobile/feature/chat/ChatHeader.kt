@@ -151,6 +151,9 @@ internal fun ChatHeader(
     onOpenSpeakerPicker: () -> Unit,
     onOpenPreset: () -> Unit,
     onOpenAgentSheet: () -> Unit,
+    /** 规划书未完成条目数（T9.7a）：0 时入口只写「规划」，不显示 0。 */
+    ledgerOpen: Int,
+    onOpenLedger: () -> Unit,
 ) {
     val p = LocalQq.current
     QqTopBar(
@@ -213,6 +216,23 @@ internal fun ChatHeader(
         },
         trailing = {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // 规划书入口（T9.7a）：群聊才有；条数是未完成数，全清时不显示 0。
+                if (state.isGroup) {
+                    Text(
+                        if (ledgerOpen > 0) "规划 " + ledgerOpen else "规划",
+                        color = if (ledgerOpen > 0) p.accent else p.t2,
+                        fontSize = qqFontBody(12.sp),
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (ledgerOpen > 0) p.accent.copy(alpha = 0.12f) else Color.Transparent,
+                            )
+                            .clickable { onOpenLedger() }
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                    )
+                }
                 // 主持人模式（brief-then-moderated）才给「指定」：把下一位发言人钉成某个成员，
                 // 一次有效；没指定时只是一枚安静的文字入口，不占位也不改观感。
                 if (moderatorMode) {

@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import dev.dsh.mobile.core.data.preset.AgentPresets
+import dev.dsh.mobile.core.data.group.GroupRole
+import dev.dsh.mobile.core.data.group.LedgerStatus
 import dev.dsh.mobile.core.data.repo.SendQueue
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -200,6 +202,9 @@ fun ChatScreen(
     // 群聊 T5.4：点开的成员卡片、以及「指定下一位发言人」选择器（都按会话重置）。
     var cardMember by remember(state.sessionId) { mutableStateOf<Participant?>(null) }
     var speakerPicker by remember(state.sessionId) { mutableStateOf(false) }
+    // 项目规划书面板（T9.7a）：开关留在这一层，不新增全局状态；按会话重置。
+    var ledgerOpen by remember(state.sessionId) { mutableStateOf(false) }
+    val groupLedger by viewModel.groupLedger.collectAsStateWithLifecycle()
 
     fun attach(uri: Uri, label: String) {
         scope.launch {
@@ -402,7 +407,24 @@ fun ChatScreen(
             onOpenSpeakerPicker = { speakerPicker = true },
             onOpenPreset = { presetOpen = true },
             onOpenAgentSheet = { picking = true },
+            ledgerOpen = groupLedger.entries.count { it.status != LedgerStatus.Done },
+            onOpenLedger = { ledgerOpen = true },
         )
+
+        // 规划书面板：负责人可能是角色（supervisor/planner/…）也可能是群成员 id，两种都还原成名字。
+        if (ledgerOpen) {
+            val ownerNames = GroupRole.entries.associate { it.id to it.label } +
+                state.participants.associate { it.id to it.name }
+            GroupLedgerBoard(
+                ledger = groupLedger,
+                ownerNames = ownerNames,
+                onDismiss = { ledgerOpen = false },
+                onAdd = { title, owner -> viewModel.addLedgerEntry(title, owner) },
+                onStatus = { id, status -> viewModel.setLedgerStatus(id, status) },
+                onNote = { id, note -> viewModel.appendLedgerNote(id, note) },
+                onRemove = { id -> viewModel.removeLedgerEntry(id) },
+            )
+        }
 
         if (usageOpen) UsageDialog(
             state = state,
