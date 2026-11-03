@@ -25,16 +25,42 @@ private val Context.presetDataStore by preferencesDataStore(
 class AgentPresetStore(private val dataStore: DataStore<Preferences>) {
     constructor(context: Context) : this(context.applicationContext.presetDataStore)
     private val key = stringPreferencesKey("presets")
+    /** 身份卡覆盖表：presetId -> IdentityCard。单独一条 key 是为了让内置预设也能挂卡（本体不可覆盖）。 */
+    private val cardsKey = stringPreferencesKey("preset_cards")
     private val json = Json { ignoreUnknownKeys = true }
 
     /** 标准预设 + 导入的预设；内置预设不在这个列表里（用 [AgentPresets.builtins]）。 */
     val presets = dataStore.data.map { decode(it[key].orEmpty()) }
+
+    /** 覆盖表（presetId -> 身份卡），UI 直接 collect 做编辑区回显。 */
+    val cards = dataStore.data.map { decodeCards(it[cardsKey].orEmpty()) }
 
     /** 内置优先，其次导入的；老版本存的 "default" 归一成标准模式。 */
     suspend fun get(id: String): AgentPreset? {
         val resolved = AgentPresets.resolveId(id)
         AgentPresets.builtinOf(resolved)?.let { return it }
         return presets.first().firstOrNull { it.id == resolved }
+    }
+
+    /**
+     * 预设 id 对应的身份卡：覆盖表优先，其次预设本体自带的 [AgentPreset.card]。
+     * 内置预设本体写死在代码里，所以用户给它们编的卡只能落在覆盖表里。
+     */
+    suspend fun cardOf(id: String): IdentityCard? {
+        val resolved = AgentPresets.resolveId(id)
+        this.cards.first()[resolved]?.let { return it }
+        return get(resolved)?.card
+    }
+
+    /** 写 / 清空一张卡（null 或空卡 = 清空，读侧回落到预设自带卡）。内置预设也允许。 */
+    suspend fun setCard(id: String, card: IdentityCard?) {
+        val resolved = AgentPresets.resolveId(id)
+        require(resolved.isNotBlank()) { "预设 id 不能为空" }
+        dataStore.edit { prefs ->
+            val map = decodeCards(prefs[cardsKey].orEmpty()).toMutableMap()
+            if (card == null || !card.hasContent()) map.remove(resolved) else map[resolved] = card
+            prefs[cardsKey] = json.encodeToString(map)
+        }
     }
 
     suspend fun upsert(preset: AgentPreset) {
@@ -63,6 +89,9 @@ class AgentPresetStore(private val dataStore: DataStore<Preferences>) {
         require(id != "default" && id != AgentPresets.standard.id) { standardMessage }
         require(id !in AgentPresets.builtinIds) { builtinMessage }
     }
+
+    private fun decodeCards(raw: String): Map<String, IdentityCard> =
+        runCatching { json.decodeFromString<Map<String, IdentityCard>>(raw) }.getOrDefault(emptyMap())
 
     private fun decode(raw: String): List<AgentPreset> = listOf(AgentPresets.standard) +
         runCatching { json.decodeFromString<List<AgentPreset>>(raw) }.getOrDefault(emptyList())

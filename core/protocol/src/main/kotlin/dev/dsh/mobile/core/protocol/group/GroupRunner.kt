@@ -796,10 +796,17 @@ internal class GroupRunner(
         )
         // 群状态行每轮现算：谁在跑、谁空着。成员据此知道自己要不要等别人。
         val stateLine = groupStateLine(pool.agents.value, turn.plan.members, member.id)
+        // 席位身份：卡优先，没卡回落旧 persona；两者都空时拼接结果与改造前逐字一致。
+        val seatCard = member.card.ifBlank { member.persona }.trim()
+        val seatSystem = if (seatCard.isEmpty()) {
+            member.cfg.systemPrompt + "\n\n" + extra
+        } else {
+            member.cfg.systemPrompt + "\n\n用户为该席位设定的人设与规则，请始终遵守：\n" + seatCard + "\n\n" + extra
+        }
         val asm = threads.buildContextReport(
             sessionId = task.sessionId,
             agentId = member.thread,
-            systemPrompt = member.cfg.systemPrompt + "\n\n" + extra,
+            systemPrompt = seatSystem,
             groupState = stateLine,
             userTurn = userTurn,
             budgetChars = turn.plan.contextBudget,

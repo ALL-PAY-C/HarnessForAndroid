@@ -9,6 +9,7 @@ import dev.dsh.mobile.core.model.SessionStatus
 import dev.dsh.mobile.core.model.TokenUsage
 import dev.dsh.mobile.core.model.ToolCall
 import dev.dsh.mobile.core.model.TransportKind
+import dev.dsh.mobile.core.protocol.identity.IdentityInjector
 import dev.dsh.mobile.core.protocol.transport.DshCarrier
 import dev.dsh.mobile.core.protocol.transport.DshMux
 import dev.dsh.mobile.core.protocol.transport.LineCarrier
@@ -47,10 +48,13 @@ class AcpTransport(
     muxOptions: MuxOptions = MuxOptions(),
     private val defaultCwd: () -> String = { "/" },
     /**
-     * 会话人设 / 额外系统提示。远程会话没有 LocalEngineTransport 的 extraSystem 字段，
-     * 只能在首条用户文本上补一次（见 [personaWrapped]）。默认空实现 = 老行为：原文照发。
+     * 会话身份卡文本（IdentityCard.render()，兼容旧 persona）。远程会话没有 LocalEngineTransport
+     * 的 extraSystem 字段，只能借用户文本带过去，注入节奏由 [IdentityInjector] 决定。
+     * 默认空实现 = 老行为：原文照发。
      */
     private val personaProvider: suspend (String) -> String = { "" },
+    /** 补注入间隔（轮）。默认 6；测试可传 1 强制每轮，或传大值只看首轮。 */
+    identityEveryTurns: Int = IdentityInjector.DEFAULT_EVERY_TURNS,
 ) : DshTransport {
 
     /**
@@ -64,6 +68,7 @@ class AcpTransport(
         reconnectPolicy: ReconnectPolicy = ReconnectPolicy(),
         defaultCwd: () -> String = { "/" },
         personaProvider: suspend (String) -> String = { "" },
+        identityEveryTurns: Int = IdentityInjector.DEFAULT_EVERY_TURNS,
     ) : this(
         carrier = LineCarrier(scope, channelProvider),
         kind = kind,
@@ -71,6 +76,7 @@ class AcpTransport(
         muxOptions = MuxOptions.from(reconnectPolicy),
         defaultCwd = defaultCwd,
         personaProvider = personaProvider,
+        identityEveryTurns = identityEveryTurns,
     )
 
     private val _events = MutableSharedFlow<DshEvent>(
@@ -85,8 +91,8 @@ class AcpTransport(
 
     /** P5 barrier：prompt 响应后合成的终态 marker 由 collector 消费完再 ACK，保证旧 chunk 全部消费后才放 sendGate。 */
     private val turnAcks = ConcurrentHashMap<String, CompletableDeferred<Unit>>()
-    /** 已注入过人设的会话 → 那次注入的原文。人设没变就不重复注入，别每轮都往历史里塞一遍。 */
-    private val personaInjected = ConcurrentHashMap<String, String>()
+    /** 身份注入记账：首轮 + 每 N 轮 + 卡变 + 关/续会话 + 压缩后补注入（见 [IdentityInjector]）。 */
+    private val identity = IdentityInjector(identityOf = { sessionId -> personaProvider(sessionId) }, everyTurns = identityEveryTurns)
 
     private val mux = DshMux(
         carrier = carrier,
@@ -259,18 +265,20 @@ class AcpTransport(
     }
 
     override suspend fun resumeSession(sessionId: String): Session {
+        // 续接 = 远端历史可能已被裁剪过，身份必须重新落一次。
+        identity.invalidate(sessionId)
         val res = mux.call("session/resume", buildJsonObject { put("sessionId", sessionId) }, 120_000L)
         return res.toSession().copy(id = sessionId)
     }
 
     override suspend fun closeSession(sessionId: String) {
-        // 会话关了，人设注入记录跟着作废：同名重建时要能重新注入一次。
-        personaInjected.remove(sessionId)
+        // 会话关了，注入记账跟着作废：同名重建时要从第 1 轮重新注入。
+        identity.forget(sessionId)
         mux.call("session/close", buildJsonObject { put("sessionId", sessionId) }, 20_000L)
     }
 
     override suspend fun prompt(sessionId: String, text: String, images: List<String>, turnId: String?): String {
-        val body = personaWrapped(sessionId, text)
+        val body = identity.wrap(sessionId, text)
         val res = mux.call(
             "session/prompt",
             buildJsonObject {
@@ -303,21 +311,12 @@ class AcpTransport(
     }
 
     /**
-     * 把会话人设前置到本轮文本上，同一人设只注入一次（改过之后下一轮重新注入）。
-     *
-     * 远程 transport 的 session/prompt 没有「系统提示」字段，ACPP 端也不会替我们拼 persona，
-     * 所以只能借第一条用户消息带过去：让它出现在远端历史里一次，而不是每轮重复一遍。
+     * 远端侧发生压缩（历史被摘要替换）后调用：身份文本已经不在历史里了，下一轮必须重发。
+     * 挂点是本类对外的唯一入口——压缩在远端服务端完成，本地看不到过程，只能由知道结果的
+     * 一方（事件流里的 [DshEvent.Compacted] 消费者）回调进来。
      */
-    private suspend fun personaWrapped(sessionId: String, text: String): String {
-        val persona = runCatching { personaProvider(sessionId) }.getOrNull().orEmpty().trim()
-        if (persona.isEmpty()) {
-            // 人设被清空：顺手丢掉「已注入」的记账，否则同一份人设再打开时会被当成已注入而跳过。
-            personaInjected.remove(sessionId)
-            return text
-        }
-        if (personaInjected[sessionId] == persona) return text
-        personaInjected[sessionId] = persona
-        return "用户为这个会话设定的人设与规则，请始终遵守：\n" + persona + "\n\n" + text
+    fun onCompacted(sessionId: String) {
+        identity.invalidate(sessionId)
     }
 
     override suspend fun cancel(sessionId: String) {

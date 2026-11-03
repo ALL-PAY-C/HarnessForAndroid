@@ -6,6 +6,8 @@ import dev.dsh.mobile.core.data.preset.AgentPreset
 import dev.dsh.mobile.core.data.preset.AgentPresetImporter
 import dev.dsh.mobile.core.data.preset.AgentPresetStore
 import dev.dsh.mobile.core.data.preset.AgentPresets
+import dev.dsh.mobile.core.data.preset.IdentityCard
+import dev.dsh.mobile.core.data.preset.IdentityCards
 import dev.dsh.mobile.core.data.settings.SettingsStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +39,10 @@ data class PresetDrawerState(
     val busy: Boolean = false,
     /** 面板内常驻的红字错误；null 表示没有错误。 */
     val error: String? = null,
+    /** presetId -> 身份卡（覆盖表；内置预设的卡也在这里）。 */
+    val cards: Map<String, IdentityCard> = emptyMap(),
+    /** 当前会话还留着的旧自由文本人设；只在「没有卡」时合成只读卡展示。 */
+    val legacyPersona: String = "",
 ) {
     val defaultName: String get() = presets.firstOrNull { it.id == defaultPresetId }?.name ?: AgentPresets.standard.name
 }
@@ -50,6 +56,8 @@ class PresetDrawerViewModel(
     private val presetStore: AgentPresetStore,
     private val settingsStore: SettingsStore,
     private val importer: AgentPresetImporter = AgentPresetImporter(),
+    /** 取会话旧人设文本（会话实体上那个 persona 字段）；默认空实现 = 没有旧数据。 */
+    private val personaOf: suspend (String) -> String = { "" },
 ) : ViewModel() {
 
     private val busy = MutableStateFlow(false)
@@ -58,19 +66,22 @@ class PresetDrawerViewModel(
     val uiState: StateFlow<PresetDrawerState> = combine(
         settingsStore.settings,
         presetStore.presets,
+        presetStore.cards,
         ActiveChatSession.id,
         busy,
-        error,
-    ) { settings, imported, sessionId, b, e ->
+    ) { settings, imported, cards, sessionId, b ->
         PresetDrawerState(
             // 内置在前、导入的在后；同 id 的旧副本已经被 Store 过滤掉，这里再兜一次底。
             presets = AgentPresets.builtins + imported.filterNot { it.id in AgentPresets.builtinIds },
             defaultPresetId = settings.presetFor(sessionId.ifBlank { null }),
             sessionScoped = sessionId.isNotBlank(),
             busy = b,
-            error = e,
+            cards = cards,
+            // 旧人设只在「当前生效的那张预设没有卡」时才有意义，所以读的是当前会话的人设。
+            legacyPersona = if (sessionId.isBlank()) "" else runCatching { personaOf(sessionId) }.getOrDefault(""),
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PresetDrawerState())
+    }.combine(error) { s, e -> s.copy(error = e) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PresetDrawerState())
 
     fun import(input: String) {
         if (busy.value) return
@@ -130,6 +141,37 @@ class PresetDrawerViewModel(
             }
         }
     }
+
+    /** 写 / 清空一张身份卡（null = 清空）。内置预设也能挂卡，卡存在覆盖表里，不碰预设本体。 */
+    fun saveCard(id: String, card: IdentityCard?) {
+        error.value = null
+        viewModelScope.launch {
+            try {
+                presetStore.setCard(id, card)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                error.value = e.message ?: "身份卡保存失败"
+            }
+        }
+    }
+
+    /**
+     * 「转为身份卡」：把会话里那坨旧自由文本人设落成一张真卡，之后再改字段就不用改数据库了。
+     * 原 persona 保持不动（回退用），只是从此读侧优先看卡。
+     */
+    fun adoptLegacyPersona(preset: AgentPreset, persona: String) {
+        val text = persona.trim()
+        if (text.isEmpty()) return
+        saveCard(preset.id, IdentityCard(name = preset.name.ifBlank { "身份卡" }, freeform = text))
+    }
+
+    /** 某预设当前生效的卡：覆盖表 > 预设自带 > 旧人设合成的只读卡。 */
+    fun cardFor(preset: AgentPreset): IdentityCard? =
+        IdentityCards.ofCard(
+            uiState.value.cards[preset.id] ?: preset.card,
+            if (preset.id == uiState.value.defaultPresetId) uiState.value.legacyPersona else "",
+        )
 
     fun clearError() {
         error.value = null

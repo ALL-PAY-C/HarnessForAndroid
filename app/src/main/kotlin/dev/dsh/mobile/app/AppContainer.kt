@@ -139,6 +139,19 @@ class AppContainer(private val context: Context) {
     }
 
     /**
+     * 会话身份文本：预设身份卡渲染结果优先，没有卡时回落到会话的旧自由文本 persona。
+     *
+     * 远端（把文本塞进首条 user 消息）与本地（拼 extraSystem）都从这一个入口取，
+     * 两条路径看到的身份永远一致；卡是预设级的，换会话即换身份。
+     */
+    private suspend fun identityText(sessionId: String): String {
+        val presetId = settings.settings.first().presetFor(sessionId)
+        val card = runCatching { presetStore.cardOf(presetId) }.getOrNull()
+        if (card != null && card.hasContent()) return card.render()
+        return db.sessionDao().byId(sessionId)?.persona.orEmpty()
+    }
+
+    /**
      * 当前可被模型调用的技能目录（名字 + 一句描述）。
      *
      * 技能库落在 :node 引擎的 DSH_HOME 下，这边看不到文件，只能问 /skill-manager；
@@ -725,7 +738,7 @@ class AppContainer(private val context: Context) {
                             if (!r.ok) throw IllegalStateException(r.error ?: "phone 工具失败")
                             r.output
                         },
-                        personaProvider = { id -> db.sessionDao().byId(id)?.persona.orEmpty() },
+                        personaProvider = { id -> identityText(id) },
                         autoApprove = { settings.settings.first().autoApproveTools },
                         // 工具桥（原生文件/通道/后台任务）与单聊上下文预算，见 .mock/agent-env/task-app-shell 与 task-proto-wiring 报告。
                         fsExec = fsExec,
@@ -767,7 +780,7 @@ class AppContainer(private val context: Context) {
                                 cwd()
                             }
                         },
-                        personaProvider = { id -> db.sessionDao().byId(id)?.persona.orEmpty() },
+                        personaProvider = { id -> identityText(id) },
                     )
                 }
                 _transport.value = t

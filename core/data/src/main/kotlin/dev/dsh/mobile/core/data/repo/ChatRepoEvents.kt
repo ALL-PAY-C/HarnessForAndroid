@@ -132,6 +132,7 @@ internal fun DshEvent.sessionIdOrNull(): String? = when (this) {
     is DshEvent.Permission -> sessionId
     is DshEvent.PermissionResolved -> sessionId
     is DshEvent.TurnEnd -> sessionId
+    is DshEvent.Compacted -> sessionId
     is DshEvent.Raw -> null
 }
 
@@ -146,6 +147,7 @@ internal fun DshEvent.withLocalSessionId(localId: String): DshEvent = when (this
     is DshEvent.Permission -> copy(sessionId = localId, request = request.copy(sessionId = localId))
     is DshEvent.PermissionResolved -> copy(sessionId = localId)
     is DshEvent.TurnEnd -> copy(sessionId = localId)
+    is DshEvent.Compacted -> copy(sessionId = localId)
     is DshEvent.Raw -> this
 }
 

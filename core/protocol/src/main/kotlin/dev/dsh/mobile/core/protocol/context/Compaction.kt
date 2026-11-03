@@ -48,6 +48,11 @@ internal class Compaction(
     private val postOnce: suspend (LlmConfig, JsonObject) -> JsonObject,
     /** 上游上报的上下文占用（prompt+completion tokens）；从没上报过返回 null。 */
     private val usedTokensOf: (String) -> Int?,
+    /**
+     * 压缩真发生了（摘要已落盘并投影）时回调。远端 transport 靠它知道「历史已被替换，
+     * 身份文本随之蒸发」，于是下一轮重注入。默认空实现 = 纯记账，不惊动任何人。
+     */
+    private val onCompacted: (String) -> Unit = {},
 ) {
     /** 每会话已摘要掉的历史条数：超预算时别每轮重复压同一段（省一次 LLM 请求）。 */
     private val summarizedCount = java.util.concurrent.ConcurrentHashMap<String, Int>()
@@ -128,6 +133,8 @@ internal class Compaction(
         val after = ContextBudget.tokensOf(summary.length)
         projections.noteCompaction(sessionId, before, after, summary.length)
         projections.noteSummaryChars(sessionId, summary.length)
+        runCatching { onCompacted(sessionId) }
+            .onFailure { AppLog.w("压缩回调失败：" + (it.message ?: it.javaClass.simpleName)) }
     }
 
     /** LLM 不可用时的兜底摘要：只留最近若干条 80 字节选，比整段丢掉强。 */

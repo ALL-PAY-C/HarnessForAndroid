@@ -55,6 +55,13 @@ sealed interface DshEvent {
         val turnId: String? = null,
         val truncatedToolCall: Boolean = false,
     ) : DshEvent
+    /**
+     * 上下文压缩已发生：这个会话的历史已被摘要替换。
+     *
+     * 远端 ACP 没有 system 字段，身份只能塞在某条 user 文本里；那条消息被压掉之后身份就永久消失，
+     * 所以压缩是「必须重注入」的信号（见 IdentityInjector.invalidate）。
+     */
+    data class Compacted(val sessionId: String) : DshEvent
     /** Unknown notification, forwarded for plugin/extension consumers. */
     data class Raw(val method: String, val params: kotlinx.serialization.json.JsonObject) : DshEvent
 }

@@ -109,8 +109,14 @@ data class LlmConfig(
 data class GroupMember(
     val id: String,
     val name: String,
+    /** 旧的人设自由文本；[card] 为空时回落到它（老调用方只填 persona 也能用）。 */
     val persona: String,
     val cfg: LlmConfig,
+    /**
+     * 席位身份卡渲染结果（IdentityCard.render()）。空 = 没卡，退到 [persona]。
+     * 群聊里每个成员的自述/边界都靠它，没有它就只是一段没有名字的人设文本。
+     */
+    val card: String = "",
     /**
      * 这个席位自己的上下文线程键。
      *
@@ -382,6 +388,8 @@ class LocalEngineTransport(
         engineRpc = engineRpc,
         postOnce = { cfg, body -> stream.postOnce(cfg, body) },
         usedTokensOf = { sid -> lastUsageTokens[sid]?.toInt()?.takeIf { it > 0 } },
+        // 压缩发生后历史里已经没有身份文本了：赶紧往事件流上喊一声，让注入侧重发。
+        onCompacted = { sid -> post(DshEvent.Compacted(sid)) },
     )
 
     /**

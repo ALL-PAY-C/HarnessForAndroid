@@ -183,7 +183,14 @@ fun AppNav(container: AppContainer) {
     // 这样抽屉路由与聊天页拿到的是同一个实例（默认预设切换后抽屉标题立刻跟着变）。
     val presetVm: PresetDrawerViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { PresetDrawerViewModel(container.presetStore, container.settings) }
+            initializer {
+                PresetDrawerViewModel(
+                    container.presetStore,
+                    container.settings,
+                    // 旧自由文本人设还在会话实体上：没有卡时用它合成只读卡展示。
+                    personaOf = { id -> container.db.sessionDao().byId(id)?.persona.orEmpty() },
+                )
+            }
         },
     )
     val presetState by presetVm.uiState.collectAsStateWithLifecycle()
