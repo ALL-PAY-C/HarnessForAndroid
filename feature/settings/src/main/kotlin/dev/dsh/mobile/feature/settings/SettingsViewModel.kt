@@ -17,6 +17,7 @@ import dev.dsh.mobile.core.data.settings.ThemeMode
 import dev.dsh.mobile.core.data.update.UpdateInfo
 import dev.dsh.mobile.core.data.update.Updater
 import java.io.File
+import dev.dsh.mobile.core.model.BackMaterial
 import dev.dsh.mobile.core.model.Endpoint
 import dev.dsh.mobile.core.model.RuntimeControl
 import dev.dsh.mobile.core.model.RuntimeState
@@ -281,6 +282,24 @@ class SettingsViewModel(
     fun setGlassAlpha(v: Float) = launch { settingsStore.setGlassAlpha(v) }
     fun setGlassBlur(v: Int) = launch { settingsStore.setGlassBlur(v) }
 
+    /**
+     * 「恢复默认外观」的唯一实现。以前这段内联在设置页的折叠卡里，页面拆成子页后
+     * 两处都要用，所以收进 ViewModel —— 不再有第二份同样的十行调用。
+     */
+    fun resetAppearance() {
+        setAppIconStyle("system")
+        setCustomIconUri("")
+        setBackgroundUri("")
+        setAccent(DEFAULT_ACCENT)
+        setRadius(18)
+        setFontScale(1f)
+        setDensity(1f)
+        // 材质也一起回默认：否则「恢复默认外观」后仍停在液态，用户会以为没生效。
+        setBackMaterial(BackMaterial.DEFAULT.key)
+        setGlassAlpha(0.82f)
+        setGlassBlur(0)
+    }
+
     // ---- layout ----
     fun setGroup(v: Boolean) = launch { settingsStore.setGroupSessions(v) }
 
@@ -399,5 +418,8 @@ class SettingsViewModel(
     private companion object {
         /** 历史设置里 runtimeVersion 的占位值，见 init 中的归一化。 */
         const val LEGACY_BUNDLED = "bundled"
+
+        /** 与设置页 ACCENTS 的第一个蓝一致，恢复默认外观时用它。 */
+        const val DEFAULT_ACCENT = 0xFF0099FF
     }
 }

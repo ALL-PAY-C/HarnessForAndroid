@@ -74,13 +74,12 @@ import dev.dsh.mobile.core.model.SessionStatus
 import dev.dsh.mobile.design.Ava
 import dev.dsh.mobile.design.CollapsibleSection
 import dev.dsh.mobile.design.EmptyState
-import dev.dsh.mobile.design.IconBtn
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider
 import dev.dsh.mobile.design.QqRow
 import dev.dsh.mobile.design.QqShape
 import dev.dsh.mobile.design.QqSpace
-import dev.dsh.mobile.design.QqTopBar
+import dev.dsh.mobile.design.QqScreenTopBar
 import dev.dsh.mobile.design.RunPill
 import dev.dsh.mobile.design.StatusCapsule
 import dev.dsh.mobile.design.qqFontBody
@@ -122,16 +121,18 @@ fun AgentsScreen(
 
     Box(Modifier.fillMaxSize().background(p.bg)) {
         Column(Modifier.fillMaxSize()) {
-            QqTopBar(
-                leading = { IconBtn(Icons.Filled.Menu, "菜单", onOpenDrawer) },
-                trailing = {
+            QqScreenTopBar(
+                title = "Agent",
+                navigationIcon = Icons.Filled.Menu,
+                navigationDescription = "菜单",
+                onNavigationClick = onOpenDrawer,
+                // 运行状态胶囊占右侧操作槽位，位置与迁移前完全一致。
+                actions = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         StatusCapsule(state.runtime)
                     }
                 },
-            ) {
-                Text("Agent", color = p.t1, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-            }
+            )
 
             LazyColumn(
                 Modifier.fillMaxSize(),

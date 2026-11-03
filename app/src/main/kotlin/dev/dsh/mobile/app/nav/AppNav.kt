@@ -86,6 +86,8 @@ import dev.dsh.mobile.feature.chat.PresetDrawerPanel
 import dev.dsh.mobile.feature.chat.PresetDrawerViewModel
 import dev.dsh.mobile.feature.sessions.SessionsScreen
 import dev.dsh.mobile.feature.sessions.SessionsViewModel
+import dev.dsh.mobile.feature.settings.AppAppearanceScreen
+import dev.dsh.mobile.feature.settings.AppGatewayScreen
 import dev.dsh.mobile.feature.settings.ExtrasScreen
 import dev.dsh.mobile.feature.settings.SettingsScreen
 import dev.dsh.mobile.feature.settings.SettingsViewModel
@@ -104,10 +106,14 @@ private object Routes {
     const val TERMINAL = "terminal"
     const val SEARCH = "search"
     const val EXTRAS = "settings/extras"
+    const val SETTINGS_SECTION = "settings/section/{section}"
+    const val SETTINGS_APPEARANCE = "settings/appearance"
+    const val SETTINGS_GATEWAY = "settings/gateway"
     const val PLUGIN_PAGE = "plugin-page/{pageId}"
     fun chat(id: String) = "chat/$id"
     fun chatSettings(id: String) = "chat/$id/settings"
     fun pluginPage(id: String) = "plugin-page/$id"
+    fun settingsSection(id: String) = "settings/section/$id"
 }
 
 private val TABS = listOf(
@@ -626,6 +632,44 @@ fun AppNav(container: AppContainer) {
                             extraSettings = container.pluginHost.slots.settingsItems.map { item ->
                                 { item.content() }
                             },
+                            // 根列表只有两种点击结果：进子页。网关详情、外观各有自己的路由。
+                            gatewayCard = { dev.dsh.mobile.app.gateway.GatewayCard(container) },
+                            onOpenGateway = { nav.navigate(Routes.SETTINGS_GATEWAY) { launchSingleTop = true } },
+                            onOpenAppearance = { nav.navigate(Routes.SETTINGS_APPEARANCE) { launchSingleTop = true } },
+                            onOpenSection = { id -> nav.navigate(Routes.settingsSection(id)) { launchSingleTop = true } },
+                            tabBarVisible = true,
+                        )
+                    }
+
+                    // 分类子页：同一个 SettingsScreen 只渲染 section 那一块，顶栏换成返回箭头。
+                    composable(
+                        Routes.SETTINGS_SECTION,
+                        arguments = listOf(navArgument("section") { type = NavType.StringType }),
+                    ) { entry ->
+                        val section = entry.arguments?.getString("section").orEmpty()
+                        SettingsScreen(
+                            viewModel = settingsSubViewModel(container, "settings-section-" + section),
+                            onOpenExtras = { nav.navigate(Routes.EXTRAS) { launchSingleTop = true } },
+                            onOpenTerminal = { nav.navigate(Routes.TERMINAL) { launchSingleTop = true } },
+                            extraSettings = container.pluginHost.slots.settingsItems.map { item ->
+                                { item.content() }
+                            },
+                            section = section,
+                            tabBarVisible = false,
+                            onBack = { nav.popBackStack() },
+                        )
+                    }
+
+                    composable(Routes.SETTINGS_APPEARANCE) {
+                        AppAppearanceScreen(
+                            viewModel = settingsSubViewModel(container, "settings-appearance"),
+                            onBack = { nav.popBackStack() },
+                        )
+                    }
+
+                    composable(Routes.SETTINGS_GATEWAY) {
+                        AppGatewayScreen(
+                            onBack = { nav.popBackStack() },
                             gatewayCard = { dev.dsh.mobile.app.gateway.GatewayCard(container) },
                         )
                     }
@@ -885,6 +929,30 @@ private fun runHttp(
  * 三个面板（Agent 预设 / 手机控制 / 技能中心）自己只画内容，以前直接把内容贴到壁纸上，
  * 没有底色也没有顶栏，进去就退不出来、字还压在花纹上。
  */
+/**
+ * 设置域的子页各要一份 [SettingsViewModel]。key 隔开实例，工厂参数只写一次。
+ */
+@Composable
+private fun settingsSubViewModel(container: AppContainer, key: String): SettingsViewModel {
+    val ctx = LocalContext.current
+    return viewModel(
+        key = key,
+        factory = viewModelFactory {
+            initializer {
+                SettingsViewModel(
+                    settingsStore = container.settings,
+                    secretStore = container.secretStore,
+                    linuxActions = dev.dsh.mobile.app.LinuxSettingsController(ctx.applicationContext, container),
+                    endpoints = container.endpoints,
+                    runtime = container.runtimeControl,
+                    updater = dev.dsh.mobile.core.data.update.Updater(ctx),
+                    onReconnect = { container.connectActive(force = true) },
+                )
+            }
+        },
+    )
+}
+
 @Composable
 private fun DrawerPage(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
     val p = LocalQq.current

@@ -8,12 +8,6 @@ import android.os.Build
 import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -48,7 +42,6 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -73,55 +66,66 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import dev.dsh.mobile.core.data.settings.SendMode
 import dev.dsh.mobile.core.data.settings.ThemeMode
-import dev.dsh.mobile.core.model.BackMaterial
 import dev.dsh.mobile.core.model.TransportKind
 import dev.dsh.mobile.design.IconBtn
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider
 import dev.dsh.mobile.design.QqRow
+import dev.dsh.mobile.design.QqScreenTopBar
 import dev.dsh.mobile.design.QqShape
 import dev.dsh.mobile.design.QqSpace
-import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.SectionHeading
 import dev.dsh.mobile.design.SectionSpacing
 import dev.dsh.mobile.design.StatusCapsule
 import dev.dsh.mobile.design.qqFontBody
+import dev.dsh.mobile.design.qqPageBottomInset
 import dev.dsh.mobile.toolbridge.AppStorage
 import dev.dsh.mobile.toolbridge.phone.PhoneBridge
 import kotlinx.coroutines.launch
 
-private val ACCENTS = listOf(
-    0xFF0099FF, 0xFF3CB4FF, 0xFF22C55E, 0xFFF59E0B,
-    0xFFFF3B30, 0xFF8B5CF6, 0xFFEC4899, 0xFF14B8A6,
-)
-
 private const val README_URL = "https://github.com/ALL-PAY-C/HarnessForAndroid#readme"
 
+/**
+ * 一级列表的默认展开集合。设置页已经**没有**折叠态（一级列表全部跳子页、二级分组固定展开），
+ * 这个常量留着的意义只剩一条不变式：默认没有任何分区处于展开状态。测试锁的就是它。
+ */
 internal const val OPEN_DEFAULT = ""
 
 /**
- * 设置页。东西越来越多之后平铺已经没法看了，所以改成两层折叠：
- * 一级是分类卡片（点标题展开/收起），二级是分类内部的子分组。
- * 展开状态按 id 存在 rememberSaveable 的 csv 里，旋转屏幕不丢。
+ * 设置页。一级列表只有一种交互：**点一行进一个子页**。
+ *
+ * 以前这里是两级手风琴（一级卡点标题原地展开，二级子分组再展开一次），问题不是审美：
+ * 展开会让下面所有行整体下移，用户记住的位置第二次点击落到别的卡上（实机连点 3 次误触）。
+ * 现在折叠态一律不存在——列表行的右箭头永远是「进入」，页内没有原地展开，也就没有重排。
+ *
+ * 同一个组件同时承担「根列表」和「分类子页」两种形态，靠 [section] 切换：
+ * 传 null 是根列表（全部跳子页），传分类 id 就只渲染那一块内容；页面顶栏跟着换成返回箭头。
  */
+
+/** 分类 id → 子页标题。根列表与子页共用这张表，标题不会两处写两遍。 */
+private val SECTION_TITLES = mapOf(
+    "basic" to "应用与更新",
+    "chat" to "会话",
+    "notify" to "通知",
+    "env" to "环境",
+    "pluginSettings" to "插件设置",
+)
+
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
@@ -130,6 +134,18 @@ fun SettingsScreen(
     onOpenTerminal: () -> Unit = {},
     extraSettings: List<@Composable () -> Unit> = emptyList(),
     gatewayCard: (@Composable () -> Unit)? = null,
+    /** 内置网关行的入口；为 null 时该行不出现（没有网关就没有这一项）。 */
+    onOpenGateway: (() -> Unit)? = null,
+    /** 网关行的副标题（状态摘要），由宿主算好传进来，设置页不持有网关状态。 */
+    gatewaySummary: String? = null,
+    /** 外观有独立页面（AppAppearanceScreen），走自己的路由。 */
+    onOpenAppearance: () -> Unit = {},
+    /** null = 根列表；否则是当前子页的分类 id。 */
+    section: String? = null,
+    /** 宿主是否已经为底部 tab 栏单独留过位置（根页 true，子页 false）。 */
+    tabBarVisible: Boolean = true,
+    onOpenSection: (String) -> Unit = {},
+    onBack: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val linux by viewModel.linuxState.collectAsStateWithLifecycle()
@@ -142,12 +158,6 @@ fun SettingsScreen(
     val p = LocalQq.current
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-
-    var openCsv by rememberSaveable { mutableStateOf(OPEN_DEFAULT) }
-    val open = remember(openCsv) { openCsv.split(',').filter { it.isNotBlank() }.toSet() }
-    fun toggle(id: String) {
-        openCsv = if (id in open) (open - id).joinToString(",") else (open + id).joinToString(",")
-    }
 
 
     val cwdPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -202,25 +212,34 @@ fun SettingsScreen(
 
     Box(Modifier.fillMaxSize().background(p.bg)) {
         Column(Modifier.fillMaxSize()) {
-            QqTopBar(leading = { IconBtn(Icons.Filled.Menu, "菜单", onOpenDrawer) }) {
-                Text("设置", color = p.t1, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-            }
+            QqScreenTopBar(
+                title = if (section == null) "设置" else SECTION_TITLES[section] ?: "设置",
+                isBack = section != null,
+                onNavigationClick = if (section == null) onOpenDrawer else onBack,
+            )
+            // 底部留白只在这里算一次：tab 栏在场时它自己占位（补 0），子页/键盘弹起时补齐。
+            val bottomInset = qqPageBottomInset(tabBarVisible)
             LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(SectionSpacing.cardGap),
+                contentPadding = PaddingValues(
+                    start = SectionSpacing.cardGap,
+                    top = SectionSpacing.cardGap,
+                    end = SectionSpacing.cardGap,
+                    bottom = SectionSpacing.cardGap + bottomInset,
+                ),
                 verticalArrangement = Arrangement.spacedBy(SectionSpacing.cardGap),
             ) {
 
                 // ---------- 1. 应用与更新 ----------
                 item {
-                    ExpandableSection(
+                    SectionSlot(
                         id = "basic",
+                        section = section,
+                        onOpen = onOpenSection,
                         title = "应用与更新",
                         subtitle = "版本 ${state.appVersion}",
                         icon = Icons.Filled.SystemUpdate,
                         tint = p.accent,
-                        open = "basic" in open,
-                        onToggle = { toggle("basic") },
                     ) {
                         QqRow(
                             icon = Icons.Filled.SystemUpdate,
@@ -285,8 +304,6 @@ fun SettingsScreen(
                         SubGroup(
                             title = "工作区",
                             subtitle = state.settings.defaultCwd.ifBlank { "应用私有目录" },
-                            open = "workspace" in open,
-                            onToggle = { toggle("workspace") },
                         ) {
                             Column(Modifier.padding(horizontal = 13.dp, vertical = 10.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -362,57 +379,34 @@ fun SettingsScreen(
                     }
                 }
 
-                // ---------- 2. 外观 ----------
-                item {
-                    ExpandableSection(
-                        id = "theme",
-                        title = "外观",
-                        subtitle = "图标 / 壁纸 / 材质 / 细节",
-                        icon = Icons.Filled.Palette,
-                        tint = p.accent2,
-                        open = "theme" in open,
-                        onToggle = { toggle("theme") },
-                    ) {
-                        AppearanceSectionBody(state = state, vm = viewModel)
-                        QqCardDivider()
-                        QqRow(
-                            icon = Icons.Filled.Bolt,
-                            title = "恢复默认外观",
-                            subtitle = "重置图标、壁纸、颜色与间距",
-                            tint = p.t3,
-                            onClick = {
-                                viewModel.setAppIconStyle("system")
-                                viewModel.setCustomIconUri("")
-                                viewModel.setBackgroundUri("")
-                                viewModel.setAccent(ACCENTS[0])
-                                viewModel.setRadius(18)
-                                viewModel.setFontScale(1f)
-                                viewModel.setDensity(1f)
-                                // 材质也一起回默认：否则「恢复默认外观」后仍停在液态，用户会以为没生效。
-                                viewModel.setBackMaterial(BackMaterial.DEFAULT.key)
-                                viewModel.setGlassAlpha(0.82f)
-                                viewModel.setGlassBlur(0)
-                            },
+                // ---------- 2. 外观（内容在 AppAppearanceScreen，这里只留入口） ----------
+                // 只有根列表才有这一行；子页里再出现一次入口就成了套娃。
+                if (section == null) {
+                    item {
+                        SectionNavRow(
+                            title = "外观",
+                            subtitle = "图标 / 壁纸 / 材质 / 细节",
+                            icon = Icons.Filled.Palette,
+                            tint = p.accent2,
+                            onClick = onOpenAppearance,
                         )
                     }
                 }
 
                 // ---------- 3. 会话 ----------
                 item {
-                    ExpandableSection(
+                    SectionSlot(
                         id = "chat",
+                        section = section,
+                        onOpen = onOpenSection,
                         title = "会话",
                         subtitle = "发送 / 显示 / 群组 / 模板",
                         icon = Icons.Filled.Bolt,
                         tint = p.accent,
-                        open = "chat" in open,
-                        onToggle = { toggle("chat") },
                     ) {
                         SubGroup(
                             title = "发送与显示",
                             subtitle = "发消息 / 滚动 / 思考",
-                            open = "chatSend" in open,
-                            onToggle = { toggle("chatSend") },
                         ) {
                             SegmentedRow(
                                 label = "运行中发消息",
@@ -458,8 +452,6 @@ fun SettingsScreen(
                         SubGroup(
                             title = "上下文与工具",
                             subtitle = "状态 / 用量 / 上限",
-                            open = "chatCtx" in open,
-                            onToggle = { toggle("chatCtx") },
                         ) {
                             SwitchRow("显示 Agent 状态", "运行中/等待确认标记", state.settings.showAgentStatus) { viewModel.setShowAgentStatus(it) }
                             QqCardDivider()
@@ -481,8 +473,6 @@ fun SettingsScreen(
                         SubGroup(
                             title = "群组编排",
                             subtitle = "并行度 / 分工 / 上下文预算",
-                            open = "chatGroup" in open,
-                            onToggle = { toggle("chatGroup") },
                         ) {
                             SliderRow("最大并行", "${state.settings.groupMaxParallel} 个 Agent") {
                                 Slider(
@@ -532,8 +522,6 @@ fun SettingsScreen(
                         SubGroup(
                             title = "快捷指令与模板",
                             subtitle = "斜杠命令 / 常用提问",
-                            open = "quick" in open,
-                            onToggle = { toggle("quick") },
                         ) {
                             Text("每行一条，聊天页显示为快捷按钮", color = p.t3, fontSize = qqFontBody(11.5.sp))
                             Spacer(Modifier.height(7.dp))
@@ -556,14 +544,14 @@ fun SettingsScreen(
 
                 // ---------- 4. 通知 ----------
                 item {
-                    ExpandableSection(
+                    SectionSlot(
                         id = "notify",
+                        section = section,
+                        onOpen = onOpenSection,
                         title = "通知",
                         subtitle = "常驻面板 / 思维链 / 通知内选择",
                         icon = Icons.Filled.Notifications,
                         tint = p.red,
-                        open = "notify" in open,
-                        onToggle = { toggle("notify") },
                     ) {
                         SwitchRow("通知", "总开关，关掉后所有提醒静默", state.settings.notificationsEnabled) {
                             viewModel.setNotifications(it)
@@ -575,8 +563,6 @@ fun SettingsScreen(
                         SubGroup(
                             title = "常驻聚合通知",
                             subtitle = "n 个会话在跑时展示 n 行",
-                            open = "notifyOngoing" in open,
-                            onToggle = { toggle("notifyOngoing") },
                         ) {
                             SwitchRow("开启常驻通知", "进行中的会话常驻通知栏", state.settings.notifyOngoing) {
                                 viewModel.setNotifyOngoing(it)
@@ -609,8 +595,6 @@ fun SettingsScreen(
                         SubGroup(
                             title = "提醒与选择",
                             subtitle = "完成 / 待确认 / 震动",
-                            open = "notifyAlert" in open,
-                            onToggle = { toggle("notifyAlert") },
                         ) {
                             SwitchRow("完成通知", "对话跑完时提醒", state.settings.notifyOnComplete) {
                                 viewModel.setNotifyOnComplete(it)
@@ -652,20 +636,18 @@ fun SettingsScreen(
 
                 // ---------- 5. 环境 ----------
                 item {
-                    ExpandableSection(
+                    SectionSlot(
                         id = "env",
+                        section = section,
+                        onOpen = onOpenSection,
                         title = "环境",
                         subtitle = "运行时 / 连接 / 工具 / 网络 / Linux",
                         icon = Icons.Filled.Memory,
                         tint = p.accent,
-                        open = "env" in open,
-                        onToggle = { toggle("env") },
                     ) {
                         SubGroup(
                             title = "运行时",
                             subtitle = "${state.versions.firstOrNull() ?: "未内置"} · ${state.storageBytes / 1024 / 1024} MB",
-                            open = "envRuntime" in open,
-                            onToggle = { toggle("envRuntime") },
                         ) {
                             QqRow(
                                 icon = Icons.Filled.Memory,
@@ -727,8 +709,6 @@ fun SettingsScreen(
                         SubGroup(
                             title = "连接",
                             subtitle = "本地 / 局域网 / 远程",
-                            open = "envEndpoint" in open,
-                            onToggle = { toggle("envEndpoint") },
                         ) {
                             state.endpoints.forEachIndexed { i, ep ->
                                 if (i > 0) QqCardDivider()
@@ -779,8 +759,6 @@ fun SettingsScreen(
                         SubGroup(
                             title = "工具通道",
                             subtitle = "决定 shell 命令在哪跑",
-                            open = "envShell" in open,
-                            onToggle = { toggle("envShell") },
                         ) {
                             QqRow(
                                 icon = Icons.Filled.Terminal,
@@ -832,8 +810,6 @@ fun SettingsScreen(
                         SubGroup(
                             title = "网络与下载",
                             subtitle = "搜索引擎、密钥与下载限制 · 代理：" + proxyLabel(state.settings.proxyUrl),
-                            open = "envWeb" in open,
-                            onToggle = { toggle("envWeb") },
                         ) {
                             SegmentedRow(
                                 label = "搜索引擎", icon = Icons.Filled.Wifi,
@@ -881,8 +857,6 @@ fun SettingsScreen(
                         SubGroup(
                             title = "权限与后台",
                             subtitle = "无障碍、通知使用权、电池优化、Shizuku",
-                            open = "envPerm" in open,
-                            onToggle = { toggle("envPerm") },
                         ) {
                             var permTick by remember { mutableStateOf(0) }
                             val permBridge = remember(permTick, ctx) { PhoneBridge(ctx) }
@@ -926,8 +900,6 @@ fun SettingsScreen(
                         SubGroup(
                             title = "Linux 环境",
                             subtitle = linux.rootfs,
-                            open = "envLinux" in open,
-                            onToggle = { toggle("envLinux") },
                         ) {
                             Column(Modifier.padding(QqSpace.l()), verticalArrangement = Arrangement.spacedBy(QqSpace.s())) {
                                 Text("rootfs：" + linux.rootfs, color = p.t1)
@@ -967,19 +939,31 @@ fun SettingsScreen(
                 }
 
                 // ---------- 宿主内置网关：靠下、默认收起（没有就不占位） ----------
-                gatewayCard?.let { card -> item { card() } }
+                // 以前这里直接贴一张 Material Card，裸文本 + 蓝色文字链接浮在页面底色上（O2）。
+                // 现在它和别的分类一样是一行：同样的圆角/内边距/字号，点进去才是详情。
+                if (section == null && onOpenGateway != null && (gatewayCard != null || gatewaySummary != null)) {
+                    item {
+                        SectionNavRow(
+                            title = "内置模型网关",
+                            subtitle = gatewaySummary ?: "状态 / 凭据 / 端口",
+                            icon = Icons.Filled.Link,
+                            tint = p.accent,
+                            onClick = { onOpenGateway?.invoke() },
+                        )
+                    }
+                }
 
                 // ---------- 插件自带的设置项 ----------
                 if (extraSettings.isNotEmpty()) {
                     item {
-                        ExpandableSection(
+                        SectionSlot(
                             id = "pluginSettings",
+                            section = section,
+                            onOpen = onOpenSection,
                             title = "插件设置",
                             subtitle = "${extraSettings.size} 个插件项",
                             icon = Icons.Filled.Extension,
                             tint = p.accent2,
-                            open = "pluginSettings" in open,
-                            onToggle = { toggle("pluginSettings") },
                         ) {
                             Column(Modifier.padding(QqSpace.xs())) {
                                 extraSettings.forEach { slot -> slot() }
@@ -1027,101 +1011,136 @@ fun SettingsScreen(
         )
     }
 }
+
 /**
- * 一级折叠卡片：整张卡片的标题行可点，展开后才是内容。
- * 收起时只显示标题 + 副标题，所以一屏能看见全部分类。
+ * 一级列表行：设置页唯一的范式——点一下进子页，右箭头永远朝右，没有任何原地展开。
+ * 形状 / 间距 / 字号与原来的折叠卡头完全一致，所以列表看起来没变，变的是点击结果可预判。
  */
 @Composable
-private fun ExpandableSection(
-    id: String,
+private fun SectionNavRow(
     title: String,
     subtitle: String?,
     icon: ImageVector,
     tint: Color,
-    open: Boolean,
-    onToggle: () -> Unit,
+    onClick: () -> Unit,
+) {
+    val p = LocalQq.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(QqShape.card())
+            .background(p.card)
+            .clickable(onClick = onClick)
+            .padding(horizontal = SectionSpacing.horizontal, vertical = SectionSpacing.vertical),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(30.dp)
+                .clip(QqShape.chip())
+                .background(tint.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, null, tint = tint, modifier = Modifier.size(17.dp))
+        }
+        Spacer(Modifier.width(11.dp))
+        SectionHeading(title, subtitle, Modifier.weight(1f))
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            "进入",
+            tint = p.t3,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
+/**
+ * 子页里承载某个分类内容的卡：圆角 / 分隔线 / 内边距与列表行同一套，但**不可折叠**——
+ * 这一页只有这一个分类，折叠没有意义，只会把「点完位置就变」的问题再引一遍。
+ */
+@Composable
+internal fun SectionFrame(
+    title: String?,
+    icon: ImageVector?,
+    tint: Color,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val p = LocalQq.current
-    val arrow by animateFloatAsState(if (open) 90f else 0f, label = "arrow-" + id)
     Column(
         Modifier
             .fillMaxWidth()
             .clip(QqShape.card())
             .background(p.card),
     ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onToggle)
-                .padding(horizontal = SectionSpacing.horizontal, vertical = SectionSpacing.vertical),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
+        // 顶栏已经写了分类名时不重复报一遍：传 null 就只留卡片本体。
+        if (title != null && icon != null) {
+            Row(
                 Modifier
-                    .size(30.dp)
-                    .clip(QqShape.chip())
-                    .background(tint.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
+                    .fillMaxWidth()
+                    .padding(horizontal = SectionSpacing.horizontal, vertical = SectionSpacing.vertical),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(icon, null, tint = tint, modifier = Modifier.size(17.dp))
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .clip(QqShape.chip())
+                        .background(tint.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, null, tint = tint, modifier = Modifier.size(17.dp))
+                }
+                Spacer(Modifier.width(11.dp))
+                SectionHeading(title, null, Modifier.weight(1f))
             }
-            Spacer(Modifier.width(11.dp))
-            SectionHeading(title, subtitle, Modifier.weight(1f))
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                if (open) "收起" else "展开",
-                tint = p.t3,
-                modifier = Modifier.size(20.dp).rotate(arrow),
-            )
+            Box(Modifier.fillMaxWidth().height(1.dp).background(p.line))
         }
-        AnimatedVisibility(
-            visible = open,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut(),
-        ) {
-            Column(Modifier.fillMaxWidth()) {
-                Box(Modifier.fillMaxWidth().height(1.dp).background(p.line))
-                content()
-            }
-        }
+        content()
     }
 }
 
-/** 二级折叠：分类内部再细分（缩进 + 更小的标题，避免和一级抢视觉）。 */
+/**
+ * 一个分类槽位。[section] 为 null（根列表）时渲染成一行入口；等于自身 [id] 时渲染成内容卡。
+ * 根列表与子页因此是同一个组件、同一套行样式，不会出现「两套实现各走各的」。
+ */
+@Composable
+private fun SectionSlot(
+    id: String,
+    title: String,
+    subtitle: String?,
+    icon: ImageVector,
+    tint: Color,
+    section: String?,
+    onOpen: (String) -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    when {
+        section == null -> SectionNavRow(title, subtitle, icon, tint) { onOpen(id) }
+        section == id -> SectionFrame(title, icon, tint, content)
+    }
+}
+
+/** 二级分组标题：**固定展开**。以前这里也能折叠，展开后整列下移，同一坐标第二次点击落到别处。 */
 @Composable
 private fun SubGroup(
     title: String,
     subtitle: String?,
-    open: Boolean,
-    onToggle: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val p = LocalQq.current
-    val arrow by animateFloatAsState(if (open) 90f else 0f, label = "sub-" + title)
     Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onToggle)
-                .padding(start = SectionSpacing.horizontal * 2, end = SectionSpacing.horizontal, top = SectionSpacing.vertical, bottom = SectionSpacing.vertical),
+                .padding(
+                    start = SectionSpacing.horizontal * 2,
+                    end = SectionSpacing.horizontal,
+                    top = SectionSpacing.vertical,
+                    bottom = SectionSpacing.vertical,
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SectionHeading(title, subtitle, Modifier.weight(1f))
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                if (open) "收起" else "展开",
-                tint = p.t3,
-                modifier = Modifier.size(17.dp).rotate(arrow),
-            )
         }
-        AnimatedVisibility(
-            visible = open,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut(),
-        ) {
-            Column(Modifier.fillMaxWidth().padding(start = QqSpace.m())) { content() }
-        }
+        Column(Modifier.fillMaxWidth().padding(start = QqSpace.m())) { content() }
     }
 }
 

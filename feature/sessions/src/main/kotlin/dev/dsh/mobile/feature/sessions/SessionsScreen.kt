@@ -71,7 +71,7 @@ import dev.dsh.mobile.design.IconBtn
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqShape
 import dev.dsh.mobile.design.QqSpace
-import dev.dsh.mobile.design.QqTopBar
+import dev.dsh.mobile.design.QqScreenTopBar
 import dev.dsh.mobile.design.SectionChevron
 import dev.dsh.mobile.design.SlotEditFrame
 import dev.dsh.mobile.design.SlotEditItem
@@ -147,49 +147,52 @@ fun SessionsScreen(
     val contentRows = state.groups.filterNot { hiddenByAncestor(it.first) }
 
     Column(Modifier.fillMaxSize().background(p.bg)) {
-        QqTopBar(
-            leading = { IconBtn(Icons.Filled.Menu, "侧边栏", onOpenDrawer) },
-            trailing = {
+        QqScreenTopBar(
+            navigationIcon = Icons.Filled.Menu,
+            navigationDescription = "侧边栏",
+            onNavigationClick = onOpenDrawer,
+            actions = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconBtn(Icons.Filled.CreateNewFolder, "新建文件夹") { creatingFolder = "" }
                     Spacer(Modifier.width(2.dp))
                     IconBtn(Icons.Filled.Add, "新建会话") { creating = true }
                 }
             },
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(QqSpace.s())) {
-                if (state.selectionMode) {
-                    Text(
-                        "已选 ${state.selected.size} 项",
-                        color = p.accent,
-                        fontSize = qqFontBody(13.5.sp),
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        "全选",
-                        color = p.accent,
-                        fontSize = qqFontBody(12.5.sp),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { viewModel.selectAll(visibleIds) }
-                            .padding(horizontal = 7.dp, vertical = 3.dp),
-                    )
-                    Text(
-                        "退出",
-                        color = p.t3,
-                        fontSize = qqFontBody(12.5.sp),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { viewModel.clearSelection() }
-                            .padding(horizontal = 7.dp, vertical = 3.dp),
-                    )
-                } else if (state.settings.showTokenUsage) {
-                    val usage = state.groups.flatMap { it.second }
-                        .fold(TokenUsage.EMPTY) { acc, s -> acc + s.usage }
-                    TokenPill(usage)
+            center = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(QqSpace.s())) {
+                    if (state.selectionMode) {
+                        Text(
+                            "已选 ${state.selected.size} 项",
+                            color = p.accent,
+                            fontSize = qqFontBody(13.5.sp),
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            "全选",
+                            color = p.accent,
+                            fontSize = qqFontBody(12.5.sp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { viewModel.selectAll(visibleIds) }
+                                .padding(horizontal = 7.dp, vertical = 3.dp),
+                        )
+                        Text(
+                            "退出",
+                            color = p.t3,
+                            fontSize = qqFontBody(12.5.sp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { viewModel.clearSelection() }
+                                .padding(horizontal = 7.dp, vertical = 3.dp),
+                        )
+                    } else if (state.settings.showTokenUsage) {
+                        val usage = state.groups.flatMap { it.second }
+                            .fold(TokenUsage.EMPTY) { acc, s -> acc + s.usage }
+                        TokenPill(usage)
+                    }
                 }
-            }
-        }
+            },
+        )
 
         // UI 修改模式：会话列表项旁多一个可横滑的「+」，点开就是既有候选弹窗。
         // 抽屉分组的位置在抽屉里（AppDrawer），这里不再放第二个入口。
