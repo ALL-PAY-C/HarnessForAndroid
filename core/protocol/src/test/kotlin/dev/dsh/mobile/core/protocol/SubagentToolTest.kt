@@ -1,5 +1,6 @@
 package dev.dsh.mobile.core.protocol
 
+import dev.dsh.mobile.core.protocol.llm.SUBAGENT_MAX_DEPTH
 import dev.dsh.mobile.core.protocol.llm.SUBAGENT_ROLE
 import dev.dsh.mobile.core.protocol.llm.SUBAGENT_TOOLS
 import dev.dsh.mobile.core.protocol.llm.SubagentLoop
@@ -40,17 +41,18 @@ class SubagentToolTest {
         assertEquals(listOf("prompt"), params["required"]!!.jsonArray.map { it.jsonPrimitive.content })
         val props = params["properties"]!!.jsonObject.keys
         assertTrue(props.toString(), props.containsAll(listOf("prompt", "name", "model")))
-        // 说明里必须点明「看不到当前对话」和「不能再派子代理」，否则模型会写「上面那个文件」。
+        // 说明里必须点明「看不到当前对话」和嵌套深度上限，否则模型会写「上面那个文件」或盲目递归。
         val help = fn["description"]!!.jsonPrimitive.content
         assertTrue(help, help.contains("看不到当前对话"))
-        assertTrue(help, help.contains("不能再派子代理"))
+        assertTrue(help, help.contains("子代理最多嵌套 2 层"))
     }
 
     @Test
-    fun subagentToolTableNeverContainsItself() {
+    fun subagentToolsJsonDefaultsToTheBaseWhitelist() {
         val transport = transport()
         val names = transport.subagentToolsJson().mapNotNull { nameOf(it) }
-        assertFalse("子代理不能嵌套调用自己：$names", "subagent" in names)
+        // 默认实参是底座白名单；能不能再往下派由 subagentToolNames(depth) 决定（见 SubagentDepthTest）。
+        assertFalse("默认白名单不含 subagent：$names", "subagent" in names)
         assertEquals(SUBAGENT_TOOLS, names.toSet())
         // 注入式白名单：只给 shell 就只剩 shell。
         assertEquals(listOf("shell"), transport.subagentToolsJson(setOf("shell")).mapNotNull { nameOf(it) })
@@ -103,7 +105,7 @@ class SubagentToolTest {
     }
 
     @Test
-    fun loopNeverRunsToolsOutsideTheWhitelist() = runBlocking {
+    fun loopAtDepthLimitRefusesNestedSubagent() = runBlocking {
         val bodies = mutableListOf<JsonObject>()
         var toolRuns = 0
         val loop = SubagentLoop(
@@ -116,6 +118,8 @@ class SubagentToolTest {
             },
             runTool = { _, _ -> toolRuns++; ToolExecResult(ok = true, output = "不该执行") },
             tools = JsonArray(emptyList()),
+            // 深度到顶：白名单里没有 subagent，模型硬写也执行不了，错误要可读。
+            depth = SUBAGENT_MAX_DEPTH,
         )
 
         val outcome = loop.run("试试嵌套")
@@ -123,7 +127,7 @@ class SubagentToolTest {
         assertTrue(outcome.text, outcome.ok)
         assertEquals(0, toolRuns)
         val toolMessage = bodies[1]["messages"]!!.jsonArray.last().jsonObject["content"]!!.jsonPrimitive.content
-        assertTrue(toolMessage, toolMessage.contains("子代理不能用工具：subagent"))
+        assertTrue(toolMessage, toolMessage.contains("子代理最多嵌套 2 层"))
     }
 
     @Test

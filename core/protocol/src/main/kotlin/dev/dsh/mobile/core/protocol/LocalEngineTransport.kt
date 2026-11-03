@@ -56,6 +56,11 @@ import dev.dsh.mobile.core.protocol.llm.ModelStream
 import dev.dsh.mobile.core.protocol.llm.SUBAGENT_TOOLS
 import dev.dsh.mobile.core.protocol.llm.SubagentLoop
 import dev.dsh.mobile.core.protocol.llm.strOrEmpty
+import dev.dsh.mobile.core.protocol.llm.SUBAGENT_MAX_DEPTH
+import dev.dsh.mobile.core.protocol.llm.SubagentBudget
+import dev.dsh.mobile.core.protocol.llm.depthRefusal
+import dev.dsh.mobile.core.protocol.llm.parseSubagentTasks
+import dev.dsh.mobile.core.protocol.llm.subagentToolNames
 
 /** 一个可接入的模型后端描述（协议层只认这些字段，不依赖数据层）。 */
 data class LlmConfig(
@@ -975,7 +980,19 @@ class LocalEngineTransport(
                             ToolExecResult(ok = false, output = "", error = "用户未确认，已跳过该命令")
                         // 子代理不能走 toolRunner：那里是 30 秒单次超时 + 1 次重试，
                         // 而一个子代理要跑满 8 轮工具往返、总预算 180 秒。
-                        name == "subagent" -> runSubagent(cfg, parentSystem, args) { step ->
+                        name == "subagent" -> runSubagent(
+                            cfg = cfg,
+                            parentSystem = parentSystem,
+                            args = args,
+                            sessionId = sessionId,
+                            turnId = turnId,
+                            // 父任务链：执行池里的任务用 task.id，主代理直接答的那一轮用 turnId。
+                            parentTaskId = task?.id ?: turnId,
+                            agentId = authorId,
+                            agentName = authorName,
+                            // runLoop 只跑主代理/群成员这一层；再往下都由子代理递归，层级在那里 +1。
+                            callerDepth = 0,
+                        ) { step ->
                             _events.tryEmit(
                                 DshEvent.ToolCallEvent(
                                     sessionId,
@@ -1308,6 +1325,25 @@ class LocalEngineTransport(
     override suspend fun compact(sessionId: String, budgetTokens: Int): CompactResult =
         compaction.compact(sessionId, budgetTokens)
 
+    /**
+     * 子代理嵌套上限（T5.3）：默认 2。深度口径 = 当前执行者层级，主代理第 0 层。
+     * 设置项（1/2/3）还没接进来 —— core/data 的 SettingsStore 不在本次改动范围，先留这个可写入口。
+     */
+    @Volatile
+    internal var subagentMaxDepth: Int = SUBAGENT_MAX_DEPTH
+
+    /**
+     * 子代理预算闸门（T5.3）：用量读既有 [lastUsageTokens]，预算读房间预算 / settings 上下文预算。
+     * 这里不存任何计数，只算百分比与并发分摊。
+     */
+    private val subagentBudget = SubagentBudget(
+        usedTokensOf = { sid -> lastUsageTokens[sid] ?: 0L },
+        budgetTokensOf = { sid ->
+            val chars = groupRunner.roomBudgetTokens(sid).takeIf { it > 0 } ?: contextBudgetProvider(sid)
+            ContextBudget.tokensOf(chars)
+        },
+    )
+
     /** 子代理显示名：参数给了 name 就用，否则「子代理」。 */
     internal fun subagentLabel(args: JsonObject): String =
         args["name"]?.jsonPrimitive?.contentOrNullSafe()?.trim()?.takeIf { it.isNotEmpty() } ?: "子代理"
@@ -1315,7 +1351,8 @@ class LocalEngineTransport(
     /**
      * 子代理的工具表：从默认表里按白名单过滤。
      *
-     * subagent 自己不在白名单里，所以嵌套深度天然只有 1 层；[allowed] 可注入，单测直接传集合。
+     * 默认实参是底座白名单（不含 subagent）；要放开嵌套时由调用方传 [subagentToolNames] 算出的集合，
+     * 深度闸门因此在工具表这一层就生效，而不是等模型调了才拒。[allowed] 可注入，单测直接传集合。
      */
     internal fun subagentToolsJson(allowed: Set<String> = SUBAGENT_TOOLS): JsonArray {
         val nameOf: (JsonElement) -> String? = { element ->
@@ -1328,13 +1365,21 @@ class LocalEngineTransport(
     /**
      * subagent 工具：把一个只有自己上下文的子代理跑完，只把结论带回父代理。
      *
-     * 三条硬约束：子代理看不到主对话（prompt 必须自带背景）、不能再派子代理（白名单里没有
-     * subagent）、失败也回可读文本（父代理绝不会收到空串）。
+     * 三道闸门（T5.3）：子代理看不到主对话（prompt 必须自带背景）；嵌套深度受 [subagentMaxDepth]
+     * 限制，超限回可读错误而不静默失败；父会话预算按并发数分摊，80% 落一条告急通知、100% 拒绝。
+     * 结论里显式列出的任务清单解析成子任务投进执行池，父任务 id 记在 AgentTask.parentId 上。
      */
     private suspend fun runSubagent(
         cfg: LlmConfig,
         parentSystem: String,
         args: JsonObject,
+        sessionId: String,
+        turnId: String?,
+        parentTaskId: String?,
+        agentId: String?,
+        agentName: String?,
+        // 调用者所在层级：主代理 0，它派出的子代理 1……
+        callerDepth: Int,
         onStep: (String) -> Unit,
     ): ToolExecResult {
         val prompt = args["prompt"]?.jsonPrimitive?.contentOrNullSafe()?.trim().orEmpty()
@@ -1345,28 +1390,80 @@ class LocalEngineTransport(
                 error = "prompt 参数缺失：写清要委派什么，子代理看不到当前对话",
             )
         }
+        // 深度闸门：模型自报的 depth 只能把层级抬高（更严），压不低运行时的真实层级。
+        val declared = args["depth"]?.jsonPrimitive?.contentOrNullSafe()?.trim()?.toIntOrNull() ?: 0
+        val depth = maxOf(callerDepth, declared)
+        if (depth >= subagentMaxDepth) {
+            return ToolExecResult(ok = false, output = "", error = depthRefusal(subagentMaxDepth, depth))
+        }
+        val verdict = subagentBudget.begin(sessionId)
+        if (verdict.warn) {
+            _events.tryEmit(
+                DshEvent.MessageChunk(
+                    sessionId,
+                    "[预算告急] 已用 " + verdict.percent + "%，后续子任务可能被拒",
+                    "system",
+                    "系统",
+                    turnId,
+                ),
+            )
+        }
+        if (!verdict.allowed) return ToolExecResult(ok = false, output = "", error = verdict.reason)
         val label = subagentLabel(args)
         val model = args["model"]?.jsonPrimitive?.contentOrNullSafe()?.trim()?.takeIf { it.isNotEmpty() } ?: cfg.model
         val childCfg = if (model == cfg.model) cfg else cfg.copy(model = model)
         val started = System.currentTimeMillis()
-        // 复用同一条流式请求路径（含网关自举与引擎路由），子代理才会和主代理看到同样的上游行为。
-        val outcome = SubagentLoop(
-            model = model,
-            parentSystemPrompt = parentSystem,
-            chat = { body -> stream.post(childCfg, body) },
-            runTool = { name, a -> toolRunner.run(name, a) },
-            tools = subagentToolsJson(),
-            label = label,
-            onStep = onStep,
-            spill = spill,
-        ).run(prompt)
-        return ToolExecResult(
-            ok = outcome.ok,
-            output = if (outcome.ok) outcome.text else "",
-            error = if (outcome.ok) null else outcome.text,
-            elapsedMs = System.currentTimeMillis() - started,
-            attempts = 1,
-        )
+        val childDepth = depth + 1
+        try {
+            // 复用同一条流式请求路径（含网关自举与引擎路由），子代理才会和主代理看到同样的上游行为。
+            val outcome = SubagentLoop(
+                model = model,
+                parentSystemPrompt = parentSystem,
+                chat = { body -> stream.post(childCfg, body) },
+                runTool = { name, a ->
+                    if (name == "subagent") {
+                        // 深度 2 以内允许再派：递归走同一条路径，层级 +1、父任务 id 一路带下去。
+                        runSubagent(
+                            childCfg, parentSystem, a, sessionId, turnId, parentTaskId, agentId, agentName, childDepth, onStep,
+                        )
+                    } else {
+                        toolRunner.run(name, a)
+                    }
+                },
+                tools = subagentToolsJson(subagentToolNames(childDepth, subagentMaxDepth)),
+                label = label,
+                depth = childDepth,
+                maxDepth = subagentMaxDepth,
+                budgetChars = verdict.shareChars,
+                onStep = onStep,
+                spill = spill,
+            ).run(prompt)
+            // 任务清单进池：解析失败就是「这轮没派活」，结论文本照常带回去。
+            val specs = if (outcome.ok) parseSubagentTasks(outcome.text) else emptyList()
+            val taskIds = groupRunner.submitSubagentTasks(
+                sessionId = sessionId,
+                parentTaskId = parentTaskId,
+                agentId = agentId ?: "main",
+                agentName = agentName ?: "主代理",
+                specs = specs,
+            )
+            val tasksNote = when {
+                specs.isEmpty() -> ""
+                taskIds.isEmpty() -> "\n\n[子任务未进池] 结论里有 " + specs.size +
+                    " 条任务，但当前会话没有可用的执行池（只有群聊房间里能派活）。"
+                else -> "\n\n[已进池] " + taskIds.size + " 条子任务：" +
+                    specs.joinToString("；") { it.title } + "（父任务 " + (parentTaskId ?: "-") + "）"
+            }
+            return ToolExecResult(
+                ok = outcome.ok,
+                output = if (outcome.ok) outcome.text + tasksNote else "",
+                error = if (outcome.ok) null else outcome.text,
+                elapsedMs = System.currentTimeMillis() - started,
+                attempts = 1,
+            )
+        } finally {
+            subagentBudget.end(sessionId)
+        }
     }
 
     /**

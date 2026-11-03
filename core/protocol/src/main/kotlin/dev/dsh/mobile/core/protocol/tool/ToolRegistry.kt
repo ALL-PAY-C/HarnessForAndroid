@@ -585,6 +585,11 @@ private fun decl_subagent(): JsonObject = buildJsonObject {
                             put("type", "string")
                             put("description", "可选：换一个模型跑这个子任务；留空继承当前模型")
                         }
+                        putJsonObject("depth") {
+                            put("type", "integer")
+                            put("description", "当前调用者所在层级（主代理 0，第一层子代理 1）；省略按运行时深度算，" +
+                                "超过嵌套上限的派发会被拒并回「子代理最多嵌套 N 层」")
+                        }
                     }
                     putJsonArray("required") { add("prompt") }
                 }
@@ -636,8 +641,11 @@ private fun decl_subagent(): JsonObject = buildJsonObject {
         append("subagent 工具：把独立、可并行的子任务交给子代理。")
         append("子代理有自己的上下文和工具（shell / 文件 / phone），只把结论回给你，")
         append("不占用也不污染主对话历史——适合「同时查三件事」「先读完一大堆代码再给我结论」。")
-        append("它看不到当前对话，prompt 必须自带全部背景，别写「上面那个文件」；它也不能再派子代理。")
+        append("它看不到当前对话，prompt 必须自带全部背景，别写「上面那个文件」。")
+        append("嵌套有深度上限（默认 2 层，主代理算第 0 层）：第 2 层还能再派，第 3 层会被拒并回「子代理最多嵌套 2 层」。")
         append("互不相关的子任务就同一轮里发多个 subagent：依次执行、各自回结论。")
+        append("要把活拆给执行池：在结论里显式列出来——\"- 任务：<标题>｜<说明>\" 每行一条，")
+        append("或一段 [{\"title\":\"..\",\"detail\":\"..\"}] JSON 数组；父会话会把它投进执行池并记下父任务 id。")
     }
 
 /**

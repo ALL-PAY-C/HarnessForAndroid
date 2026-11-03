@@ -27,6 +27,11 @@ data class AgentTask(
      * 为空表示按 [dependsOn] 推断接力语义，群聊的普通轮转不受影响。
      */
     val hint: String = "",
+    /**
+     * 父任务 id：子代理产出的子任务用它追溯「谁派的活」（T5.3）。
+     * 可空 —— 群聊直接派的任务没有父任务，老数据照旧反序列化。
+     */
+    val parentId: String? = null,
 )
 
 /** 执行池里某个 Agent 的实时状态，UI 用它显示“谁在执行什么”。 */

@@ -24,6 +24,7 @@ import dev.dsh.mobile.core.protocol.buildUserContent
 import dev.dsh.mobile.core.protocol.detectGroupMode
 import dev.dsh.mobile.core.protocol.digest
 import dev.dsh.mobile.core.protocol.groupStateLine
+import dev.dsh.mobile.core.protocol.llm.SubagentTaskSpec
 import dev.dsh.mobile.core.protocol.llm.ModelStream
 import dev.dsh.mobile.core.protocol.namedMentions
 import dev.dsh.mobile.core.protocol.nextReworkCount
@@ -831,6 +832,44 @@ internal class GroupRunner(
         taskOutputs[taskId] = text
     }
 
+
+    /**
+     * 房间预算（token）：群聊按房间预算走，不在房间里就回 0（调用方回落 settings 的上下文预算）。
+     * T5.3 的分摊分母从这里取，与 runModeratedRoom 的 [预算告急] 同一口径。
+     */
+    internal fun roomBudgetTokens(sessionId: String): Int =
+        groupTurns[sessionId]?.plan?.contextBudget ?: 0
+
+    /**
+     * 子代理产出的子任务进池（T5.3）：复用既有 [AgentTask] 与 [ExecutionPool] 执行路径，
+     * 父任务 id 落在 [AgentTask.parentId] 上，池里能一路查回「谁派的活」。
+     *
+     * 没有群快照就返回空表 —— 执行池的 runner 是 [runMemberTask]，单聊会话没有成员上下文，
+     * 入池只会得到一条空产出，宁可不派（调用方会在工具输出里明说未进池）。
+     */
+    internal fun submitSubagentTasks(
+        sessionId: String,
+        parentTaskId: String?,
+        agentId: String,
+        agentName: String,
+        specs: List<SubagentTaskSpec>,
+    ): List<String> {
+        if (specs.isEmpty() || groupTurns[sessionId] == null) return emptyList()
+        return specs.map { spec ->
+            val task = AgentTask(
+                id = UUID.randomUUID().toString(),
+                sessionId = sessionId,
+                agentId = agentId,
+                agentName = agentName,
+                prompt = spec.detail,
+                hint = "这是子任务「" + spec.title + "」：只做这一件，做完直接给结论，别复述任务本身。" +
+                    (parentTaskId?.let { "（父任务 " + it + "）" } ?: ""),
+                parentId = parentTaskId,
+            )
+            dispatchGroupTasks(sessionId, listOf(task))
+            task.id
+        }
+    }
 
     /** 会话取消/关闭时丢掉这一轮的群状态（与传输层 cancel 同一时刻，语义不变）。 */
     internal fun forget(sessionId: String) {
