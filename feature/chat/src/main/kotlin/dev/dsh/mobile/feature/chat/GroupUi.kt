@@ -51,10 +51,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.dsh.mobile.core.model.ChatMessage
 import dev.dsh.mobile.core.model.Participant
+import dev.dsh.mobile.core.protocol.group.LedgerSnapshot
+import dev.dsh.mobile.core.protocol.group.LedgerState
 import dev.dsh.mobile.design.Ava
 import dev.dsh.mobile.design.LocalQq
+import dev.dsh.mobile.design.QqCardDivider
 import dev.dsh.mobile.design.QqShape
+import dev.dsh.mobile.design.QqSpace
 import dev.dsh.mobile.design.SectionChevron
+import dev.dsh.mobile.design.qqFontBody
 
 // ── 数据派生：全部从现有 state 算，不新增状态源 ───────────────────────────────
 
@@ -503,4 +508,167 @@ internal fun SpeakerPickerDialog(
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("关闭", color = p.accent) } },
     )
+}
+
+// ── 组件 5：房间账本（待办胶囊 + 账本面板，T5.3）──────────────────────────────
+
+/**
+ * 成员条右侧的「待办 N」胶囊：未完成任务 + 未解问题的条数。
+ *
+ * 0 条时整个组件不渲染 —— 没有账本的群聊零视觉变化。
+ * 点开是 [LedgerSheet]；面板开关留在这一层，不新增全局状态。
+ */
+@Composable
+internal fun GroupLedgerChip(
+    pending: Int,
+    snapshot: LedgerSnapshot,
+    memberNames: Map<String, String>,
+) {
+    if (pending <= 0) return
+    val p = LocalQq.current
+    var open by rememberSaveable { mutableStateOf(false) }
+    Row(
+        Modifier
+            .clip(QqShape.chip())
+            .background(p.warn.copy(alpha = 0.14f))
+            .clickable { open = true }
+            .padding(horizontal = QqSpace.s(), vertical = QqSpace.xs()),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(5.dp).clip(QqShape.pill()).background(p.warn))
+        Spacer(Modifier.width(QqSpace.xs()))
+        Text("待办 " + pending, color = p.warn, fontSize = qqFontBody(11.5.sp), maxLines = 1)
+    }
+    if (open) {
+        LedgerSheet(snapshot = snapshot, memberNames = memberNames) { open = false }
+    }
+}
+
+/**
+ * 账本面板：未完成（含负责人）/ 未解问题 / 已完成（折叠，点开看最近 5 条）。
+ *
+ * 状态用行首色点表达：Open 蓝、Reworked 琥珀、Done 绿 —— 全是既有 palette token，
+ * 不新造颜色；圆角与间距走 QqShape / QqSpace，字号走 qqFontBody。
+ */
+@Composable
+internal fun LedgerSheet(
+    snapshot: LedgerSnapshot,
+    memberNames: Map<String, String>,
+    onDismiss: () -> Unit,
+) {
+    val p = LocalQq.current
+    var showDone by rememberSaveable { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = p.card,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("房间账本", color = p.t1, fontSize = qqFontBody(15.sp), fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.width(QqSpace.s()))
+                Text(
+                    "未完成 " + snapshot.open.size + " · 问题 " + snapshot.questions.size,
+                    color = p.t3,
+                    fontSize = qqFontBody(11.sp),
+                    maxLines = 1,
+                )
+            }
+        },
+        text = {
+            Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                LedgerGroupTitle("未完成")
+                if (snapshot.open.isEmpty()) {
+                    Text("没有未完成的事", color = p.t3, fontSize = qqFontBody(12.sp))
+                }
+                snapshot.open.forEach { item ->
+                    val owner = item.ownerId?.let { memberNames[it] }.orEmpty()
+                    val tail = buildList {
+                        if (owner.isNotEmpty()) add(owner)
+                        if (item.state == LedgerState.Reworked) add("已打回")
+                    }.joinToString(" · ")
+                    LedgerLine(dot = ledgerDot(item.state), text = item.title, tail = tail)
+                }
+                if (snapshot.questions.isNotEmpty()) {
+                    QqCardDivider()
+                    LedgerGroupTitle("未解问题")
+                    snapshot.questions.forEach { q -> LedgerLine(dot = p.warn, text = q, tail = "") }
+                }
+                if (snapshot.done.isNotEmpty()) {
+                    QqCardDivider()
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { showDone = !showDone }
+                            .padding(vertical = QqSpace.s()),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "已完成 " + snapshot.done.size + " 条",
+                            color = p.t2,
+                            fontSize = qqFontBody(12.sp),
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            if (showDone) "收起" else "最近 5 条",
+                            color = p.accent,
+                            fontSize = qqFontBody(11.sp),
+                        )
+                    }
+                    if (showDone) {
+                        snapshot.done.takeLast(5).forEach { item ->
+                            LedgerLine(dot = p.green, text = item.title, tail = "")
+                        }
+                    }
+                }
+                if (snapshot.reworkCount > 0) {
+                    Spacer(Modifier.height(QqSpace.s()))
+                    Text(
+                        "累计打回 " + snapshot.reworkCount + " 次",
+                        color = p.t3,
+                        fontSize = qqFontBody(10.5.sp),
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭", color = p.accent) } },
+    )
+}
+
+/** 段落小标题：色不是信息，字号与字重才是层级，所以用 t2 而不是状态色。 */
+@Composable
+private fun LedgerGroupTitle(text: String) {
+    val p = LocalQq.current
+    Text(
+        text,
+        color = p.t2,
+        fontSize = qqFontBody(11.5.sp),
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(top = QqSpace.s(), bottom = QqSpace.xs()),
+    )
+}
+
+/** 一条账本：状态色点 + 正文 + 尾部说明（负责人 / 已打回）。 */
+@Composable
+private fun LedgerLine(dot: Color, text: String, tail: String) {
+    val p = LocalQq.current
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.Top) {
+        Box(Modifier.padding(top = 5.dp).size(5.dp).clip(QqShape.pill()).background(dot))
+        Spacer(Modifier.width(QqSpace.s()))
+        Column(Modifier.weight(1f)) {
+            Text(text, color = p.t1, fontSize = qqFontBody(12.sp), lineHeight = qqFontBody(17.sp))
+            if (tail.isNotEmpty()) {
+                Text(tail, color = p.t3, fontSize = qqFontBody(10.5.sp))
+            }
+        }
+    }
+}
+
+/** 状态色点：Open 蓝 / Reworked 琥珀 / Done 绿，全走既有 palette。 */
+@Composable
+private fun ledgerDot(state: LedgerState): Color {
+    val p = LocalQq.current
+    return when (state) {
+        LedgerState.Reworked -> p.amber
+        LedgerState.Done -> p.green
+        LedgerState.Open, LedgerState.Dropped -> p.accent
+    }
 }

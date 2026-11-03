@@ -24,6 +24,8 @@ import dev.dsh.mobile.core.model.Session
 import dev.dsh.mobile.core.model.SessionKind
 import dev.dsh.mobile.core.model.TokenUsage
 import dev.dsh.mobile.core.protocol.CompactResult
+import dev.dsh.mobile.core.protocol.group.LedgerSnapshot
+import dev.dsh.mobile.core.protocol.group.RoomLedgers
 import dev.dsh.mobile.core.protocol.SessionProjection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -74,6 +76,11 @@ data class ChatUiState(
     val queue: List<SendQueue.Item> = emptyList(),
     /** 执行池快照（只读）；空 = 拿不到或全空闲，消息区顶部状态条不渲染。 */
     val agents: List<AgentRuntimeState> = emptyList(),
+    /**
+     * 房间账本快照（T5.3 群聊外环）：空 = 这个会话还没有账本，
+     * 成员条上的「待办 N」与账本面板整块不渲染。
+     */
+    val ledger: LedgerSnapshot = LedgerSnapshot(),
     /** 本会话生效的预设 id（会话切过就是会话的，否则全局默认）。 */
     val presetId: String = AgentPresets.defaultPresetId,
     /** 该预设暴露的开关；内置预设以外为空，「+」面板据此决定要不要渲染开关区。 */
@@ -185,6 +192,9 @@ class ChatViewModel(
 
     /** 没有执行池就发一个空流，顶部状态条整条不渲染。 */
     private val agentsFlow: Flow<List<AgentRuntimeState>> = executionAgents ?: flowOf(emptyList())
+
+    /** 账本快照：GroupRunner 写 [RoomLedgers]，这里只读镜像，不算第二套真值。 */
+    private val ledgerFlow: StateFlow<LedgerSnapshot> = RoomLedgers.flow(sessionId)
 
     val uiState: StateFlow<ChatUiState> = combine(
         repo.observeMessages(sessionId),
@@ -323,6 +333,8 @@ class ChatViewModel(
         )
     }.combine(agentsFlow) { state, agents ->
         if (agents.isEmpty()) state else state.copy(agents = agents)
+    }.combine(ledgerFlow) { state, ledger ->
+        if (ledger == state.ledger) state else state.copy(ledger = ledger)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState(sessionId))
 
     // ------------------------------------------------- 投影 / 压缩（只读 UI 接线）

@@ -82,3 +82,6 @@ app/src/main/jniLibs/*/libgateway.so
 
 # 网关 OAuth 凭据（含 refresh token，禁止入库；构建时从本机 assets 目录打进去）
 app/src/main/assets/gateway/auth/
+
+# 回归截图（verify.ps1 默认输出，不入库）
+baseline/

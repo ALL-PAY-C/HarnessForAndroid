@@ -326,6 +326,12 @@ internal fun ChatMemberStrip(
                     onClick = { onOpenMember(part) },
                 )
             }
+            // 账本待办胶囊（T5.3）：跟在成员后面，0 条时组件自己 return，不占位。
+            GroupLedgerChip(
+                pending = state.ledger.pending,
+                snapshot = state.ledger,
+                memberNames = state.participants.associate { it.id to it.name },
+            )
         }
     }
 }

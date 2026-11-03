@@ -71,6 +71,9 @@ internal class GroupRunner(
 ) {
     private val groupTurns = mutableMapOf<String, GroupTurn>()
 
+    /** sessionId -> 房间账本（T5.3 §6：跨用户轮不重建，只在 forget 时清掉）。 */
+    private val ledgers = mutableMapOf<String, RoomLedger>()
+
     /** 上一个真正说完话的成员（sessionId -> agentId）：未 @ 时用来判断「是不是在追问它」。 */
     private val lastSpeaker = mutableMapOf<String, String>()
 
@@ -105,6 +108,10 @@ internal class GroupRunner(
         val turnId: String? = null,
     )
 
+    /** 本会话的账本；没有就建一份（跨用户轮存活，会话删除才丢）。 */
+    private fun ledgerFor(sessionId: String): RoomLedger =
+        synchronized(ledgers) { ledgers.getOrPut(sessionId) { RoomLedger(sessionId) } }
+
     /**
      * 群组：拆任务 → 进执行池串行跑 → 全部结束后再发一个总 TurnEnd。
      *
@@ -125,6 +132,8 @@ internal class GroupRunner(
         // 公共历史：谁说了什么都按时间记一份，成员上下文从这里取。
         threads.appendPublic(sessionId, "user", userText, "用户")
         groupTurns[sessionId] = GroupTurn(plan, history, userText, turnId)
+        // 新一轮用户消息：账本跨轮留着，只重置「本轮完成 / 打回」计数。
+        ledgerFor(sessionId).beginTurn()
         // 先分诊：办公室分工 / 并行 / 接力 / 自动机（一棒做、一棒验收，打回重做）。
         val mode = detectGroupMode(userText, plan.members.size, plan.mode)
         // 点名优先：用户 @（或直呼）了谁，就只让这几位出场。
@@ -145,8 +154,11 @@ internal class GroupRunner(
                 lastSpeakerId = null,
                 mode = GroupMode.Chain,
             )
+            emitLedgerOpening(sessionId, plan)
             dispatchGroupTasks(sessionId, tasks)
             pool.await(sessionId)
+            markRoundOutcome(tasks)
+            emitLedgerClosing(sessionId, plan)
             groupTurns.remove(sessionId)
             emit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
             return
@@ -181,7 +193,7 @@ internal class GroupRunner(
             round = 0,
             charsUsed = userText.length,
             elapsedMs = 0L,
-            ledger = LedgerView(),
+            roomLedger = ledgerFor(sessionId),
             lastSpeakerId = synchronized(lastSpeaker) { lastSpeaker[sessionId] },
         )
         if (LegacyScheduler(plan, userText, prior).next(legacyRoom) is SchedulerDecision.Done) {
@@ -205,6 +217,7 @@ internal class GroupRunner(
             groupTurns[sessionId] = it.copy(plan = it.plan.copy(pendingSpeakerIds = round.deferred))
         }
         round.notice?.let { text -> emitGroupNotice(sessionId, text) }
+        emitLedgerOpening(sessionId, plan)
         val tasks = round.tasks
         if (tasks.isEmpty()) {
             groupTurns.remove(sessionId)
@@ -215,6 +228,8 @@ internal class GroupRunner(
         dispatchGroupTasks(sessionId, tasks)
         // 等本 session 的活全部结束（完成/失败/取消都会唤醒），不靠轮询 sleep。
         pool.await(sessionId)
+        markRoundOutcome(tasks)
+        emitLedgerClosing(sessionId, plan)
         groupTurns.remove(sessionId)
         emit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
     }
@@ -240,13 +255,17 @@ internal class GroupRunner(
         val stall = StallDetector()
         val silence = SilenceTracker()
         val transcript = ArrayList<TranscriptLine>()
-        val ledger = LedgerView()
+        val ledger = ledgerFor(sessionId)
         val startedAt = System.currentTimeMillis()
         var charsUsed = userText.length
         var round = 0
         var warned = false
         var lastSpeakerId: String? = synchronized(lastSpeaker) { lastSpeaker[sessionId] }
-        while (true) {
+        // 账本非空就先报一句：用户第二句话问「刚才那两件做完了吗」时，房间里真有东西可看。
+        emitLedgerOpening(sessionId, plan)
+        // 散会播报挂在 finally 上：打断 / 预算到顶 / 正常收工都是同一条出口。
+        try {
+            while (true) {
             // 用户打断优先级最高：协程被取消就直接收手，别再派活。
             if (!currentCoroutineContext().isActive) {
                 emitGroupNotice(sessionId, "[群聊已散会] 用户打断，立即散会。")
@@ -266,7 +285,7 @@ internal class GroupRunner(
                 round = round,
                 charsUsed = charsUsed,
                 elapsedMs = budget.elapsedMs,
-                ledger = ledger,
+                roomLedger = ledger,
                 lastSpeakerId = lastSpeakerId,
             )
             val stop = evaluateStop(
@@ -327,7 +346,7 @@ internal class GroupRunner(
                 emitGroupNotice(sessionId, "[群聊已散会] 这一轮没有可执行的任务。")
                 return
             }
-            dispatchGroupTasks(sessionId, tasks)
+            dispatchGroupTasks(sessionId, tasks, round)
             pool.await(sessionId)
             // 记发言必须用「成员 id」（task.agentId），不能用任务 id：
             // RoomView.briefPhase 靠 members[i].spokeCount 判断首轮是否结束，
@@ -338,6 +357,9 @@ internal class GroupRunner(
                 transcript.add(transcriptOf(memberId, name, text, round))
                 charsUsed += text.length
             }
+            // 每轮 outputs 汇总处：跑成的标 Done、没跑成的标 Reworked，再从正文里扫问题 / 结论。
+            markRoundOutcome(tasks)
+            scanOutputs(ledger, outputs, round)
             lastSpeakerId = tasks.lastOrNull()?.agentId ?: lastSpeakerId
             stall.onRound(
                 texts = outputs.map { it.third },
@@ -346,6 +368,9 @@ internal class GroupRunner(
             )
             silence.onRound(contributorsOf(outputs.map { it.second to it.third }))
             round++
+            }
+        } finally {
+            emitLedgerClosing(sessionId, plan)
         }
     }
 
@@ -357,9 +382,11 @@ internal class GroupRunner(
         round: Int,
         charsUsed: Int,
         elapsedMs: Long,
-        ledger: LedgerView,
+        roomLedger: RoomLedger,
         lastSpeakerId: String?,
     ): RoomView {
+        // 读侧（规格 §5）：主持人看到的账本与成员待办数都来自同一本 RoomLedger，不再用名字猜。
+        val ledger = roomLedger.view()
         val mentioned = parseMentions(userText, plan.members).map { it.first }
             .ifEmpty { namedMentions(userText, plan.members) }
         val forcedIds = mentioned.map { it.id }.toSet()
@@ -371,7 +398,7 @@ internal class GroupRunner(
                 name = m.name,
                 spokeCount = mine.size,
                 lastSpokeRound = mine.lastOrNull()?.round ?: -1,
-                pendingTasks = ledger.openTasks.count { it.contains(m.name) },
+                pendingTasks = roomLedger.openTasksOf(m.id),
                 forced = m.id in forcedIds,
                 named = m.id in namedIds,
             )
@@ -443,6 +470,8 @@ internal class GroupRunner(
      */
     private suspend fun runAutomaton(sessionId: String, plan: GroupPlan, userText: String) {
         val members = plan.members
+        // 自动机档与群聊共用同一本账（规格 §5）：执行/验收两条腿都在这里记账。
+        val ledger = ledgerFor(sessionId)
         val mentioned = parseMentions(userText, members).map { it.first }
         val worker = mentioned.getOrNull(0) ?: members.firstOrNull() ?: return
         val reviewer = mentioned.getOrNull(1)
@@ -464,38 +493,39 @@ internal class GroupRunner(
         val stall = StallDetector()
         while (round < rounds) {
             round++
-            val stepId = pool.submitOne(
-                sessionId,
-                autoTask(
-                    sessionId = sessionId,
-                    member = worker,
-                    prompt = "自动机第 " + round + " 轮，轮到你执行。\n" +
-                        "用户给的规则：" + shared + "\n" +
-                        "当前进度：" + progress,
-                    hint = "你是本轮执行者：只做这一轮该你做的那一步，不要跳步、" +
-                        "不要替 " + reviewer.name + " 做验收、不要一次把后面几轮全算完。" +
-                        "做完用一两句话说明这一步的结果，以及这个值现在是几。",
-                ),
+            val stepTask = autoTask(
+                sessionId = sessionId,
+                member = worker,
+                prompt = "自动机第 " + round + " 轮，轮到你执行。\n" +
+                    "用户给的规则：" + shared + "\n" +
+                    "当前进度：" + progress,
+                hint = "你是本轮执行者：只做这一轮该你做的那一步，不要跳步、" +
+                    "不要替 " + reviewer.name + " 做验收、不要一次把后面几轮全算完。" +
+                    "做完用一两句话说明这一步的结果，以及这个值现在是几。",
             )
+            // 自动机与群聊共用同一本账（规格 §5）：开场任务直接入账，Done 时收敛。
+            ledger.mergeTasks(listOf(stepTask), round)
+            val stepId = pool.submitOne(sessionId, stepTask)
             pool.await(sessionId)
             if (!taskSucceeded(stepId)) return
+            ledger.markDone(listOf(stepId))
             // 自动机档也要更新 lastSpeaker：不然「未 @ 的追问」会一直找错人（默认档早就更新了）。
             synchronized(lastSpeaker) { lastSpeaker[sessionId] = worker.id }
             val workerOut = taskOutputs[stepId].orEmpty()
-            val checkId = pool.submitOne(
-                sessionId,
-                autoTask(
-                    sessionId = sessionId,
-                    member = reviewer,
-                    prompt = "用户给的规则：" + shared + "\n" +
-                        "上一位 " + worker.name + " 本轮的输出：\n" + digest(workerOut, 600),
-                    hint = "你是本轮验收者：只核对和回写，不要重算一遍。" +
-                        "核对无误就把值回写进结论；有错就指出错在哪。" +
-                        "最后一行只写下面三者之一：【继续】还没到终点、【完成】整个任务已达成、【打回】<一句原因> 这一轮不合格要重做。",
-                ),
+            val checkTask = autoTask(
+                sessionId = sessionId,
+                member = reviewer,
+                prompt = "用户给的规则：" + shared + "\n" +
+                    "上一位 " + worker.name + " 本轮的输出：\n" + digest(workerOut, 600),
+                hint = "你是本轮验收者：只核对和回写，不要重算一遍。" +
+                    "核对无误就把值回写进结论；有错就指出错在哪。" +
+                    "最后一行只写下面三者之一：【继续】还没到终点、【完成】整个任务已达成、【打回】<一句原因> 这一轮不合格要重做。",
             )
+            ledger.mergeTasks(listOf(checkTask), round)
+            val checkId = pool.submitOne(sessionId, checkTask)
             pool.await(sessionId)
             if (!taskSucceeded(checkId)) return
+            ledger.markDone(listOf(checkId))
             synchronized(lastSpeaker) { lastSpeaker[sessionId] = reviewer.id }
             val reviewOut = taskOutputs[checkId].orEmpty()
             progress = digest(reviewOut, 300)
@@ -504,6 +534,8 @@ internal class GroupRunner(
             rework = nextReworkCount(rework, verdict)
             when (verdict) {
                 Verdict.Rework -> {
+                    // 写入点四（规格 §3）：打回的意见进账本，下一轮主持人看得见它还欠着。
+                    ledger.markRework(listOf(stepId))
                     if (rework > MAX_AUTOMATON_REWORK) {
                         AppLog.w("自动机：" + reviewer.name + " 连续打回 " + rework + " 次，提前收工")
                         emitGroupNotice(
@@ -516,6 +548,7 @@ internal class GroupRunner(
                 }
                 // 验收说完成就完成：Done 的优先级高于僵局判定（短发言也可能就是正确答案）。
                 Verdict.Done -> {
+                    ledger.markDone(listOf(stepId))
                     emitGroupNotice(sessionId, "[自动机已收工] 第 " + round + " 轮验收通过，任务达成。")
                     return
                 }
@@ -711,7 +744,9 @@ internal class GroupRunner(
      * 同一个 agent 上一轮还在跑时不再开第二条并行的活 —— 那会让它一边说一边说、自相矛盾；
      * 改成一条排队任务，prompt 前标「（补充）」，由池按「同 agent 串行」的规则接着跑。
      */
-    private fun dispatchGroupTasks(sessionId: String, tasks: List<AgentTask>) {
+    private fun dispatchGroupTasks(sessionId: String, tasks: List<AgentTask>, round: Int = 0) {
+        // 写入点一（规格 §3）：派活前先入账，主持人下一轮才看得见谁欠什么活。
+        ledgerFor(sessionId).mergeTasks(tasks, round)
         val agents = pool.agents.value
         for (task in tasks) {
             val state = agents[task.agentId]?.state
@@ -823,7 +858,9 @@ internal class GroupRunner(
      */
     private fun emitGroupNotice(sessionId: String, text: String) {
         val turnId = groupTurns[sessionId]?.turnId
-        emit(DshEvent.MessageChunk(sessionId, text, "system", "系统", turnId))
+        // 每条 notice 单独成段：chunk 是追加进同一个 assistant part 的，不补换行就会和上一条 notice
+        // 拼成一行（实测「[群聊已散会] … 散会[账本] 本轮完成 1 条…」），而 UI 按换行切段。
+        emit(DshEvent.MessageChunk(sessionId, "\n" + text, "system", "系统", turnId))
     }
 
     /** 记下这一棒的最终发言（自动机下一棒要用）；量大了整体清空，避免长会话里无界增长。 */
@@ -855,6 +892,8 @@ internal class GroupRunner(
         specs: List<SubagentTaskSpec>,
     ): List<String> {
         if (specs.isEmpty() || groupTurns[sessionId] == null) return emptyList()
+        // 写入点二（规格 §3）：子任务进池前先入账（dispatchGroupTasks 再入一次会按 task.id 去重）。
+        val ledger = ledgerFor(sessionId)
         return specs.map { spec ->
             val task = AgentTask(
                 id = UUID.randomUUID().toString(),
@@ -866,6 +905,7 @@ internal class GroupRunner(
                     (parentTaskId?.let { "（父任务 " + it + "）" } ?: ""),
                 parentId = parentTaskId,
             )
+            ledger.mergeTasks(listOf(task), 0)
             dispatchGroupTasks(sessionId, listOf(task))
             task.id
         }
@@ -874,6 +914,69 @@ internal class GroupRunner(
     /** 会话取消/关闭时丢掉这一轮的群状态（与传输层 cancel 同一时刻，语义不变）。 */
     internal fun forget(sessionId: String) {
         groupTurns.remove(sessionId)
+        // 账本与群状态同一时刻释放（规格 §6：会话删除即释放，不落盘）。
+        synchronized(ledgers) { ledgers.remove(sessionId) }
+        RoomLedgers.clear(sessionId)
+    }
+
+    /**
+     * 一轮跑完按执行池结果记账（写入点三，规格 §3）：跑成的收敛成 Done，
+     * 没跑成的标 Reworked —— 下一轮主持人看到的「未完成」才是真的。
+     */
+    private fun markRoundOutcome(tasks: List<AgentTask>) {
+        if (tasks.isEmpty()) return
+        val ledger = ledgerFor(tasks.first().sessionId)
+        ledger.markDone(tasks.filter { taskSucceeded(it.id) }.map { it.id })
+        ledger.markRework(tasks.filterNot { taskSucceeded(it.id) }.map { it.id })
+    }
+
+    /**
+     * 每轮成员输出扫描（写入点五，规格 §4）：问题 / 事实各每轮最多 2 条，
+     * 一律过 digest(120) 再进账本，「（无补充）」直接跳过。
+     */
+    private fun scanOutputs(ledger: RoomLedger, outputs: List<Triple<String, String, String>>, round: Int) {
+        var questions = 0
+        var facts = 0
+        outputs.forEach { (_, _, text) ->
+            if (text.isBlank() || isNoAdd(text)) return@forEach
+            if (questions < QUESTIONS_PER_ROUND) {
+                questionsOf(text, QUESTIONS_PER_ROUND - questions).forEach { q ->
+                    ledger.addQuestion(q, round)
+                    questions++
+                }
+            }
+            if (facts < FACTS_PER_ROUND) {
+                factsOf(text, FACTS_PER_ROUND - facts).forEach { f ->
+                    ledger.addFact(f, round)
+                    facts++
+                }
+            }
+        }
+    }
+
+    /** 开场播报：账本非空才说话（新房间零视觉变化）。 */
+    private fun emitLedgerOpening(sessionId: String, plan: GroupPlan) {
+        val open = ledgerFor(sessionId).snapshot().open
+        if (open.isEmpty()) return
+        val head = open.take(3).joinToString("；") { it.title }
+        emitGroupNotice(sessionId, "[账本] 未完成 " + open.size + " 条：" + head + "（上一轮遗留）")
+    }
+
+    /** 散会播报：本轮完成 / 未完成 / 成员分布 / 打回次数（规格 §5 的固定文案）。 */
+    private fun emitLedgerClosing(sessionId: String, plan: GroupPlan) {
+        val ledger = ledgerFor(sessionId)
+        val snap = ledger.snapshot()
+        if (snap.isEmpty && ledger.turnDoneCount == 0 && ledger.turnReworkCount == 0) return
+        val dist = ledger.ownerCounts().entries.joinToString(" / ") { (ownerId, n) ->
+            (plan.members.firstOrNull { it.id == ownerId }?.name ?: ownerId) + " " + n
+        }
+        val line = buildString {
+            append("[账本] 本轮完成 ").append(ledger.turnDoneCount)
+            append(" 条，未完成 ").append(snap.open.size).append(" 条")
+            if (dist.isNotEmpty()) append("（成员分布：").append(dist).append("）")
+            append("，打回 ").append(ledger.turnReworkCount).append(" 次。")
+        }
+        emitGroupNotice(sessionId, line)
     }
 }
 
