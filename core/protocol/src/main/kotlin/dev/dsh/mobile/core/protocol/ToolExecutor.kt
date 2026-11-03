@@ -32,13 +32,20 @@ class ToolExecutor(
      * 正文留头尾 + locator，模型用 read_output 按 offset/limit 读回全文。
      */
     private val spill: ToolOutputSpill? = null,
+    /**
+     * 不可重试的工具名。执行器默认失败重试 1 次，这对读类工具没坏处，
+     * 但对有副作用的工具就是「把点击/输入再打一遍」——那些工具自己用错误包回业务失败，
+     * 唯一需要拦住的就是这一层重试。
+     */
+    private val noRetryTools: Set<String> = emptySet(),
 ) {
     /** [callId] 用于落盘文件名：同一轮里同名工具调两次不能互相覆盖输出。 */
     suspend fun run(name: String, args: JsonObject, turnId: String? = null, callId: String? = null): ToolExecResult {
         val started = System.currentTimeMillis()
         var attempts = 0
         var last: String? = null
-        for (i in 0..retries) {
+        val maxRetries = if (name in noRetryTools) 0 else retries
+        for (i in 0..maxRetries) {
             attempts = i + 1
             try {
                 val exec = executors[name]
@@ -66,7 +73,7 @@ class ToolExecutor(
                 last = t.javaClass.simpleName + ": " + (t.message ?: "执行失败")
                 AppLog.w("tool exec failed (attempt " + attempts + "): " + last)
             }
-            if (i < retries) delay(retryDelayMs)
+            if (i < maxRetries) delay(retryDelayMs)
         }
         return ToolExecResult(
             ok = false,

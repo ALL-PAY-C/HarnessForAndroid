@@ -34,6 +34,14 @@ class PhoneTestProbe : BroadcastReceiver() {
                 val r = PhoneBridge(context.applicationContext).exec(json)
                 Log.d(TAG, "EXEC json=" + json)
                 Log.d(TAG, "RESULT ok=" + r.ok + " error=" + r.error)
+                // logcat 单条消息约 4KB，节点树这类大结果会被截断；要完整结果就带 --es out <文件名>，
+                // 落盘到应用私有目录，用 adb shell run-as <pkg> cat files/<文件名> 取回。
+                val outName = intent.getStringExtra("out")
+                if (!outName.isNullOrBlank()) {
+                    val file = java.io.File(context.filesDir, outName)
+                    file.writeText(r.output)
+                    Log.d(TAG, "OUT_FILE " + file.absolutePath + " bytes=" + file.length())
+                }
                 Log.d(TAG, "OUTPUT>>> " + r.output)
             } catch (t: Throwable) {
                 Log.d(TAG, "CRASH " + t.javaClass.name + ": " + t.message, t)

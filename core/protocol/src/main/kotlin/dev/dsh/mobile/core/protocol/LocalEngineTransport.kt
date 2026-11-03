@@ -288,6 +288,9 @@ class LocalEngineTransport(
         ) + web.toolHandlers(),
         // 超阈值不再硬截 6000 字符：落盘 + 头尾 + locator，模型按需读回全文。
         spill = spill,
+        // 手机动作全是有副作用的（点击/输入/滚动），失败重试 1 次 = 再点一次。
+        // 这里只关掉执行器那一层重试；业务失败由 phone 自己用错误包回（ok=false 的 code/message）。
+        noRetryTools = setOf("phone", "phone_tree"),
     )
 
     /** 每个会话的插话队列，见 [interject]。 */
@@ -1668,8 +1671,16 @@ class LocalEngineTransport(
                                 putJsonArray("enum") {
                                     add("tap"); add("swipe"); add("type"); add("back"); add("home")
                                     add("recents"); add("readscreen"); add("openapp"); add("screenshot")
+                                    add("scroll"); add("pinch"); add("drag"); add("wait_for")
+                                    add("currentapp"); add("apps"); add("sequence"); add("key")
                                 }
-                                put("description", "动作：tap 点击 / swipe 滑动 / type 输入 / back 返回 / home 主页 / recents 最近任务 / readscreen 读屏 / openapp 开应用 / screenshot 截图")
+                                put(
+                                    "description",
+                                    "动作：tap 点击 / swipe 滑动 / type 输入 / back 返回 / home 主页 / recents 最近任务 / " +
+                                        "readscreen 读屏 / openapp 开应用 / screenshot 截图 / " +
+                                        "scroll 滚可滚容器 / pinch 双指缩放 / drag 拖拽 / wait_for 等条件成立 / " +
+                                        "currentapp 当前应用 / apps 已装可启动应用 / sequence 批量步骤 / key 系统键或输入框键",
+                                )
                             }
                             putJsonObject("fx") { put("type", "number"); put("description", "起点横坐标（分数 0-1，相对屏幕宽，优先于 x）") }
                             putJsonObject("fy") { put("type", "number"); put("description", "起点纵坐标（分数 0-1，相对屏幕高，优先于 y）") }
@@ -1684,6 +1695,60 @@ class LocalEngineTransport(
                             putJsonObject("query") { put("type", "string"); put("description", "按文本/描述查找节点并点击（tap 用，可选）") }
                             putJsonObject("durationMs") { put("type", "number"); put("description", "手势时长毫秒（tap 长按 / swipe 滑动时长）") }
                             putJsonObject("maxItems") { put("type", "number"); put("description", "读屏最多返回条目数（readscreen 用，默认 120）") }
+                            putJsonObject("nodeId") {
+                                put("type", "string")
+                                put("description", "节点身份 \"<snapshotId>:<seq>\"（来自 phone_tree）。跨代失效回 E_STALE_SNAPSHOT 且不执行")
+                            }
+                            putJsonObject("target") {
+                                put("type", "object")
+                                put("description", "选择器对象：text/textContains/desc/viewId/viewIdSuffix/className/package/index/clickable/editable/scrollable（字段间 AND）。多命中回 E_NODE_AMBIGUOUS，加 index 或换更精确条件")
+                            }
+                            putJsonObject("index") {
+                                put("type", "number")
+                                put("description", "选择器多命中时取第几个（0 起）")
+                            }
+                            putJsonObject("mode") { put("type", "string"); put("description", "type 的模式：set 覆盖 / append 追加 / clear 清空（默认 set）") }
+                            putJsonObject("perChar") { put("type", "boolean"); put("description", "type 逐字写入（默认 false）") }
+                            putJsonObject("intervalMs") { put("type", "number"); put("description", "逐字间隔毫秒（perChar 用，20-1000，默认 80）") }
+                            putJsonObject("key") { put("type", "string"); put("description", "back/home/recents/enter/delete/tab（key 动作）") }
+                            putJsonObject("times") { put("type", "number"); put("description", "重复次数（key/scroll 用，1-20，默认 1）") }
+                            putJsonObject("direction") { put("type", "string"); put("description", "scroll 方向：forward 往下 / backward 往上") }
+                            putJsonObject("verify") { put("type", "boolean"); put("description", "scroll 是否用界面指纹校验真的滚了（默认 true）") }
+                            putJsonObject("until") { put("type", "object"); put("description", "scroll 的目标选择器：命中即停（stoppedReason=until）") }
+                            putJsonObject("cond") {
+                                put("type", "object")
+                                put("description", "wait_for 条件：type=node_present/node_absent（带 selector）、text_present（带 textContains）、package_is（带 package）、generation_changed")
+                            }
+                            putJsonObject("timeoutMs") { put("type", "number"); put("description", "wait_for 超时毫秒（100-15000，默认 3000），超时回 E_WAIT_TIMEOUT") }
+                            putJsonObject("pollMs") { put("type", "number"); put("description", "wait_for 轮询间隔毫秒（100-2000，默认 250）") }
+                            putJsonObject("scale") { put("type", "number"); put("description", "pinch 比例：<1 缩小、>1 放大（也可直接给 fromRadius/toRadius）") }
+                            putJsonObject("fromRadius") { put("type", "number"); put("description", "pinch 起始半径像素（≥20）") }
+                            putJsonObject("toRadius") { put("type", "number"); put("description", "pinch 结束半径像素（≥20）") }
+                            putJsonObject("cx") { put("type", "number"); put("description", "pinch 中心横坐标（绝对像素，默认屏幕中心）") }
+                            putJsonObject("cy") { put("type", "number"); put("description", "pinch 中心纵坐标（绝对像素，默认屏幕中心）") }
+                            putJsonObject("startTarget") { put("type", "object"); put("description", "swipe 起点选择器或 nodeId 串") }
+                            putJsonObject("endTarget") { put("type", "object"); put("description", "swipe 终点选择器或 nodeId 串") }
+                            putJsonObject("fromX") { put("type", "number"); put("description", "drag 起点横坐标（或 x）") }
+                            putJsonObject("fromY") { put("type", "number"); put("description", "drag 起点纵坐标（或 y）") }
+                            putJsonObject("toX") { put("type", "number"); put("description", "drag 终点横坐标（或给 dx 位移）") }
+                            putJsonObject("toY") { put("type", "number"); put("description", "drag 终点纵坐标（或给 dy 位移）") }
+                            putJsonObject("dx") { put("type", "number"); put("description", "drag 横向位移（toX 缺省时用）") }
+                            putJsonObject("dy") { put("type", "number"); put("description", "drag 纵向位移（toY 缺省时用）") }
+                            putJsonObject("holdMs") { put("type", "number"); put("description", "drag 按下保持毫秒（0-2000，默认 500）") }
+                            putJsonObject("steps") {
+                                put("type", "array")
+                                put("description", "sequence 的步骤数组（≤20 步）：{action, args?, waitAfterMs?}。可用 tap/swipe/scroll/type/key/pinch/drag/wait_for/openapp/back/home/recents；动作参数也可直接写在步骤里（不必包一层 args）")
+                            }
+                            putJsonObject("stopOnError") { put("type", "boolean"); put("description", "sequence 单步失败是否立即停（默认 true，不回滚）") }
+                            putJsonObject("dryRun") { put("type", "boolean"); put("description", "sequence 只校验参数不执行（默认 false）") }
+                            putJsonObject("limit") { put("type", "number"); put("description", "apps 每页条数（1-500，默认 120）") }
+                            putJsonObject("offset") { put("type", "number"); put("description", "apps 分页起始下标（默认 0）") }
+                            putJsonObject("includeSystem") { put("type", "boolean"); put("description", "apps 是否包含系统应用（默认 false）") }
+                            putJsonObject("maxDepth") { put("type", "number"); put("description", "动作侧读树的深度上限（默认 6，与 phone_tree 同义）") }
+                            putJsonObject("maxNodes") { put("type", "number"); put("description", "动作侧读树的节点上限（默认 400，与 phone_tree 同义）") }
+                            putJsonObject("includeInvisible") { put("type", "boolean"); put("description", "动作侧是否包含不可见节点（默认 false）") }
+                            putJsonObject("onlyClickable") { put("type", "boolean"); put("description", "动作侧只保留可点节点（默认 false）") }
+                            putJsonObject("filter") { put("type", "object"); put("description", "动作侧读树的过滤选择器（与 phone_tree 的 filter 同义，保证 seq 一致）") }
                         }
                         putJsonArray("required") { add("action") }
                     }
@@ -1904,6 +1969,17 @@ class LocalEngineTransport(
         append("、openapp（package 包名或 query 应用名模糊匹配）、screenshot（Android 11+ 存本地文件）。")
         append("坐标优先用 fx/fy（0-1 相对屏幕），模型看的是缩放截图，绝对像素容易点偏。")
         append("读屏输出每行 text|desc|cx,cy|clickable|class。")
+        append("结构化读屏（viewId/bounds/节点身份/快照代次）用 phone_tree 工具。")
+        append("定位统一用 target（选择器对象）或 nodeId（\"<snapshotId>:<seq>\"，来自 phone_tree）：")
+        append("nodeId 跨代回 E_STALE_SNAPSHOT、选择器多命中回 E_NODE_AMBIGUOUS，两者都不派发任何动作。")
+        append("命中节点自身不可点会自动上溯最近可点祖先（列表行靠这个才点得动）。")
+        append("新动作：scroll（滚 scrollable=true 容器，direction/times/until/verify，advanced 用界面指纹判）")
+        append("、wait_for（cond.type=node_present/node_absent/text_present/package_is/generation_changed，timeoutMs 默认 3000，超时回 E_WAIT_TIMEOUT）")
+        append("、pinch（center 或 cx/cy + scale 或 fromRadius/toRadius）、drag（fromX/fromY→toX/toY 或 dx/dy，holdMs）")
+        append("、key（enter/delete/tab 打在聚焦输入框；back/home/recents 走系统键）、currentapp（当前前台应用）")
+        append("、apps（已装可启动应用，query/limit/offset 分页）、sequence（steps 一次下发，单步失败带步骤号即停）")
+        append("、type 另支持 target + mode=set/append/clear + perChar 逐字（intervalMs）。")
+        append("新动作外层恒 ok=true，真实成败与错误码在内层 {ok,code,message,retryable,effectLanded}；手机动作不重试。")
     }
 
     /**

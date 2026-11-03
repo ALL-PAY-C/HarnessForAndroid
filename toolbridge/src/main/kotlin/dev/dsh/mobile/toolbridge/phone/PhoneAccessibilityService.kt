@@ -53,7 +53,15 @@ class PhoneAccessibilityService : AccessibilityService() {
             foregroundPkg = pkg
             // 只有真的换台才刷新「从什么时候开始」，否则同一窗口的重复事件会把 sinceMs 一直往后推。
             if (switched) {
-                foregroundClass = e.className?.toString()
+                // WINDOW_STATE_CHANGED 的 className 常常是根视图类名（android.widget.FrameLayout），
+                // 拿它当 activity 名会误导模型；只收看起来像组件名的值，其余如实留空。
+                val cls = e.className?.toString().orEmpty()
+                foregroundClass = cls.takeIf {
+                    it.isNotEmpty() &&
+                        !it.startsWith("android.widget.") &&
+                        !it.startsWith("android.view.") &&
+                        !it.startsWith("android.app.")
+                }
                 foregroundSince = System.currentTimeMillis()
             }
             statusView?.text = statusText()
@@ -84,7 +92,11 @@ class PhoneAccessibilityService : AccessibilityService() {
 
     // ---- T4.1 读侧：前台快照与树代次 ----
 
-    fun foregroundPackage(): String? = foregroundPkg
+    /**
+     * 事件缓存没有时回落到活动窗口的包名：服务刚被启用时还没收到 WINDOW_STATE_CHANGED，
+     * 这时如实返回空会让模型以为「没有前台应用」。
+     */
+    fun foregroundPackage(): String? = foregroundPkg ?: rootInActiveWindow?.packageName?.toString()
 
     fun foregroundActivity(): String? = foregroundClass
 
