@@ -1008,27 +1008,45 @@ class PhoneBridge(private val context: Context) {
         if (fromRadius < 20 || toRadius < 20) {
             return failResult(PhoneErrorCode.BadArgs, "半径至少 20px（fromRadius/toRadius 或 scale）")
         }
+        // 手势路径的坐标不能越界：GestureDescription 对负坐标直接抛
+        // IllegalArgumentException("Path bounds must not be negative")，真机上表现为整条命令崩掉。
+        // 水平双指绕中心对称，所以可用半径被左右两侧较窄的一边限制。
+        val screen = screenSize()
+        val room = minOf(centerPoint.first, screen.first - 1 - centerPoint.first).coerceAtLeast(0)
+        val fitFrom = minOf(fromRadius, room)
+        val fitTo = minOf(toRadius, room)
+        if (fitFrom < 20 || fitTo < 20) {
+            return failResult(
+                PhoneErrorCode.BadArgs,
+                "中心点 (" + centerPoint.first + "," + centerPoint.second + ") 距屏幕左右边界只有 " + room +
+                    "px，放不下缩放半径；换一个靠中间的中心点（cx/cy）或缩小半径",
+            )
+        }
         val durationMs = obj.optLong("durationMs", 400L).coerceIn(100L, 3_000L)
         val p1 = Path().apply {
-            moveTo((centerPoint.first - fromRadius).toFloat(), centerPoint.second.toFloat())
-            lineTo((centerPoint.first - toRadius).toFloat(), centerPoint.second.toFloat())
+            moveTo((centerPoint.first - fitFrom).toFloat(), centerPoint.second.toFloat())
+            lineTo((centerPoint.first - fitTo).toFloat(), centerPoint.second.toFloat())
         }
         val p2 = Path().apply {
-            moveTo((centerPoint.first + fromRadius).toFloat(), centerPoint.second.toFloat())
-            lineTo((centerPoint.first + toRadius).toFloat(), centerPoint.second.toFloat())
+            moveTo((centerPoint.first + fitFrom).toFloat(), centerPoint.second.toFloat())
+            lineTo((centerPoint.first + fitTo).toFloat(), centerPoint.second.toFloat())
         }
-        val strokes = listOf(
-            GestureDescription.StrokeDescription(p1, 0L, durationMs),
-            GestureDescription.StrokeDescription(p2, 0L, durationMs),
-        )
+        val strokes = runCatching {
+            listOf(
+                GestureDescription.StrokeDescription(p1, 0L, durationMs),
+                GestureDescription.StrokeDescription(p2, 0L, durationMs),
+            )
+        }.getOrElse {
+            return failResult(PhoneErrorCode.GestureRejected, "双指路径被系统拒绝：" + it.message)
+        }
         val dispatched = gestureStrokes(svc, strokes)
         val body = JSONObject()
             .put("ok", dispatched)
             .put("dispatched", dispatched)
             .put("strokes", strokes.size)
             .put("center", pointJson(centerPoint))
-            .put("fromRadius", fromRadius)
-            .put("toRadius", toRadius)
+            .put("fromRadius", fitFrom)
+            .put("toRadius", fitTo)
             .put("durationMs", durationMs)
             .put("elapsedMs", System.currentTimeMillis() - started)
         if (!dispatched) body.put("code", PhoneErrorCode.GestureRejected.code).put("retryable", false)
@@ -1037,7 +1055,18 @@ class PhoneBridge(private val context: Context) {
 
     /** drag：单指按下 —— hold 段 —— 位移。续段用 continueStroke，父段必须先 addStroke。 */
     private fun doDrag(svc: AccessibilityService, obj: JSONObject): PhoneResult {
-        val started = System.currentTimeMillis()
+        // 目标形态优先：给了 startTarget/endTarget 就按节点定位（与 swipe 的写法一致），
+        // 只给坐标的老形态原样保留。
+        if (obj.has("startTarget") || obj.has("endTarget")) {
+            val p = parseTreeParams(obj) ?: return failResult(PhoneErrorCode.BadArgs, "filter 必须是对象")
+            val walked = readActionTree(svc, p) ?: return failResult(PhoneErrorCode.Timeout, "读节点树超时")
+            val generation = generationOf(svc)
+            val fromNode = resolvePointOn(walked, obj.opt("startTarget"), generation)
+                ?: return failResult(PhoneErrorCode.NodeNotFound, "startTarget 没定位到节点")
+            val toNode = resolvePointOn(walked, obj.opt("endTarget"), generation)
+                ?: return failResult(PhoneErrorCode.NodeNotFound, "endTarget 没定位到节点")
+            return dragPoints(svc, obj, fromNode, toNode)
+        }
         val from = pointOf(obj, "fromX", "fromY") ?: pointOf(obj, "x", "y")
             ?: return failResult(PhoneErrorCode.BadArgs, "drag 需要 fromX/fromY（或用 x/y 起点）")
         val to = pointOf(obj, "toX", "toY") ?: run {
@@ -1046,6 +1075,17 @@ class PhoneBridge(private val context: Context) {
             if (dx == Int.MIN_VALUE && dy == Int.MIN_VALUE) null
             else Pair(from.first + (if (dx == Int.MIN_VALUE) 0 else dx), from.second + (if (dy == Int.MIN_VALUE) 0 else dy))
         } ?: return failResult(PhoneErrorCode.BadArgs, "drag 需要 toX/toY 或 dx/dy")
+        return dragPoints(svc, obj, from, to)
+    }
+
+    /** 从两个已定位的点执行拖拽：单指按下 → hold 段 → 续段位移。 */
+    private fun dragPoints(
+        svc: AccessibilityService,
+        obj: JSONObject,
+        from: Pair<Int, Int>,
+        to: Pair<Int, Int>,
+    ): PhoneResult {
+        val started = System.currentTimeMillis()
         val holdMs = obj.optLong("holdMs", 500L).coerceIn(0L, 2_000L)
         val durationMs = obj.optLong("durationMs", 600L).coerceIn(100L, 5_000L)
         val down = Path().apply { moveTo(from.first.toFloat(), from.second.toFloat()) }
