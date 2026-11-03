@@ -298,7 +298,7 @@ fun SettingsScreen(
                                     Text(
                                         digest,
                                         color = when (state.updateDigestOk) {
-                                            true -> Color(0xFF22C55E)
+                                            true -> p.green
                                             false -> p.red
                                             null -> p.t3
                                         },
@@ -889,7 +889,7 @@ fun SettingsScreen(
                                     placeholder = { Text("http://127.0.0.1:7890") },
                                     isError = proxyError(proxy) != null, modifier = Modifier.fillMaxWidth(),
                                 )
-                                proxyError(proxy)?.let { Text(it, color = Color(0xFFC00000), fontSize = qqFontBody(12.sp)) }
+                                proxyError(proxy)?.let { Text(it, color = p.red, fontSize = qqFontBody(12.sp)) }
                                 TextButton(onClick = { viewModel.setProxyUrl(proxy) }, enabled = !state.busy && proxyError(proxy) == null) { Text("保存代理") }
                                 Hint("保存后所有子进程（Termux / proot / 应用内 shell，含 pip 与 git）都带上它；清空即直连。")
                             }
@@ -957,7 +957,7 @@ fun SettingsScreen(
                                     TextButton(onClick = { confirmingRuntimeReinstall = true }, enabled = !linux.busy) { Text("重装运行时") }
                                 }
                                 linux.error?.let {
-                                    Text(it.lineSequence().take(2).joinToString("\n"), color = Color(0xFFC00000), fontSize = qqFontBody(12.sp))
+                                    Text(it.lineSequence().take(2).joinToString("\n"), color = p.red, fontSize = qqFontBody(12.sp))
                                 }
                                 TextButton(onClick = viewModel::installKernel, enabled = !linux.busy) { Text("安装 / 修复 DSH 内核") }
                                 TextButton(onClick = viewModel::runLinuxSelfCheck, enabled = !linux.busy) { Text("运行自检") }
@@ -1246,7 +1246,7 @@ private fun PermissionRow(
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(title, color = p.t1, fontSize = qqFontBody(14.sp), modifier = Modifier.weight(1f))
-            Text(if (granted) "已授权" else "未授权", color = if (granted) Color(0xFF22C55E) else p.t2, fontSize = qqFontBody(12.sp))
+            Text(if (granted) "已授权" else "未授权", color = if (granted) p.green else p.t2, fontSize = qqFontBody(12.sp))
         }
         Text(label, color = p.t2, fontSize = qqFontBody(12.sp))
         if (actionLabel.isNotBlank()) TextButton(onClick = onAction) { Text(actionLabel) }

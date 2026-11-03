@@ -10,10 +10,11 @@ class ThemeRadiusTest {
     @Test
     fun defaultTokensFollowCornerRadius() {
         val t = ThemeTokens()
-        assertEquals(18.dp, t.bubbleRadius(true))
-        assertEquals(18.dp, t.bubbleRadius(false))
-        assertEquals(6.dp, t.tailRadius(true))
-        assertEquals(6.dp, t.tailRadius(false))
+        // 默认主圆角在 T2.1a 从 18dp 收到 16dp（16 是当时卡片最高频实测值），尖角恒为主圆角 1/3。
+        assertEquals(16.dp, t.bubbleRadius(true))
+        assertEquals(16.dp, t.bubbleRadius(false))
+        assertEquals(16.dp / 3, t.tailRadius(true))
+        assertEquals(16.dp / 3, t.tailRadius(false))
     }
 
     @Test

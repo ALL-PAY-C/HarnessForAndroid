@@ -82,33 +82,46 @@ fun GatewayCard(container: AppContainer) {
 
     val p = LocalQq.current
     SectionCard(modifier = Modifier.fillMaxWidth()) {
+        // 标题两行：上行标题 + 下行状态摘要。原来把「标题 · 状态 · 凭据未导入」+ 主按钮 + 展开
+        // 挤在一行，长文案会顶掉按钮右边距，窄屏直接贴边（实机截图 matrix/03-内置模型网关.png）。
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { expanded = !expanded }
-                .padding(horizontal = SectionSpacing.horizontal, vertical = 11.dp),
+                .padding(horizontal = SectionSpacing.horizontal, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                buildString {
-                    append("内置模型网关 · ")
-                    append(status)
-                    if (credentialMissing) append(" · 凭据未导入")
-                },
-                modifier = Modifier.weight(1f),
-                color = p.t1,
-                fontSize = qqFontBody(15.sp),
-                fontWeight = FontWeight.Medium,
-            )
-            if (credentialMissing) {
-                GatewayChip("导入凭据", primary = true) { importing = true }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    "内置模型网关",
+                    color = p.t1,
+                    fontSize = qqFontBody(15.sp),
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    if (credentialMissing) "$status · 凭据未导入" else status,
+                    color = if (credentialMissing) p.warn else p.t2,
+                    fontSize = qqFontBody(12.sp),
+                )
             }
             Text(
                 if (expanded) "收起 ▴" else "展开 ▾",
                 color = p.t3,
                 fontSize = qqFontBody(12.sp),
             )
+        }
+
+        if (credentialMissing) {
+            Row(
+                modifier = Modifier.padding(
+                    start = SectionSpacing.horizontal,
+                    end = SectionSpacing.horizontal,
+                    bottom = 11.dp,
+                ),
+            ) {
+                GatewayChip("导入凭据", primary = true) { importing = true }
+            }
         }
 
         if (expanded) {

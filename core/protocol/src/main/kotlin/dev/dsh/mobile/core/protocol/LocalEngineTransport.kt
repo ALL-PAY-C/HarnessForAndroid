@@ -34,6 +34,9 @@ import dev.dsh.mobile.core.protocol.group.contributorsOf
 import dev.dsh.mobile.core.protocol.group.evaluateStop
 import dev.dsh.mobile.core.protocol.group.explain
 import dev.dsh.mobile.core.protocol.group.transcriptOf
+import dev.dsh.mobile.core.protocol.tool.ToolCtx
+import dev.dsh.mobile.core.protocol.tool.contentOrNullSafe
+import dev.dsh.mobile.core.protocol.tool.ToolRegistry
 import dev.dsh.mobile.core.protocol.web.WebToolkit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -56,13 +59,11 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -294,37 +295,29 @@ class LocalEngineTransport(
     // ---- 工具防抖 / 执行器 / 每 Agent 线程 / 执行池（需求 A、B、D、E） ----
     private val loopGuard = ToolLoopGuard()
 
+    /** 注入通道 + 注册表：声明、执行、授权三者共用同一份 ToolSpec。 */
+    private val toolCtx = ToolCtx(
+        shellExecChannel = shellExecChannel,
+        fsExec = fsExec,
+        channelListExec = channelListExec,
+        bgExec = bgExec,
+        phoneExec = phoneExec,
+        skillExec = skillExec,
+        spill = spill,
+        shellHelp = toolHelp,
+        web = web,
+    )
+
+    private val toolRegistry = ToolRegistry(toolCtx)
+
     /** internal 而非 private：单测要证明注入的通道真的被走到（toolsJson 只是声明，不执行）。 */
     internal val toolRunner = ToolExecutor(
-        mapOf(
-            "shell" to { args -> shellExecChannel(args["command"]?.jsonPrimitive?.contentOrNullSafe().orEmpty(), (args["channel"] as? JsonPrimitive)?.contentOrNullSafe()) },
-            "fs_read" to { args -> fsExec("fs_read", args) },
-            "fs_write" to { args -> fsExec("fs_write", args) },
-            "fs_list" to { args -> fsExec("fs_list", args) },
-            "fs_op" to { args -> fsExec("fs_op", args) },
-            "channel_list" to { _ -> channelListExec() },
-            "run_bg" to { args -> bgExec("run_bg", args) },
-            "bg_status" to { args -> bgExec("bg_status", args) },
-            "bg_kill" to { args -> bgExec("bg_kill", args) },
-            "phone" to phoneExec,
-            // phone_tree 复用 phone 通道：toolbridge 的实现细节不进 protocol 的依赖面，
-            // 这里只把 action 换成读侧动作名（见 PhoneBridge 的 ACTION_TREE）。
-            "phone_tree" to { args -> phoneExec(JsonObject(args + ("action" to JsonPrimitive("tree")))) },
-            "skill" to { args -> skillExec(args) },
-            // P0-4：大输出回读。与其它工具同一条链路（toolsJson 声明 + toolRunner 执行）。
-            "read_output" to { args ->
-                spill.read(
-                    path = args["path"]?.jsonPrimitive?.contentOrNullSafe().orEmpty(),
-                    offset = args["offset"]?.jsonPrimitive?.contentOrNullSafe()?.toIntOrNull() ?: 0,
-                    limit = args["limit"]?.jsonPrimitive?.contentOrNullSafe()?.toIntOrNull() ?: 200,
-                )
-            },
-        ) + web.toolHandlers(),
+        toolRegistry.handlers(),
         // 超阈值不再硬截 6000 字符：落盘 + 头尾 + locator，模型按需读回全文。
         spill = spill,
         // 手机动作全是有副作用的（点击/输入/滚动），失败重试 1 次 = 再点一次。
         // 这里只关掉执行器那一层重试；业务失败由 phone 自己用错误包回（ok=false 的 code/message）。
-        noRetryTools = setOf("phone", "phone_tree"),
+        noRetryTools = toolRegistry.noRetryNames(),
     )
 
     /** 每个会话的插话队列，见 [interject]。 */
@@ -1923,456 +1916,9 @@ class LocalEngineTransport(
         }
     }
 
-    /** 工具表与执行器保持一致，原生文件和后台命令不借 shell 转义。 */
-    internal fun toolsJson(): JsonArray = buildJsonArray {
-        add(
-            buildJsonObject {
-                put("type", "function")
-                putJsonObject("function") {
-                    put("name", "shell")
-                    put("description", toolHelp())
-                    putJsonObject("parameters") {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("command") {
-                                put("type", "string")
-                                put("description", "要执行的命令，例如 ls /sdcard、dumpsys battery、pm list packages")
-                            }
-                            putJsonObject("channel") {
-                                put("type", "string")
-                                put("description", "默认 proot；读 /sdcard 用 app 通道")
-                                putJsonArray("enum") { add("proot"); add("app"); add("shizuku"); add("root") }
-                            }
-                            putJsonObject("reason") {
-                                put("type", "string")
-                                put("description", "为什么要执行这条命令，一句话说明")
-                            }
-                        }
-                        putJsonArray("required") { add("command") }
-                    }
-                }
-            },
-        )
-        // P0-5：模型侧待办（整表替换，语义对齐桌面 dsh-tool-todo）。
-        add(buildJsonObject {
-            put("type", "function")
-            putJsonObject("function") {
-                put("name", "todo_write")
-                put("description", "更新本轮待办清单：整表替换（不是追加）。每条含 content 与 status，" +
-                    "status 只能是 pending / in_progress / completed。同一时刻最多一条 in_progress。")
-                putJsonObject("parameters") {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("todos") {
-                            put("type", "array")
-                            put("description", "完整待办列表；空数组表示清空")
-                            putJsonObject("items") {
-                                put("type", "object")
-                                putJsonObject("properties") {
-                                    putJsonObject("content") { put("type", "string"); put("description", "一句话待办") }
-                                    putJsonObject("status") {
-                                        put("type", "string")
-                                        putJsonArray("enum") { add("pending"); add("in_progress"); add("completed") }
-                                    }
-                                }
-                                putJsonArray("required") { add("content"); add("status") }
-                            }
-                        }
-                    }
-                    putJsonArray("required") { add("todos") }
-                }
-            }
-        })
-        // P0-5：目标（get / create / update），update 带 revision 做乐观锁。
-        add(buildJsonObject {
-            put("type", "function")
-            putJsonObject("function") {
-                put("name", "goal")
-                put("description", "跨轮次的长期目标：get 读当前目标，create 新建，update 改状态。" +
-                    "update 必须带 revision（get 会返回），不匹配说明状态已被别处改过。")
-                putJsonObject("parameters") {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("action") {
-                            put("type", "string")
-                            putJsonArray("enum") { add("get"); add("create"); add("update") }
-                        }
-                        putJsonObject("objective") { put("type", "string"); put("description", "目标正文（create 必填）") }
-                        putJsonObject("phase") {
-                            put("type", "string")
-                            put("description", "update 用")
-                            putJsonArray("enum") { add("active"); add("paused"); add("blocked"); add("complete") }
-                        }
-                        putJsonObject("max_rounds") { put("type", "integer"); put("description", "最多自动续跑轮数") }
-                        putJsonObject("revision") { put("type", "integer"); put("description", "期望的版本号（update 用）") }
-                        putJsonObject("blocked_reason") { put("type", "string"); put("description", "phase=blocked 时说明卡在哪") }
-                    }
-                    putJsonArray("required") { add("action") }
-                }
-            }
-        })
-        // P0-4：按 offset/limit 读回落盘的工具输出（只允许读 tools-output 目录下）。
-        add(buildJsonObject {
-            put("type", "function")
-            putJsonObject("function") {
-                put("name", "read_output")
-                put("description", "读回被落盘的大工具输出。path 用工具结果里 locator 给的路径，按行 offset/limit 分段读。")
-                putJsonObject("parameters") {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("path") { put("type", "string"); put("description", "locator 里的 path") }
-                        putJsonObject("offset") { put("type", "integer"); put("description", "起始行（0 起）") }
-                        putJsonObject("limit") { put("type", "integer"); put("description", "最多返回行数，默认 200") }
-                    }
-                    putJsonArray("required") { add("path") }
-                }
-            }
-        })
-        add(
-            buildJsonObject {
-                put("type", "function")
-                putJsonObject("function") {
-                    put("name", "phone")
-                    put("description", phoneHelp())
-                    putJsonObject("parameters") {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("action") {
-                                put("type", "string")
-                                putJsonArray("enum") {
-                                    add("tap"); add("swipe"); add("type"); add("back"); add("home")
-                                    add("recents"); add("readscreen"); add("openapp"); add("screenshot")
-                                    add("scroll"); add("pinch"); add("drag"); add("wait_for")
-                                    add("currentapp"); add("apps"); add("sequence"); add("key")
-                                }
-                                put(
-                                    "description",
-                                    "动作：tap 点击 / swipe 滑动 / type 输入 / back 返回 / home 主页 / recents 最近任务 / " +
-                                        "readscreen 读屏 / openapp 开应用 / screenshot 截图 / " +
-                                        "scroll 滚可滚容器 / pinch 双指缩放 / drag 拖拽 / wait_for 等条件成立 / " +
-                                        "currentapp 当前应用 / apps 已装可启动应用 / sequence 批量步骤 / key 系统键或输入框键",
-                                )
-                            }
-                            putJsonObject("fx") { put("type", "number"); put("description", "起点横坐标（分数 0-1，相对屏幕宽，优先于 x）") }
-                            putJsonObject("fy") { put("type", "number"); put("description", "起点纵坐标（分数 0-1，相对屏幕高，优先于 y）") }
-                            putJsonObject("x") { put("type", "number"); put("description", "起点横坐标（绝对像素）") }
-                            putJsonObject("y") { put("type", "number"); put("description", "起点纵坐标（绝对像素）") }
-                            putJsonObject("fx2") { put("type", "number"); put("description", "终点横坐标（分数 0-1，swipe 用）") }
-                            putJsonObject("fy2") { put("type", "number"); put("description", "终点纵坐标（分数 0-1，swipe 用）") }
-                            putJsonObject("x2") { put("type", "number"); put("description", "终点横坐标（绝对像素，swipe 用）") }
-                            putJsonObject("y2") { put("type", "number"); put("description", "终点纵坐标（绝对像素，swipe 用）") }
-                            putJsonObject("text") { put("type", "string"); put("description", "要输入的文本（type 用）") }
-                            putJsonObject("package") { put("type", "string"); put("description", "应用包名（openapp 用）") }
-                            putJsonObject("query") { put("type", "string"); put("description", "按文本/描述查找节点并点击（tap 用，可选）") }
-                            putJsonObject("durationMs") { put("type", "number"); put("description", "手势时长毫秒（tap 长按 / swipe 滑动时长）") }
-                            putJsonObject("maxItems") { put("type", "number"); put("description", "读屏最多返回条目数（readscreen 用，默认 120）") }
-                            putJsonObject("nodeId") {
-                                put("type", "string")
-                                put("description", "节点身份 \"<snapshotId>:<seq>\"（来自 phone_tree）。跨代失效回 E_STALE_SNAPSHOT 且不执行")
-                            }
-                            putJsonObject("target") {
-                                put("type", "object")
-                                put("description", "选择器对象：text/textContains/desc/viewId/viewIdSuffix/className/package/index/clickable/editable/scrollable（字段间 AND）。多命中回 E_NODE_AMBIGUOUS，加 index 或换更精确条件")
-                            }
-                            putJsonObject("index") {
-                                put("type", "number")
-                                put("description", "选择器多命中时取第几个（0 起）")
-                            }
-                            putJsonObject("mode") { put("type", "string"); put("description", "type 的模式：set 覆盖 / append 追加 / clear 清空（默认 set）") }
-                            putJsonObject("perChar") { put("type", "boolean"); put("description", "type 逐字写入（默认 false）") }
-                            putJsonObject("intervalMs") { put("type", "number"); put("description", "逐字间隔毫秒（perChar 用，20-1000，默认 80）") }
-                            putJsonObject("key") { put("type", "string"); put("description", "back/home/recents/enter/delete/tab（key 动作）") }
-                            putJsonObject("times") { put("type", "number"); put("description", "重复次数（key/scroll 用，1-20，默认 1）") }
-                            putJsonObject("direction") { put("type", "string"); put("description", "scroll 方向：forward 往下 / backward 往上") }
-                            putJsonObject("verify") { put("type", "boolean"); put("description", "scroll 是否用界面指纹校验真的滚了（默认 true）") }
-                            putJsonObject("until") { put("type", "object"); put("description", "scroll 的目标选择器：命中即停（stoppedReason=until）") }
-                            putJsonObject("cond") {
-                                put("type", "object")
-                                put("description", "wait_for 条件：type=node_present/node_absent（带 selector）、text_present（带 textContains）、package_is（带 package）、generation_changed")
-                            }
-                            putJsonObject("timeoutMs") { put("type", "number"); put("description", "wait_for 超时毫秒（100-15000，默认 3000），超时回 E_WAIT_TIMEOUT") }
-                            putJsonObject("pollMs") { put("type", "number"); put("description", "wait_for 轮询间隔毫秒（100-2000，默认 250）") }
-                            putJsonObject("scale") { put("type", "number"); put("description", "pinch 比例：<1 缩小、>1 放大（也可直接给 fromRadius/toRadius）") }
-                            putJsonObject("fromRadius") { put("type", "number"); put("description", "pinch 起始半径像素（≥20）") }
-                            putJsonObject("toRadius") { put("type", "number"); put("description", "pinch 结束半径像素（≥20）") }
-                            putJsonObject("cx") { put("type", "number"); put("description", "pinch 中心横坐标（绝对像素，默认屏幕中心）") }
-                            putJsonObject("cy") { put("type", "number"); put("description", "pinch 中心纵坐标（绝对像素，默认屏幕中心）") }
-                            putJsonObject("startTarget") { put("type", "object"); put("description", "swipe 起点选择器或 nodeId 串") }
-                            putJsonObject("endTarget") { put("type", "object"); put("description", "swipe 终点选择器或 nodeId 串") }
-                            putJsonObject("fromX") { put("type", "number"); put("description", "drag 起点横坐标（或 x）") }
-                            putJsonObject("fromY") { put("type", "number"); put("description", "drag 起点纵坐标（或 y）") }
-                            putJsonObject("toX") { put("type", "number"); put("description", "drag 终点横坐标（或给 dx 位移）") }
-                            putJsonObject("toY") { put("type", "number"); put("description", "drag 终点纵坐标（或给 dy 位移）") }
-                            putJsonObject("dx") { put("type", "number"); put("description", "drag 横向位移（toX 缺省时用）") }
-                            putJsonObject("dy") { put("type", "number"); put("description", "drag 纵向位移（toY 缺省时用）") }
-                            putJsonObject("holdMs") { put("type", "number"); put("description", "drag 按下保持毫秒（0-2000，默认 500）") }
-                            putJsonObject("steps") {
-                                put("type", "array")
-                                put("description", "sequence 的步骤数组（≤20 步）：{action, args?, waitAfterMs?}。可用 tap/swipe/scroll/type/key/pinch/drag/wait_for/openapp/back/home/recents；动作参数也可直接写在步骤里（不必包一层 args）")
-                            }
-                            putJsonObject("stopOnError") { put("type", "boolean"); put("description", "sequence 单步失败是否立即停（默认 true，不回滚）") }
-                            putJsonObject("dryRun") { put("type", "boolean"); put("description", "sequence 只校验参数不执行（默认 false）") }
-                            putJsonObject("limit") { put("type", "number"); put("description", "apps 每页条数（1-500，默认 120）") }
-                            putJsonObject("offset") { put("type", "number"); put("description", "apps 分页起始下标（默认 0）") }
-                            putJsonObject("includeSystem") { put("type", "boolean"); put("description", "apps 是否包含系统应用（默认 false）") }
-                            putJsonObject("maxDepth") { put("type", "number"); put("description", "动作侧读树的深度上限（默认 6，与 phone_tree 同义）") }
-                            putJsonObject("maxNodes") { put("type", "number"); put("description", "动作侧读树的节点上限（默认 400，与 phone_tree 同义）") }
-                            putJsonObject("includeInvisible") { put("type", "boolean"); put("description", "动作侧是否包含不可见节点（默认 false）") }
-                            putJsonObject("onlyClickable") { put("type", "boolean"); put("description", "动作侧只保留可点节点（默认 false）") }
-                            putJsonObject("filter") { put("type", "object"); put("description", "动作侧读树的过滤选择器（与 phone_tree 的 filter 同义，保证 seq 一致）") }
-                        }
-                        putJsonArray("required") { add("action") }
-                    }
-                }
-            },
-        )
-        // T4.1 读侧：结构化节点树（viewId + bounds + 节点身份 + 快照代次）。执行复用 phone 通道。
-        add(
-            buildJsonObject {
-                put("type", "function")
-                putJsonObject("function") {
-                    put("name", "phone_tree")
-                    put("description", phoneTreeHelp())
-                    putJsonObject("parameters") {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("maxDepth") { put("type", "integer"); put("description", "最大深度，默认 6（越界夹到 1..64）") }
-                            putJsonObject("maxNodes") { put("type", "integer"); put("description", "最多返回节点数，默认 400（越界夹到 1..2000）") }
-                            putJsonObject("includeInvisible") { put("type", "boolean"); put("description", "是否包含不可见节点，默认 false") }
-                            putJsonObject("excludeOwnPackage") { put("type", "boolean"); put("description", "是否剔除手机控制自身的浮层/窗口，默认 true") }
-                            putJsonObject("package") { put("type", "string"); put("description", "只看该包名的窗口（可选）") }
-                            putJsonObject("onlyClickable") { put("type", "boolean"); put("description", "只返回可点击节点，默认 false") }
-                            putJsonObject("filter") {
-                                put("type", "object")
-                                put("description", "节点过滤选择器，字段之间是 AND，缺省字段不参与匹配")
-                                putJsonObject("properties") {
-                                    putJsonObject("text") { put("type", "string"); put("description", "text 全等") }
-                                    putJsonObject("textContains") { put("type", "string"); put("description", "text 包含（忽略大小写）") }
-                                    putJsonObject("desc") { put("type", "string"); put("description", "contentDescription 全等") }
-                                    putJsonObject("viewId") { put("type", "string"); put("description", "完整 resource-id，如 com.android.settings:id/search") }
-                                    putJsonObject("viewIdSuffix") { put("type", "string"); put("description", "只写 id 段（冒号后那截）") }
-                                    putJsonObject("className") { put("type", "string"); put("description", "控件类名全等") }
-                                    putJsonObject("package") { put("type", "string"); put("description", "节点所属包名") }
-                                    putJsonObject("index") { put("type", "integer"); put("description", "命中集合里的第几个（0 起）") }
-                                    putJsonObject("clickable") { put("type", "boolean"); put("description", "要求可点击") }
-                                    putJsonObject("editable") { put("type", "boolean"); put("description", "要求可输入") }
-                                    putJsonObject("scrollable") { put("type", "boolean"); put("description", "要求可滚动") }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-        )
-        add(buildJsonObject {
-            put("type", "function")
-            putJsonObject("function") {
-                put("name", "fs_read")
-                put("description", "读取原生文件")
-                putJsonObject("parameters") {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("path") { put("type", "string") }
-                        putJsonObject("offset") { put("type", "integer") }
-                        putJsonObject("limit") { put("type", "integer") }
-                    }
-                    putJsonArray("required") { add("path") }
-                }
-            }
-        })
-        add(buildJsonObject {
-            put("type", "function")
-            putJsonObject("function") {
-                put("name", "fs_write")
-                put("description", "写入原生文件")
-                putJsonObject("parameters") {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("path") { put("type", "string") }
-                        putJsonObject("content") { put("type", "string") }
-                        putJsonObject("append") { put("type", "boolean") }
-                    }
-                    putJsonArray("required") { add("path"); add("content") }
-                }
-            }
-        })
-        add(buildJsonObject {
-            put("type", "function")
-            putJsonObject("function") {
-                put("name", "fs_list")
-                put("description", "列出原生目录")
-                putJsonObject("parameters") {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("path") { put("type", "string") }
-                        putJsonObject("recursive") { put("type", "boolean") }
-                    }
-                    putJsonArray("required") { add("path") }
-                }
-            }
-        })
-        add(buildJsonObject {
-            put("type", "function")
-            putJsonObject("function") {
-                put("name", "fs_op")
-                put("description", "操作原生文件")
-                putJsonObject("parameters") {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("op") { put("type", "string"); putJsonArray("enum") { add("move"); add("copy"); add("delete"); add("mkdir"); add("stat") } }
-                        putJsonObject("src") { put("type", "string") }
-                        putJsonObject("dst") { put("type", "string") }
-                    }
-                    putJsonArray("required") { add("op"); add("src") }
-                }
-            }
-        })
-        add(buildJsonObject {
-            put("type", "function")
-            putJsonObject("function") {
-                put("name", "channel_list")
-                put("description", "列出 shell 通道与可用状态")
-                putJsonObject("parameters") {
-                    put("type", "object")
-                    putJsonObject("properties") {
+    /** 工具表：由 [toolRegistry] 按同一份 ToolSpec 生成，执行面与授权档位读的也是它。 */
+    internal fun toolsJson(): JsonArray = toolRegistry.declarations()
 
-                    }
-                    putJsonArray("required") {  }
-                }
-            }
-        })
-        add(buildJsonObject {
-            put("type", "function")
-            putJsonObject("function") {
-                put("name", "run_bg")
-                put("description", "启动后台命令")
-                putJsonObject("parameters") {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("command") { put("type", "string") }
-                        putJsonObject("logfile") { put("type", "string") }
-                    }
-                    putJsonArray("required") { add("command") }
-                }
-            }
-        })
-        add(buildJsonObject {
-            put("type", "function")
-            putJsonObject("function") {
-                put("name", "bg_status")
-                put("description", "查询后台进程和日志")
-                putJsonObject("parameters") {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("pid") { put("type", "integer") }
-                        putJsonObject("logfile") { put("type", "string") }
-                    }
-                    putJsonArray("required") { add("pid") }
-                }
-            }
-        })
-        add(buildJsonObject {
-            put("type", "function")
-            putJsonObject("function") {
-                put("name", "bg_kill")
-                put("description", "终止后台进程")
-                putJsonObject("parameters") {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("pid") { put("type", "integer") }
-                    }
-                    putJsonArray("required") { add("pid") }
-                }
-            }
-        })
-        add(buildJsonObject {
-            put("type", "function")
-            putJsonObject("function") {
-                put("name", "skill")
-                put("description", "读取一个已安装技能的完整说明（SKILL.md）。当任务与某个技能描述匹配时，先调用本工具读取再按技能执行。")
-                putJsonObject("parameters") {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("name") { put("type", "string"); put("description", "技能名") }
-                    }
-                    putJsonArray("required") { add("name") }
-                }
-            }
-        })
-        add(buildJsonObject {
-            put("type", "function")
-            putJsonObject("function") {
-                put("name", "subagent")
-                put("description", subagentHelp())
-                putJsonObject("parameters") {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("prompt") {
-                            put("type", "string")
-                            put(
-                                "description",
-                                "要委派的完整任务：目标、要看的东西、期望的输出形态。子代理看不到当前对话，别写「上面那个文件」。",
-                            )
-                        }
-                        putJsonObject("name") {
-                            put("type", "string")
-                            put("description", "短标签（2-6 字），只用于进度显示，例如「查日志」")
-                        }
-                        putJsonObject("model") {
-                            put("type", "string")
-                            put("description", "可选：换一个模型跑这个子任务；留空继承当前模型")
-                        }
-                    }
-                    putJsonArray("required") { add("prompt") }
-                }
-            }
-        })
-        web.functionSpecs().forEach { add(it) }
-    }
-
-    /** phone 工具说明独立成段，避免污染 shell 的通道说明。 */
-    private fun phoneHelp(): String = buildString {
-        append("phone 工具：直接操控手机（无需 root/ADB，需先在 设置→无障碍 开启「DSH Mobile 手机控制」）。")
-        append("动作 action：tap（点击，用 fx/fy 分数坐标最稳，或 x/y 像素；带 query 按文本点；带 durationMs 变长按）")
-        append("、swipe（滑动，起点 fx/fy 或 x/y，终点 fx2/fy2 或 x2/y2，durationMs 控制快慢）")
-        append("、type（往聚焦输入框写字，参数 text）、back/home/recents（系统键）")
-        append("、readscreen（读当前屏幕文本，紧凑列表，maxItems 限条目）")
-        append("、openapp（package 包名或 query 应用名模糊匹配）、screenshot（Android 11+ 存本地文件）。")
-        append("坐标优先用 fx/fy（0-1 相对屏幕），模型看的是缩放截图，绝对像素容易点偏。")
-        append("读屏输出每行 text|desc|cx,cy|clickable|class。")
-        append("结构化读屏（viewId/bounds/节点身份/快照代次）用 phone_tree 工具。")
-        append("定位统一用 target（选择器对象）或 nodeId（\"<snapshotId>:<seq>\"，来自 phone_tree）：")
-        append("nodeId 跨代回 E_STALE_SNAPSHOT、选择器多命中回 E_NODE_AMBIGUOUS，两者都不派发任何动作。")
-        append("命中节点自身不可点会自动上溯最近可点祖先（列表行靠这个才点得动）。")
-        append("新动作：scroll（滚 scrollable=true 容器，direction/times/until/verify，advanced 用界面指纹判）")
-        append("、wait_for（cond.type=node_present/node_absent/text_present/package_is/generation_changed，timeoutMs 默认 3000，超时回 E_WAIT_TIMEOUT）")
-        append("、pinch（center 或 cx/cy + scale 或 fromRadius/toRadius）、drag（fromX/fromY→toX/toY 或 dx/dy，holdMs）")
-        append("、key（enter/delete/tab 打在聚焦输入框；back/home/recents 走系统键）、currentapp（当前前台应用）")
-        append("、apps（已装可启动应用，query/limit/offset 分页）、sequence（steps 一次下发，单步失败带步骤号即停）")
-        append("、type 另支持 target + mode=set/append/clear + perChar 逐字（intervalMs）。")
-        append("新动作外层恒 ok=true，真实成败与错误码在内层 {ok,code,message,retryable,effectLanded}；手机动作不重试。")
-    }
-
-    /**
-     * phone_tree 的说明。
-     *
-     * 与 [phoneHelp] 分开写是因为它讲的是「读」而不是「动作」；T4.3 要把这两段与
-     * PhoneBridge.describeForModel() 合并成单一真源，届时一起搬。
-     */
-    private fun phoneTreeHelp(): String = buildString {
-        append("phone_tree：把当前界面读成结构化节点树（需先在 设置→无障碍 开启「DSH Mobile 手机控制」）。")
-        append("返回 snapshotId 与扁平 nodes[]，每个节点带 nodeId（\"<snapshotId>:<seq>\"）、parentId、depth、")
-        append("className/package/text/desc/viewId/bounds{left,top,right,bottom}/clickable/editable/scrollable/")
-        append("checkable/checked/selected/enabled/focused/visible，外加 screen{width,height,density}、")
-        append("foreground{package,activity,sinceMs}、nodeCount、truncated + truncatedReason、changedDuringRead、elapsedMs。")
-        append("参数：maxDepth 默认 6、maxNodes 默认 400、includeInvisible 默认 false、onlyClickable 默认 false、")
-        append("package 只看该包名；filter 是选择器对象（text/textContains/desc/viewId/viewIdSuffix/className/package/")
-        append("index/clickable/editable/scrollable，字段间 AND），filter 无命中返回 E_NODE_NOT_FOUND。")
-        append("节点身份带代次：界面变了以后旧 nodeId 作废，重读一次拿新 snapshotId；changedDuringRead=true 表示遍历期间界面又变了。")
-        append("只读，不改变界面；要点击/输入用 phone 工具。")
-    }
-
-    /** subagent 工具说明：讲清「独立上下文 + 只回结论 + 看不到当前对话 + 不能嵌套」。 */
     // ── P0-5 模型侧待办 / 目标 ──────────────────────────────────────────────
 
     /**
@@ -2682,14 +2228,6 @@ class LocalEngineTransport(
             message = "已压缩 " + plan.dropped.size + " 条早期历史：" + usedTok + " → " + afterTok +
                 " tokens（预算 " + budgetTok + " / 窗口 " + window + "）。",
         )
-    }
-
-    private fun subagentHelp(): String = buildString {
-        append("subagent 工具：把独立、可并行的子任务交给子代理。")
-        append("子代理有自己的上下文和工具（shell / 文件 / phone），只把结论回给你，")
-        append("不占用也不污染主对话历史——适合「同时查三件事」「先读完一大堆代码再给我结论」。")
-        append("它看不到当前对话，prompt 必须自带全部背景，别写「上面那个文件」；它也不能再派子代理。")
-        append("互不相关的子任务就同一轮里发多个 subagent：依次执行、各自回结论。")
     }
 
     /** 子代理显示名：参数给了 name 就用，否则「子代理」。 */
@@ -3047,7 +2585,6 @@ class LocalEngineTransport(
         cont.invokeOnCancellation { runCatching { cancel() } }
     }
 
-    private fun JsonPrimitive.contentOrNullSafe(): String? = if (this is JsonNull) null else content
 
     /**
      * 把重试请求里最后一条 user 消息的正文前置一段框架提示（见 [PERSONA_FRAME]）。

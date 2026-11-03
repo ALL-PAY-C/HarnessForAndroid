@@ -1,5 +1,6 @@
 package dev.dsh.mobile.core.protocol
 
+import dev.dsh.mobile.core.protocol.tool.ToolCatalog
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -42,43 +43,21 @@ sealed interface ToolAuth {
  * 以前只有 shell 走确认（[LocalEngineTransport.CONFIRM_PATTERNS] 字符串包含匹配），
  * phone 这类「不是 shell 命令」的工具完全不受逐调用授权 —— 模型想点哪就点哪。
  * 这里把判据搬到工具名 + 参数上，phone 的复合动作（sequence/pinch/drag/输入）默认要问。
+ *
+ * T7.1：档位不再在这张表里另抄一份工具名单，改成读 [ToolCatalog] 的同一份 ToolSpec ——
+ * 声明、执行、授权三处各写一遍名单的时代结束（以前加一个工具要改三处，漏一处就是
+ * 「声明了但执行不了」或「能执行但不受授权管」）。
  */
 object ToolPolicy {
-    /** phone 里只读或单步可撤销的动作，直接放行。 */
-    private val PHONE_ALLOW = setOf(
-        "tree", "readscreen", "screenshot", "currentapp", "apps", "back", "home", "recents", "wait_for",
-    )
-
-    /** phone 里能改写别的 App 内容或一步到位做很多事的动作，逐次确认。 */
-    private val PHONE_ASK = setOf("type", "sequence", "pinch", "drag")
-
-    private val READ_ONLY_TOOLS = setOf(
-        "fs_read", "fs_list", "read_output", "channel_list", "bg_status", "phone_tree", "web_search",
-    )
-
-    private val REVERSIBLE_WRITE_TOOLS = setOf("fs_write", "todo_write", "goal", "skill", "download", "web_fetch")
 
     /**
-     * 一次调用的敏感度。未知工具一律按 [ToolSensitivity.DeviceControl] 之外的保守档处理：
-     * 归到 ReversibleWrite（不是要拦它，是不敢声称它只读）。
+     * 一次调用的敏感度：查 ToolSpec 的逐调用档位。
+     *
+     * 未注册的名字归 [ToolSensitivity.ReversibleWrite]（不是要拦它，是不敢声称它只读）；
+     * 与拆分前 else 分支一致。
      */
-    fun sensitivity(name: String, args: JsonObject): ToolSensitivity = when (name) {
-        in READ_ONLY_TOOLS -> ToolSensitivity.ReadOnly
-        in REVERSIBLE_WRITE_TOOLS -> ToolSensitivity.ReversibleWrite
-        "shell" -> ToolSensitivity.Irreversible
-        "subagent" -> ToolSensitivity.Irreversible
-        "fs_op" -> if (toolArg(args, "op") == "delete") ToolSensitivity.Irreversible else ToolSensitivity.ReversibleWrite
-        "run_bg" -> ToolSensitivity.ReversibleWrite
-        "bg_kill" -> ToolSensitivity.ReversibleWrite
-        "phone" -> phoneSensitivity(toolArg(args, "action"))
-        else -> ToolSensitivity.ReversibleWrite
-    }
-
-    private fun phoneSensitivity(action: String?): ToolSensitivity = when (action) {
-        in PHONE_ALLOW -> ToolSensitivity.ReadOnly
-        in PHONE_ASK -> ToolSensitivity.Irreversible
-        else -> ToolSensitivity.DeviceControl
-    }
+    fun sensitivity(name: String, args: JsonObject): ToolSensitivity =
+        ToolCatalog.spec(name)?.sensitivityOf(args) ?: ToolSensitivity.ReversibleWrite
 
     /**
      * 判定。规则很少，刻意少：档位不可逆 + 复合动作才问，其余放行。
