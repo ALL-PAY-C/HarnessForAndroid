@@ -43,6 +43,8 @@ class PhoneTestProbe : BroadcastReceiver() {
                     Log.d(TAG, "OUT_FILE " + file.absolutePath + " bytes=" + file.length())
                 }
                 Log.d(TAG, "OUTPUT>>> " + r.output)
+                // T4.4：截图是否进了「下一轮注入」队列（其他动作恒为 null，这行不打印）。
+                r.imageQueued?.let { Log.d(TAG, "IMAGE_QUEUED queued=" + it + " reason=" + (r.imageQueueReason ?: "")) }
             } catch (t: Throwable) {
                 Log.d(TAG, "CRASH " + t.javaClass.name + ": " + t.message, t)
             } finally {

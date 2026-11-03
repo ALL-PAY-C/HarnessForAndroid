@@ -56,8 +56,14 @@ internal const val PLANNER_MAX_TOKENS = 1_500
 internal const val SUMMARIZER_MAX_TOKENS = 4_000
 internal const val WORKER_MAX_TOKENS = 3_000
 internal const val MAX_GROUP_SPEAKERS = 4
-internal const val MAX_AUTOMATON_ROUNDS = 20
+internal const val MAX_AUTOMATON_ROUNDS = 8
 internal const val MAX_AUTOMATON_REWORK = 2
+
+/** 僵局窗口：连续几轮「没工具调用 + 短发言 + 没有新任务」就判原地打转。 */
+internal const val STALL_WINDOW_ROUNDS = 2
+
+/** 一棒「短发言」的字数线：低于它就算没说出新东西。 */
+internal const val STALL_MIN_CHARS = 40
 
 private val AUTOMATON_WORDS = listOf(
     "监督", "验收", "审核", "复核", "打回", "重做", "返工", "自动机", "循环", "直到", "每轮",
@@ -475,16 +481,21 @@ private fun parallelSplitTasks(
     // 真正的并发上限由执行池的 maxParallel 管，和任务条数是两回事。
     val total = members.size
     val bySlice = slices.size >= total
+    // 座次按 memberId 的 code-unit 升序算，和「上一轮谁先发言」无关：
+    // 用发言顺序当 idx 会让同一句话在两次运行里切出不同分片（结果不可复现）。
+    val seat = HashMap<String, Int>()
+    members.sortedBy { it.id }.forEachIndexed { i, m -> seat.putIfAbsent(m.id, i) }
     return members.mapIndexed { idx, m ->
+        val rank = seat[m.id] ?: idx
         val own = segments[m.id]?.trim().orEmpty().ifBlank {
-            if (bySlice) (idx until slices.size step total).joinToString(" ") { slices[it] } else ""
+            if (bySlice) (rank until slices.size step total).joinToString(" ") { slices[it] } else ""
         }
         val prompt = when {
-            own.isNotBlank() -> "你是第 ${idx + 1}/$total 位，只负责这部分：" + own +
+            own.isNotBlank() -> "你是第 ${rank + 1}/$total 位，只负责这部分：" + own +
                 "；其余部分由其他人并行处理，不要代写、不要重复他们的方向，也不要总结他们的结果。"
-            idx == 0 -> "你是第 1/$total 位，主攻实现这部分：" + shared +
+            rank == 0 -> "你是第 1/$total 位，主攻实现这部分：" + shared +
                 "；其余成员会独立复核并给出不同方案，不要替他们完成复核，也不要总结他们的结果。"
-            else -> "你是第 ${idx + 1}/$total 位，独立复核第 1 位的实现并给出不同方案，请求是：" + shared +
+            else -> "你是第 ${rank + 1}/$total 位，独立复核第 1 位的实现并给出不同方案，请求是：" + shared +
                 "；不要代写第 1 位的实现，也不要重复他的方向。"
         }
         parallelTask(sessionId, m, idx, prompt, now)
@@ -524,7 +535,100 @@ private fun splitRequest(userText: String): List<String> {
     return if (clauses.size >= 2) clauses else listOf(t)
 }
 
-/** 把一句话拆成「谁干什么」：@ > 点名 > 轮次 > 全员接力。 */
+/**
+ * 一轮群聊的编排结果。
+ *
+ * 以前只回任务列表，超上限的人被 `take(MAX_GROUP_SPEAKERS)` 静默砍掉：既没发言，
+ * 也没人知道他被砍了。现在被砍的人进 [deferred]（下一轮优先），并配一条 [notice] 说明。
+ */
+internal data class GroupRound(
+    val tasks: List<AgentTask>,
+    /** 本轮没轮到的成员 id，按下一轮该先说的顺序。 */
+    val deferred: List<String> = emptyList(),
+    /** 给群里看的一句话说明；没有截断时为 null。 */
+    val notice: String? = null,
+)
+
+/** 上一轮没轮到的成员排到最前（其余保持原序），得到本轮候选顺序。 */
+internal fun withPriority(
+    members: List<GroupMember>,
+    priorityIds: List<String>,
+): List<GroupMember> {
+    if (priorityIds.isEmpty()) return members
+    val first = priorityIds.mapNotNull { id -> members.firstOrNull { it.id == id } }.distinctBy { it.id }
+    if (first.isEmpty()) return members
+    val firstIds = first.map { it.id }.toSet()
+    return first + members.filter { it.id !in firstIds }
+}
+
+/** 把一句话拆成「谁干什么」：@ > 点名 > 轮次 > 全员接力；超出上限的人显式排到下一轮。 */
+internal fun planGroupRound(
+    sessionId: String,
+    plan: GroupPlan,
+    userText: String,
+    history: List<ChatMessage>,
+    lastSpeakerId: String? = null,
+    now: Long = System.currentTimeMillis(),
+    mode: GroupMode = GroupMode.Chain,
+    /** 上一轮没轮到的成员：本轮排最前先发言（默认取 [GroupPlan.pendingSpeakerIds]）。 */
+    priorityIds: List<String> = plan.pendingSpeakerIds,
+): GroupRound {
+    if (plan.members.isEmpty()) return GroupRound(emptyList())
+    val shared = digest(sharedText(userText, plan.members), 200).ifBlank { digest(userText, 200) }
+    val mentioned = parseMentions(userText, plan.members)
+    val named = if (mentioned.isNotEmpty()) {
+        mentioned
+    } else {
+        namedMentions(userText, plan.members).map { it to "" }
+    }
+    // 并行档：>=2 个席位就是「每个 Participant.slot 一条独立任务」，一人一条、互不依赖。
+    // 只有两种情形才串行：显式单包（RoundRobin 单人作答）和席位不足 2 个。
+    // 点名不算串行理由 —— 点名只是把整句收窄成本人那段，不能让并行档退回接力。
+    if (mode == GroupMode.Parallel && plan.routing != GroupRouting.RoundRobin && plan.members.size >= 2) {
+        // 席位顺序固定用 plan.members（不做 orderForTurn）：并行档谁拿哪片只看稳定座次。
+        val seats = if (named.isNotEmpty()) {
+            named.map { it.first }.distinctBy { it.id }
+        } else {
+            plan.members
+        }
+        val segments = HashMap<String, String>()
+        named.forEach { (member, segment) ->
+            if (segment.isNotBlank()) segments.putIfAbsent(member.id, segment)
+        }
+        return GroupRound(
+            parallelSplitTasks(
+                sessionId = sessionId,
+                members = seats,
+                userText = userText,
+                shared = shared,
+                now = now,
+                segments = segments,
+            ),
+        )
+    }
+    if (named.isNotEmpty()) return GroupRound(chainTasks(sessionId, named, shared, now))
+    if (plan.routing == GroupRouting.RoundRobin) {
+        val one = listOfNotNull(pickSingleResponder(plan, userText, history, lastSpeakerId)).map { it to "" }
+        return GroupRound(chainTasks(sessionId, one, shared, now))
+    }
+    // 接力/自动机默认档：本轮最多 MAX_GROUP_SPEAKERS 位，多出来的排下一轮，不再静默丢弃。
+    val ordered = withPriority(orderForTurn(plan.members, userText, lastSpeakerId), priorityIds)
+    val speakers = if (ordered.size <= MAX_GROUP_SPEAKERS) ordered else ordered.take(MAX_GROUP_SPEAKERS)
+    val deferred = ordered.drop(speakers.size)
+    val notice = if (deferred.isEmpty()) {
+        null
+    } else {
+        "本轮 " + speakers.size + "/" + ordered.size + " 位发言，其余 " + deferred.size +
+            " 位下一轮优先（成员：" + deferred.joinToString("、") { it.name } + "）"
+    }
+    return GroupRound(
+        tasks = chainTasks(sessionId, speakers.map { it to "" }, shared, now),
+        deferred = deferred.map { it.id },
+        notice = notice,
+    )
+}
+
+/** 只要任务列表的老入口（点名单包 / 测试用）。 */
 internal fun planGroupTasks(
     sessionId: String,
     plan: GroupPlan,
@@ -533,45 +637,15 @@ internal fun planGroupTasks(
     lastSpeakerId: String? = null,
     now: Long = System.currentTimeMillis(),
     mode: GroupMode = GroupMode.Chain,
-): List<AgentTask> {
-    if (plan.members.isEmpty()) return emptyList()
-    val shared = digest(sharedText(userText, plan.members), 200).ifBlank { digest(userText, 200) }
-    val mentioned = parseMentions(userText, plan.members)
-    val named = if (mentioned.isNotEmpty()) {
-        mentioned
-    } else {
-        namedMentions(userText, plan.members).map { it to "" }
-    }
-    val speakers = when {
-        named.isNotEmpty() -> named
-        plan.routing == GroupRouting.RoundRobin ->
-            listOfNotNull(pickSingleResponder(plan, userText, history, lastSpeakerId)).map { it to "" }
-        else -> orderForTurn(plan.members, userText, lastSpeakerId).take(MAX_GROUP_SPEAKERS).map { it to "" }
-    }
-    // 并行档：>=2 个席位就是「每个 Participant.slot 一条独立任务」，一人一条、互不依赖。
-    // 只有两种情形才串行：显式单包（RoundRobin 单人作答）和席位不足 2 个。
-    // 点名不算串行理由 —— 点名只是把整句收窄成本人那段，不能让并行档退回接力。
-    if (mode == GroupMode.Parallel && plan.routing != GroupRouting.RoundRobin && plan.members.size >= 2) {
-        val seats = if (named.isNotEmpty()) {
-            named.map { it.first }.distinctBy { it.id }
-        } else {
-            orderForTurn(plan.members, userText, lastSpeakerId)
-        }
-        val segments = HashMap<String, String>()
-        named.forEach { (member, segment) ->
-            if (segment.isNotBlank()) segments.putIfAbsent(member.id, segment)
-        }
-        return parallelSplitTasks(
-            sessionId = sessionId,
-            members = seats,
-            userText = userText,
-            shared = shared,
-            now = now,
-            segments = segments,
-        )
-    }
-    return chainTasks(sessionId, speakers, shared, now)
-}
+): List<AgentTask> = planGroupRound(
+    sessionId = sessionId,
+    plan = plan,
+    userText = userText,
+    history = history,
+    lastSpeakerId = lastSpeakerId,
+    now = now,
+    mode = mode,
+).tasks
 
 /** 按句子分诊：这一轮该用哪种编排形态。 */
 internal fun detectGroupMode(
@@ -592,8 +666,37 @@ internal fun detectGroupMode(
     return GroupMode.Parallel
 }
 
-/** 自动机最多跑几轮：只有「直到/监督/循环」这类话才给长预算。 */
+private val CN_DIGITS = mapOf(
+    '一' to 1, '二' to 2, '两' to 2, '三' to 3, '四' to 4, '五' to 5,
+    '六' to 6, '七' to 7, '八' to 8, '九' to 9,
+)
+
+/**
+ * 用户明确写了几轮就用几轮：「跑三轮」→ 3、「跑 5 轮」→ 5、「跑十二轮」→ 12，
+ * 都夹在 [MAX_AUTOMATON_ROUNDS] 以内。没写才回落到默认值。
+ */
+internal fun explicitRoundCount(userText: String): Int? {
+    Regex("""(\d+)\s*(?:轮|回合|遍)""").find(userText)?.let { m ->
+        m.groupValues[1].toIntOrNull()?.let { return it }
+    }
+    Regex("""([一二两三四五六七八九十]{1,3})\s*(?:轮|回合|遍)""").find(userText)?.let { m ->
+        val raw = m.groupValues[1]
+        if (raw == "十") return 10
+        if (raw.length == 1) return CN_DIGITS[raw[0]]
+        if (raw[0] == '十') return 10 + (CN_DIGITS[raw[1]] ?: 0)
+        if (raw.length >= 2) {
+            val tens = CN_DIGITS[raw[0]] ?: return null
+            val ones = CN_DIGITS[raw[1]] ?: 0
+            return tens * 10 + ones
+        }
+        return null
+    }
+    return null
+}
+
+/** 自动机最多跑几轮：用户写死的轮数优先，其次「直到/监督/循环」这类话才给长预算。 */
 internal fun automatonRounds(userText: String): Int {
+    explicitRoundCount(userText)?.let { return it.coerceIn(1, MAX_AUTOMATON_ROUNDS) }
     val looping = listOf(
         "监督", "打回", "重做", "自动机", "循环", "直到", "每轮", "回合", "接力", "互相",
         "自动跑", "一直", "supervise", "until", "loop", "redo", "each round",
@@ -612,6 +715,48 @@ internal fun automatonVerdict(reviewOut: String): Verdict {
             AppLog.w("自动机：验收结论未识别（应为【继续】/【完成】/【打回】），已停止；最后一行=<" + last.take(200) + ">")
             Verdict.Done
         }
+    }
+}
+
+/**
+ * 打回计数的一次推进：验收不过 +1，任一通过轮直接清零。
+ *
+ * 以前只增不清，于是「跑了十轮、中间打过两次回、后面全过」也会在第 3 次打回时提前收工。
+ */
+internal fun nextReworkCount(current: Int, verdict: Verdict): Int = when (verdict) {
+    Verdict.Rework -> current + 1
+    Verdict.More, Verdict.Done -> 0
+}
+
+/**
+ * 僵局检测：连续 [window] 轮，每轮**所有**发言都没有工具调用、单轮发言都不到 [minChars] 字、
+ * 也没有新任务入池 —— 说明只是在原地打转，该停手而不是烧到轮次上限。
+ *
+ * 放在 [automatonVerdict] 同级：结论由验收者给，僵局由调度方兜底；[Verdict.Done] 优先于僵局。
+ */
+internal class StallDetector(
+    private val window: Int = STALL_WINDOW_ROUNDS,
+    private val minChars: Int = STALL_MIN_CHARS,
+) {
+    private var streak = 0
+
+    /** 判定依据的一句话，给群里看；没连续上时为 null。 */
+    var reason: String? = null
+        private set
+
+    val stalled: Boolean get() = streak >= window
+
+    /** 记录一轮，返回是否已判僵局。 */
+    fun onRound(texts: List<String>, toolCalls: Int = 0, newTasks: Int = 0): Boolean {
+        val quiet = texts.isNotEmpty() && toolCalls <= 0 && newTasks <= 0 &&
+            texts.all { it.trim().length < minChars }
+        streak = if (quiet) streak + 1 else 0
+        reason = if (streak == 0) {
+            null
+        } else {
+            "连续 " + streak + " 轮没有工具调用、每轮发言都不到 " + minChars + " 字、也没有新任务"
+        }
+        return stalled
     }
 }
 

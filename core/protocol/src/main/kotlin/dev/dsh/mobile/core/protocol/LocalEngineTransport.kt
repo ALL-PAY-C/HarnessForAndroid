@@ -2,6 +2,7 @@ package dev.dsh.mobile.core.protocol
 
 import dev.dsh.mobile.core.common.AppLog
 import dev.dsh.mobile.core.common.LoopbackGateway
+import dev.dsh.mobile.core.common.PendingImageQueue
 import dev.dsh.mobile.core.model.AgentRunState
 import dev.dsh.mobile.core.model.AgentRuntimeState
 import dev.dsh.mobile.core.model.AgentTask
@@ -145,6 +146,13 @@ data class GroupPlan(
     val maxParallel: Int = 3,
     /** 群上下文预算（字符）。群成员共享的对话摘要在超过这个量时压缩得更狠。 */
     val contextBudget: Int = 24_000,
+    /**
+     * 上一轮因发言上限（[MAX_GROUP_SPEAKERS]）没轮到的成员 id：下一轮排最前先发言。
+     *
+     * 宿主每轮都从设置重建 [GroupPlan]（AppContainer.groupPlan），所以编排层另按 sessionId
+     * 存一份（见 LocalEngineTransport 的 pendingSpeakers）；这个字段是给外部调度/持久化看的载体。
+     */
+    val pendingSpeakerIds: List<String> = emptyList(),
 )
 
 /**
@@ -308,6 +316,19 @@ class LocalEngineTransport(
     private val lastSpeaker = mutableMapOf<String, String>()
 
     /**
+     * sessionId -> 上一轮因发言上限没轮到的成员（下一轮优先）。
+     *
+     * 宿主每轮都从设置重建 GroupPlan，plan 上的字段带不过去，所以这里单独存一份。
+     */
+    private val pendingSpeakers = mutableMapOf<String, List<String>>()
+
+    /**
+     * taskId -> 这一棒实际执行的工具次数。执行池只留状态不留过程，
+     * 僵局检测要判断「到底有没有真的动工具」，所以单独记一份。
+     */
+    private val taskToolCallCounts = java.util.concurrent.ConcurrentHashMap<String, Int>()
+
+    /**
      * taskId -> 该任务最终发言。执行池只留状态（Done/Failed），不留正文，
      * 而自动机要拿上一棒的产出喂下一棒，所以这里存一份（每轮覆盖，超量直接清空）。
      */
@@ -463,6 +484,18 @@ class LocalEngineTransport(
 
     // ------------------------------------------------------------------ loop
 
+    /**
+     * T4.4 回图像：工具阶段截的图进不了 role=tool 的 image_url，只能在发起下一次请求前
+     * 从 [PendingImageQueue] 取出来并进本轮 user 消息的 content（限 2 张，空队列返回空表）。
+     * 每次请求只调一次：取走即出队，别让同一张图串到后面几轮。
+     */
+    private fun takeQueuedImages(): List<String> {
+        val queued = PendingImageQueue.drainForNextTurn(PendingImageQueue.MAX_ITEMS)
+        if (queued.isEmpty()) return emptyList()
+        AppLog.i("queued screenshots: inject=" + queued.size + " paths=" + queued.joinToString("、") { it.path })
+        return queued.map { it.path }
+    }
+
     private suspend fun runLoop(
         sessionId: String,
         cfg: LlmConfig,
@@ -541,9 +574,11 @@ class LocalEngineTransport(
         val presetEndsWithUser = presetMessages?.lastOrNull()
             ?.get("role")?.toString()?.contains("user") == true
         if (!presetEndsWithUser) {
+            // 上一轮 tool 里截的图并进来（队列为空时 content 与改造前逐字节一致）。
+            val withQueued = userImages + takeQueuedImages()
             messages += buildJsonObject {
                 put("role", "user")
-                put("content", buildUserContent(userText, userImages))
+                put("content", buildUserContent(userText, withQueued))
             }
         }
 
@@ -1007,6 +1042,7 @@ class LocalEngineTransport(
                     }
                     loopGuard.recordResult(signature, result.output)
                     toolRunsThisTurn++
+                    recordTaskToolCalls(task?.id, toolRunsThisTurn)
                     // 失败摘要留给收尾用：本轮若最终没有正文，turnEndNotice 会把它写成一条说明。
                     // 这里不发 MessageChunk —— 它追加到同一个气泡，模型随后还要接着写正文，
                     // 中途插一行会把回答劈成两半（失败本身已在工具卡 detail 里可见）。
@@ -1130,14 +1166,25 @@ class LocalEngineTransport(
             _events.tryEmit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
             return
         }
-        val tasks = planGroupTasks(
+        // 上一轮被上限挤下来的人优先；plan 上的字段带不过来（宿主每轮重建），所以优先取本会话那份。
+        val prior = synchronized(pendingSpeakers) { pendingSpeakers[sessionId] }.orEmpty()
+            .ifEmpty { plan.pendingSpeakerIds }
+        val round = planGroupRound(
             sessionId = sessionId,
             plan = plan,
             userText = userText,
             history = history,
             lastSpeakerId = synchronized(lastSpeaker) { lastSpeaker[sessionId] },
             mode = mode,
+            priorityIds = prior,
         )
+        // 被上限挤到下一轮的人：记进 GroupPlan 字段 + 本会话待发言表，并在群里留一句话说明。
+        synchronized(pendingSpeakers) { pendingSpeakers[sessionId] = round.deferred }
+        groupTurns[sessionId]?.let { it ->
+            groupTurns[sessionId] = it.copy(plan = it.plan.copy(pendingSpeakerIds = round.deferred))
+        }
+        round.notice?.let { text -> emitGroupNotice(sessionId, text) }
+        val tasks = round.tasks
         if (tasks.isEmpty()) {
             groupTurns.remove(sessionId)
             _events.tryEmit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
@@ -1176,6 +1223,7 @@ class LocalEngineTransport(
         var round = 0
         var rework = 0
         var progress = "还没开始，起始值按用户规则来。"
+        val stall = StallDetector()
         while (round < rounds) {
             round++
             val stepId = pool.submitOne(
@@ -1193,6 +1241,8 @@ class LocalEngineTransport(
             )
             pool.await(sessionId)
             if (!taskSucceeded(stepId)) return
+            // 自动机档也要更新 lastSpeaker：不然「未 @ 的追问」会一直找错人（默认档早就更新了）。
+            synchronized(lastSpeaker) { lastSpeaker[sessionId] = worker.id }
             val workerOut = taskOutputs[stepId].orEmpty()
             val checkId = pool.submitOne(
                 sessionId,
@@ -1208,19 +1258,38 @@ class LocalEngineTransport(
             )
             pool.await(sessionId)
             if (!taskSucceeded(checkId)) return
+            synchronized(lastSpeaker) { lastSpeaker[sessionId] = reviewer.id }
             val reviewOut = taskOutputs[checkId].orEmpty()
             progress = digest(reviewOut, 300)
-            when (automatonVerdict(reviewOut)) {
+            val verdict = automatonVerdict(reviewOut)
+            // 打回计数只统计**连续**的：任一通过轮（继续/完成）直接归零，跨轮累计不算数。
+            rework = nextReworkCount(rework, verdict)
+            when (verdict) {
                 Verdict.Rework -> {
-                    if (rework >= MAX_AUTOMATON_REWORK) {
+                    if (rework > MAX_AUTOMATON_REWORK) {
                         AppLog.w("自动机：" + reviewer.name + " 连续打回 " + rework + " 次，提前收工")
+                        emitGroupNotice(
+                            sessionId,
+                            "自动机连续打回 " + rework + " 次（上限 " + MAX_AUTOMATON_REWORK + "），已收工，等你看一眼下一步。",
+                        )
                         return
                     }
-                    rework++
                     round-- // 这一轮不算数，重做同一轮
                 }
+                // 验收说完成就完成：Done 的优先级高于僵局判定（短发言也可能就是正确答案）。
                 Verdict.Done -> return
                 Verdict.More -> Unit
+            }
+            // 僵局：连续两轮都「没工具调用 + 短发言 + 没有新任务」，说明在原地打转，别烧到轮次上限。
+            val calls = taskToolCalls(stepId) + taskToolCalls(checkId)
+            if (stall.onRound(listOf(workerOut, reviewOut), toolCalls = calls, newTasks = 0)) {
+                AppLog.w("自动机：判定僵局（" + (stall.reason ?: "") + "），收工")
+                emitGroupNotice(
+                    sessionId,
+                    "[群聊已停下] 判定僵局：" + (stall.reason ?: "") +
+                        "。连续两轮都在原地打转，先停手，避免继续空转烧预算。",
+                )
+                return
             }
         }
         AppLog.w("自动机：撞到轮次上限 " + rounds + "，收工")
@@ -1437,7 +1506,9 @@ class LocalEngineTransport(
             }
             append("只输出你自己要说的话：不要写「[名字]」这样的前缀，不要替其他成员发言。")
         }
-        val images = turn.history.lastOrNull { it.role == ChatMessage.Role.USER }?.attachments.orEmpty()
+        // 群成员这一轮同样要看到上一轮的截图（与单聊同一条队列、同一次注入）。
+        val images = turn.history.lastOrNull { it.role == ChatMessage.Role.USER }?.attachments.orEmpty() +
+            takeQueuedImages()
         // 本轮用户消息按「这个任务自己的 prompt」装进上下文（图片照旧带上），
         // 不再由 runLoop 兜底追加 —— 那条兜底会和这里重复一遍。
         val userTurn = listOf(
@@ -1490,6 +1561,25 @@ class LocalEngineTransport(
         threads.markFinished(task.sessionId, member.thread, member.name, finalText)
         synchronized(lastSpeaker) { lastSpeaker[task.sessionId] = member.id }
         return finalText
+    }
+
+    /** 记下这一棒实际调了几次工具（僵局检测用）；量大了整体清空，避免长会话里无界增长。 */
+    private fun recordTaskToolCalls(taskId: String?, count: Int) {
+        if (taskId == null) return
+        if (taskToolCallCounts.size > 200) taskToolCallCounts.clear()
+        taskToolCallCounts[taskId] = count
+    }
+
+    /** 某一棒的工具调用次数；没记录就是 0（没动过工具）。 */
+    private fun taskToolCalls(taskId: String): Int = taskToolCallCounts[taskId] ?: 0
+
+    /**
+     * 群里发一条系统说明：不调模型、不进成员上下文，走的是普通消息气泡的渲染路径，
+     * 用户看得见「为什么这轮有人没说话 / 为什么停了」。
+     */
+    private fun emitGroupNotice(sessionId: String, text: String) {
+        val turnId = groupTurns[sessionId]?.turnId
+        _events.tryEmit(DshEvent.MessageChunk(sessionId, text, "system", "系统", turnId))
     }
 
     /** 记下这一棒的最终发言（自动机下一棒要用）；量大了整体清空，避免长会话里无界增长。 */

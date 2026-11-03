@@ -34,6 +34,10 @@ data class PhoneResult(
     val ok: Boolean,
     val output: String,
     val error: String? = null,
+    /** screenshot 专用：这张图是否已登记进「下一轮 user 消息」的注入队列；其他动作恒为 null。 */
+    val imageQueued: Boolean? = null,
+    /** [imageQueued] = false 时的未入队原因；成功为 null。 */
+    val imageQueueReason: String? = null,
 )
 
 class PhoneBridge(private val context: Context) {
@@ -1416,7 +1420,15 @@ class PhoneBridge(private val context: Context) {
                 val dir = File(context.cacheDir, "screenshots").apply { mkdirs() }
                 val f = File(dir, "shot_" + System.currentTimeMillis() + ".png")
                 FileOutputStream(f).use { bitmap.compress(Bitmap.CompressFormat.PNG, 90, it) }
-                PhoneResult(true, "已保存 " + bitmap.width + "x" + bitmap.height + " → " + f.absolutePath)
+                // 回图像：role=tool 放不进 image_url，先登记，下一次模型请求把它并进 user 消息。
+                val queued = PhoneImageQueue.enqueue(f.absolutePath, "image/png", f.length())
+                val out = buildString {
+                    // 第一行逐字节保持旧文案（悬浮窗/动作日志只取第一行）。
+                    append("已保存 ").append(bitmap.width).append("x").append(bitmap.height).append(" → ").append(f.absolutePath)
+                    append("\nimageQueued: ").append(queued.queued)
+                    if (!queued.queued) append("（未入队原因：").append(queued.reason ?: "未知").append("）")
+                }
+                PhoneResult(true, out, imageQueued = queued.queued, imageQueueReason = queued.reason)
             }
             else -> PhoneResult(false, "", "截图失败：无结果")
         }
