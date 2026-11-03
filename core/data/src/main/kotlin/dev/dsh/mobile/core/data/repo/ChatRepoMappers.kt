@@ -70,7 +70,7 @@ fun SessionEntity.toModel(): Session = Session(
         toolJson.decodeFromString(
             kotlinx.serialization.builtins.ListSerializer(ParticipantDto.serializer()),
             participantsJson.ifBlank { "[]" },
-        ).map { Participant(it.id, it.modelId, it.name, it.persona, it.slot) }
+        ).map { Participant(it.id, it.modelId, it.name, it.persona, it.slot, it.role) }
     }.getOrDefault(emptyList()),
     remoteId = remoteId,
     endpointId = endpointId,
@@ -94,7 +94,7 @@ fun Session.toEntity(): SessionEntity = SessionEntity(
     agentId = agentId,
     participantsJson = toolJson.encodeToString(
         kotlinx.serialization.builtins.ListSerializer(ParticipantDto.serializer()),
-        participants.map { ParticipantDto(it.id, it.modelId, it.name, it.persona, it.slot) },
+        participants.map { ParticipantDto(it.id, it.modelId, it.name, it.persona, it.slot, it.role) },
     ),
     persona = persona,
     remoteId = remoteId,

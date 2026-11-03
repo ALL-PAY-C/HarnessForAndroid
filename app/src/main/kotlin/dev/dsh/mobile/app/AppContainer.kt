@@ -933,11 +933,18 @@ class AppContainer(private val context: Context) {
         val members = session.participants.mapNotNull { p ->
             val m = profiles.firstOrNull { it.id == p.modelId } ?: return@mapNotNull null
             if (!m.usable()) return@mapNotNull null
+            // 角色席位（T9.7b）：没选角色就是 null，这个席位不参与角色编排，退回老轮转。
+            // 选了就把该角色的身份卡（用户在设置里改过的覆盖层优先）拼在 persona 前面注入。
+            val role = dev.dsh.mobile.core.model.GroupRole.of(p.role).takeIf { p.role.isNotBlank() }
+            val roleCard = role?.let { presetStore.roleCard(it).render().takeIf(String::isNotBlank) }
             GroupMember(
                 id = p.id,
                 name = p.name,
                 persona = p.persona,
                 cfg = llmConfigOf(m, cap, sessionId),
+                card = listOfNotNull(roleCard, p.persona.takeIf { it.isNotBlank() })
+                    .joinToString("\n\n"),
+                role = role,
                 // 「同人多次拉入各自独立」开关真正生效的地方：默认每个席位一条线程，
                 // 关掉时按模型归并，多个实例共用一份记忆（对照用）。
                 thread = if (isolate) p.id else p.modelId,
@@ -960,6 +967,8 @@ class AppContainer(private val context: Context) {
             contextBudget = s.groupContextBudget,
             scheduler = s.groupScheduler,
             moderatorModel = s.groupModeratorModel,
+            // 角色编排循环的账本：席位选了角色时，B/D/C/A 的条目状态写进这本规划书。
+            roleLedger = groupLedger,
         )
     }
 

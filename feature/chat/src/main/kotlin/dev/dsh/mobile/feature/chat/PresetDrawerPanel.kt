@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.dsh.mobile.core.data.preset.AgentPreset
-import dev.dsh.mobile.core.data.preset.IdentityCard
+import dev.dsh.mobile.core.model.IdentityCard
 import dev.dsh.mobile.core.data.preset.IdentityCards
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqIdentityCardEditor

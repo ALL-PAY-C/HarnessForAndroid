@@ -3,6 +3,7 @@ package dev.dsh.mobile.feature.chat
 
 import android.content.Intent
 import dev.dsh.mobile.core.data.preset.AgentPresets
+import dev.dsh.mobile.core.model.GroupRole
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -285,11 +286,13 @@ internal fun AgentSheet(
     onAdd: (String) -> Unit,
     onRemove: (String) -> Unit,
     onRename: suspend (String, String) -> String?,
+    onRole: (String, GroupRole?) -> Unit,
 ) {
     val p = LocalQq.current
     val scope = rememberCoroutineScope()
     var editing by remember { mutableStateOf<Participant?>(null) }
     var editError by remember { mutableStateOf<String?>(null) }
+    var roleEdit by remember { mutableStateOf<Participant?>(null) }
 
     editing?.let { part ->
         RenameMemberDialog(
@@ -309,6 +312,17 @@ internal fun AgentSheet(
                         editError = failure
                     }
                 }
+            },
+        )
+    }
+
+    roleEdit?.let { part ->
+        RolePickerDialog(
+            current = part.role.takeIf { it.isNotBlank() }?.let(GroupRole::of),
+            onDismiss = { roleEdit = null },
+            onPick = { picked ->
+                onRole(part.id, picked)
+                roleEdit = null
             },
         )
     }
@@ -356,6 +370,17 @@ internal fun AgentSheet(
                                     editError = null
                                 },
                         )
+                        // 角色 chip：点了选角色（A 监督 / B 规划 / C 检测 / D 执行 / 自定义 / 未指定）。
+                        Box(
+                            Modifier.clip(RoundedCornerShape(8.dp)).clickable { roleEdit = part }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                part.role.takeIf { it.isNotBlank() }?.let(GroupRole::of)?.label ?: "选角色",
+                                color = if (part.role.isBlank()) p.t3 else p.t2,
+                                fontSize = 12.sp,
+                            )
+                        }
                         Box(
                             Modifier.clip(RoundedCornerShape(8.dp)).clickable { onRemove(part.id) }
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -521,5 +546,49 @@ internal fun PresetPickDialog(currentId: String, onDismiss: () -> Unit, onPick: 
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("关闭", color = p.accent) } },
+    )
+}
+
+/** 席位角色选择：角色决定这个席位在编排循环里被叫到哪一棒；未指定 = 不参与编排。 */
+@Composable
+private fun RolePickerDialog(
+    current: GroupRole?,
+    onDismiss: () -> Unit,
+    onPick: (GroupRole?) -> Unit,
+) {
+    val p = LocalQq.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("席位角色", color = p.t1, fontSize = 16.sp) },
+        text = {
+            Column {
+                listOf<GroupRole?>(
+                    null,
+                    GroupRole.Supervisor,
+                    GroupRole.Planner,
+                    GroupRole.Inspector,
+                    GroupRole.Worker,
+                    GroupRole.Custom,
+                ).forEach { role ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onPick(role) }
+                            .padding(horizontal = 8.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            role?.label ?: "未指定（不参与编排）",
+                            color = if (role == current) p.t1 else p.t2,
+                            fontSize = 14.sp,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (role == current) Text("当前", color = p.t3, fontSize = 11.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
     )
 }

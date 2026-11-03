@@ -1,5 +1,6 @@
 package dev.dsh.mobile.core.data.preset
 
+import dev.dsh.mobile.core.model.IdentityCard
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

@@ -13,9 +13,6 @@ dependencies {
     // core:common 被 Components.kt:535/:685 以全限定名 dev.dsh.mobile.core.common.TimeFmt 使用，
     // 不是 import 形式，grep "import dev.dsh.mobile.core.common" 会漏判。保持 api 以维持下游可见性。
     api(project(":core:common"))
-    // IdentityCardUi.kt（身份卡编辑器）复用 core:data 的 IdentityCard 八字段模型；
-    // implementation 即可，下游模块（feature:chat / feature:settings）本来就直连 core:data。
-    implementation(project(":core:data"))
 
     val composeBom = platform(libs.compose.bom)
     api(composeBom)

@@ -8,6 +8,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import dev.dsh.mobile.core.model.GroupLedger
+import dev.dsh.mobile.core.model.GroupLedgerSink
+import dev.dsh.mobile.core.model.LedgerEntry
+import dev.dsh.mobile.core.model.LedgerStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -32,28 +36,28 @@ private val Context.groupDataStore by preferencesDataStore(
 class GroupLedgerStore(
     private val dataStore: DataStore<Preferences>,
     private val clock: () -> Long = System::currentTimeMillis,
-) {
+) : GroupLedgerSink {
     constructor(context: Context) : this(context.applicationContext.groupDataStore)
 
     private val key = stringPreferencesKey("group_ledgers")
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     /** 观察通道：UI 直接 collect 这一本，任何写入都会推一帧。 */
-    fun ledger(sessionId: String): Flow<GroupLedger> =
+    override fun ledger(sessionId: String): Flow<GroupLedger> =
         dataStore.data.map { decode(it[key].orEmpty())[sessionId] ?: GroupLedger.EMPTY }
 
     /** 一次取全量（updatedAt 倒序）；写后要读快照时用它。 */
-    suspend fun list(sessionId: String): List<LedgerEntry> = ledger(sessionId).first().sorted()
+    override suspend fun list(sessionId: String): List<LedgerEntry> = ledger(sessionId).first().sorted()
 
     /** 新增或整条覆盖（同 id 覆盖）。 */
-    suspend fun upsert(sessionId: String, entry: LedgerEntry): GroupLedger = write(sessionId) { it.upsert(entry, clock()) }
+    override suspend fun upsert(sessionId: String, entry: LedgerEntry): GroupLedger = write(sessionId) { it.upsert(entry, clock()) }
 
     /** 只改状态；条目不存在时不动。 */
-    suspend fun updateStatus(sessionId: String, id: String, status: LedgerStatus): GroupLedger =
+    override suspend fun updateStatus(sessionId: String, id: String, status: LedgerStatus): GroupLedger =
         write(sessionId) { it.updateStatus(id, status, clock()) }
 
     /** 追加一条备注（换行拼接，空串忽略）。 */
-    suspend fun appendNote(sessionId: String, id: String, note: String): GroupLedger =
+    override suspend fun appendNote(sessionId: String, id: String, note: String): GroupLedger =
         write(sessionId) { it.appendNote(id, note, clock()) }
 
     suspend fun remove(sessionId: String, id: String): GroupLedger = write(sessionId) { it.remove(id) }

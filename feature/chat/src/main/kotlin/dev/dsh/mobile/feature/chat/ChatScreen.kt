@@ -7,8 +7,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import dev.dsh.mobile.core.data.preset.AgentPresets
-import dev.dsh.mobile.core.data.group.GroupRole
-import dev.dsh.mobile.core.data.group.LedgerStatus
+import dev.dsh.mobile.core.model.GroupRole
+import dev.dsh.mobile.core.model.LedgerStatus
 import dev.dsh.mobile.core.data.repo.SendQueue
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -311,6 +311,7 @@ fun ChatScreen(
             onAdd = { id -> viewModel.addParticipant(id) },
             onRemove = { pid -> viewModel.removeParticipant(pid) },
             onRename = { pid, name -> viewModel.renameParticipant(pid, name) },
+            onRole = { pid, role -> viewModel.setParticipantRole(pid, role) },
         )
     }
 

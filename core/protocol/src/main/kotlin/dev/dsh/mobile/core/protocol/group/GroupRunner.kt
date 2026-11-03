@@ -4,6 +4,7 @@ import dev.dsh.mobile.core.common.AppLog
 import dev.dsh.mobile.core.model.AgentRunState
 import dev.dsh.mobile.core.model.AgentTask
 import dev.dsh.mobile.core.model.ChatMessage
+import dev.dsh.mobile.core.model.GroupRole
 import dev.dsh.mobile.core.model.TaskState
 import dev.dsh.mobile.core.protocol.AgentThreads
 import dev.dsh.mobile.core.protocol.DshEvent
@@ -163,6 +164,20 @@ internal class GroupRunner(
             emit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
             return
         }
+        // T9.7b 角色编排：席位都选了角色（且其中有规划者）时接管默认档。
+        // 缺 B 就不启用 —— 没人出计划，循环只会空转，这里直接退回下面的老轮转；
+        // 缺 C / A / D 在循环内部降级（见 RoleOrchestrator）。
+        val roleSeats = plan.members.mapNotNull { m -> m.role?.let { RoleSeat(m, it) } }
+        if (plan.mode == "auto" &&
+            roleSeats.size >= 2 &&
+            roleSeats.any { it.role == GroupRole.Planner } &&
+            plan.roleLedger != null
+        ) {
+            runRoleLoop(sessionId, plan, roleSeats, userText)
+            groupTurns.remove(sessionId)
+            emit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
+            return
+        }
         if (mode == GroupMode.Automaton) {
             runAutomaton(sessionId, plan, userText)
             groupTurns.remove(sessionId)
@@ -232,6 +247,49 @@ internal class GroupRunner(
         emitLedgerClosing(sessionId, plan)
         groupTurns.remove(sessionId)
         emit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
+    }
+
+    /** 角色编排循环（T9.7b）：本地只管「一棒怎么跑」，棒次与账本在 RoleOrchestrator 里。 */
+    private suspend fun runRoleLoop(
+        sessionId: String,
+        plan: GroupPlan,
+        seats: List<RoleSeat>,
+        userText: String,
+    ) {
+        val sink = plan.roleLedger ?: return
+        RoleOrchestrator(
+            seats = seats,
+            ledger = sink,
+            speak = { seat, prompt -> speakAsSeat(sessionId, seat, prompt) },
+            notice = { text -> emitGroupNotice(sessionId, text) },
+        ).run(sessionId, userText)
+    }
+
+    /**
+     * 角色编排的一棒：与自动机走同一条路（执行池 + 同 agent 串行），
+     * 于是成员上下文、工具开关、事件流与普通群聊逐字一致，只是 prompt 由编排器给。
+     */
+    private suspend fun speakAsSeat(sessionId: String, seat: RoleSeat, prompt: String): String {
+        val task = autoTask(sessionId, seat.member, prompt, hint = roleHint(seat.role))
+        val id = pool.submitOne(sessionId, task)
+        pool.await(sessionId)
+        if (!taskSucceeded(id)) return ""
+        synchronized(lastSpeaker) { lastSpeaker[sessionId] = seat.member.id }
+        return taskOutputs[id].orEmpty()
+    }
+
+    /** 角色的行为约束（进 AgentTask.hint）：每一棒只做自己那一格的事。 */
+    private fun roleHint(role: GroupRole): String = when (role) {
+        GroupRole.Planner ->
+            "你是本群的项目规划者（B）：这一棒只出或更新计划，不亲手改文件，不替别人下结论。"
+        GroupRole.Worker ->
+            "你是本群的执行者（D）：这一棒只做派给你的那一条，做完给证据，完成与否交给检测者判。"
+        GroupRole.Inspector ->
+            "你是本群的检测者（C）：这一棒只验交付物与使用体验，结论必须有证据，第一行写「通过」或「不通过：<原因>」。"
+        GroupRole.Supervisor ->
+            "你是本群的监督者（A）：这一棒只挑遗忘、越权与未经验收就标完成的地方，不亲自动手。"
+        GroupRole.Custom ->
+            "你是本群的自定义席位：严格按你的身份卡行事，只做这一棒该做的事。"
     }
 
     /**

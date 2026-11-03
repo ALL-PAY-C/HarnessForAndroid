@@ -31,9 +31,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.dsh.mobile.core.data.group.GroupLedger
-import dev.dsh.mobile.core.data.group.LedgerEntry
-import dev.dsh.mobile.core.data.group.LedgerStatus
+import dev.dsh.mobile.core.model.GroupLedger
+import dev.dsh.mobile.core.model.LedgerEntry
+import dev.dsh.mobile.core.model.LedgerStatus
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider
 import dev.dsh.mobile.design.QqShape

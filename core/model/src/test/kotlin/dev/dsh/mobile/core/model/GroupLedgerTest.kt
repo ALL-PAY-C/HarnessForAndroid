@@ -1,4 +1,4 @@
-package dev.dsh.mobile.core.data.group
+package dev.dsh.mobile.core.model
 
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json

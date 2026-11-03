@@ -324,6 +324,7 @@ fun ChatSettingsScreen(
             onAdd = { id -> viewModel.addParticipant(id) },
             onRemove = { pid -> viewModel.removeParticipant(pid) },
             onRename = { pid, name -> viewModel.renameParticipant(pid, name) },
+            onRole = { pid, role -> viewModel.setParticipantRole(pid, role) },
         )
     }
 

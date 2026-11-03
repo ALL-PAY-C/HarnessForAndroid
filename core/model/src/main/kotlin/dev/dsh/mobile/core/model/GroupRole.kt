@@ -1,6 +1,5 @@
-package dev.dsh.mobile.core.data.group
+package dev.dsh.mobile.core.model
 
-import dev.dsh.mobile.core.data.preset.IdentityCard
 
 /**
  * 群聊 superagent 的角色席位（T9.7a）。

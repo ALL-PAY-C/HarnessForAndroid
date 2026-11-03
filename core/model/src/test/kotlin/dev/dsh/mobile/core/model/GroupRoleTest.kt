@@ -1,4 +1,4 @@
-package dev.dsh.mobile.core.data.group
+package dev.dsh.mobile.core.model
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals

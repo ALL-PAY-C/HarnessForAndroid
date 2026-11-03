@@ -6,7 +6,7 @@ import dev.dsh.mobile.core.data.preset.AgentPreset
 import dev.dsh.mobile.core.data.preset.AgentPresetImporter
 import dev.dsh.mobile.core.data.preset.AgentPresetStore
 import dev.dsh.mobile.core.data.preset.AgentPresets
-import dev.dsh.mobile.core.data.preset.IdentityCard
+import dev.dsh.mobile.core.model.IdentityCard
 import dev.dsh.mobile.core.data.preset.IdentityCards
 import dev.dsh.mobile.core.data.settings.SettingsStore
 import kotlinx.coroutines.CancellationException

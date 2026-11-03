@@ -22,7 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.dsh.mobile.core.data.group.GroupRole
+import dev.dsh.mobile.core.model.GroupRole
 import dev.dsh.mobile.core.data.preset.AgentPresetStore
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider

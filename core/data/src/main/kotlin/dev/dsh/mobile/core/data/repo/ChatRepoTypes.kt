@@ -76,6 +76,8 @@ internal data class ParticipantDto(
     val name: String,
     val persona: String = "",
     val slot: Int = 0,
+    /** 群聊角色席位 id；空串 = 未指定。老数据没有这个字段，靠默认值兼容。 */
+    val role: String = "",
 )
 
 internal val toolJson = Json { ignoreUnknownKeys = true }

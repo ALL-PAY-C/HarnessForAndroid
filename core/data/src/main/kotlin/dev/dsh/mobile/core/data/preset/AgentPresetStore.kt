@@ -13,7 +13,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import dev.dsh.mobile.core.data.group.GroupRole
+import dev.dsh.mobile.core.model.GroupRole
+import dev.dsh.mobile.core.model.IdentityCard
 
 private val Context.presetDataStore by preferencesDataStore(
     name = "dsh_presets",

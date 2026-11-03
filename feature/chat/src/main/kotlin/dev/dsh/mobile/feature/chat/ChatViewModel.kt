@@ -3,12 +3,13 @@ package dev.dsh.mobile.feature.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.dsh.mobile.core.common.DshResult
-import dev.dsh.mobile.core.data.group.GroupLedger
+import dev.dsh.mobile.core.model.GroupLedger
 import dev.dsh.mobile.core.data.group.GroupLedgerStore
-import dev.dsh.mobile.core.data.group.LedgerEntry
-import dev.dsh.mobile.core.data.group.LedgerStatus
+import dev.dsh.mobile.core.model.LedgerEntry
+import dev.dsh.mobile.core.model.LedgerStatus
 import dev.dsh.mobile.core.data.repo.ChatRepository
 import dev.dsh.mobile.core.data.repo.SendQueue
+import dev.dsh.mobile.core.model.GroupRole
 import dev.dsh.mobile.core.data.preset.AgentPresets
 import dev.dsh.mobile.core.data.preset.PresetSwitch
 import dev.dsh.mobile.core.data.repo.TurnState
@@ -710,6 +711,17 @@ class ChatViewModel(
         }
         repo.setParticipants(sessionId, updated)
         return null
+    }
+
+    /** 设置席位角色（T9.7b）：null = 未指定，该席位不参与角色编排，退回老轮转。 */
+    fun setParticipantRole(participantId: String, role: GroupRole?) = viewModelScope.launch {
+        val session = repo.session(sessionId) ?: return@launch
+        repo.setParticipants(
+            sessionId,
+            session.participants.map {
+                if (it.id == participantId) it.copy(role = role?.id.orEmpty()) else it
+            },
+        )
     }
 
     fun removeParticipant(participantId: String) = viewModelScope.launch {

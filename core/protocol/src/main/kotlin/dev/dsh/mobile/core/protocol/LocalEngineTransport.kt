@@ -6,6 +6,8 @@ import dev.dsh.mobile.core.common.device.DeviceCapability
 import dev.dsh.mobile.core.model.AgentRuntimeState
 import dev.dsh.mobile.core.model.AgentTask
 import dev.dsh.mobile.core.model.ChatMessage
+import dev.dsh.mobile.core.model.GroupLedgerSink
+import dev.dsh.mobile.core.model.GroupRole
 import dev.dsh.mobile.core.model.PermissionOption
 import dev.dsh.mobile.core.model.PermissionRequest
 import dev.dsh.mobile.core.model.RuntimeState
@@ -125,6 +127,11 @@ data class GroupMember(
      * 改成 modelId：几个实例共享一条线程，用来对照「共享 vs 独立」的差别。
      */
     val thread: String = id,
+    /**
+     * 角色席位（T9.7b）：null = 未指定，这个席位不参与角色编排。
+     * 角色决定它在编排循环里什么时候被叫到（A 监督 / B 规划 / C 检测 / D 执行）。
+     */
+    val role: GroupRole? = null,
 )
 
 enum class GroupRouting {
@@ -167,6 +174,11 @@ data class GroupPlan(
      * 存一份（见 GroupRunner 的 pendingSpeakers）；这个字段是给外部调度/持久化看的载体。
      */
     val pendingSpeakerIds: List<String> = emptyList(),
+    /**
+     * 规划书写入口（T9.7b）：角色编排循环用它落账。
+     * null = 没接（老调用方 / 单测），此时角色卡照样注入提示词，只是不跑编排循环。
+     */
+    val roleLedger: GroupLedgerSink? = null,
 )
 
 /**

@@ -1,5 +1,6 @@
-package dev.dsh.mobile.core.data.group
+package dev.dsh.mobile.core.model
 
+import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -106,4 +107,18 @@ data class GroupLedger(val entries: List<LedgerEntry> = emptyList()) {
         const val MAX_ENTRIES: Int = 50
         val EMPTY: GroupLedger = GroupLedger()
     }
+}
+
+/**
+ * 规划书写入通道：编排层（core:protocol）只认这几个动作，不认 DataStore / Context。
+ *
+ * [dev.dsh.mobile.core.data.group.GroupLedgerStore] 是正式实现；单测传内存实现，
+ * 于是 core:protocol 不需要 datastore 依赖，编排循环也能在纯 JVM 里跑。
+ */
+interface GroupLedgerSink {
+    fun ledger(sessionId: String): Flow<GroupLedger>
+    suspend fun list(sessionId: String): List<LedgerEntry>
+    suspend fun upsert(sessionId: String, entry: LedgerEntry): GroupLedger
+    suspend fun updateStatus(sessionId: String, id: String, status: LedgerStatus): GroupLedger
+    suspend fun appendNote(sessionId: String, id: String, note: String): GroupLedger
 }

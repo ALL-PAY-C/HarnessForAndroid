@@ -41,6 +41,8 @@ data class Participant(
     val name: String,
     val persona: String = "",
     val slot: Int = 0,
+    /** 群聊角色席位（[dev.dsh.mobile.core.model.GroupRole.id]）：空串 = 未指定，不参与角色编排。 */
+    val role: String = "",
 )
 
 enum class SessionStatus { Idle, Running, WaitingPermission, Failed }

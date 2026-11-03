@@ -20,7 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.dsh.mobile.core.data.preset.IdentityCard
+import dev.dsh.mobile.core.model.IdentityCard
 
 /**
  * 身份卡编辑区：八个字段 + 预览 + 清空，全部用现有 OutlinedTextField 范式与调色板。
