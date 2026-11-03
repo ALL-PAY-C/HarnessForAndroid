@@ -625,7 +625,8 @@ fun SettingsScreen(
                         icon = Icons.Filled.Notifications,
                         tint = p.red,
                     ) {
-                        SwitchRow("通知", "总开关，关掉后所有提醒静默", state.settings.notificationsEnabled) {
+                        // 不叫「通知」：subsection 页级标题已经占了这个词，开关标签同名会让 dump 里出现两个精确相等的节点。
+                        SwitchRow("开启通知", "总开关，关掉后所有提醒静默", state.settings.notificationsEnabled) {
                             viewModel.setNotifications(it)
                             if (it) askNotifyPermission()
                         }

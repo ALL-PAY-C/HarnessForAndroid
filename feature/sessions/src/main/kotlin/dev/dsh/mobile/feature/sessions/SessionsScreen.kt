@@ -149,51 +149,66 @@ fun SessionsScreen(
 
     // 键盘弹起时按 ime 收缩整页（同 ChatScreen.kt:375 的写法），否则搜索框与列表尾部被键盘盖住。
     Column(Modifier.fillMaxSize().imePadding().background(p.bg)) {
+        // 选择态的居中行：只在选择态传给 center 槽，非选择态这个槽交给 title。
+        // 不能 title 与 center 同时传——QqTopBar 里 center 非空会整块顶替 title（见 QqTopBar.kt:54-56），
+        // 所以按选择态切槽位：非选择态 title="会话"（与其它一级 tab 同构），选择态 center=<下面这一行>，
+        // 两者落在同一个 Box(weight(1f)) 居中槽，像素位置不动。
+        val selectionCenter: (@Composable () -> Unit)? = if (state.selectionMode) {
+            {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(QqSpace.s()),
+                ) {
+                    Text(
+                        "已选 ${state.selected.size} 项",
+                        color = p.accent,
+                        fontSize = qqFontBody(13.5.sp),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        "全选",
+                        color = p.accent,
+                        fontSize = qqFontBody(12.5.sp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { viewModel.selectAll(visibleIds) }
+                            .padding(horizontal = 7.dp, vertical = 3.dp),
+                    )
+                    Text(
+                        "退出",
+                        color = p.t3,
+                        fontSize = qqFontBody(12.5.sp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { viewModel.clearSelection() }
+                            .padding(horizontal = 7.dp, vertical = 3.dp),
+                    )
+                }
+            }
+        } else {
+            null
+        }
         QqScreenTopBar(
+            title = if (state.selectionMode) null else "会话",
             navigationIcon = Icons.Filled.Menu,
             navigationDescription = "侧边栏",
             onNavigationClick = onOpenDrawer,
             actions = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // 计数胶囊从居中槽移到 actions 右槽：居中槽现在归标题/选择态占，
+                    // 胶囊只在非选择态出现，showTokenUsage 开关照旧生效。
+                    if (!state.selectionMode && state.settings.showTokenUsage) {
+                        val usage = state.groups.flatMap { it.second }
+                            .fold(TokenUsage.EMPTY) { acc, s -> acc + s.usage }
+                        TokenPill(usage)
+                        Spacer(Modifier.width(2.dp))
+                    }
                     IconBtn(Icons.Filled.CreateNewFolder, "新建文件夹") { creatingFolder = "" }
                     Spacer(Modifier.width(2.dp))
                     IconBtn(Icons.Filled.Add, "新建会话") { creating = true }
                 }
             },
-            center = {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(QqSpace.s())) {
-                    if (state.selectionMode) {
-                        Text(
-                            "已选 ${state.selected.size} 项",
-                            color = p.accent,
-                            fontSize = qqFontBody(13.5.sp),
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            "全选",
-                            color = p.accent,
-                            fontSize = qqFontBody(12.5.sp),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { viewModel.selectAll(visibleIds) }
-                                .padding(horizontal = 7.dp, vertical = 3.dp),
-                        )
-                        Text(
-                            "退出",
-                            color = p.t3,
-                            fontSize = qqFontBody(12.5.sp),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { viewModel.clearSelection() }
-                                .padding(horizontal = 7.dp, vertical = 3.dp),
-                        )
-                    } else if (state.settings.showTokenUsage) {
-                        val usage = state.groups.flatMap { it.second }
-                            .fold(TokenUsage.EMPTY) { acc, s -> acc + s.usage }
-                        TokenPill(usage)
-                    }
-                }
-            },
+            center = selectionCenter,
         )
 
         // UI 修改模式：会话列表项旁多一个可横滑的「+」，点开就是既有候选弹窗。
