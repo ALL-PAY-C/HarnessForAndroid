@@ -4,7 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.sync.Semaphore
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -19,8 +19,14 @@ import java.util.Collections
  * [write] 返回 false 表示没落盘（体积超限或 IO 失败），调用方不需要处理 —— 缓存是尽力而为。
  */
 interface MarketCacheStore {
-    /** 缓存内容；文件缺失、损坏、解析不出条目时一律返回空列表，不抛。 */
+    /** 新鲜缓存（年龄在 TTL 内）；文件缺失、损坏、过期、解析不出条目时一律返回空列表，不抛。 */
     fun read(): List<MarketEntry>
+
+    /** 不看 TTL 的读取：全部源都挂掉时用它，稍旧的列表也好过空列表。 */
+    fun readAny(): List<MarketEntry> = read()
+
+    /** 缓存年龄（毫秒）；没有缓存或实现不支持计时时返回 null。 */
+    fun ageMs(): Long? = null
 
     fun write(entries: List<MarketEntry>): Boolean
 }
@@ -44,16 +50,36 @@ class MemoryMarketCache(private var entries: List<MarketEntry> = emptyList()) : 
 class FileMarketCache(
     private val file: File,
     private val maxBytes: Int = MAX_BYTES,
+    /** 超过这个年龄的缓存不再参与「正常刷新」的合并，只在全源失败时兜底。 */
+    private val ttlMs: Long = DEFAULT_TTL_MS,
+    private val clock: () -> Long = { System.currentTimeMillis() },
 ) : MarketCacheStore {
 
     override fun read(): List<MarketEntry> = runCatching {
         if (!file.isFile) return emptyList()
-        MarketCacheCodec.decode(file.readText())
+        val snap = MarketCacheCodec.decodeSnapshot(file.readText()) ?: return emptyList()
+        if (ageOf(snap.savedAt) > ttlMs) return emptyList()
+        snap.entries
     }.getOrDefault(emptyList())
+
+    override fun readAny(): List<MarketEntry> = runCatching {
+        if (!file.isFile) return emptyList()
+        MarketCacheCodec.decodeSnapshot(file.readText())?.entries.orEmpty()
+    }.getOrDefault(emptyList())
+
+    override fun ageMs(): Long? = runCatching {
+        if (!file.isFile) return null
+        val snap = MarketCacheCodec.decodeSnapshot(file.readText()) ?: return null
+        ageOf(snap.savedAt)
+    }.getOrNull()
+
+    /** 时钟回拨（负数）当 0：文件比当前时间还新说明时钟乱了，不该因此判过期。 */
+    private fun ageOf(savedAt: Long): Long = (clock() - savedAt).coerceAtLeast(0L)
 
     override fun write(entries: List<MarketEntry>): Boolean = runCatching {
         if (entries.isEmpty()) return false
-        val text = MarketCacheCodec.encode(entries)
+        // 时间戳用注入的时钟：否则测试里的假时钟和文件里的真时间对不上，TTL 永远算不出过期。
+        val text = MarketCacheCodec.encode(entries, clock())
         if (text.toByteArray().size > maxBytes) {
             file.delete()
             return false
@@ -74,6 +100,12 @@ class FileMarketCache(
     companion object {
         /** 1 MB；当前合并结果几百 KB，超了就不写。 */
         const val MAX_BYTES = 1_048_576
+
+        /**
+         * 15 分钟。市场条目每天变不了几次，但「一小时前的索引」当刷新结果给用户
+         * 又会让人以为新插件没发布 —— 15 分钟够覆盖一次正常刷新周期。
+         */
+        const val DEFAULT_TTL_MS = 15 * 60 * 1000L
     }
 }
 
@@ -89,10 +121,10 @@ object MarketCacheCodec {
      *  v2：APK 不再内置任何插件条目，旧快照里那些条目会一直活着。 */
     private const val VERSION = 2
 
-    fun encode(entries: List<MarketEntry>): String {
+    fun encode(entries: List<MarketEntry>, savedAt: Long = System.currentTimeMillis()): String {
         val root = JSONObject()
         root.put("version", VERSION)
-        root.put("savedAt", System.currentTimeMillis())
+        root.put("savedAt", savedAt)
         val array = JSONArray()
         entries.forEach { e ->
             array.put(
@@ -119,12 +151,18 @@ object MarketCacheCodec {
         return root.toString()
     }
 
-    fun decode(text: String): List<MarketEntry> {
-        if (text.isBlank()) return emptyList()
-        val root = runCatching { JSONObject(text) }.getOrNull() ?: return emptyList()
-        if (root.optInt("version", 0) != VERSION) return emptyList()
-        val array = root.optJSONArray("entries") ?: return emptyList()
-        return (0 until array.length()).mapNotNull { i ->
+    /** 带写入时间的一版快照：TTL 判定靠 [savedAt]。 */
+    data class CachedSnapshot(val entries: List<MarketEntry>, val savedAt: Long)
+
+    fun decode(text: String): List<MarketEntry> = decodeSnapshot(text)?.entries.orEmpty()
+
+    /** 解析到「条目 + 写入时间」；版本不符或结构不对返回 null（静默丢弃是需求）。 */
+    fun decodeSnapshot(text: String): CachedSnapshot? {
+        if (text.isBlank()) return null
+        val root = runCatching { JSONObject(text) }.getOrNull() ?: return null
+        if (root.optInt("version", 0) != VERSION) return null
+        val array = root.optJSONArray("entries") ?: return null
+        val entries = (0 until array.length()).mapNotNull { i ->
             runCatching {
                 val o = array.optJSONObject(i) ?: return@runCatching null
                 val id = o.optString("id").trim()
@@ -149,6 +187,8 @@ object MarketCacheCodec {
                 )
             }.getOrNull()
         }
+        // 老快照没有 savedAt：当 0 处理，于是它在 TTL 下必然过期，只在兜底路径可见。
+        return CachedSnapshot(entries, root.optLong("savedAt", 0L))
     }
 
     private fun JSONArray?.toStringList(): List<String> {
@@ -197,6 +237,7 @@ class MarketLoader(
     private val cache: MarketCacheStore? = null,
     private val sources: List<MarketSource> = PluginMarket.sources,
     private val timeoutMs: Long = PluginMarket.SOURCE_TIMEOUT_MS,
+    private val maxConcurrent: Int = PluginMarket.SOURCE_CONCURRENCY,
     private val fetch: suspend (MarketSource) -> List<MarketEntry> = { PluginMarket.fetchSource(it) },
 ) {
 
@@ -223,9 +264,11 @@ class MarketLoader(
         val cached = cache?.read().orEmpty()
         val base = bundled()
         val collected = Collections.synchronizedList(ArrayList<Pair<SourceStatus, List<MarketEntry>>>())
+        // 闸门跨源共享：12 个源不会一次全发出去抢带宽。
+        val gate = Semaphore(maxConcurrent.coerceAtLeast(1))
         val jobs = sources.map { source ->
             async(Dispatchers.IO) {
-                val outcome = runCatching { withTimeout(timeoutMs) { fetch(source) } }
+                val outcome = runCatching { PluginMarket.fetchOne(source, timeoutMs, gate, fetch) }
                 val entries = outcome.getOrDefault(emptyList())
                 val status = SourceStatus(
                     id = source.id,
@@ -255,7 +298,9 @@ class MarketLoader(
         val live = results.flatMap { it.second }
         val statuses = results.map { it.first }
         val anyOk = statuses.any { it.ok }
-        val plugins = PluginMarket.merge(live + cached + base)
+        // 全挂时连过期缓存也接上：TTL 只决定它参不参与正常合并，不决定断网时要不要给空列表。
+        val stale = if (anyOk) emptyList() else cache?.readAny().orEmpty()
+        val plugins = PluginMarket.merge(live + cached + stale + base)
         // 全挂时不能拿「只有内置」的列表覆盖掉上次的成功索引。
         if (anyOk) runCatching { cache?.write(plugins) }
         MarketLoad(
@@ -264,8 +309,8 @@ class MarketLoader(
                 sources = statuses,
                 rawCount = live.size + cached.size + base.size,
             ),
-            fromCache = anyOk.not() && cached.isNotEmpty(),
-            usedBundled = anyOk.not() && cached.isEmpty(),
+            fromCache = anyOk.not() && (cached.isNotEmpty() || stale.isNotEmpty()),
+            usedBundled = anyOk.not() && cached.isEmpty() && stale.isEmpty(),
         )
     }
 }

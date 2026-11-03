@@ -3,6 +3,7 @@ package dev.dsh.mobile.core.data.update
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
+import dev.dsh.mobile.core.common.RuntimeMirrors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -41,6 +42,29 @@ class Updater(private val context: Context) {
     /** 多连接分段下载器（默认 6 条 Range 连接 + 多镜像并行探测）。 */
     private val downloader = SegmentedDownloader()
 
+    /**
+     * 清单的三级回退链：并行拉取 → 内存 → 磁盘（TTL）。
+     *
+     * 落点是 filesDir 而不是 cacheDir：缓存目录会被系统清掉，而这份副本正是
+     * 「断网时还能判断有没有新版」的唯一依据。TTL 由 [KEY_MANIFEST_TTL] 覆盖，默认 6h。
+     */
+    private val manifestStore: ManifestStore by lazy {
+        ManifestStore(
+            file = File(context.filesDir, "update-manifest.json"),
+            ttlMs = prefs.getLong(KEY_MANIFEST_TTL, ManifestStore.DEFAULT_TTL_MS),
+        )
+    }
+
+    private val manifestResolver: ManifestResolver by lazy {
+        ManifestResolver(manifestStore) { sources ->
+            ManifestRace.race(
+                sources = sources,
+                perSourceTimeoutMs = manifestTimeoutMs(),
+                totalBudgetMs = manifestBudgetMs(),
+            ) { httpGet(it) }
+        }
+    }
+
     /** 更新源（清单 URL）。没手动配就走内置默认源（GitHub 仓库里的 update.json）。 */
     fun sourceUrl(): String = prefs.getString(KEY_SOURCE, "").orEmpty().ifBlank { DEFAULT_SOURCES.first() }
 
@@ -78,14 +102,11 @@ class Updater(private val context: Context) {
         runCatching {
             val sources = sourceCandidates()
             require(sources.isNotEmpty()) { "还没配置更新源" }
-            var body = ""
-            var lastError = ""
-            for (s in sources) {
-                val r = runCatching { httpGet(s) }
-                if (r.isSuccess) { body = r.getOrThrow(); lastError = ""; break }
-                lastError = r.exceptionOrNull()?.message.orEmpty()
+            val body = when (val resolved = manifestResolver.resolve(sources)) {
+                is ManifestResult.Ok -> resolved.body
+                // 全挂且本地没有可用副本才走到这里；消息里带每一个源的原因，不只第一个。
+                is ManifestResult.Failed -> error("清单拉取失败：" + describeFailures(resolved.failures))
             }
-            require(body.isNotBlank()) { "清单拉取失败：$lastError" }
             val json = JSONObject(body)
             val mirrors = json.optJSONArray("apkMirrors")?.let { arr ->
                 (0 until arr.length()).mapNotNull { arr.optString(it).takeIf { u -> u.isNotBlank() } }
@@ -169,25 +190,45 @@ class Updater(private val context: Context) {
         }
     }
 
-    companion object {
-        /** 内置更新源候选：国内网络 raw.githubusercontent 常被拦，先用反代与 jsDelivr，最后才直连。 */
-        private const val REPO = "ALL-PAY-C/HarnessForAndroid"
-        private const val RAW = "https://raw.githubusercontent.com/$REPO/main/update.json"
-        const val DEFAULT_SOURCE = "https://gh-proxy.com/$RAW"
-        val DEFAULT_SOURCES = listOf(
-            DEFAULT_SOURCE,
-            "https://ghfast.top/$RAW",
-            "https://cdn.jsdelivr.net/gh/$REPO@main/update.json",
-            RAW,
-        )
+    /** 单源超时（毫秒）。可配是因为弱网用户愿意等更久，而正常用户不想等 8s。 */
+    fun manifestTimeoutMs(): Long =
+        prefs.getLong(KEY_MANIFEST_TIMEOUT, ManifestRace.PER_SOURCE_TIMEOUT_MS)
+            .coerceIn(1_000L, 60_000L)
 
-        /** APK 下载用的 GitHub 反代前缀（按可达性排序）。 */
-        private val MIRROR_PREFIXES = listOf(
-            "https://gh-proxy.com/",
-            "https://ghfast.top/",
-            "https://hk.gh-proxy.com/",
-            "https://ghproxy.net/",
-        )
+    /** 一次 check 的总预算。并行之后它才是真正的「最坏耗时」上限。 */
+    fun manifestBudgetMs(): Long =
+        prefs.getLong(KEY_MANIFEST_BUDGET, ManifestRace.TOTAL_BUDGET_MS)
+            .coerceIn(1_000L, 120_000L)
+
+    fun setManifestBudgets(timeoutMs: Long, budgetMs: Long) {
+        prefs.edit()
+            .putLong(KEY_MANIFEST_TIMEOUT, timeoutMs)
+            .putLong(KEY_MANIFEST_BUDGET, budgetMs)
+            .apply()
+    }
+
+    companion object {
+        /**
+         * 内置更新源候选：国内网络 raw.githubusercontent 常被拦，先用反代与 jsDelivr，最后才直连。
+         *
+         * 前缀统一来自 [RuntimeMirrors]，不再在本文件里写死 —— 换反代只改那一处。
+         */
+        private const val REPO = "ALL-PAY-C/HarnessForAndroid"
+        // 全部用 getter：用户在设置里换了反代之后，下一次 check 就该用新的那一套。
+        private val RAW: String get() = RuntimeMirrors.GITHUB_RAW + REPO + "/main/update.json"
+        val DEFAULT_SOURCE: String get() = RuntimeMirrors.proxied(RAW)
+        val DEFAULT_SOURCES: List<String> get() = buildList {
+            addAll(RuntimeMirrors.githubProxies().map { it + RAW })
+            add(RuntimeMirrors.JSDELIVR_GH + REPO + "@main/update.json")
+            add(RAW)
+        }
+
+        /** APK 下载用的 GitHub 反代前缀（按可达性排序），跟清单反代同源。 */
+        private val MIRROR_PREFIXES: List<String> get() = RuntimeMirrors.githubProxies()
+
         private const val KEY_SOURCE = "source"
+        private const val KEY_MANIFEST_TIMEOUT = "manifest_timeout_ms"
+        private const val KEY_MANIFEST_BUDGET = "manifest_budget_ms"
+        private const val KEY_MANIFEST_TTL = "manifest_ttl_ms"
     }
 }

@@ -1,5 +1,6 @@
 package dev.dsh.mobile.linux
 
+import dev.dsh.mobile.core.common.RuntimeMirrors
 import dev.dsh.mobile.toolbridge.ShellChannel
 import dev.dsh.mobile.toolbridge.ShellResult
 import java.io.File
@@ -37,9 +38,15 @@ object LinuxEnvBootstrap {
     /** 全量集体积上限（KB）。超了就认为不值得为「可能有用的包」付存储与时长。 */
     const val PIP_BULK_LIMIT_KB = 300 * 1024
 
-    const val GIT_MIRROR = "https://gh-proxy.com/https://github.com/"
+    /**
+     * git 镜像前缀：来源是 [RuntimeMirrors]，与清单/市场源共用一份配置。
+     *
+     * 用 getter 而不是 val 常量：用户改了反代列表之后，下一次生成的脚本要跟着变，
+     * 否则装好的机器和设置页显示的不是同一个镜像。
+     */
+    val GIT_MIRROR: String get() = RuntimeMirrors.proxied(RuntimeMirrors.GITHUB)
     const val GIT_UPSTREAM = "https://github.com/"
-    const val GIT_MIRROR_KEY = "url." + GIT_MIRROR + ".insteadOf"
+    val GIT_MIRROR_KEY: String get() = "url." + GIT_MIRROR + ".insteadOf"
 
     /** 验收 clone 用的仓库：只有一个 README，镜像通不通立刻见分晓。 */
     const val CLONE_REPO = "https://github.com/octocat/Hello-World.git"

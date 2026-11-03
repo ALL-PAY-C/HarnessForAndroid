@@ -1,9 +1,12 @@
 package dev.dsh.mobile.pluginhost
 
+import dev.dsh.mobile.core.common.RuntimeMirrors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
@@ -118,23 +121,41 @@ object PluginMarket {
     const val READ_TIMEOUT_MS = 5_000
 
     /**
+     * 同时在飞的源数上限。
+     *
+     * 12 个源一次全发，在移动网络下会互相抢带宽、还容易被对端按 IP 限流；
+     * 6 条既能压满链路，又让后 6 个源在第一批回来后立刻补位。
+     */
+    const val SOURCE_CONCURRENCY = 6
+
+    /**
+     * GitHub token 由设置注入（带上就把 API 限额从 60/h 抬到 5000/h）。
+     * 默认返回 null —— 没配就不发 Authorization 头。
+     */
+    @Volatile
+    var githubTokenProvider: () -> String? = { null }
+
+    fun githubToken(): String? =
+        runCatching { githubTokenProvider() }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+
+    /**
      * 内置源。官方源在前；社区/GitHub pages/镜像都按「JSON 数组或 {items:[...]}」
      * 解析，任何一个挂了都静默降级成空列表，不影响其他源和内置目录。
      */
-    val sources: List<MarketSource> = listOf(
+    val sources: List<MarketSource> get() = listOf(
         // market-v2 是目前唯一还在更新的社区索引（600 条、带 packages.targets
         // 里可直接安装的 npm/url 目标）。放最前面，因为它是真的能装上东西的那一个。
         MarketSource(
             id = "awesome",
             name = "awesome-dsh-plugin 索引",
-            url = "https://raw.githubusercontent.com/bruc3van/awesome-dsh-plugin/main/data/market-v2.json",
+            url = RuntimeMirrors.GITHUB_RAW + "bruc3van/awesome-dsh-plugin/main/data/market-v2.json",
             kind = MarketSource.SourceKind.Community,
             format = MarketSource.Format.MarketV2,
         ),
         MarketSource(
             id = "awesome-jsdelivr",
             name = "awesome-dsh-plugin · jsDelivr 镜像",
-            url = "https://cdn.jsdelivr.net/npm/awesome-dsh-plugin-feed@latest/data/market-v2.json",
+            url = RuntimeMirrors.JSDELIVR_NPM + "awesome-dsh-plugin-feed@latest/data/market-v2.json",
             kind = MarketSource.SourceKind.Mirror,
             format = MarketSource.Format.MarketV2,
         ),
@@ -172,7 +193,7 @@ object PluginMarket {
         MarketSource(
             id = "github",
             name = "GitHub · dsh-plugins 社区索引",
-            url = "https://raw.githubusercontent.com/dsh-plugins/index/main/plugins.json",
+            url = RuntimeMirrors.GITHUB_RAW + "dsh-plugins/index/main/plugins.json",
         ),
         MarketSource(
             id = "pages",
@@ -182,7 +203,7 @@ object PluginMarket {
         MarketSource(
             id = "mirror",
             name = "jsDelivr 镜像",
-            url = "https://cdn.jsdelivr.net/gh/dsh-plugins/index@main/plugins.json",
+            url = RuntimeMirrors.JSDELIVR_GH + "dsh-plugins/index@main/plugins.json",
             kind = MarketSource.SourceKind.Mirror,
         ),
         // 静态索引常年失修，动态搜索补上「新发布的插件」。三条查询各管一类作者写法。
@@ -279,21 +300,15 @@ object PluginMarket {
     suspend fun fetchAllStreaming(
         list: List<MarketSource> = sources,
         timeoutMs: Long = SOURCE_TIMEOUT_MS,
+        maxConcurrent: Int = SOURCE_CONCURRENCY,
         onProgress: (MarketSnapshot) -> Unit,
     ): MarketSnapshot = coroutineScope {
         val collected = java.util.Collections.synchronizedList(ArrayList<Pair<SourceStatus, List<MarketEntry>>>())
+        val gate = Semaphore(maxConcurrent.coerceAtLeast(1))
         val jobs = list.map { source ->
             async(Dispatchers.IO) {
-                val outcome = runCatching { withTimeout(timeoutMs) { fetchSource(source) } }
-                val entries = outcome.getOrDefault(emptyList())
-                val status = SourceStatus(
-                    id = source.id,
-                    name = source.name,
-                    ok = outcome.isSuccess,
-                    count = entries.size,
-                    error = outcome.exceptionOrNull()?.let { it.message ?: it::class.java.simpleName },
-                )
-                collected.add(status to entries)
+                val pair = attempt(source, timeoutMs, gate)
+                collected.add(pair)
                 val snapshotNow = collected.toList()
                 val all = snapshotNow.flatMap { it.second }
                 runCatching {
@@ -305,7 +320,7 @@ object PluginMarket {
                         ),
                     )
                 }
-                status to entries
+                pair
             }
         }
         val results = jobs.awaitAll()
@@ -320,22 +335,11 @@ object PluginMarket {
     suspend fun fetchAll(
         list: List<MarketSource> = sources,
         timeoutMs: Long = SOURCE_TIMEOUT_MS,
+        maxConcurrent: Int = SOURCE_CONCURRENCY,
     ): MarketSnapshot = coroutineScope {
+        val gate = Semaphore(maxConcurrent.coerceAtLeast(1))
         val results = list
-            .map { source ->
-                async {
-                    val outcome = runCatching { withTimeout(timeoutMs) { fetchSource(source) } }
-                    val entries = outcome.getOrDefault(emptyList())
-                    val status = SourceStatus(
-                        id = source.id,
-                        name = source.name,
-                        ok = outcome.isSuccess,
-                        count = entries.size,
-                        error = outcome.exceptionOrNull()?.let { it.message ?: it::class.java.simpleName },
-                    )
-                    status to entries
-                }
-            }
+            .map { source -> async(Dispatchers.IO) { attempt(source, timeoutMs, gate) } }
             .awaitAll()
 
         val all = results.flatMap { it.second }
@@ -344,6 +348,51 @@ object PluginMarket {
             sources = results.map { it.first },
             rawCount = all.size,
         )
+    }
+
+    /**
+     * 拉一个源：单源预算在最外层，重试与并发闸门都在里面。
+     *
+     * 预算必须包住「排队等闸门 + 重试」：否则第 7 个源实际耗时是「排队 + 自己的超时」，
+     * 用户会以为网络变慢了。队列满时它一样要在预算内退出。
+     */
+    suspend fun fetchOne(
+        source: MarketSource,
+        timeoutMs: Long = SOURCE_TIMEOUT_MS,
+        gate: Semaphore? = null,
+    ): List<MarketEntry> = fetchOne(source, timeoutMs, gate) { fetchSource(it) }
+
+    suspend fun fetchOne(
+        source: MarketSource,
+        timeoutMs: Long,
+        gate: Semaphore?,
+        fetch: suspend (MarketSource) -> List<MarketEntry>,
+    ): List<MarketEntry> = withTimeout(timeoutMs) {
+        // 不把 suspend lambda 存进局部变量：K2 的 IR 后端在那种写法上会踩
+        // "FUN LOCAL_FUNCTION_FOR_LAMBDA ... has no continuation"，这里写两遍。
+        if (gate == null) {
+            retrying { _ -> fetch(source) }
+        } else {
+            gate.withPermit { retrying { _ -> fetch(source) } }
+        }
+    }
+
+    /** 把异常折叠成一行 [SourceStatus]：单源失败只影响自己那一行，不升级成整体失败。 */
+    private suspend fun attempt(
+        source: MarketSource,
+        timeoutMs: Long,
+        gate: Semaphore,
+    ): Pair<SourceStatus, List<MarketEntry>> {
+        val outcome = runCatching { fetchOne(source, timeoutMs, gate) }
+        val entries = outcome.getOrDefault(emptyList())
+        val status = SourceStatus(
+            id = source.id,
+            name = source.name,
+            ok = outcome.isSuccess,
+            count = entries.size,
+            error = outcome.exceptionOrNull()?.let { it.message ?: it::class.java.simpleName },
+        )
+        return status to entries
     }
 
     /**
@@ -412,6 +461,8 @@ object PluginMarket {
             setRequestProperty("Accept", "application/vnd.github+json, application/json")
             // GitHub 未带 UA 会直接 403。
             setRequestProperty("User-Agent", "dsh-mobile")
+            // token 只发给 api.github.com；反代与 jsDelivr 一律不带。
+            authHeader(full, githubToken())?.let { setRequestProperty("Authorization", it) }
         }
         try {
             val code = conn.responseCode
