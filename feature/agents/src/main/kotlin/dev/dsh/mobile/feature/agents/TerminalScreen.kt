@@ -63,8 +63,11 @@ import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
 import dev.dsh.mobile.core.common.AppLog
 import dev.dsh.mobile.design.IconBtn
+import dev.dsh.mobile.design.QqShape
+import dev.dsh.mobile.design.QqSpace
 import dev.dsh.mobile.design.LocalFontRoles
 import dev.dsh.mobile.design.LocalQq
+import dev.dsh.mobile.design.qqFontBody
 import dev.dsh.mobile.toolbridge.ShellBridge
 import dev.dsh.mobile.toolbridge.ShellSpec
 import kotlinx.coroutines.launch
@@ -103,11 +106,11 @@ fun TerminalScreen(shell: ShellBridge, onBack: () -> Unit) {
     ) {
         // 第一行：返回 + 模式胶囊 + 字号。
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = QqSpace.s()),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconBtn(Icons.AutoMirrored.Filled.ArrowBack, "返回", onBack)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(QqSpace.s()))
             ModePill(
                 label = (spec?.label ?: "shell") + " · " + if (pty) "PTY" else "简易",
                 onClick = { pty = !pty },
@@ -115,18 +118,18 @@ fun TerminalScreen(shell: ShellBridge, onBack: () -> Unit) {
             Spacer(Modifier.weight(1f))
             if (pty) {
                 TextChip("A-") { textSize = (textSize - 1).coerceIn(9, 22) }
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(QqSpace.xs()))
                 TextChip("A+") { textSize = (textSize + 1).coerceIn(9, 22) }
             }
         }
 
         when {
             failure != null -> Box(Modifier.fillMaxSize().padding(24.dp), Alignment.Center) {
-                Text(failure!!, color = p.t2, fontSize = 13.sp)
+                Text(failure!!, color = p.t2, fontSize = qqFontBody(13.sp))
             }
 
             spec == null -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                Text("正在启动 shell…", color = p.t3, fontSize = 13.sp)
+                Text("正在启动 shell…", color = p.t3, fontSize = qqFontBody(13.sp))
             }
 
             pty -> PtyArea(spec!!, textSize)
@@ -141,13 +144,13 @@ private fun ModePill(label: String, onClick: () -> Unit) {
     val p = LocalQq.current
     Row(
         Modifier
-            .clip(RoundedCornerShape(50))
+            .clip(QqShape.pill())
             .background(p.hover)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = p.t1, fontSize = 12.5.sp, fontWeight = FontWeight.Medium)
+        Text(label, color = p.t1, fontSize = qqFontBody(12.5.sp), fontWeight = FontWeight.Medium)
     }
 }
 
@@ -157,9 +160,9 @@ private fun TextChip(label: String, onClick: () -> Unit) {
     Text(
         label,
         color = p.t2,
-        fontSize = 12.5.sp,
+        fontSize = qqFontBody(12.5.sp),
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
+            .clip(QqShape.pill())
             .clickable(onClick = onClick)
             .padding(horizontal = 11.dp, vertical = 7.dp),
     )
@@ -222,7 +225,7 @@ private fun PtyArea(spec: ShellSpec, textSize: Int) {
             Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 10.dp, vertical = 4.dp),
+                .padding(horizontal = 10.dp, vertical = QqSpace.xs()),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -242,7 +245,7 @@ private fun PtyArea(spec: ShellSpec, textSize: Int) {
             }
             Row(
                 Modifier
-                    .clip(RoundedCornerShape(50))
+                    .clip(QqShape.pill())
                     .clickable {
                         tabs += newTab()
                         active = tabs.lastIndex
@@ -252,7 +255,7 @@ private fun PtyArea(spec: ShellSpec, textSize: Int) {
             ) {
                 Icon(Icons.Filled.Add, null, tint = p.accent, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(3.dp))
-                Text("新建", color = p.accent, fontSize = 12.5.sp)
+                Text("新建", color = p.accent, fontSize = qqFontBody(12.5.sp))
             }
         }
 
@@ -265,7 +268,7 @@ private fun PtyArea(spec: ShellSpec, textSize: Int) {
                 .background(Color(0xFF0B0F14)),
         ) {
             if (current == null) {
-                Text("正在启动 shell…", color = p.t3, fontSize = 13.sp, modifier = Modifier.align(Alignment.Center))
+                Text("正在启动 shell…", color = p.t3, fontSize = qqFontBody(13.sp), modifier = Modifier.align(Alignment.Center))
             } else {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
@@ -300,13 +303,13 @@ private fun PtyArea(spec: ShellSpec, textSize: Int) {
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 10.dp, vertical = 6.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(QqShape.chip())
                     .background(p.card)
                     .clickable { tabs += newTab().also { active = tabs.lastIndex } }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = QqSpace.m(), vertical = QqSpace.s()),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("shell 已退出（" + exited + "）· 点这里新开一个", color = p.amber, fontSize = 12.sp)
+                Text("shell 已退出（" + exited + "）· 点这里新开一个", color = p.amber, fontSize = qqFontBody(12.sp))
             }
         }
 
@@ -328,7 +331,7 @@ private fun TabChip(title: String, selected: Boolean, onSelect: () -> Unit, onCl
     val p = LocalQq.current
     Row(
         Modifier
-            .clip(RoundedCornerShape(50))
+            .clip(QqShape.pill())
             .background(if (selected) p.accent.copy(alpha = 0.16f) else p.hover)
             .clickable(onClick = onSelect)
             .padding(start = 13.dp, end = if (onClose == null) 13.dp else 6.dp, top = 7.dp, bottom = 7.dp),
@@ -337,14 +340,14 @@ private fun TabChip(title: String, selected: Boolean, onSelect: () -> Unit, onCl
         Text(
             title,
             color = if (selected) p.accent else p.t2,
-            fontSize = 12.5.sp,
+            fontSize = qqFontBody(12.5.sp),
             fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
         )
         if (onClose != null) {
             Spacer(Modifier.width(6.dp))
             // 命中区 34dp，叉号视觉 12dp：原来 18dp 的框点了半天点不中。
             Box(
-                Modifier.size(34.dp).clip(RoundedCornerShape(50)).clickable(onClick = onClose),
+                Modifier.size(34.dp).clip(QqShape.pill()).clickable(onClick = onClose),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -369,7 +372,7 @@ private fun KeyBar(onKey: (ByteArray) -> Unit, onScroll: (Int) -> Unit) {
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
             .navigationBarsPadding()
-            .padding(horizontal = 8.dp, vertical = 8.dp),
+            .padding(horizontal = QqSpace.s(), vertical = QqSpace.s()),
         horizontalArrangement = Arrangement.spacedBy(7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -395,7 +398,7 @@ private fun KeyChip(label: String, accent: Boolean = false, onClick: () -> Unit)
     val p = LocalQq.current
     Row(
         Modifier
-            .clip(RoundedCornerShape(50))
+            .clip(QqShape.pill())
             .background(if (accent) p.accent.copy(alpha = 0.14f) else p.hover)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 9.dp),
@@ -404,7 +407,7 @@ private fun KeyChip(label: String, accent: Boolean = false, onClick: () -> Unit)
         Text(
             label,
             color = if (accent) p.accent else p.t1,
-            fontSize = 12.sp,
+            fontSize = qqFontBody(12.sp),
             fontWeight = FontWeight.Medium,
         )
     }
@@ -444,11 +447,11 @@ private fun SimpleArea(shell: ShellBridge, spec: ShellSpec) {
             Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 4.dp)
+                .padding(horizontal = 10.dp, vertical = QqSpace.xs())
                 .clip(RoundedCornerShape(14.dp))
                 .background(p.card)
                 .verticalScroll(scroll)
-                .padding(12.dp),
+                .padding(QqSpace.m()),
         ) {
             Text(
                 spec.label + " · " + spec.shell,
@@ -456,7 +459,7 @@ private fun SimpleArea(shell: ShellBridge, spec: ShellSpec) {
                 fontSize = 11.sp * LocalFontRoles.current.terminal,
                 fontFamily = FontFamily.Monospace,
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(QqSpace.s()))
             lines.forEach { line ->
                 Text(
                     line.text,
@@ -466,7 +469,7 @@ private fun SimpleArea(shell: ShellBridge, spec: ShellSpec) {
                     lineHeight = 18.sp * LocalFontRoles.current.terminal,
                     fontFamily = FontFamily.Monospace,
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(QqSpace.xs()))
             }
             if (busy) {
                 Text("执行中…", color = p.t3, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
@@ -477,14 +480,14 @@ private fun SimpleArea(shell: ShellBridge, spec: ShellSpec) {
             Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 10.dp, vertical = 8.dp)
-                .clip(RoundedCornerShape(50))
+                .padding(horizontal = 10.dp, vertical = QqSpace.s())
+                .clip(QqShape.pill())
                 .background(p.hover)
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("#", color = p.accent, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(QqSpace.s()))
             BasicTextField(
                 value = cmd,
                 onValueChange = { cmd = it },
@@ -499,13 +502,13 @@ private fun SimpleArea(shell: ShellBridge, spec: ShellSpec) {
                     inner()
                 },
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(QqSpace.s()))
             Text(
                 if (busy) "…" else "执行",
                 color = p.accent,
-                fontSize = 12.5.sp,
-                modifier = Modifier.clip(RoundedCornerShape(50)).clickable { run() }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                fontSize = qqFontBody(12.5.sp),
+                modifier = Modifier.clip(QqShape.pill()).clickable { run() }
+                    .padding(horizontal = QqSpace.s(), vertical = QqSpace.xs()),
             )
         }
     }

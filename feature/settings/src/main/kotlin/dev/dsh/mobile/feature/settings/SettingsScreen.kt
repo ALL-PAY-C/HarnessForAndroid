@@ -97,10 +97,13 @@ import dev.dsh.mobile.design.IconBtn
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider
 import dev.dsh.mobile.design.QqRow
+import dev.dsh.mobile.design.QqShape
+import dev.dsh.mobile.design.QqSpace
 import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.SectionHeading
 import dev.dsh.mobile.design.SectionSpacing
 import dev.dsh.mobile.design.StatusCapsule
+import dev.dsh.mobile.design.qqFontBody
 import dev.dsh.mobile.toolbridge.AppStorage
 import dev.dsh.mobile.toolbridge.phone.PhoneBridge
 import kotlinx.coroutines.launch
@@ -243,10 +246,10 @@ fun SettingsScreen(
                         if (state.updateStatus != null || state.updateInfo != null) {
                             QqCardDivider()
                             Column(Modifier.padding(horizontal = 13.dp, vertical = 10.dp)) {
-                                Text(state.updateStatus.orEmpty(), color = p.t2, fontSize = 12.5.sp)
+                                Text(state.updateStatus.orEmpty(), color = p.t2, fontSize = qqFontBody(12.5.sp))
                                 state.updateInfo?.notes?.takeIf { it.isNotBlank() }?.let { notes ->
-                                    Spacer(Modifier.height(4.dp))
-                                    Text(notes, color = p.t3, fontSize = 12.sp)
+                                    Spacer(Modifier.height(QqSpace.xs()))
+                                    Text(notes, color = p.t3, fontSize = qqFontBody(12.sp))
                                 }
                                 if (state.updateProgress in 1..99) {
                                     Spacer(Modifier.height(6.dp))
@@ -255,8 +258,8 @@ fun SettingsScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                     )
                                 }
-                                Spacer(Modifier.height(8.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Spacer(Modifier.height(QqSpace.s()))
+                                Row(horizontalArrangement = Arrangement.spacedBy(QqSpace.s())) {
                                     if (state.updateInfo != null && !state.updateReady) {
                                         AccentChip("下载") { viewModel.downloadUpdate() }
                                     }
@@ -290,24 +293,24 @@ fun SettingsScreen(
                                     Icon(Icons.Filled.Folder, null, tint = p.accent, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.width(10.dp))
                                     Text("默认工作区", color = p.t1, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                                    TextButton(onClick = { cwdPicker.launch(null) }) { Text("选择", fontSize = 13.sp) }
+                                    TextButton(onClick = { cwdPicker.launch(null) }) { Text("选择", fontSize = qqFontBody(13.sp)) }
                                     if (state.settings.defaultCwd.isNotBlank()) {
                                         TextButton(onClick = {
                                             viewModel.setDefaultCwd("")
                                             viewModel.setCwdTreeUri("")
-                                        }) { Text("清除", color = p.t3, fontSize = 13.sp) }
+                                        }) { Text("清除", color = p.t3, fontSize = qqFontBody(13.sp)) }
                                     }
                                 }
                                 Text(
                                     middleEllipsis(state.settings.defaultCwd.ifBlank { "未设置 · 使用应用私有目录" }),
                                     color = p.t3,
-                                    fontSize = 12.sp,
+                                    fontSize = qqFontBody(12.sp),
                                 )
                                 if (state.settings.cwdTreeUri.isNotBlank()) {
                                     Text(
                                         "已授权系统目录访问；运行时读写仍按上面的绝对路径",
                                         color = p.t3,
-                                        fontSize = 11.sp,
+                                        fontSize = qqFontBody(11.sp),
                                     )
                                 }
                                 // 全文件访问：Android 11+ 才存在这个设置页，低版本整条不显示。
@@ -532,7 +535,7 @@ fun SettingsScreen(
                             open = "quick" in open,
                             onToggle = { toggle("quick") },
                         ) {
-                            Text("每行一条，聊天页显示为快捷按钮", color = p.t3, fontSize = 11.5.sp)
+                            Text("每行一条，聊天页显示为快捷按钮", color = p.t3, fontSize = qqFontBody(11.5.sp))
                             Spacer(Modifier.height(7.dp))
                             TextArea(
                                 value = state.settings.quickCommands.joinToString("\n"),
@@ -540,7 +543,7 @@ fun SettingsScreen(
                                 onChange = viewModel::setQuickCommands,
                             )
                             Spacer(Modifier.height(10.dp))
-                            Text("Prompt 模板", color = p.t3, fontSize = 11.5.sp)
+                            Text("Prompt 模板", color = p.t3, fontSize = qqFontBody(11.5.sp))
                             Spacer(Modifier.height(7.dp))
                             TextArea(
                                 value = state.settings.promptTemplates.joinToString("\n"),
@@ -677,9 +680,9 @@ fun SettingsScreen(
                                         Text(
                                             "重启",
                                             color = p.accent,
-                                            fontSize = 12.5.sp,
+                                            fontSize = qqFontBody(12.5.sp),
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(9.dp))
+                                                .clip(QqShape.chip())
                                                 .background(p.accent.copy(alpha = 0.1f))
                                                 .clickable { viewModel.reconnect() }
                                                 .padding(horizontal = 9.dp, vertical = 5.dp),
@@ -689,8 +692,8 @@ fun SettingsScreen(
                             )
                             if (state.versions.isNotEmpty()) {
                                 QqCardDivider()
-                                Column(Modifier.padding(horizontal = 13.dp, vertical = 8.dp)) {
-                                    Text("运行时版本", color = p.t3, fontSize = 11.5.sp)
+                                Column(Modifier.padding(horizontal = 13.dp, vertical = QqSpace.s())) {
+                                    Text("运行时版本", color = p.t3, fontSize = qqFontBody(11.5.sp))
                                     Spacer(Modifier.height(6.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         state.versions.forEach { v ->
@@ -698,9 +701,9 @@ fun SettingsScreen(
                                             Text(
                                                 v,
                                                 color = if (on) Color.White else p.t2,
-                                                fontSize = 12.sp,
+                                                fontSize = qqFontBody(12.sp),
                                                 modifier = Modifier
-                                                    .clip(RoundedCornerShape(9.dp))
+                                                    .clip(QqShape.chip())
                                                     .background(if (on) p.accent else p.hover)
                                                     .clickable { viewModel.setRuntimeVersion(v) }
                                                     .padding(horizontal = 10.dp, vertical = 5.dp),
@@ -709,9 +712,9 @@ fun SettingsScreen(
                                         Text(
                                             "清日志",
                                             color = p.t2,
-                                            fontSize = 12.sp,
+                                            fontSize = qqFontBody(12.sp),
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(9.dp))
+                                                .clip(QqShape.chip())
                                                 .background(p.hover)
                                                 .clickable { viewModel.clearLogs() }
                                                 .padding(horizontal = 10.dp, vertical = 5.dp),
@@ -742,7 +745,7 @@ fun SettingsScreen(
                                                 Text(
                                                     "使用中",
                                                     color = p.accent,
-                                                    fontSize = 11.5.sp,
+                                                    fontSize = qqFontBody(11.5.sp),
                                                     modifier = Modifier
                                                         .clip(RoundedCornerShape(8.dp))
                                                         .background(p.accent.copy(alpha = 0.1f))
@@ -838,7 +841,7 @@ fun SettingsScreen(
                                 selected = state.settings.webSearchEngine,
                                 onSelect = viewModel::setWebSearchEngine,
                             )
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(Modifier.padding(QqSpace.l()), verticalArrangement = Arrangement.spacedBy(QqSpace.s())) {
                                 var instance by remember(state.settings.searxngInstance) { mutableStateOf(state.settings.searxngInstance) }
                                 OutlinedTextField(
                                     value = instance, onValueChange = { instance = it }, singleLine = true,
@@ -869,7 +872,7 @@ fun SettingsScreen(
                                     placeholder = { Text("http://127.0.0.1:7890") },
                                     isError = proxyError(proxy) != null, modifier = Modifier.fillMaxWidth(),
                                 )
-                                proxyError(proxy)?.let { Text(it, color = Color(0xFFC00000), fontSize = 12.sp) }
+                                proxyError(proxy)?.let { Text(it, color = Color(0xFFC00000), fontSize = qqFontBody(12.sp)) }
                                 TextButton(onClick = { viewModel.setProxyUrl(proxy) }, enabled = !state.busy && proxyError(proxy) == null) { Text("保存代理") }
                                 Hint("保存后所有子进程（Termux / proot / 应用内 shell，含 pip 与 git）都带上它；清空即直连。")
                             }
@@ -887,7 +890,7 @@ fun SettingsScreen(
                             val notif = remember(permTick) { permBridge.isNotificationListenerEnabled() }
                             val battery = remember(permTick) { permBridge.isIgnoringBatteryOptimizations() }
                             val shizuku = remember(permTick) { permBridge.shizukuStatus() }
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(Modifier.padding(QqSpace.l()), verticalArrangement = Arrangement.spacedBy(QqSpace.s())) {
                                 // 只给状态与入口，不代用户开系统权限：这类授权必须在系统界面里确认。
                                 PermissionRow(
                                     title = "无障碍服务",
@@ -926,7 +929,7 @@ fun SettingsScreen(
                             open = "envLinux" in open,
                             onToggle = { toggle("envLinux") },
                         ) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(Modifier.padding(QqSpace.l()), verticalArrangement = Arrangement.spacedBy(QqSpace.s())) {
                                 Text("rootfs：" + linux.rootfs, color = p.t1)
                                 Text("DSH 内核：" + linux.kernel, color = p.t1)
                                 Text(linux.health, color = p.t2)
@@ -941,22 +944,22 @@ fun SettingsScreen(
                                     TextButton(onClick = { confirmingRuntimeReinstall = true }, enabled = !linux.busy) { Text("重装运行时") }
                                 }
                                 linux.error?.let {
-                                    Text(it.lineSequence().take(2).joinToString("\n"), color = Color(0xFFC00000), fontSize = 12.sp)
+                                    Text(it.lineSequence().take(2).joinToString("\n"), color = Color(0xFFC00000), fontSize = qqFontBody(12.sp))
                                 }
                                 TextButton(onClick = viewModel::installKernel, enabled = !linux.busy) { Text("安装 / 修复 DSH 内核") }
                                 TextButton(onClick = viewModel::runLinuxSelfCheck, enabled = !linux.busy) { Text("运行自检") }
                                 TextButton(onClick = viewModel::refreshLinux, enabled = !linux.busy) { Text("刷新状态") }
                                 TextButton(onClick = viewModel::bootstrapLinuxEnv, enabled = !linux.busy) { Text("一键补齐环境（Termux / proot / pip / git）") }
                                 TextButton(onClick = viewModel::cleanupLinux, enabled = !linux.busy) { Text("清理非激活版本") }
-                                linux.message?.let { Text(it, color = p.t2, fontSize = 12.sp) }
+                                linux.message?.let { Text(it, color = p.t2, fontSize = qqFontBody(12.sp)) }
                                 TextButton(onClick = viewModel::clearLinuxDiagnostics, enabled = !linux.busy) { Text("清空诊断日志") }
                                 SelectionContainer {
                                     Text(
-                                        linux.diagnostics.ifBlank { "暂无诊断日志" }, color = p.t2, fontSize = 12.sp,
+                                        linux.diagnostics.ifBlank { "暂无诊断日志" }, color = p.t2, fontSize = qqFontBody(12.sp),
                                         modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp).verticalScroll(rememberScrollState()),
                                     )
                                 }
-                                linux.checks.forEach { detail -> Text(detail, color = p.t2, fontSize = 12.sp) }
+                                linux.checks.forEach { detail -> Text(detail, color = p.t2, fontSize = qqFontBody(12.sp)) }
 
                             }
                         }
@@ -978,7 +981,7 @@ fun SettingsScreen(
                             open = "pluginSettings" in open,
                             onToggle = { toggle("pluginSettings") },
                         ) {
-                            Column(Modifier.padding(4.dp)) {
+                            Column(Modifier.padding(QqSpace.xs())) {
                                 extraSettings.forEach { slot -> slot() }
                             }
                         }
@@ -1044,7 +1047,7 @@ private fun ExpandableSection(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(QqShape.card())
             .background(p.card),
     ) {
         Row(
@@ -1057,7 +1060,7 @@ private fun ExpandableSection(
             Box(
                 Modifier
                     .size(30.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(QqShape.chip())
                     .background(tint.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
@@ -1117,7 +1120,7 @@ private fun SubGroup(
             enter = expandVertically() + fadeIn(),
             exit = shrinkVertically() + fadeOut(),
         ) {
-            Column(Modifier.fillMaxWidth().padding(start = 12.dp)) { content() }
+            Column(Modifier.fillMaxWidth().padding(start = QqSpace.m())) { content() }
         }
     }
 }
@@ -1128,9 +1131,9 @@ private fun AccentChip(label: String, onClick: () -> Unit) {
     Text(
         label,
         color = Color.White,
-        fontSize = 13.sp,
+        fontSize = qqFontBody(13.sp),
         modifier = Modifier
-            .clip(RoundedCornerShape(9.dp))
+            .clip(QqShape.chip())
             .background(p.accent)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 7.dp),
@@ -1159,10 +1162,10 @@ private fun <T> SegmentedRow(
             Text(
                 text,
                 color = if (on) Color.White else p.t2,
-                fontSize = 12.sp,
+                fontSize = qqFontBody(12.sp),
                 modifier = Modifier
                     .padding(start = 5.dp)
-                    .clip(RoundedCornerShape(9.dp))
+                    .clip(QqShape.chip())
                     .background(if (on) p.accent else p.hover)
                     .clickable { onSelect(value) }
                     .padding(horizontal = 9.dp, vertical = 5.dp),
@@ -1182,10 +1185,10 @@ private fun PermissionRow(
     val p = LocalQq.current
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(title, color = p.t1, fontSize = 14.sp, modifier = Modifier.weight(1f))
-            Text(if (granted) "已授权" else "未授权", color = if (granted) Color(0xFF22C55E) else p.t2, fontSize = 12.sp)
+            Text(title, color = p.t1, fontSize = qqFontBody(14.sp), modifier = Modifier.weight(1f))
+            Text(if (granted) "已授权" else "未授权", color = if (granted) Color(0xFF22C55E) else p.t2, fontSize = qqFontBody(12.sp))
         }
-        Text(label, color = p.t2, fontSize = 12.sp)
+        Text(label, color = p.t2, fontSize = qqFontBody(12.sp))
         if (actionLabel.isNotBlank()) TextButton(onClick = onAction) { Text(actionLabel) }
     }
 }
@@ -1196,8 +1199,8 @@ private fun Hint(text: String) {
     Text(
         text,
         color = p.t3,
-        fontSize = 11.sp,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 4.dp),
+        fontSize = qqFontBody(11.sp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = QqSpace.xs()),
     )
 }
 
@@ -1207,7 +1210,7 @@ private fun SliderRow(label: String, value: String, content: @Composable () -> U
     Column(Modifier.padding(horizontal = 13.dp, vertical = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(label, color = p.t1, fontSize = 15.sp, modifier = Modifier.weight(1f))
-            Text(value, color = p.t3, fontSize = 12.5.sp)
+            Text(value, color = p.t3, fontSize = qqFontBody(12.5.sp))
         }
         content()
     }
@@ -1222,9 +1225,9 @@ private fun SwitchRow(label: String, subtitle: String, checked: Boolean, onChang
     ) {
         Column(Modifier.weight(1f)) {
             Text(label, color = p.t1, fontSize = 15.sp)
-            Text(subtitle, color = p.t3, fontSize = 11.5.sp)
+            Text(subtitle, color = p.t3, fontSize = qqFontBody(11.5.sp))
         }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(QqSpace.s()))
         Switch(checked = checked, onCheckedChange = onChange)
     }
 }
@@ -1236,15 +1239,15 @@ private fun TextArea(value: String, placeholder: String, onChange: (String) -> U
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 13.dp)
-            .clip(RoundedCornerShape(11.dp))
+            .clip(QqShape.field())
             .background(p.bg)
             .padding(horizontal = 11.dp, vertical = 9.dp),
     ) {
-        if (value.isBlank()) Text(placeholder, color = p.t3, fontSize = 13.sp)
+        if (value.isBlank()) Text(placeholder, color = p.t3, fontSize = qqFontBody(13.sp))
         BasicTextField(
             value = value,
             onValueChange = onChange,
-            textStyle = TextStyle(fontSize = 13.5.sp, color = p.t1),
+            textStyle = TextStyle(fontSize = qqFontBody(13.5.sp), color = p.t1),
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -1290,19 +1293,19 @@ private fun EndpointDialog(draft: EndpointDraft?, onDismiss: () -> Unit, onSave:
 private fun Field(label: String, value: String, onChange: (String) -> Unit) {
     val p = LocalQq.current
     Column {
-        Text(label, color = p.t3, fontSize = 11.5.sp)
+        Text(label, color = p.t3, fontSize = qqFontBody(11.5.sp))
         Box(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
+                .clip(QqShape.chip())
                 .background(p.bg)
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 10.dp, vertical = QqSpace.s()),
         ) {
             BasicTextField(
                 value = value,
                 onValueChange = onChange,
                 singleLine = true,
-                textStyle = TextStyle(fontSize = 14.sp, color = p.t1),
+                textStyle = TextStyle(fontSize = qqFontBody(14.sp), color = p.t1),
                 modifier = Modifier.fillMaxWidth(),
             )
         }

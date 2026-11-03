@@ -11,7 +11,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import android.widget.Toast
@@ -44,7 +43,6 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -154,7 +152,7 @@ fun Ava(
                 Modifier
                     .align(Alignment.BottomEnd)
                     .size(size * 0.26f)
-                    .clip(RoundedCornerShape(50))
+                    .clip(QqShape.pill())
                     .background(LocalQq.current.green),
             )
         }
@@ -186,7 +184,7 @@ fun QqTopBar(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = 52.dp)
-                .padding(horizontal = 8.dp),
+                .padding(horizontal = QqSpace.s()),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // 左右各占一份剩余空间：内容不带 weight，天然落在正中间，
@@ -225,17 +223,17 @@ fun TokenPill(usage: TokenUsage) {
     val total = if (usage.total > 0) usage.total else usage.input + usage.output
     Row(
         Modifier
-            .clip(RoundedCornerShape(50))
+            .clip(QqShape.pill())
             .background(p.accent.copy(alpha = 0.1f))
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        Box(Modifier.size(6.dp).clip(RoundedCornerShape(50)).background(p.accent))
+        Box(Modifier.size(6.dp).clip(QqShape.pill()).background(p.accent))
         Text(
             formatTokens(total),
             color = p.accent,
-            fontSize = 13.sp,
+            fontSize = qqFontBody(13.sp),
             fontWeight = FontWeight.Bold,
         )
     }
@@ -267,8 +265,8 @@ fun StatusCapsule(state: RuntimeState, onClick: () -> Unit = {}) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Box(Modifier.size(5.dp).clip(RoundedCornerShape(50)).background(color))
-        Text(label, color = color, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
+        Box(Modifier.size(5.dp).clip(QqShape.pill()).background(color))
+        Text(label, color = color, fontSize = qqFontBody(10.5.sp), fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -302,12 +300,12 @@ fun ConvRow(
                 Box(
                     Modifier
                         .size(22.dp)
-                        .clip(RoundedCornerShape(50))
+                        .clip(QqShape.pill())
                         .background(if (selected) p.accent else Color.Transparent)
                         .then(if (selected) Modifier else Modifier.background(p.card)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(if (selected) "✓" else "", color = Color.White, fontSize = 13.sp)
+                    Text(if (selected) "✓" else "", color = Color.White, fontSize = qqFontBody(13.sp))
                 }
                 Spacer(Modifier.width(10.dp))
             }
@@ -317,7 +315,7 @@ fun ConvRow(
                 label = session.title,
                 online = session.status == SessionStatus.Running,
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(QqSpace.m()))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // 四色状态点跟着标题走：蓝=运行中 / 橙=待选择 / 绿=做完 / 红=意外中断。
@@ -327,7 +325,7 @@ fun ConvRow(
                     Text(
                         session.title.ifBlank { "未命名会话" },
                         color = p.t1,
-                        fontSize = 15.5.sp,
+                        fontSize = qqFontBody(15.5.sp),
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f, fill = false),
                     )
@@ -337,16 +335,16 @@ fun ConvRow(
                             Modifier.clip(RoundedCornerShape(6.dp)).background(p.accent.copy(alpha = 0.12f))
                                 .padding(horizontal = 5.dp, vertical = 1.dp),
                         ) {
-                            Text("群 ${session.memberCount}", color = p.accent, fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold)
+                            Text("群 ${session.memberCount}", color = p.accent, fontSize = qqFontBody(9.5.sp), fontWeight = FontWeight.SemiBold)
                         }
                     }
                     if (session.pinned) {
                         Spacer(Modifier.width(5.dp))
-                        Text("置顶", color = p.t3, fontSize = 10.sp)
+                        Text("置顶", color = p.t3, fontSize = qqFontBody(10.sp))
                     }
                     Spacer(Modifier.weight(1f))
                     if (timeText.isNotBlank()) {
-                        Text(timeText, color = p.t3, fontSize = 11.5.sp)
+                        Text(timeText, color = p.t3, fontSize = qqFontBody(11.5.sp))
                     }
                 }
                 Spacer(Modifier.height(3.dp))
@@ -354,7 +352,7 @@ fun ConvRow(
                     Text(
                         session.preview.ifBlank { "开始对话…" },
                         color = p.t2,
-                        fontSize = 13.sp,
+                        fontSize = qqFontBody(13.sp),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
@@ -443,7 +441,7 @@ fun RunPill(text: String) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Box(Modifier.size(5.dp).clip(RoundedCornerShape(50)).background(p.accent))
+        Box(Modifier.size(5.dp).clip(QqShape.pill()).background(p.accent))
         Text(text, color = p.accent, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
     }
 }
@@ -463,8 +461,8 @@ fun SessionRow(
 fun SectionCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val p = LocalQq.current
     val style = LocalSurfaceStyle.current
-    val border = style.borderWidth
-    val shape = RoundedCornerShape(16.dp)
+    val border = qqBorder()
+    val shape = QqShape.card()
     Column(
         modifier
             .fillMaxWidth()
@@ -534,7 +532,7 @@ fun MessageBubble(
                     Text(
                         dev.dsh.mobile.core.common.TimeFmt.clock(message.at),
                         color = p.t3,
-                        fontSize = 11.sp,
+                        fontSize = qqFontBody(11.sp),
                         modifier = Modifier.padding(end = 4.dp, bottom = 3.dp),
                     )
                 }
@@ -548,7 +546,7 @@ fun MessageBubble(
                     Column {
                         message.attachments.forEach { path -> AttachmentImage(path, true) }
                         SelectionContainer {
-                            Text(message.text, color = Color.White, fontSize = 15.5.sp, lineHeight = 22.sp)
+                            Text(message.text, color = Color.White, fontSize = qqFontBody(15.5.sp), lineHeight = 22.sp)
                         }
                     }
                 }
@@ -579,7 +577,7 @@ fun MessageBubble(
             Text(
                 message.authorName ?: "DSH",
                 color = if (colorizeAuthors) avatarAccent(message.authorId ?: message.sessionId) else p.t1,
-                fontSize = 13.sp,
+                fontSize = qqFontBody(13.sp),
                 fontWeight = FontWeight.Medium,
             )
             if (showDuration && message.at > 0) {
@@ -600,7 +598,7 @@ fun MessageBubble(
                 val used = message.inputTokens + message.outputTokens
                 if (used > 0L) {
                     Spacer(Modifier.width(6.dp))
-                    Text("· " + formatTokens(used) + " tok", color = p.t3, fontSize = 11.sp)
+                    Text("· " + formatTokens(used) + " tok", color = p.t3, fontSize = qqFontBody(11.sp))
                 }
             }
             // 正文全选复制：长回答在手机上拖选很难受，给一个一键复制。流式时先不给。
@@ -612,7 +610,7 @@ fun MessageBubble(
         // 流式中即使还没有一个字，也要先把「深度思索中」的头露出来：
         // 以前要等第一段思维链到达才出现，用户点了发送后几秒钟屏幕上什么都没有。
         if (showThoughts && (message.streaming || message.thought.isNotBlank() || message.toolCalls.isNotEmpty())) {
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(QqSpace.xs()))
             ActivitySummary(
                 thought = message.thought,
                 tools = message.toolCalls,
@@ -706,19 +704,6 @@ private fun StreamingDot() {
     )
 }
 
-@Composable
-fun EmptyState(title: String, subtitle: String) {
-    val p = LocalQq.current
-    Column(
-        Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 56.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(title, color = p.t2, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(6.dp))
-        Text(subtitle, color = p.t3, fontSize = 13.sp)
-    }
-}
-
 /** Bottom tab bar: icon + label, accent when active. */
 data class TabSpec(val label: String, val icon: ImageVector)
 
@@ -795,7 +780,7 @@ fun QqRow(
 ) {
     val p = LocalQq.current
     // 行级不画描边：QqRow 通常嵌在 SectionCard 里，行框会落在卡片描边内侧变成双层框。
-    // 描边由 SectionCard / SurfaceCard 这类卡片级容器统一消费 LocalSurfaceStyle。
+    // 描边由 SectionCard 这类卡片级容器统一消费 LocalSurfaceStyle。
     val tokens = LocalThemeTokens.current
     Row(
         Modifier
@@ -812,11 +797,11 @@ fun QqRow(
         ) {
             Icon(icon, null, tint = tint ?: p.t2, modifier = Modifier.size(17.dp))
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(QqSpace.m()))
         Column(Modifier.weight(1f)) {
-            Text(title, color = p.t1, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Text(title, color = p.t1, fontSize = qqFontBody(15.sp), fontWeight = FontWeight.Medium)
             if (subtitle != null) {
-                Text(subtitle, color = p.t3, fontSize = 11.5.sp)
+                Text(subtitle, color = p.t3, fontSize = qqFontBody(11.5.sp))
             }
         }
         trailing?.invoke()
@@ -828,18 +813,38 @@ fun QqCardDivider() {
     Box(Modifier.fillMaxWidth().padding(start = 56.dp).height(1.dp).background(LocalQq.current.line))
 }
 
-/** Shared empty state for lists and centers: icon, primary/secondary copy, optional action. */
+/**
+ * 空状态：主副文案，可选图标与动作。
+ *
+ * 历史上是「无图标」和「带图标」两个同名重载：调用点一半用位置参数（EmptyState(a, b)），
+ * 一半用命名参数（icon = ... / title = ...）。合并成一个时把 icon 排到 title/subtitle 之后，
+ * 位置调用照旧解析、命名调用一个都不用改。icon 为 null 走无图标旧版式（32/56 内边距、
+ * 15sp t2 标题），非 null 走带图标版式（28/48、18sp t1 标题）——两边像素与合并前一致。
+ */
 @Composable
 fun EmptyState(
-    icon: ImageVector,
     title: String,
     subtitle: String? = null,
+    icon: ImageVector? = null,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     iconSize: Dp = 42.dp,
 ) {
     val p = LocalQq.current
+    if (icon == null) {
+        Column(
+            modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 56.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(title, color = p.t2, fontSize = qqFontBody(15.sp), fontWeight = FontWeight.SemiBold)
+            if (!subtitle.isNullOrBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(subtitle, color = p.t3, fontSize = qqFontBody(13.sp))
+            }
+        }
+        return
+    }
     Column(
         modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 48.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -870,10 +875,10 @@ object SectionSpacing {
 fun SectionHeading(title: String, subtitle: String? = null, modifier: Modifier = Modifier) {
     val p = LocalQq.current
     Column(modifier.padding(vertical = 2.dp)) {
-        Text(title, color = p.t1, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+        Text(title, color = p.t1, fontSize = qqFontBody(15.sp), fontWeight = FontWeight.Medium)
         if (!subtitle.isNullOrBlank()) {
-            Spacer(Modifier.height(4.dp))
-            Text(subtitle, color = p.t3, fontSize = 12.sp, lineHeight = 18.sp)
+            Spacer(Modifier.height(QqSpace.xs()))
+            Text(subtitle, color = p.t3, fontSize = qqFontBody(12.sp), lineHeight = 18.sp)
         }
     }
 }
@@ -926,20 +931,6 @@ private val ChevronDownGlyph: ImageVector by lazy {
             lineTo(18f, 9f)
         }
     }.build()
-}
-
-@Composable
-fun SurfaceCard(content: @Composable () -> Unit) {
-    val p = LocalQq.current
-    val border = LocalSurfaceStyle.current.borderWidth
-    Surface(
-        color = p.card,
-        shape = RoundedCornerShape(16.dp),
-        border = if (border > 0.dp) BorderStroke(border, p.line) else null,
-    ) {
-        // Surface 自己铺 color，所以叠层要放在它内部才压得住底色；无材质时是空操作。
-        Box(Modifier.panelSheen()) { content() }
-    }
 }
 
 /** One action revealed by swiping a row to the left. */
@@ -1531,7 +1522,7 @@ private fun AttachmentImage(path: String, mine: Boolean) {
                     fontSize = 24.sp,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(20.dp)
+                        .padding(QqSpace.xl())
                         .clickable { preview = false },
                 )
             }
@@ -1698,10 +1689,10 @@ fun GroupChild(
         Row(
             Modifier
                 .weight(1f)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(QqShape.chip())
                 .background(p.card)
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-                .border(1.dp, p.line, RoundedCornerShape(10.dp))
+                .border(1.dp, p.line, QqShape.chip())
                 .padding(horizontal = 12.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
             content = content,

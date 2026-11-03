@@ -46,9 +46,12 @@ import dev.dsh.mobile.design.EmptyState
 import dev.dsh.mobile.design.IconBtn
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider
+import dev.dsh.mobile.design.QqShape
+import dev.dsh.mobile.design.QqSpace
 import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.SectionCard
 import dev.dsh.mobile.design.SectionTitle
+import dev.dsh.mobile.design.qqFontBody
 import dev.dsh.mobile.runtimehost.NodeEngine
 import dev.dsh.mobile.runtimehost.NodeEngineException
 import java.io.File
@@ -262,8 +265,8 @@ fun SkillCenterScreen(
                     )
                 } else {
                     LazyColumn(
-                        Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                        contentPadding = PaddingValues(vertical = 8.dp),
+                        Modifier.fillMaxSize().padding(horizontal = QqSpace.m()),
+                        contentPadding = PaddingValues(vertical = QqSpace.s()),
                     ) {
                         item { SectionTitle("技能", s.entries.size) }
                         item {
@@ -334,15 +337,15 @@ private fun InstallSkillDialog(
                     placeholder = { Text("https://github.com/owner/repo") },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(QqSpace.s()))
                 Text(
                     "支持含 SKILL.md 的 GitHub 仓库、owner/repo，或 zip 直链；装完即时生效。",
                     color = p.t2,
-                    fontSize = 12.5.sp,
+                    fontSize = qqFontBody(12.5.sp),
                 )
                 error?.let {
-                    Spacer(Modifier.height(8.dp))
-                    Text(it, color = p.red, fontSize = 12.5.sp)
+                    Spacer(Modifier.height(QqSpace.s()))
+                    Text(it, color = p.red, fontSize = qqFontBody(12.5.sp))
                 }
             }
         },
@@ -355,13 +358,13 @@ private fun InstallSkillDialog(
                         modifier = Modifier.size(16.dp),
                     )
                 } else {
-                    Text("安装", color = p.accent, fontSize = 14.sp)
+                    Text("安装", color = p.accent, fontSize = qqFontBody(14.sp))
                 }
             }
         },
         dismissButton = {
             TextButton(enabled = !busy, onClick = onDismiss) {
-                Text("取消", color = p.t2, fontSize = 14.sp)
+                Text("取消", color = p.t2, fontSize = qqFontBody(14.sp))
             }
         },
     )
@@ -384,7 +387,7 @@ private fun RemoveSkillDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("移除技能", color = p.t1, fontWeight = FontWeight.SemiBold) },
-        text = { Text(removeConfirmBody(name, bundled), color = p.t2, fontSize = 13.sp) },
+        text = { Text(removeConfirmBody(name, bundled), color = p.t2, fontSize = qqFontBody(13.sp)) },
         confirmButton = {
             TextButton(enabled = !busy, onClick = onConfirm) {
                 if (busy) {
@@ -394,13 +397,13 @@ private fun RemoveSkillDialog(
                         modifier = Modifier.size(16.dp),
                     )
                 } else {
-                    Text("移除", color = p.red, fontSize = 14.sp)
+                    Text("移除", color = p.red, fontSize = qqFontBody(14.sp))
                 }
             }
         },
         dismissButton = {
             TextButton(enabled = !busy, onClick = onDismiss) {
-                Text("取消", color = p.t2, fontSize = 14.sp)
+                Text("取消", color = p.t2, fontSize = qqFontBody(14.sp))
             }
         },
     )
@@ -571,24 +574,24 @@ private fun LoadingBody() {
     ) {
         CircularProgressIndicator(color = p.accent, strokeWidth = 2.5.dp, modifier = Modifier.size(28.dp))
         Spacer(Modifier.height(14.dp))
-        Text("正在启动 Node 引擎…", color = p.t2, fontSize = 13.sp)
+        Text("正在启动 Node 引擎…", color = p.t2, fontSize = qqFontBody(13.sp))
     }
 }
 
 @Composable
 private fun FailureBody(stage: String, message: String, onRetry: () -> Unit) {
     val p = LocalQq.current
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
+    Column(Modifier.fillMaxSize().padding(QqSpace.l())) {
         SectionCard {
-            Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-                Text("技能列表读取失败", color = p.red, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Column(Modifier.padding(horizontal = 14.dp, vertical = QqSpace.m())) {
+                Text("技能列表读取失败", color = p.red, fontSize = qqFontBody(14.sp), fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(6.dp))
-                Text("stage: $stage", color = p.t3, fontSize = 11.5.sp)
+                Text("stage: $stage", color = p.t3, fontSize = qqFontBody(11.5.sp))
                 Spacer(Modifier.height(2.dp))
-                Text(message, color = p.t2, fontSize = 12.5.sp)
-                Spacer(Modifier.height(4.dp))
+                Text(message, color = p.t2, fontSize = qqFontBody(12.5.sp))
+                Spacer(Modifier.height(QqSpace.xs()))
                 TextButton(onClick = onRetry, contentPadding = PaddingValues(0.dp)) {
-                    Text("重试", color = p.accent, fontSize = 13.sp)
+                    Text("重试", color = p.accent, fontSize = qqFontBody(13.sp))
                 }
             }
         }
@@ -614,13 +617,13 @@ private fun SkillRow(
                 Text(
                     entry.description,
                     color = p.t2,
-                    fontSize = 12.5.sp,
+                    fontSize = qqFontBody(12.5.sp),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(QqSpace.xs()))
         // 删除入口与开关并排：busy 时换成同尺寸转圈，行宽不跳。
         if (busy) {
             Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {

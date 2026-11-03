@@ -1,12 +1,10 @@
 package dev.dsh.mobile.app
 
 import android.app.Application
+import android.os.Build
 import dev.dsh.mobile.core.common.AppLog
 import dev.dsh.mobile.noderuntime.NodeRuntime
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import dev.dsh.mobile.core.model.RuntimeControl
-import dev.dsh.mobile.core.model.RuntimeState
+import dev.dsh.mobile.render.RichContentInstaller
 
 class DshApplication : Application() {
 
@@ -22,8 +20,12 @@ class DshApplication : Application() {
             AppLog.i("DshApplication skip, process=" + processName(this))
             return
         }
+        // 富内容渲染槽：:render 的实现注入 plugin-api，plugin-host 只持接口（T1.2 分层）。
+        // 必须在任何插件 UI 上屏之前装好，否则 markdown 会先画成纯文本再重组。
+        RichContentInstaller.install()
         container = AppContainer(this)
-        AppLog.i("DshApplication start, abi=${container.runtimeHost.abi}")
+        // abi 以前由已删除的进程内运行时宿主提供：直接用系统 ABI，只用于日志。
+        AppLog.i("DshApplication start, abi=" + (Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"))
         // Native UI must never wait on the runtime: kick the connection off in the background.
         container.connectActive()
         // 工具链（bash/jq/ffmpeg）在后台预装：冷启动不等它，幂等脚本已装齐就不联网。
@@ -65,23 +67,4 @@ class DshApplication : Application() {
                 .onFailure { AppLog.e("node self-test failed: ${it.message}", it) }
         }, "node-selftest").start()
     }
-}
-
-/** Adapts [EmbeddedRuntimeHost] to the UI-facing RuntimeControl interface. */
-class RuntimeControlAdapter(private val container: AppContainer) : RuntimeControl {
-    override val state: StateFlow<RuntimeState>
-        get() = container.transport.value?.state ?: container.runtimeHost.state
-
-    override fun versions(): List<String> =
-        container.runtimeHost.bundledVersions().ifEmpty { listOf("bundled") }
-
-    override fun hasBundled(version: String): Boolean = container.runtimeHost.hasBundledNode(version)
-
-    override fun storageBytes(): Long = container.runtimeHost.storageBytes()
-
-    override suspend fun clearLogs() {
-        container.runtimeHost.clearLogs()
-    }
-
-    override fun reconnect() = container.connectActive(force = true)
 }

@@ -10,20 +10,22 @@ android {
 
 dependencies {
     api(project(":core:model"))
+    // core:common 被 Components.kt:535/:685 以全限定名 dev.dsh.mobile.core.common.TimeFmt 使用，
+    // 不是 import 形式，grep "import dev.dsh.mobile.core.common" 会漏判。保持 api 以维持下游可见性。
     api(project(":core:common"))
 
-    val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
+    val composeBom = platform(libs.compose.bom)
     api(composeBom)
-    api("androidx.compose.ui:ui")
-    api("androidx.compose.ui:ui-graphics")
-    api("androidx.compose.foundation:foundation")
-    api("androidx.compose.material3:material3")
-    api("androidx.compose.material:material-icons-extended")
-    api("androidx.compose.ui:ui-tooling-preview")
-    debugApi("androidx.compose.ui:ui-tooling")
-    api("androidx.activity:activity-compose:1.9.3")
-    api("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    api("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    testImplementation("junit:junit:4.13.2")
+    api(libs.compose.ui)
+    api(libs.compose.graphics)
+    api(libs.compose.foundation)
+    api(libs.compose.material3)
+    api(libs.compose.icons)
+    api(libs.compose.preview)
+    debugApi(libs.compose.tooling)
+    api(libs.androidx.activity.compose)
+    api(libs.androidx.lifecycle.runtime.compose)
+    api(libs.androidx.lifecycle.viewmodel.compose)
+    api(libs.kotlinx.coroutines.android)
+    testImplementation(libs.junit)
 }

@@ -35,11 +35,14 @@ mobile-bridge-identity.json
 *.keystore
 *.jks
 app/keystore/*.jks
-# 签名材料进版本库：证书稳定，别处（含 CI）构建出的包才能覆盖升级已发布的包。
-# 工程不对外分发正式版，私钥放仓库只是为了让签名可复现，不构成额外风险。
+# 证书本身入库：证书稳定，别处（含 CI）构建出的包才能覆盖升级已发布的包。
+# 工程不对外分发正式版，私钥放仓库只是为了让签名可复现，不构成额外风险（见 docs/signing.md）。
 !app/keystore/dsh-debug.jks
 !app/keystore/app-release.jks
-!app/keystore.properties
+# 口令一律不入库（T1.7）：keystore.properties 只在本机存在，键名见 app/keystore.properties.example。
+# 新正式证书的 keystore 与口令都在仓库外（默认 %USERPROFILE%\.dsh\hfa-release\）。
+keystore.properties
+**/keystore.properties
 
 # ---------- 5. 日志 ----------
 *.log

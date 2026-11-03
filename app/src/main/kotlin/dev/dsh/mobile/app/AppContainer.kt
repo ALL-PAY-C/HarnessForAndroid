@@ -27,6 +27,7 @@ import dev.dsh.mobile.core.model.connectGate
 import dev.dsh.mobile.core.model.connectionKey
 import dev.dsh.mobile.core.model.shouldReconnect
 import dev.dsh.mobile.core.model.teardownConnection
+import dev.dsh.mobile.core.model.RuntimeControl
 import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.TransportKind
 import dev.dsh.mobile.core.model.AgentRuntimeState
@@ -55,8 +56,9 @@ import dev.dsh.mobile.pluginhost.PluginStore
 import dev.dsh.mobile.pluginhost.ExternalPluginStore
 import dev.dsh.mobile.app.notify.NotificationCenter
 import dev.dsh.mobile.app.notify.OngoingCenter
-import dev.dsh.mobile.runtimehost.EmbeddedRuntimeHost
 import dev.dsh.mobile.runtimehost.NodeEngine
+import dev.dsh.mobile.app.node.RuntimeControlAdapter
+import dev.dsh.mobile.runtimehost.NodeEngineHost
 import dev.dsh.mobile.app.node.RemoteNodeEngine
 import dev.dsh.mobile.linux.LinuxAbis
 import dev.dsh.mobile.linux.LinuxDownload
@@ -177,7 +179,25 @@ class AppContainer(private val context: Context) {
         }
     }
 
-    val runtimeHost: EmbeddedRuntimeHost by lazy { EmbeddedRuntimeHost(context, scope) }
+    /** 只给同进程的适配器（RuntimeControlAdapter）读 assets 与私有目录用。 */
+    val appContext: Context get() = context.applicationContext
+
+    /**
+     * APK 里有没有引擎包。assets/runtime/engine.zip 是构建期从 engine/ 生成的唯一投放物；
+     * 旧布局 assets/runtime/<version>/<abi>/node 已经不存在，这里就是「有没有内置引擎」的判据。
+     */
+    val engineBundled: Boolean by lazy {
+        runCatching {
+            context.assets.open(NodeEngineHost.ASSET_ZIP).close()
+            true
+        }.getOrDefault(false)
+    }
+
+    /**
+     * 设置页「运行时」面板的数据源（单例）：state 是 stateIn 出来的热流，
+     * 每次重组新建一份会白白多一条协程，所以这里只建一次。
+     */
+    val runtimeControl: RuntimeControl by lazy { RuntimeControlAdapter(this) }
 
     /**
      * Node 引擎（libnode + engine bundle）：真正跑在 `:node` 子进程里，这里只是 AIDL 代理。
@@ -637,7 +657,8 @@ class AppContainer(private val context: Context) {
             val key = connectionKey(
                 endpoint = active,
                 runtimeVersion = settingsValue.runtimeVersion,
-                bundledNode = runtimeHost.hasBundledNode(settingsValue.runtimeVersion),
+                // 引擎只有一个内置包，版本切换没有第二个包可切，只报「有没有」。
+                bundledNode = engineBundled,
                 workspaceCwd = cwd(),
             )
             // H6：相同端点/运行时配置且已 Ready 时，重进不应掐掉正在跑的一轮；
@@ -649,8 +670,12 @@ class AppContainer(private val context: Context) {
     }
 
     /**
-     * 默认永远是"手机本地运行"：进程内启动内置 Node 运行时。
+     * 默认永远是"手机本地运行"：进程内的 Kotlin 引擎（LocalEngineTransport），
+     * 需要 Node 的调用由 engine:// 端点转给 `:node` 子进程。
      * 只有在设置里显式切换到某个 loopback / remote endpoint 时才走网络。
+     *
+     * kind 仍是 InProcess：这个 transport 确实是进程内的，不是网络端点；语义与
+     * LocalEngineTransport 一致。旧的「内置 node 可执行文件」进程内通道已经删了。
      */
     fun defaultEndpoint(): Endpoint =
         Endpoint(id = "embedded", name = "本地运行时", kind = TransportKind.InProcess, cwd = cwd())
@@ -662,62 +687,54 @@ class AppContainer(private val context: Context) {
             start = {
                 _runtime.value = RuntimeState.Starting("准备运行时")
                 val t: DshTransport = when (endpoint.kind) {
-                    TransportKind.InProcess -> if (runtimeHost.hasBundledNode()) {
-                        AcpTransport(
-                            channelProvider = { runtimeHost.start(runtimeVersion, cwd()) },
-                            kind = TransportKind.InProcess,
-                            scope = scope,
-                            defaultCwd = { cwd() },
-                            personaProvider = { id -> db.sessionDao().byId(id)?.persona.orEmpty() },
-                        )
-                    } else {
-                        // 没内置 Node 时用纯 Kotlin 本地引擎：同一套 DshTransport，UI 无感。
-                        LocalEngineTransport(
-                            scope = scope,
-                            web = WebToolkit(
-                                workspace = File(context.filesDir, "workspace").apply {
-                                    check(isDirectory || mkdirs()) { "创建 Web 工作区失败：$absolutePath" }
-                                },
-                                settings = { settings.settings.first().toWebSettings(secretStore) },
-                            ),
-                            configProvider = { sessionId -> activeLlmConfig(sessionId) },
-                            groupProvider = { sessionId -> groupPlan(sessionId) },
-                            historyProvider = { id -> db.messageDao().bySession(id).map { it.toModel() } },
-                            shellExec = { cmd ->
-                                val r = shell.exec(cmd)
-                                // 失败必须抛出原因：以前直接返回 asToolOutput()（空串），
-                                // UI 就只剩一个「失败」+ 空的响应 JSON。
-                                if (!r.ok) throw IllegalStateException(r.asToolOutput().ifBlank { "退出码 ${r.code}" })
-                                r.asToolOutput()
+                    // 本地端点走纯 Kotlin 引擎（LocalEngineTransport）：同一套 DshTransport，UI 无感。
+                    // 需要 Node 的调用由 engineChat / engineRpc 转给 `:node` 子进程；旧的
+                    // 「assets/runtime/<version>/<abi>/node 解出可执行文件在进程内跑」分支已删。
+                    TransportKind.InProcess -> LocalEngineTransport(
+                        scope = scope,
+                        web = WebToolkit(
+                            workspace = File(context.filesDir, "workspace").apply {
+                                check(isDirectory || mkdirs()) { "创建 Web 工作区失败：$absolutePath" }
                             },
-                            toolHelp = { shell.describeForModel() + "\n\n" + phone.describeForModel() },
-                            phoneExec = { args ->
-                                val r = phone.exec(args.toString())
-                                if (!r.ok) throw IllegalStateException(r.error ?: "phone 工具失败")
-                                r.output
-                            },
-                            personaProvider = { id -> db.sessionDao().byId(id)?.persona.orEmpty() },
-                            autoApprove = { settings.settings.first().autoApproveTools },
-                            // 工具桥（原生文件/通道/后台任务）与单聊上下文预算，见 .mock/agent-env/task-app-shell 与 task-proto-wiring 报告。
-                            fsExec = fsExec,
-                            shellExecChannel = shellExecChannel,
-                            channelListExec = channelListExec,
-                            bgExec = bgExec,
-                            skillExec = skillExec,
-                            // 压缩预算 = 会话模型窗口 * 0.8，和顶栏百分比同一口径（以前取 groupContextBudget 字符数，
-                            // 24000 字符 /4 = 6000 tokens，跟顶栏 32k 完全两套，于是 /compact 永远回「不需要压缩」）。
-                            contextBudgetProvider = { sid -> ContextBudget.budgetChars(contextWindowFor(sid)) },
-                            contextWindowProvider = { sid -> contextWindowFor(sid) },
-                            // 引擎插件：baseUrl = engine://<模型 id> 时走 :node 的 /llm，不碰网络。
-                            // nodeEngine 是 lazy，这里只是传闭包，真正碰引擎发生在发消息那一刻。
-                            engineChat = { payload -> nodeEngine.rpc("/llm", "chat", payload) },
-                            engineRpc = { path, endpoint, payload -> nodeEngine.rpc(path, endpoint, payload) },
-                            // P0-1/P0-4/P0-6：摘要持久化、大输出落盘、会话投影，都走同一实例给到仓库与 UI。
-                            spill = toolOutputSpill,
-                            projections = projections,
-                            summaryStore = summaryStore,
-                        )
-                    }
+                            settings = { settings.settings.first().toWebSettings(secretStore) },
+                        ),
+                        configProvider = { sessionId -> activeLlmConfig(sessionId) },
+                        groupProvider = { sessionId -> groupPlan(sessionId) },
+                        historyProvider = { id -> db.messageDao().bySession(id).map { it.toModel() } },
+                        shellExec = { cmd ->
+                            val r = shell.exec(cmd)
+                            // 失败必须抛出原因：以前直接返回 asToolOutput()（空串），
+                            // UI 就只剩一个「失败」+ 空的响应 JSON。
+                            if (!r.ok) throw IllegalStateException(r.asToolOutput().ifBlank { "退出码 ${r.code}" })
+                            r.asToolOutput()
+                        },
+                        toolHelp = { shell.describeForModel() + "\n\n" + phone.describeForModel() },
+                        phoneExec = { args ->
+                            val r = phone.exec(args.toString())
+                            if (!r.ok) throw IllegalStateException(r.error ?: "phone 工具失败")
+                            r.output
+                        },
+                        personaProvider = { id -> db.sessionDao().byId(id)?.persona.orEmpty() },
+                        autoApprove = { settings.settings.first().autoApproveTools },
+                        // 工具桥（原生文件/通道/后台任务）与单聊上下文预算，见 .mock/agent-env/task-app-shell 与 task-proto-wiring 报告。
+                        fsExec = fsExec,
+                        shellExecChannel = shellExecChannel,
+                        channelListExec = channelListExec,
+                        bgExec = bgExec,
+                        skillExec = skillExec,
+                        // 压缩预算 = 会话模型窗口 * 0.8，和顶栏百分比同一口径（以前取 groupContextBudget 字符数，
+                        // 24000 字符 /4 = 6000 tokens，跟顶栏 32k 完全两套，于是 /compact 永远回「不需要压缩」）。
+                        contextBudgetProvider = { sid -> ContextBudget.budgetChars(contextWindowFor(sid)) },
+                        contextWindowProvider = { sid -> contextWindowFor(sid) },
+                        // 引擎插件：baseUrl = engine://<模型 id> 时走 :node 的 /llm，不碰网络。
+                        // nodeEngine 是 lazy，这里只是传闭包，真正碰引擎发生在发消息那一刻。
+                        engineChat = { payload -> nodeEngine.rpc("/llm", "chat", payload) },
+                        engineRpc = { path, endpoint, payload -> nodeEngine.rpc(path, endpoint, payload) },
+                        // P0-1/P0-4/P0-6：摘要持久化、大输出落盘、会话投影，都走同一实例给到仓库与 UI。
+                        spill = toolOutputSpill,
+                        projections = projections,
+                        summaryStore = summaryStore,
+                    )
                     TransportKind.Loopback -> AcpTransport(
                         channelProvider = {
                             WebSocketChannel(endpoint.url, endpoint.token, endpoint.heartbeatMs).also { it.open() }
@@ -812,7 +829,7 @@ class AppContainer(private val context: Context) {
         // fire-and-forget 会让迟到的 stop() 关掉刚 start 的 current。
         teardownConnection(
             disconnectTransport = { runCatching { old.disconnect() } },
-            stopRuntime = { runCatching { runtimeHost.stop() } },
+            stopRuntime = { runCatching { nodeEngine.stop() } },
         )
     }
 

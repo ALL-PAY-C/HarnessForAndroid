@@ -56,6 +56,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.dsh.mobile.design.IconBtn
 import dev.dsh.mobile.design.LocalQq
+import dev.dsh.mobile.design.QqShape
+import dev.dsh.mobile.design.QqSpace
 import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.SlotEditFrame
 import dev.dsh.mobile.design.SlotEditItem
@@ -63,6 +65,7 @@ import dev.dsh.mobile.design.SlotEditState
 import dev.dsh.mobile.design.SlotPickerDialog
 import dev.dsh.mobile.design.SlotPlusButton
 import dev.dsh.mobile.design.SlotStrip
+import dev.dsh.mobile.design.qqFontBody
 import dev.dsh.mobile.pluginapi.SlotAction
 import dev.dsh.mobile.pluginapi.SlotContribution
 import dev.dsh.mobile.pluginhost.PluginSlotItem
@@ -139,12 +142,12 @@ fun ChatSettingsScreen(
                 Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
-                    .padding(bottom = 12.dp),
+                    .padding(bottom = QqSpace.m()),
             ) {
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                        .padding(horizontal = QqSpace.m(), vertical = 10.dp)
                         .clip(RoundedCornerShape(14.dp))
                         .background(p.card),
                 ) {
@@ -173,22 +176,22 @@ fun ChatSettingsScreen(
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
+                        .padding(horizontal = QqSpace.m())
                         .clip(RoundedCornerShape(14.dp))
                         .background(p.card)
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                        .padding(horizontal = 14.dp, vertical = QqSpace.m()),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("特殊格式渲染", color = p.t1, fontSize = 14.sp)
+                            Text("特殊格式渲染", color = p.t1, fontSize = qqFontBody(14.sp))
                             Text(
                                 "HTML / LaTeX / Markdown / 代码块",
                                 color = p.t3,
-                                fontSize = 11.5.sp,
+                                fontSize = qqFontBody(11.5.sp),
                                 modifier = Modifier.padding(top = 2.dp),
                             )
                         }
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(QqSpace.s()))
                         Switch(checked = state.renderSpecial, onCheckedChange = viewModel::setRenderSpecial)
                     }
                     // 破甲注入：与上面同卡片同排版，点一下走既有的 SetPersona（有则清、无则写）。
@@ -198,15 +201,15 @@ fun ChatSettingsScreen(
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
-                                Text(personaLabelOf(slot.label), color = p.t1, fontSize = 14.sp)
+                                Text(personaLabelOf(slot.label), color = p.t1, fontSize = qqFontBody(14.sp))
                                 Text(
                                     if (personaOn) "已开启，下一条消息起生效" else "关闭状态，点一下写入本会话人设",
                                     color = p.t3,
-                                    fontSize = 11.5.sp,
+                                    fontSize = qqFontBody(11.5.sp),
                                     modifier = Modifier.padding(top = 2.dp),
                                 )
                             }
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(QqSpace.s()))
                             Switch(checked = personaOn, onCheckedChange = { onSlot(slot) })
                         }
                     }
@@ -218,10 +221,10 @@ fun ChatSettingsScreen(
                     Column(
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .padding(horizontal = QqSpace.m(), vertical = 6.dp)
                             .clip(RoundedCornerShape(14.dp))
                             .background(p.card)
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                            .padding(horizontal = QqSpace.m(), vertical = 10.dp),
                     ) {
                         SlotStrip(horizontal = false, modifier = Modifier.fillMaxWidth()) {
                             // setpersona 已经在上面渲染成开关，这里跳过它，避免同一条贡献出现两次。
@@ -252,7 +255,7 @@ fun ChatSettingsScreen(
                     Column(
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .padding(horizontal = QqSpace.m(), vertical = 6.dp)
                             .clip(RoundedCornerShape(14.dp))
                             .background(p.card),
                     ) {
@@ -263,7 +266,7 @@ fun ChatSettingsScreen(
 
             // 三等分：每格 weight(1f)，靠 spacedBy 留缝，按钮之间不会重叠。
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                Modifier.fillMaxWidth().padding(horizontal = QqSpace.m(), vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -386,13 +389,13 @@ private fun SettingRow(
     ) {
         Icon(icon, null, tint = p.t2, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(10.dp))
-        Text(label, color = p.t1, fontSize = 14.sp)
+        Text(label, color = p.t1, fontSize = qqFontBody(14.sp))
         Spacer(Modifier.weight(1f))
         if (value.isNotBlank()) {
             Text(
                 value,
                 color = p.t3,
-                fontSize = 13.sp,
+                fontSize = qqFontBody(13.sp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.widthIn(max = 170.dp),
@@ -433,10 +436,10 @@ private fun RowScope.BottomAction(
     Box(
         Modifier
             .weight(1f)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(QqShape.field())
             .background(if (danger) p.red.copy(alpha = 0.12f) else p.card)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 12.dp),
+            .padding(vertical = QqSpace.m()),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -446,7 +449,7 @@ private fun RowScope.BottomAction(
                 enabled -> p.t1
                 else -> p.t3
             },
-            fontSize = 14.sp,
+            fontSize = qqFontBody(14.sp),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -471,16 +474,16 @@ private fun AgentPresetDialog(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(18.dp))
                 .background(p.card)
-                .padding(16.dp),
+                .padding(QqSpace.l()),
         ) {
             Text("Agent 预设", color = p.t1, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(QqSpace.xs()))
             Text(
                 "选中的预设从下一轮请求开始生效",
                 color = p.t3,
-                fontSize = 11.5.sp,
+                fontSize = qqFontBody(11.5.sp),
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(QqSpace.m()))
 
             Column(
                 Modifier
@@ -492,17 +495,17 @@ private fun AgentPresetDialog(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(11.dp))
+                            .clip(QqShape.chip())
                             .clickable { onPick(preset.id) }
                             .background(if (selected) p.accent.copy(alpha = 0.08f) else p.card)
-                            .padding(horizontal = 8.dp, vertical = 9.dp),
+                            .padding(horizontal = QqSpace.s(), vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(
                                 preset.name,
                                 color = p.t1,
-                                fontSize = 14.sp,
+                                fontSize = qqFontBody(14.sp),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -512,7 +515,7 @@ private fun AgentPresetDialog(
                                 Text(
                                     summary,
                                     color = p.t3,
-                                    fontSize = 11.5.sp,
+                                    fontSize = qqFontBody(11.5.sp),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.padding(top = 2.dp),
@@ -520,7 +523,7 @@ private fun AgentPresetDialog(
                             }
                         }
                         if (selected) {
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(QqSpace.s()))
                             Icon(
                                 Icons.Filled.Check,
                                 "当前预设",
@@ -533,8 +536,8 @@ private fun AgentPresetDialog(
             }
 
             state.error?.let { message ->
-                Spacer(Modifier.height(8.dp))
-                Text(message, color = p.red, fontSize = 11.5.sp)
+                Spacer(Modifier.height(QqSpace.s()))
+                Text(message, color = p.red, fontSize = qqFontBody(11.5.sp))
             }
 
             Spacer(Modifier.height(10.dp))
@@ -542,9 +545,9 @@ private fun AgentPresetDialog(
                 Text(
                     "管理成员",
                     color = p.accent,
-                    fontSize = 13.sp,
+                    fontSize = qqFontBody(13.sp),
                     modifier = Modifier
-                        .clip(RoundedCornerShape(9.dp))
+                        .clip(QqShape.chip())
                         .clickable(onClick = onManageMembers)
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                 )
@@ -552,9 +555,9 @@ private fun AgentPresetDialog(
                 Text(
                     "关闭",
                     color = p.t3,
-                    fontSize = 13.sp,
+                    fontSize = qqFontBody(13.sp),
                     modifier = Modifier
-                        .clip(RoundedCornerShape(9.dp))
+                        .clip(QqShape.chip())
                         .clickable(onClick = onDismiss)
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                 )

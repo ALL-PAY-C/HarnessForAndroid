@@ -148,41 +148,78 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-// 正式签名参数来自 app/keystore.properties（不进版本库）。文件缺失时（干净的 CI、
-// 别人的机器）退回下面仓库内的 debug keystore，release 仍能构建；口令绝不硬编码。
-val releaseKeystoreProps = Properties().apply {
-    val f: File = file("keystore.properties")
+// ---------- 签名身份（T1.7）----------
+// 两套证书：
+//   legacy  = app/keystore/app-release.jks（旧正式证书，入库）：已装旧包的设备只认这张证书。
+//   release = 仓库外 %USERPROFILE%\.dsh\hfa-release\app-release.jks（新正式证书，口令只在仓库外）。
+// 口令来源，按优先级：签名属性文件（默认仓库外 ~/.dsh/hfa-release/signing.properties，
+// -PdshSigningProps=<file> 可改）→ 仓库内的本机遗留 app/keystore.properties（已不入库）→
+// 环境变量。三处都没有对应口令时视为该证书不可用，逐级降级到 debug 证书，构建不中断。
+val signingPropsFile: File = providers.gradleProperty("dshSigningProps").orNull
+    ?.let { file(it) }
+    ?: File(System.getProperty("user.home"), ".dsh/hfa-release/signing.properties")
+val signingProps = Properties().apply {
+    if (signingPropsFile.isFile) signingPropsFile.inputStream().use { load(it) }
+}
+val localKeystoreProps = Properties().apply {
+    val f = file("keystore.properties")
     if (f.isFile) f.inputStream().use { load(it) }
 }
-val hasReleaseKeystore = releaseKeystoreProps.getProperty("storeFile")
-    ?.let { file(it).isFile } == true
+fun signingProp(key: String, env: String): String? =
+    signingProps.getProperty(key) ?: localKeystoreProps.getProperty(key) ?: System.getenv(env)
 
-// 版本单一来源：defaultConfig 与 APK 文件名都读这里，改一处即可。
-val appVersionName = "v0.08"
-val appVersionCode = 102
+// .properties 里 \ 是转义符：D:\x\y.jks 会被读成 D:xy.jks，所以路径一律先换成 / 再解析。
+fun keystoreFile(raw: String): File = file(raw.replace('\\', '/'))
+
+// -PdshSigning=legacy|release，默认 legacy：不带参数构建的包与已安装旧包同证书，能直接覆盖升级。
+val signingMode: String = (providers.gradleProperty("dshSigning").orNull ?: "legacy").lowercase()
+check(signingMode == "legacy" || signingMode == "release") {
+    "-PdshSigning 只接受 legacy 或 release，收到：$signingMode"
+}
+
+// 旧证书：口令缺任一项即视为不可用（仓库里只有 .jks，没有口令）。
+val repoLegacyKeystore: File = file("keystore/app-release.jks")
+val legacyKeystore: File = signingProp("legacy.storeFile", "DSH_SIGNING_LEGACY_STOREFILE")
+    ?.let { keystoreFile(it) } ?: repoLegacyKeystore
+val legacyKeyAlias: String = signingProp("legacy.keyAlias", "DSH_SIGNING_LEGACY_KEYALIAS") ?: "dsh-release"
+val legacyStorePass: String? = signingProp("legacy.storePassword", "DSH_SIGNING_LEGACY_STOREPASS")
+val legacyKeyPass: String? = signingProp("legacy.keyPassword", "DSH_SIGNING_LEGACY_KEYPASS")
+val hasLegacySigning = legacyKeystore.isFile && legacyStorePass != null && legacyKeyPass != null
+
+// 新证书：默认仓库外路径，-PdshReleaseStoreFile / 签名属性文件可覆盖。
+val releaseKeystore: File = providers.gradleProperty("dshReleaseStoreFile").orNull
+    ?.let { keystoreFile(it) }
+    ?: signingProp("release.storeFile", "DSH_SIGNING_RELEASE_STOREFILE")?.let { keystoreFile(it) }
+    ?: File(System.getProperty("user.home"), ".dsh/hfa-release/app-release.jks")
+val releaseKeyAlias: String = signingProp("release.keyAlias", "DSH_SIGNING_RELEASE_KEYALIAS") ?: "dsh-release"
+val releaseStorePass: String? = signingProp("release.storePassword", "DSH_SIGNING_RELEASE_STOREPASS")
+val releaseKeyPass: String? = signingProp("release.keyPassword", "DSH_SIGNING_RELEASE_KEYPASS")
+val hasReleaseSigning = releaseKeystore.isFile && releaseStorePass != null && releaseKeyPass != null
+
+// 版本单一来源：gradle.properties 的 dshAppVersionName / dshAppVersionCode。
+// defaultConfig、APK 文件名与 :plugin-html-apk（插件包）都读这一对值，仓库里只有一处可改。
+val appVersionName: String = providers.gradleProperty("dshAppVersionName").get()
+val appVersionCode: Int = providers.gradleProperty("dshAppVersionCode").get().toInt()
 // 文件名只取版本号本身（"v0.01" 无空格，取到的就是 "v0.01"），中文与空格不进文件名。
 val apkVersionTag = appVersionName.substringBefore(' ')
 
+// 换证书的坑只在「同 applicationId 下已装旧包」时才咬人，构建期就把话说清楚，
+// 别等到装机那一刻才看见 INSTALL_FAILED_UPDATE_INCOMPATIBLE（见 docs/signing.md）。
+if (signingMode == "release" && repoLegacyKeystore.isFile) {
+    logger.warn("WARNING: -PdshSigning=release 换用了新正式证书，而仓库里仍有旧证书 $repoLegacyKeystore。")
+    logger.warn("WARNING: 已装旧包的设备（同 applicationId=dev.dsh.mobile，versionCode=$appVersionCode）")
+    logger.warn("WARNING: 升级时会报 INSTALL_FAILED_UPDATE_INCOMPATIBLE —— 必须卸载旧包或改用新的 applicationId。")
+}
+
 android {
     namespace = "dev.dsh.mobile.app"
-    compileSdk = 35
 
+    // compileSdk / minSdk / targetSdk 由根 build.gradle.kts 的 subprojects 块统一给（含本模块）。
     defaultConfig {
         applicationId = "dev.dsh.mobile"
-        minSdk = 26
-        targetSdk = 35
         versionCode = appVersionCode
         versionName = appVersionName
         vectorDrawables { useSupportLibrary = true }
-    }
-
-    // 内置网关的二进制以 jniLibs/libgateway.so 形式随包：exec 只能发生在 nativeLibraryDir，
-    // 而 useLegacyPackaging=false 时 AGP 默认不把它解压到磁盘。开老式打包让 PackageManager
-    // 安装时解压出可执行的 libgateway.so（Android 10+ 禁止 exec filesDir 里的文件）。
-    packaging {
-        jniLibs {
-            useLegacyPackaging = true
-        }
     }
 
     signingConfigs {
@@ -200,12 +237,25 @@ android {
             enableV2Signing = true
             enableV3Signing = true
         }
-        if (hasReleaseKeystore) {
-            create("releaseSelf") {
-                storeFile = file(releaseKeystoreProps.getProperty("storeFile"))
-                storePassword = releaseKeystoreProps.getProperty("storePassword")
-                keyAlias = releaseKeystoreProps.getProperty("keyAlias")
-                keyPassword = releaseKeystoreProps.getProperty("keyPassword")
+        // 旧正式证书：只为了让已安装旧包的设备能覆盖升级，口令来自仓库外（或环境变量）。
+        if (hasLegacySigning) {
+            create("legacy") {
+                storeFile = legacyKeystore
+                storePassword = legacyStorePass
+                keyAlias = legacyKeyAlias
+                keyPassword = legacyKeyPass
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
+        // 新正式证书：keystore 与口令都在仓库外，任何被跟踪文件里都没有口令。
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = releaseStorePass
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPass
                 enableV1Signing = true
                 enableV2Signing = true
                 enableV3Signing = true
@@ -213,31 +263,26 @@ android {
         }
     }
 
-    // debug 与 release 走同一张证书：证书一致才能相互覆盖升级。两者 applicationId
-    // 不同（.debug 后缀），所以是两个独立包，各自升级、互不覆盖，这也是 Android 常规做法。
-    val sharedSigning = if (hasReleaseKeystore) {
-        signingConfigs.getByName("releaseSelf")
-    } else {
-        signingConfigs.getByName("local")
-    }
+    // 缺证书时逐级降级：release（新）→ legacy（旧）→ local（debug），干净 CI / 别人的机器也能出包。
+    val debugSigning = signingConfigs.getByName("local")
+    val legacySigning = signingConfigs.findByName("legacy") ?: debugSigning
+    val releaseSigning = signingConfigs.findByName("release") ?: legacySigning
+    // 一个开关决定本模块所有 buildType 的签名身份：debug 与 release 必须同证书，
+    // 才能相互覆盖升级（两者 applicationId 不同，是各自独立的两个包）。
+    val activeSigning = if (signingMode == "release") releaseSigning else legacySigning
 
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
             isMinifyEnabled = false
-            signingConfig = sharedSigning
+            signingConfig = activeSigning
         }
         release {
             isMinifyEnabled = false
             isShrinkResources = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = sharedSigning
+            signingConfig = activeSigning
         }
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
 
     buildFeatures {
@@ -247,21 +292,17 @@ android {
         aidl = true
     }
 
-    sourceSets {
-        // 内置 HTML 渲染插件：plugin-html 仍是可独立发布的 APK 模块（com.android.application，
-        // 改成 library 会毁掉它的发布产物），所以这里把它的 Kotlin 源码与 Java 资源
-        // （render.js，RenderScript 按 classpath "/render.js" 读取）直接纳进 app 的编译单元。
-        // 运行时由 AppContainer 当内置插件注册，见 pluginHost。
-        getByName("main") {
-            kotlin.srcDir("../plugin-html/src/main/kotlin")
-            // 资源必须进 resources 而不是 java：Java 源集只认 .kt/.java，把 resources
-            // 目录挂到 java 上等于丢包（曾经的 render.js 与 diagram/*.js 就是这么丢的）。
-            resources.srcDir("../plugin-html/src/main/resources")
-        }
-    }
+    // T1.2：不再用 sourceSets 跨模块挂 plugin-html 的源码（同一份 Kotlin 编两次、
+    // 版本双源）。plugin-html 现在是普通 com.android.library，走 project 依赖进本模块
+    // （下面的 implementation(project(":plugin-html"))）；它的 src/main/resources
+    // （render.js / diagram/*.js）随 aar 进 APK 的 Java 资源，RenderScript 的
+    // Class.getResourceAsStream("/render.js") 路径不变。要独立发布的插件 APK 由
+    // :plugin-html-apk 这个外壳模块产出。
+    // 本文件唯一的 packaging 块（原本两个：一个只写 jniLibs、一个只写 resources，现合为一处）。
     packaging {
         resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/DEPENDENCIES")
         // 部分原生件是可执行文件而不是共享库：必须解压到 nativeLibraryDir（files/ 是 noexec）。
+        // 内置网关的 libgateway.so 靠这个开关随安装解压出来（Android 10+ 禁止 exec filesDir）。
         jniLibs.useLegacyPackaging = true
     }
 }
@@ -324,28 +365,31 @@ dependencies {
     implementation(project(":node-runtime"))
     implementation(project(":toolbridge"))
     implementation(project(":linux-runtime"))
-    testImplementation("junit:junit:4.13.2")
     implementation(project(":plugin-api"))
     implementation(project(":plugin-host"))
+    // 内置 HTML 渲染插件：HtmlPlugin 类来自这个 library，运行时由 AppContainer 当内置插件注册。
+    implementation(project(":plugin-html"))
     implementation(project(":feature:sessions"))
     implementation(project(":feature:chat"))
     implementation(project(":feature:agents"))
     implementation(project(":feature:settings"))
     implementation(project(":feature:plugins"))
 
-    val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
+    val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.activity:activity-compose:1.9.3")
-    implementation("androidx.navigation:navigation-compose:2.8.5")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-service:2.8.7")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation(libs.compose.ui)
+    implementation(libs.compose.graphics)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.icons)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.service)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
 
-    debugImplementation("androidx.compose.ui:ui-tooling")
+    testImplementation(libs.junit)
+
+    debugImplementation(libs.compose.tooling)
 }

@@ -9,13 +9,16 @@ android {
 }
 
 dependencies {
-    api(project(":design"))
-    api(project(":core:data"))
-    api(project(":plugin-api"))
-    api(project(":plugin-host"))
+    implementation(project(":design"))
+    implementation(project(":core:data"))
+    implementation(project(":core:model"))
+    implementation(project(":plugin-api"))
+    implementation(project(":plugin-host"))
+    // 解包统一走 core:common 的 ZipExtract（不再各模块自带 zip-slip 守卫）。
+    implementation(project(":core:common"))
     implementation(project(":runtime-host"))
-    implementation("androidx.navigation:navigation-compose:2.8.5")
-    testImplementation("junit:junit:4.13.2")
+    implementation(libs.androidx.navigation.compose)
+    testImplementation(libs.junit)
     // 桌面 JVM 上 org.json 只有桩实现，单测里换成真实现（与 plugin-host 同做法）。
-    testImplementation("org.json:json:20240303")
+    testImplementation(libs.org.json)
 }

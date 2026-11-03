@@ -1,5 +1,6 @@
 package dev.dsh.mobile.pluginhost
 
+import dev.dsh.mobile.core.common.archive.ZipExtract
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -7,7 +8,6 @@ import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
-import java.util.zip.ZipInputStream
 
 /**
  * 包注册表：安装器只依赖这一条窄缝。
@@ -86,7 +86,13 @@ internal data class StagedPackage(
 private val SAFE_SEGMENT = Regex("[A-Za-z0-9][A-Za-z0-9._-]*")
 private val RESERVED_NAME = Regex("(?i)con|prn|aux|nul|com[1-9]|lpt[1-9]")
 private val VERSION_SHAPE = Regex("[A-Za-z0-9][A-Za-z0-9._+-]*")
-private val DRIVE_LETTER = Regex("^[A-Za-z]:")
+
+/** 插件包解包上限：第三方的包，条目数按带 node_modules 的大包放宽，体积只防 zip 炸弹。 */
+private val ZIP_LIMITS = ZipExtract.Options(
+    maxEntries = 50_000,
+    maxEntryBytes = 128L * 1024 * 1024,
+    maxTotalBytes = 1024L * 1024 * 1024,
+)
 
 internal fun isSimpleSegment(raw: String): Boolean =
     raw.isNotBlank() && raw.length <= 128 && SAFE_SEGMENT.matches(raw) && !raw.contains("..") && !raw.endsWith(".")
@@ -659,42 +665,28 @@ class PluginPackageService(
     }
 
     private fun unpackZip(input: InputStream, target: File) {
-        val rootPath = target.canonicalPath
-        ZipInputStream(input.buffered()).use { zip ->
-            var entry = zip.nextEntry
-            while (entry != null) {
-                val name = entry.name
-                if (!entry.isDirectory) {
-                    // zip-slip / 盘符 / 绝对路径：写盘之前就拒绝。
-                    if (name.startsWith("/") || name.startsWith("\\") || DRIVE_LETTER.containsMatchIn(name)) {
-                        error("包内路径非法：" + name)
-                    }
-                    if (name.split('/', '\\').any { it == ".." }) error("包内路径越界：" + name)
-                    val out = File(target, name).canonicalFile
-                    require(out.path == rootPath || out.path.startsWith(rootPath + File.separator)) {
-                        "包内路径越界：" + name
-                    }
-                    out.parentFile?.mkdirs()
-                    out.outputStream().use { zip.copyTo(it) }
-                }
-                zip.closeEntry()
-                entry = zip.nextEntry
-            }
+        try {
+            ZipExtract.extract(input, target, ZIP_LIMITS)
+        } catch (e: ZipExtract.ZipExtractException) {
+            error(
+                when (e) {
+                    is ZipExtract.ZipExtractException.IllegalEntry -> "包内路径非法：" + e.entry
+                    is ZipExtract.ZipExtractException.TooManyEntries -> "包内条目太多（上限 ${e.limit} 个）"
+                    is ZipExtract.ZipExtractException.EntryTooLarge -> "包内单个文件太大：" + e.entry
+                    is ZipExtract.ZipExtractException.TotalTooLarge -> "包解压后总大小超过 ${e.limit / 1024 / 1024} MB"
+                    is ZipExtract.ZipExtractException.Corrupt -> "包解不开：" + e.message
+                },
+            )
         }
     }
 
-    /** 落盘后复查：任何一项 canonical 路径跑出 staging 就整包拒绝。 */
+    /** 落盘后复查：任何一项路径跑出 staging（或指向盘符/上级目录）就整包拒绝。 */
     private fun verifyTree(dir: File) {
-        val rootPath = dir.canonicalPath
         dir.walkTopDown().forEach { file ->
             val rel = file.relativeTo(dir).path
             if (rel.isEmpty()) return@forEach
-            if (rel.split(File.separatorChar).any { it == ".." }) error("包内路径越界：" + rel)
-            if (DRIVE_LETTER.containsMatchIn(rel)) error("包内路径含盘符：" + rel)
-            val canon = file.canonicalPath
-            require(canon == rootPath || canon.startsWith(rootPath + File.separator)) {
-                "包内路径越界：" + rel
-            }
+            if (ZipExtract.cleanName(rel) == null) error("包内路径越界：" + rel)
+            require(ZipExtract.isInside(dir, file)) { "包内路径越界：" + rel }
         }
     }
 

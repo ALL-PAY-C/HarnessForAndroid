@@ -18,16 +18,19 @@ android {
 
 dependencies {
     api(project(":plugin-api"))
-    // markdown 富内容节点复用宿主的块级渲染器。:render 只依赖 plugin-api/design/core，
-    // 不反向依赖 plugin-host，所以不成环。
-    implementation(project(":render"))
+    // 解包统一走 core:common 的 ZipExtract（不再各模块自带 zip-slip 守卫）。
+    implementation(project(":core:common"))
+    // 富内容（markdown / html）走 plugin-api 的 RichContentRenderers 槽位：宿主只持接口，
+    // 实现由 :render 在 app 启动时注入。宿主编译期不再依赖任何 UI 渲染层（T1.2）。
+    // PluginUiNode 的公共签名里出现 core.model 的枚举/数据类，显式声明，不靠上游泄漏。
+    implementation(project(":core:model"))
     // Node 插件（node:/@deepseek-ai/ 依赖）走 NodeEngineHost：plugin-host 只依赖它的
     // NodeEngine / NodeEngineException / LineProtocol 类型，不反向依赖 runtime-host 的 libnode。
     implementation(project(":runtime-host"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation(libs.kotlinx.coroutines.android)
     // Rhino：纯 JVM 的 ES 引擎，无 native 依赖，Android API 26 上可直接跑装有 JS 入口的插件包。
-    implementation("org.mozilla:rhino:1.7.15")
-    testImplementation("junit:junit:4.13.2")
+    implementation(libs.rhino)
+    testImplementation(libs.junit)
     // JVM 单测里 android.jar 的 org.json 是桩，用真实现替换才能验证 JSON 往返。
-    testImplementation("org.json:json:20240303")
+    testImplementation(libs.org.json)
 }

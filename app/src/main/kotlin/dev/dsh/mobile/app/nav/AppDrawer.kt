@@ -64,12 +64,15 @@ import dev.dsh.mobile.design.AppIconBadge
 import dev.dsh.mobile.design.EmptyState
 import dev.dsh.mobile.design.IconBtn
 import dev.dsh.mobile.design.LocalQq
+import dev.dsh.mobile.design.QqShape
+import dev.dsh.mobile.design.QqSpace
 import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.SlotEditItem
 import dev.dsh.mobile.design.SlotEditState
 import dev.dsh.mobile.design.SlotPickerDialog
 import dev.dsh.mobile.design.SlotRemoveBadge
 import dev.dsh.mobile.design.UiEditSlotPlusRow
+import dev.dsh.mobile.design.qqFontBody
 import dev.dsh.mobile.pluginapi.DrawerEntry
 import dev.dsh.mobile.pluginapi.SlotContribution
 import java.text.SimpleDateFormat
@@ -132,11 +135,11 @@ private fun DrawerHeader(runtime: RuntimeState) {
             .fillMaxWidth()
             .background(Brush.linearGradient(listOf(p.accent2, p.accent)))
             .statusBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp),
+            .padding(start = QqSpace.l(), end = QqSpace.l(), top = 14.dp, bottom = 14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AppIconBadge(56.dp)
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(QqSpace.m()))
             Column {
                 Text("DSH Mobile", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 Text(
@@ -148,7 +151,7 @@ private fun DrawerHeader(runtime: RuntimeState) {
                         RuntimeState.NotConfigured -> "未配置运行时"
                     },
                     color = Color.White.copy(alpha = 0.82f),
-                    fontSize = 12.sp,
+                    fontSize = qqFontBody(12.sp),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -164,7 +167,7 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onClear:
         value = query,
         onValueChange = onQueryChange,
         singleLine = true,
-        placeholder = { Text("搜索会话 / 聊天记录", color = p.t3, fontSize = 13.5.sp) },
+        placeholder = { Text("搜索会话 / 聊天记录", color = p.t3, fontSize = qqFontBody(13.5.sp)) },
         leadingIcon = { Icon(Icons.Filled.Search, null, tint = p.t3, modifier = Modifier.size(18.dp)) },
         trailingIcon = {
             if (query.isNotEmpty()) {
@@ -173,7 +176,7 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onClear:
                 }
             }
         },
-        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, color = p.t1),
+        textStyle = androidx.compose.ui.text.TextStyle(fontSize = qqFontBody(14.sp), color = p.t1),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = p.accent,
             unfocusedBorderColor = p.line,
@@ -181,7 +184,7 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onClear:
             unfocusedContainerColor = p.bg,
             cursorColor = p.accent,
         ),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = QqSpace.m(), vertical = 10.dp),
     )
 }
 
@@ -201,7 +204,7 @@ private fun BrowsePane(
     val p = LocalQq.current
     var pickingSlot by remember { mutableStateOf(false) }
     Box(modifier.fillMaxWidth()) {
-    LazyColumn(Modifier.fillMaxSize().padding(vertical = 4.dp)) {
+    LazyColumn(Modifier.fillMaxSize().padding(vertical = QqSpace.xs())) {
         item { SectionLabel("常用") }
         // 编辑态：分组标题下方给一个「+」，点开复用本页已有的挑组件弹窗（加到抽屉）。
         if (SlotEditState.plusVisible(SlotEditState.Slot.DrawerGroup)) {
@@ -235,7 +238,7 @@ private fun BrowsePane(
         item { DrawerItem(Icons.Filled.Extension, "插件", onPlugins) }
         item {
             Box(
-                Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                Modifier.padding(horizontal = 14.dp, vertical = QqSpace.s())
                     .fillMaxWidth().height(1.dp).background(p.line),
             )
         }
@@ -248,7 +251,7 @@ private fun BrowsePane(
                 ) {
                     Icon(Icons.Filled.ChatBubble, null, tint = p.t3, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(10.dp))
-                    Text("还没有会话", color = p.t3, fontSize = 12.5.sp)
+                    Text("还没有会话", color = p.t3, fontSize = qqFontBody(12.5.sp))
                 }
             }
         }
@@ -279,14 +282,14 @@ private fun SearchPane(
     val p = LocalQq.current
     when {
         search.searching -> Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Text("搜索中…", color = p.t3, fontSize = 13.sp)
+            Text("搜索中…", color = p.t3, fontSize = qqFontBody(13.sp))
         }
 
         search.noResult -> Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             EmptyState("没有找到相关内容", "换个关键词：会话标题或消息正文")
         }
 
-        else -> LazyColumn(modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        else -> LazyColumn(modifier.fillMaxWidth().padding(vertical = QqSpace.xs())) {
             if (search.sessions.isNotEmpty()) {
                 item { SectionLabel("会话") }
                 items(search.sessions) { row ->
@@ -310,9 +313,9 @@ private fun SectionLabel(text: String) {
     Text(
         text,
         color = p.t3,
-        fontSize = 11.sp,
+        fontSize = qqFontBody(11.sp),
         fontWeight = FontWeight.Medium,
-        modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 4.dp),
+        modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = QqSpace.xs()),
     )
 }
 
@@ -322,10 +325,10 @@ private fun RecentSessionRow(session: Session, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .padding(horizontal = QqSpace.s())
+            .clip(QqShape.field())
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 9.dp),
+            .padding(horizontal = QqSpace.m(), vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -333,7 +336,7 @@ private fun RecentSessionRow(session: Session, onClick: () -> Unit) {
                 Text(
                     session.title.ifBlank { "未命名会话" },
                     color = p.t1,
-                    fontSize = 14.sp,
+                    fontSize = qqFontBody(14.sp),
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -341,19 +344,19 @@ private fun RecentSessionRow(session: Session, onClick: () -> Unit) {
                 )
                 if (session.pinned) {
                     Spacer(Modifier.width(6.dp))
-                    Text("置顶", color = p.accent, fontSize = 10.sp)
+                    Text("置顶", color = p.accent, fontSize = qqFontBody(10.sp))
                 }
             }
             Text(
                 session.preview.ifBlank { "还没有消息" },
                 color = p.t2,
-                fontSize = 12.sp,
+                fontSize = qqFontBody(12.sp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Spacer(Modifier.width(8.dp))
-        Text(relativeTime(session.updatedAt), color = p.t3, fontSize = 11.sp)
+        Spacer(Modifier.width(QqSpace.s()))
+        Text(relativeTime(session.updatedAt), color = p.t3, fontSize = qqFontBody(11.sp))
     }
 }
 
@@ -363,17 +366,17 @@ private fun SessionHitRow(row: SessionEntity, query: String, onClick: () -> Unit
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .padding(horizontal = QqSpace.s())
+            .clip(QqShape.field())
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 9.dp),
+            .padding(horizontal = QqSpace.m(), vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 highlight(row.title.ifBlank { "未命名会话" }, query, p.accent),
                 color = p.t1,
-                fontSize = 14.sp,
+                fontSize = qqFontBody(14.sp),
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -382,14 +385,14 @@ private fun SessionHitRow(row: SessionEntity, query: String, onClick: () -> Unit
                 Text(
                     row.preview,
                     color = p.t2,
-                    fontSize = 12.sp,
+                    fontSize = qqFontBody(12.sp),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
-        Spacer(Modifier.width(8.dp))
-        Text(relativeTime(row.updatedAt), color = p.t3, fontSize = 11.sp)
+        Spacer(Modifier.width(QqSpace.s()))
+        Text(relativeTime(row.updatedAt), color = p.t3, fontSize = qqFontBody(11.sp))
     }
 }
 
@@ -399,10 +402,10 @@ private fun MessageHitRow(hit: ChatSearchHit, query: String, onClick: () -> Unit
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .padding(horizontal = QqSpace.s())
+            .clip(QqShape.field())
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 9.dp),
+            .padding(horizontal = QqSpace.m(), vertical = 9.dp),
         verticalAlignment = Alignment.Top,
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -410,7 +413,7 @@ private fun MessageHitRow(hit: ChatSearchHit, query: String, onClick: () -> Unit
                 Text(
                     hit.sessionTitle.ifBlank { "未命名会话" },
                     color = p.t1,
-                    fontSize = 13.sp,
+                    fontSize = qqFontBody(13.sp),
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -420,23 +423,23 @@ private fun MessageHitRow(hit: ChatSearchHit, query: String, onClick: () -> Unit
                 Text(
                     roleLabel(hit.role),
                     color = p.accent,
-                    fontSize = 10.sp,
+                    fontSize = qqFontBody(10.sp),
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
                         .background(p.accent.copy(alpha = 0.12f))
-                        .padding(horizontal = 4.dp, vertical = 1.dp),
+                        .padding(horizontal = QqSpace.xs(), vertical = 1.dp),
                 )
             }
             Text(
                 highlight(hit.snippet, query, p.accent),
                 color = p.t2,
-                fontSize = 12.sp,
+                fontSize = qqFontBody(12.sp),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Spacer(Modifier.width(8.dp))
-        Text(relativeTime(hit.at), color = p.t3, fontSize = 11.sp)
+        Spacer(Modifier.width(QqSpace.s()))
+        Text(relativeTime(hit.at), color = p.t3, fontSize = qqFontBody(11.sp))
     }
 }
 
@@ -446,14 +449,14 @@ private fun DrawerFooter() {
     Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.Memory, null, tint = p.t3, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("本地 Node 运行时 · 无需联网", color = p.t3, fontSize = 11.sp)
+            Spacer(Modifier.width(QqSpace.s()))
+            Text("本地 Node 运行时 · 无需联网", color = p.t3, fontSize = qqFontBody(11.sp))
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(QqSpace.xs()))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.Terminal, null, tint = p.t3, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("v" + BuildConfig.VERSION_NAME.removePrefix("v"), color = p.t3, fontSize = 11.sp)
+            Spacer(Modifier.width(QqSpace.s()))
+            Text("v" + BuildConfig.VERSION_NAME.removePrefix("v"), color = p.t3, fontSize = qqFontBody(11.sp))
         }
     }
 }
@@ -470,25 +473,25 @@ private fun DrawerItem(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .padding(horizontal = QqSpace.s())
+            .clip(QqShape.field())
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 11.dp),
+            .padding(horizontal = QqSpace.m(), vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, label, tint = p.accent, modifier = Modifier.size(19.dp))
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(QqSpace.m()))
         Text(
             label,
             color = p.t1,
-            fontSize = 14.5.sp,
+            fontSize = qqFontBody(14.5.sp),
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
         if (onRemove != null && SlotEditState.enabled) {
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(QqSpace.s()))
             SlotRemoveBadge(onClick = onRemove)
         }
     }

@@ -1,4 +1,6 @@
 pluginManagement {
+    // build-logic 是 included build：两处 runtime 模块的下载/校验任务类型与镜像列表都来自它。
+    includeBuild("build-logic")
     repositories {
         google()
         mavenCentral()
@@ -31,6 +33,7 @@ include(
     ":plugin-api",
     ":plugin-host",
     ":plugin-html",
+    ":plugin-html-apk",
     ":feature:sessions",
     ":feature:chat",
     ":feature:agents",

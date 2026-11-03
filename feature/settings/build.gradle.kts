@@ -9,10 +9,12 @@ android {
 }
 
 dependencies {
-    api(project(":design"))
-    api(project(":core:data"))
-    api(project(":plugin-api"))
-    implementation("androidx.navigation:navigation-compose:2.8.5")
+    implementation(project(":design"))
+    implementation(project(":core:data"))
+    implementation(project(":core:model"))
+    implementation(project(":core:common"))
+    implementation(project(":plugin-api"))
+    implementation(libs.androidx.navigation.compose)
     implementation(project(":toolbridge"))
-    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.junit)
 }

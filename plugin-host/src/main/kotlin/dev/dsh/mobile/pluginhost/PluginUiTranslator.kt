@@ -98,8 +98,7 @@ import dev.dsh.mobile.pluginapi.UiColorRole
 import dev.dsh.mobile.pluginapi.UiTextEmphasis
 import dev.dsh.mobile.pluginapi.WidthPolicy
 import dev.dsh.mobile.pluginapi.HtmlBlockRenderers
-import dev.dsh.mobile.render.ChatContent
-import dev.dsh.mobile.render.HtmlRenderer
+import dev.dsh.mobile.pluginapi.RichContentRenderers
 
 /**
  * UI 转译层（需求 7）：把 [PluginUiSpec] 的节点树翻译成宿主主题下的 Compose 组件。
@@ -517,16 +516,16 @@ private fun NodeView(node: PluginUiNode, tokens: HostThemeTokens, onAction: (Slo
         }
 
         // 富内容三种：都只吃原文，样式一律由宿主 style/tokens 决定。
-        // markdown 走 :render 的块级渲染（表格/代码/数学/列表与聊天区完全一致，
-        // html 围栏还能顺带拿到 HtmlBlockRenderers 的 WebView 通道）。
-        is PluginUiNode.Markdown -> ChatContent(
+        // markdown 走 RichContentRenderers 槽位：实现由 :render 在启动时注入（宿主持接口，
+        // 不依赖 UI 渲染层），表格/代码/数学/列表与聊天区完全一致。
+        is PluginUiNode.Markdown -> RichContentRenderers.Markdown(
             text = node.text,
             modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.bodyMedium,
         )
 
         // html 与 html 代码围栏共用一条通道：装了 dsh.html 就 WebView 真渲染，
-        // 没装就退回 HtmlRenderer 的清洗文本，绝不把裸 HTML 当 Compose 处理。
+        // 没装就退回槽位注入的 HTML 清洗文本，绝不把裸 HTML 当 Compose 处理。
         is PluginUiNode.Html -> {
             @Suppress("UNUSED_EXPRESSION") HtmlBlockRenderers.generation
             val web = HtmlBlockRenderers.render
@@ -534,7 +533,7 @@ private fun NodeView(node: PluginUiNode, tokens: HostThemeTokens, onAction: (Slo
                 web(node.html)
             } else {
                 Text(
-                    text = HtmlRenderer.toAnnotated(node.html, MaterialTheme.typography.bodyMedium),
+                    text = RichContentRenderers.htmlToAnnotated(node.html, MaterialTheme.typography.bodyMedium),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.fillMaxWidth(),
                 )

@@ -273,6 +273,9 @@ class LocalEngineTransport(
             "bg_status" to { args -> bgExec("bg_status", args) },
             "bg_kill" to { args -> bgExec("bg_kill", args) },
             "phone" to phoneExec,
+            // phone_tree 复用 phone 通道：toolbridge 的实现细节不进 protocol 的依赖面，
+            // 这里只把 action 换成读侧动作名（见 PhoneBridge 的 ACTION_TREE）。
+            "phone_tree" to { args -> phoneExec(JsonObject(args + ("action" to JsonPrimitive("tree")))) },
             "skill" to { args -> skillExec(args) },
             // P0-4：大输出回读。与其它工具同一条链路（toolsJson 声明 + toolRunner 执行）。
             "read_output" to { args ->
@@ -1687,6 +1690,44 @@ class LocalEngineTransport(
                 }
             },
         )
+        // T4.1 读侧：结构化节点树（viewId + bounds + 节点身份 + 快照代次）。执行复用 phone 通道。
+        add(
+            buildJsonObject {
+                put("type", "function")
+                putJsonObject("function") {
+                    put("name", "phone_tree")
+                    put("description", phoneTreeHelp())
+                    putJsonObject("parameters") {
+                        put("type", "object")
+                        putJsonObject("properties") {
+                            putJsonObject("maxDepth") { put("type", "integer"); put("description", "最大深度，默认 6（越界夹到 1..64）") }
+                            putJsonObject("maxNodes") { put("type", "integer"); put("description", "最多返回节点数，默认 400（越界夹到 1..2000）") }
+                            putJsonObject("includeInvisible") { put("type", "boolean"); put("description", "是否包含不可见节点，默认 false") }
+                            putJsonObject("excludeOwnPackage") { put("type", "boolean"); put("description", "是否剔除手机控制自身的浮层/窗口，默认 true") }
+                            putJsonObject("package") { put("type", "string"); put("description", "只看该包名的窗口（可选）") }
+                            putJsonObject("onlyClickable") { put("type", "boolean"); put("description", "只返回可点击节点，默认 false") }
+                            putJsonObject("filter") {
+                                put("type", "object")
+                                put("description", "节点过滤选择器，字段之间是 AND，缺省字段不参与匹配")
+                                putJsonObject("properties") {
+                                    putJsonObject("text") { put("type", "string"); put("description", "text 全等") }
+                                    putJsonObject("textContains") { put("type", "string"); put("description", "text 包含（忽略大小写）") }
+                                    putJsonObject("desc") { put("type", "string"); put("description", "contentDescription 全等") }
+                                    putJsonObject("viewId") { put("type", "string"); put("description", "完整 resource-id，如 com.android.settings:id/search") }
+                                    putJsonObject("viewIdSuffix") { put("type", "string"); put("description", "只写 id 段（冒号后那截）") }
+                                    putJsonObject("className") { put("type", "string"); put("description", "控件类名全等") }
+                                    putJsonObject("package") { put("type", "string"); put("description", "节点所属包名") }
+                                    putJsonObject("index") { put("type", "integer"); put("description", "命中集合里的第几个（0 起）") }
+                                    putJsonObject("clickable") { put("type", "boolean"); put("description", "要求可点击") }
+                                    putJsonObject("editable") { put("type", "boolean"); put("description", "要求可输入") }
+                                    putJsonObject("scrollable") { put("type", "boolean"); put("description", "要求可滚动") }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+        )
         add(buildJsonObject {
             put("type", "function")
             putJsonObject("function") {
@@ -1863,6 +1904,25 @@ class LocalEngineTransport(
         append("、openapp（package 包名或 query 应用名模糊匹配）、screenshot（Android 11+ 存本地文件）。")
         append("坐标优先用 fx/fy（0-1 相对屏幕），模型看的是缩放截图，绝对像素容易点偏。")
         append("读屏输出每行 text|desc|cx,cy|clickable|class。")
+    }
+
+    /**
+     * phone_tree 的说明。
+     *
+     * 与 [phoneHelp] 分开写是因为它讲的是「读」而不是「动作」；T4.3 要把这两段与
+     * PhoneBridge.describeForModel() 合并成单一真源，届时一起搬。
+     */
+    private fun phoneTreeHelp(): String = buildString {
+        append("phone_tree：把当前界面读成结构化节点树（需先在 设置→无障碍 开启「DSH Mobile 手机控制」）。")
+        append("返回 snapshotId 与扁平 nodes[]，每个节点带 nodeId（\"<snapshotId>:<seq>\"）、parentId、depth、")
+        append("className/package/text/desc/viewId/bounds{left,top,right,bottom}/clickable/editable/scrollable/")
+        append("checkable/checked/selected/enabled/focused/visible，外加 screen{width,height,density}、")
+        append("foreground{package,activity,sinceMs}、nodeCount、truncated + truncatedReason、changedDuringRead、elapsedMs。")
+        append("参数：maxDepth 默认 6、maxNodes 默认 400、includeInvisible 默认 false、onlyClickable 默认 false、")
+        append("package 只看该包名；filter 是选择器对象（text/textContains/desc/viewId/viewIdSuffix/className/package/")
+        append("index/clickable/editable/scrollable，字段间 AND），filter 无命中返回 E_NODE_NOT_FOUND。")
+        append("节点身份带代次：界面变了以后旧 nodeId 作废，重读一次拿新 snapshotId；changedDuringRead=true 表示遍历期间界面又变了。")
+        append("只读，不改变界面；要点击/输入用 phone 工具。")
     }
 
     /** subagent 工具说明：讲清「独立上下文 + 只回结论 + 看不到当前对话 + 不能嵌套」。 */

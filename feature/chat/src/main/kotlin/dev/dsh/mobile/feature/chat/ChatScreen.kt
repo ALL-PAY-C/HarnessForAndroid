@@ -105,6 +105,8 @@ import dev.dsh.mobile.pluginhost.PluginSlotItem
 import dev.dsh.mobile.pluginhost.rememberHostThemeTokens
 import dev.dsh.mobile.design.MessageBubble
 import dev.dsh.mobile.design.EmptyState
+import dev.dsh.mobile.design.QqShape
+import dev.dsh.mobile.design.qqFontBody
 import dev.dsh.mobile.render.ChatContent
 import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.ContextRing
@@ -359,10 +361,10 @@ fun ChatScreen(
             Text(
                 msg,
                 color = Color.White,
-                fontSize = 12.5.sp,
+                fontSize = qqFontBody(12.5.sp),
                 modifier = Modifier
                     .padding(bottom = 120.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(QqShape.chip())
                     .background(Color.Black.copy(alpha = 0.75f))
                     .padding(horizontal = 12.dp, vertical = 7.dp),
             )
@@ -391,7 +393,7 @@ fun ChatScreen(
                             Text(
                                 state.title.ifBlank { "新会话" },
                                 color = p.t1,
-                                fontSize = 17.sp,
+                                fontSize = qqFontBody(17.sp),
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.weight(1f, fill = false),
                             )
@@ -401,7 +403,7 @@ fun ChatScreen(
                                 Text(
                                     badge,
                                     color = p.accent,
-                                    fontSize = 10.sp,
+                                    fontSize = qqFontBody(10.sp),
                                     maxLines = 1,
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(6.dp))
@@ -421,7 +423,7 @@ fun ChatScreen(
                                 if (state.streaming) "正在输出 · ${usageLine(state, projection.usage)}"
                                 else usageLine(state, projection.usage),
                                 color = p.t2,
-                                fontSize = 11.sp,
+                                fontSize = qqFontBody(11.sp),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -436,7 +438,7 @@ fun ChatScreen(
                         if (presetSelection.locked) presetNameOf(state.presetId)
                         else "预设：" + presetNameOf(state.presetId),
                         color = if (presetSelection.locked) p.t3 else p.accent,
-                        fontSize = 12.sp,
+                        fontSize = qqFontBody(12.sp),
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         modifier = Modifier
@@ -1036,7 +1038,7 @@ private fun QueueStrip(
                         Modifier
                             .fillMaxWidth()
                             .padding(top = 5.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(QqShape.chip())
                             .background(p.bg)
                             .padding(start = 9.dp, end = 4.dp, top = 5.dp, bottom = 5.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -1086,7 +1088,7 @@ private fun ActionChip(label: String, color: Color, onClick: () -> Unit) {
     Box(
         Modifier
             .height(48.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(QqShape.field())
             .background(color)
             .clickable { onClick() }
             .padding(horizontal = 14.dp),
@@ -1304,7 +1306,7 @@ private fun Composer(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 10.dp, vertical = 8.dp)
-                .clip(RoundedCornerShape(20.dp))
+                .clip(QqShape.sheet())
                 .background(p.hover),
         ) {
             Box(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 11.dp)) {
@@ -1503,7 +1505,7 @@ private fun ChipFlow(items: List<String>, onClick: (String) -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(QqShape.chip())
                     .background(p.card)
                     .clickable { onClick(item) }
                     .padding(horizontal = 11.dp, vertical = 7.dp),
@@ -1517,7 +1519,7 @@ private fun ToolButton(label: String, icon: ImageVector, onClick: () -> Unit) {
     val p = LocalQq.current
     Row(
         Modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(QqShape.chip())
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1556,7 +1558,7 @@ internal fun EditDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(p.bg)) {
+            Box(Modifier.fillMaxWidth().clip(QqShape.chip()).background(p.bg)) {
                 BasicTextField(
                     value = value,
                     onValueChange = { value = it },
@@ -1634,7 +1636,7 @@ private fun PersonaDialog(
             }
             Spacer(Modifier.height(10.dp))
             Box(
-                Modifier.fillMaxWidth().heightIn(min = 110.dp).clip(RoundedCornerShape(10.dp)).background(p.bg),
+                Modifier.fillMaxWidth().heightIn(min = 110.dp).clip(QqShape.chip()).background(p.bg),
             ) {
                 BasicTextField(
                     value = value,
@@ -1688,9 +1690,9 @@ private fun PermissionCard(
         Modifier
             .fillMaxWidth()
             .padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 6.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(QqShape.field())
             .background(p.card)
-            .border(1.dp, p.accent.copy(alpha = 0.45f), RoundedCornerShape(12.dp)),
+            .border(1.dp, p.accent.copy(alpha = 0.45f), QqShape.field()),
     ) {
         Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 8.dp)) {
             Text(
@@ -1903,9 +1905,9 @@ private fun OptionBubbles(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(QqShape.field())
                     .background(if (picked) p.accent else p.card)
-                    .border(1.dp, if (picked) p.accent else p.line, RoundedCornerShape(12.dp))
+                    .border(1.dp, if (picked) p.accent else p.line, QqShape.field())
                     .clickable(enabled = selectedId == null) { onSelect(option) }
                     .padding(horizontal = 10.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1945,7 +1947,7 @@ private fun OptionBubbles(
         }
         Row(
             Modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(QqShape.field())
                 .clickable { onCustom() }
                 .padding(horizontal = 6.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -2063,7 +2065,7 @@ internal fun AgentSheet(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(QqShape.chip())
                             .clickable { if (state.isGroup) onAdd(profile.id) else onPickSingle(profile.id) }
                             .padding(horizontal = 8.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -2103,7 +2105,7 @@ internal fun AgentSheet(
                     color = p.accent,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onDismiss)
+                    modifier = Modifier.clip(QqShape.chip()).clickable(onClick = onDismiss)
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                 )
             }
@@ -2126,7 +2128,7 @@ private fun RenameMemberDialog(
         title = { Text("修改成员名字", color = p.t1) },
         text = {
             Column {
-                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(p.bg)) {
+                Box(Modifier.fillMaxWidth().clip(QqShape.chip()).background(p.bg)) {
                     BasicTextField(
                         value = value,
                         onValueChange = { value = it },

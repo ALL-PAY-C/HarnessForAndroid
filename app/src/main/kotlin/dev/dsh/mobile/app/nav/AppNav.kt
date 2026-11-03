@@ -41,7 +41,6 @@ import androidx.navigation.navArgument
 import android.content.Intent
 import android.net.Uri
 import dev.dsh.mobile.app.AppContainer
-import dev.dsh.mobile.app.RuntimeControlAdapter
 import dev.dsh.mobile.app.phone.PhoneControlScreen
 import dev.dsh.mobile.app.update.AutoUpdatePrompt
 import dev.dsh.mobile.core.model.RuntimeState
@@ -603,7 +602,7 @@ fun AppNav(container: AppContainer) {
 
                     composable(Routes.SETTINGS) {
                         val settingsContext = LocalContext.current
-                        val runtimeControl = RuntimeControlAdapter(container)
+                        val runtimeControl = container.runtimeControl
                         val vm: SettingsViewModel = viewModel(
                             factory = viewModelFactory {
                                 initializer {
@@ -691,7 +690,7 @@ fun AppNav(container: AppContainer) {
                                         secretStore = container.secretStore,
                                         linuxActions = dev.dsh.mobile.app.LinuxSettingsController(extrasContext.applicationContext, container),
                                         endpoints = container.endpoints,
-                                        runtime = RuntimeControlAdapter(container),
+                                        runtime = container.runtimeControl,
                                         updater = dev.dsh.mobile.core.data.update.Updater(extrasContext),
                                         onReconnect = { container.connectActive(force = true) },
                                     )

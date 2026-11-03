@@ -8,13 +8,15 @@ android {
 }
 dependencies {
     api(project(":core:model"))
-    api(project(":core:common"))
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // core:common 只在实现里用（AppLog 等），公共签名（LineChannel / 协议模型）不出现
+    // core.common 类型 → implementation。
+    implementation(project(":core:common"))
+    api(libs.kotlinx.serialization.json)
+    api(libs.kotlinx.coroutines.core)
+    implementation(libs.okhttp)
     // JVM 单测里 android.jar 的 org.json 是桩，用真实现替换才能验证引擎 RPC 的 JSON 往返
     // （与 core:data / plugin-host / runtime-host 同做法）。
-    testImplementation("org.json:json:20240303")
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation(libs.org.json)
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

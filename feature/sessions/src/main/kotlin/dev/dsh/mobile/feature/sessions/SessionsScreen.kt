@@ -69,6 +69,8 @@ import dev.dsh.mobile.design.ConvRow
 import dev.dsh.mobile.design.EmptyState
 import dev.dsh.mobile.design.IconBtn
 import dev.dsh.mobile.design.LocalQq
+import dev.dsh.mobile.design.QqShape
+import dev.dsh.mobile.design.QqSpace
 import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.SectionChevron
 import dev.dsh.mobile.design.SlotEditFrame
@@ -79,6 +81,7 @@ import dev.dsh.mobile.design.SwipeAction
 import dev.dsh.mobile.design.SwipeableRow
 import dev.dsh.mobile.design.TokenPill
 import dev.dsh.mobile.design.UiEditSlotPlusRow
+import dev.dsh.mobile.design.qqFontBody
 import dev.dsh.mobile.pluginapi.SlotAction
 import dev.dsh.mobile.pluginapi.SlotContribution
 import dev.dsh.mobile.pluginhost.PluginSlotItem
@@ -154,18 +157,18 @@ fun SessionsScreen(
                 }
             },
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(QqSpace.s())) {
                 if (state.selectionMode) {
                     Text(
                         "已选 ${state.selected.size} 项",
                         color = p.accent,
-                        fontSize = 13.5.sp,
+                        fontSize = qqFontBody(13.5.sp),
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
                         "全选",
                         color = p.accent,
-                        fontSize = 12.5.sp,
+                        fontSize = qqFontBody(12.5.sp),
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { viewModel.selectAll(visibleIds) }
@@ -174,7 +177,7 @@ fun SessionsScreen(
                     Text(
                         "退出",
                         color = p.t3,
-                        fontSize = 12.5.sp,
+                        fontSize = qqFontBody(12.5.sp),
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { viewModel.clearSelection() }
@@ -194,16 +197,16 @@ fun SessionsScreen(
 
         if (searching) {
             Row(
-                Modifier.fillMaxWidth().background(p.card).padding(horizontal = 12.dp, vertical = 6.dp),
+                Modifier.fillMaxWidth().background(p.card).padding(horizontal = QqSpace.m(), vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(p.bg)) {
+                Box(Modifier.weight(1f).clip(QqShape.field()).background(p.bg)) {
                     BasicTextField(
                         value = state.query,
                         onValueChange = viewModel::setQuery,
                         singleLine = true,
                         textStyle = TextStyle(fontSize = 16.sp, color = p.t1),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = QqSpace.m(), vertical = 10.dp),
                     )
                 }
                 IconBtn(Icons.Filled.Close, "关闭搜索") { searching = false; viewModel.setQuery("") }
@@ -240,7 +243,7 @@ fun SessionsScreen(
                 LazyColumn(
                     Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(QqSpace.s()),
                 ) {
                     val depthOf = state.folders.associate {
                         folderGroupKey(it.path) to it.depth
@@ -306,14 +309,14 @@ fun SessionsScreen(
                                         SectionChevron(expanded = !isCollapsed)
                                     } else {
                                         Box(Modifier.width(14.dp), contentAlignment = Alignment.Center) {
-                                            Text("·", color = p.t3, fontSize = 12.sp)
+                                            Text("·", color = p.t3, fontSize = qqFontBody(12.sp))
                                         }
                                     }
                                     Spacer(Modifier.width(7.dp))
                                     Text(
                                         label,
                                         color = p.t2,
-                                        fontSize = 12.5.sp,
+                                        fontSize = qqFontBody(12.5.sp),
                                         fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
@@ -324,7 +327,7 @@ fun SessionsScreen(
                                         Modifier.clip(RoundedCornerShape(8.dp)).background(p.card)
                                             .padding(horizontal = 7.dp, vertical = 1.dp),
                                     ) {
-                                        Text("" + count, color = p.t3, fontSize = 11.sp)
+                                        Text("" + count, color = p.t3, fontSize = qqFontBody(11.sp))
                                     }
                                 }
 
@@ -406,9 +409,9 @@ fun SessionsScreen(
                                                         Box(
                                                             Modifier
                                                                 .weight(1f)
-                                                                .clip(RoundedCornerShape(10.dp))
+                                                                .clip(QqShape.chip())
                                                                 .background(p.card)
-                                                                .border(1.dp, p.line, RoundedCornerShape(10.dp)),
+                                                                .border(1.dp, p.line, QqShape.chip()),
                                                         ) { inner() }
                                                     }
                                                 }
@@ -446,7 +449,7 @@ fun SessionsScreen(
                                 Text(
                                     "插件",
                                     color = p.t2,
-                                    fontSize = 12.5.sp,
+                                    fontSize = qqFontBody(12.5.sp),
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.padding(start = 10.dp, top = 2.dp, bottom = 6.dp),
                                 )
@@ -457,7 +460,7 @@ fun SessionsScreen(
                                                 SlotEditItem(placed.pluginId, placed.id, placed.label, placed.subtitle),
                                             )
                                         },
-                                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = QqSpace.s()),
                                     ) {
                                         PluginSlotItem(placed, hostTokens, onSlotAction)
                                     }
@@ -652,11 +655,11 @@ private fun FolderAction(label: String, danger: Boolean = false, onClick: () -> 
     Box(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(QqShape.chip())
             .clickable(onClick = onClick)
             .padding(vertical = 11.dp),
     ) {
-        Text(label, color = if (danger) p.red else p.t1, fontSize = 14.sp)
+        Text(label, color = if (danger) p.red else p.t1, fontSize = qqFontBody(14.sp))
     }
 }
 
@@ -670,15 +673,15 @@ private fun androidx.compose.foundation.layout.RowScope.MultiAction(
     Column(
         Modifier
             .weight(1f)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(QqShape.field())
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(vertical = QqSpace.s()),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             label,
             color = if (danger) p.red else p.t2,
-            fontSize = 12.sp,
+            fontSize = qqFontBody(12.sp),
             fontWeight = FontWeight.SemiBold,
         )
     }
@@ -700,29 +703,29 @@ internal fun InputDialog(
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(QqShape.card())
                 .background(p.card)
-                .padding(16.dp),
+                .padding(QqSpace.l()),
         ) {
             Text(title, color = p.t1, fontSize = 15.5.sp, fontWeight = FontWeight.SemiBold)
             if (hint.isNotBlank()) {
-                Spacer(Modifier.height(4.dp))
-                Text(hint, color = p.t3, fontSize = 11.5.sp)
+                Spacer(Modifier.height(QqSpace.xs()))
+                Text(hint, color = p.t3, fontSize = qqFontBody(11.5.sp))
             }
-            Spacer(Modifier.height(12.dp))
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(p.bg)) {
+            Spacer(Modifier.height(QqSpace.m()))
+            Box(Modifier.fillMaxWidth().clip(QqShape.field()).background(p.bg)) {
                 BasicTextField(
                     value = value,
                     onValueChange = { value = it },
                     singleLine = true,
                     textStyle = TextStyle(fontSize = 15.sp, color = p.t1),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = QqSpace.m(), vertical = 11.dp),
                 )
             }
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                 DialogButton("取消", p.t2, onDismiss)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(QqSpace.s()))
                 DialogButton(confirmLabel, p.accent) { onConfirm(value) }
             }
         }
@@ -733,11 +736,11 @@ internal fun InputDialog(
 private fun DialogButton(label: String, color: Color, onClick: () -> Unit) {
     Box(
         Modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(QqShape.chip())
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = QqSpace.s()),
     ) {
-        Text(label, color = color, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = color, fontSize = qqFontBody(13.5.sp), fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -757,9 +760,9 @@ private fun GroupDialog(
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(QqShape.card())
                 .background(p.card)
-                .padding(16.dp),
+                .padding(QqSpace.l()),
         ) {
             Text(title, color = p.t1, fontSize = 15.5.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(10.dp))
@@ -768,38 +771,38 @@ private fun GroupDialog(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(QqShape.chip())
                             .clickable { onPick(name) }
-                            .padding(horizontal = 8.dp, vertical = 10.dp),
+                            .padding(horizontal = QqSpace.s(), vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(name, color = p.t1, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                        if (name == current) Text("当前", color = p.accent, fontSize = 11.5.sp)
+                        Text(name, color = p.t1, fontSize = qqFontBody(14.sp), modifier = Modifier.weight(1f))
+                        if (name == current) Text("当前", color = p.accent, fontSize = qqFontBody(11.5.sp))
                     }
                 }
             }
-            Spacer(Modifier.height(8.dp))
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(p.bg)) {
+            Spacer(Modifier.height(QqSpace.s()))
+            Box(Modifier.fillMaxWidth().clip(QqShape.field()).background(p.bg)) {
                 BasicTextField(
                     value = newName,
                     onValueChange = { newName = it },
                     singleLine = true,
-                    textStyle = TextStyle(fontSize = 14.sp, color = p.t1),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp),
+                    textStyle = TextStyle(fontSize = qqFontBody(14.sp), color = p.t1),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = QqSpace.m(), vertical = 11.dp),
                 )
                 if (newName.isBlank()) {
                     Text(
                         "新建分组…",
                         color = p.t3,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
+                        fontSize = qqFontBody(14.sp),
+                        modifier = Modifier.padding(horizontal = QqSpace.m(), vertical = 11.dp),
                     )
                 }
             }
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                 DialogButton("取消", p.t2, onDismiss)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(QqSpace.s()))
                 DialogButton("确定", p.accent) { if (newName.isNotBlank()) onPick(newName.trim()) }
             }
         }
@@ -843,84 +846,84 @@ private fun NewChatSheet(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(18.dp))
                 .background(p.card)
-                .padding(16.dp),
+                .padding(QqSpace.l()),
         ) {
             Text("新建聊天", color = p.t1, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(QqSpace.m()))
 
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(p.bg)) {
+            Box(Modifier.fillMaxWidth().clip(QqShape.field()).background(p.bg)) {
                 BasicTextField(
                     value = name,
                     onValueChange = { name = it },
                     singleLine = true,
                     textStyle = TextStyle(fontSize = 15.sp, color = p.t1),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = QqSpace.m(), vertical = 11.dp),
                 )
                 if (name.isBlank()) {
                     Text(
                         if (isGroup) "群聊名称" else "会话名称（可留空）",
                         color = p.t3,
                         fontSize = 15.sp,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
+                        modifier = Modifier.padding(horizontal = QqSpace.m(), vertical = 11.dp),
                     )
                 }
             }
 
             Spacer(Modifier.height(10.dp))
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(p.bg)) {
+            Box(Modifier.fillMaxWidth().clip(QqShape.field()).background(p.bg)) {
                 BasicTextField(
                     value = workspace,
                     onValueChange = { workspace = it },
                     singleLine = true,
-                    textStyle = TextStyle(fontSize = 13.sp, color = p.t1),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                    textStyle = TextStyle(fontSize = qqFontBody(13.sp), color = p.t1),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = QqSpace.m(), vertical = 10.dp),
                 )
                 if (workspace.isBlank()) {
                     Text(
                         "工作区路径（留空用默认目录，产物落在这里）",
                         color = p.t3,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        fontSize = qqFontBody(13.sp),
+                        modifier = Modifier.padding(horizontal = QqSpace.m(), vertical = 10.dp),
                     )
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(QqSpace.m()))
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(p.bg).padding(3.dp),
+                Modifier.fillMaxWidth().clip(QqShape.field()).background(p.bg).padding(3.dp),
             ) {
                 listOf(false to "普通会话", true to "群聊").forEach { (value, label) ->
                     val active = isGroup == value
                     Box(
                         Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(QqShape.chip())
                             .background(if (active) p.accent else Color.Transparent)
                             .clickable { isGroup = value }
-                            .padding(vertical = 8.dp),
+                            .padding(vertical = QqSpace.s()),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
                             label,
                             color = if (active) Color.White else p.t2,
-                            fontSize = 13.5.sp,
+                            fontSize = qqFontBody(13.5.sp),
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(QqSpace.m()))
             Text(
                 if (isGroup) "选择 Agent（可重复拉同一个）" else "选择一个 Agent",
                 color = p.t2,
-                fontSize = 12.sp,
+                fontSize = qqFontBody(12.sp),
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(6.dp))
 
             if (models.isEmpty()) {
-                Text("还没有接入 Agent，先到 Agent 页添加 API Key", color = p.t3, fontSize = 12.5.sp)
+                Text("还没有接入 Agent，先到 Agent 页添加 API Key", color = p.t3, fontSize = qqFontBody(12.5.sp))
             } else {
                 Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState())) {
                     models.forEach { profile ->
@@ -929,12 +932,12 @@ private fun NewChatSheet(
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(QqShape.chip())
                                 .clickable {
                                     if (isGroup) memberIds.add(profile.id)
                                     else singleAgent = profile.id
                                 }
-                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                                .padding(horizontal = QqSpace.s(), vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Ava(seed = profile.id, size = 32.dp, label = profile.name.ifBlank { profile.model })
@@ -943,24 +946,24 @@ private fun NewChatSheet(
                                 Text(
                                     profile.name.ifBlank { profile.model },
                                     color = p.t1,
-                                    fontSize = 14.sp,
+                                    fontSize = qqFontBody(14.sp),
                                     fontWeight = FontWeight.Medium,
                                 )
-                                Text(profile.model, color = p.t3, fontSize = 11.sp)
+                                Text(profile.model, color = p.t3, fontSize = qqFontBody(11.sp))
                             }
                             if (isGroup && count > 0) {
-                                Text("×$count", color = p.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                Spacer(Modifier.width(8.dp))
+                                Text("×$count", color = p.accent, fontSize = qqFontBody(12.sp), fontWeight = FontWeight.SemiBold)
+                                Spacer(Modifier.width(QqSpace.s()))
                                 Box(
                                     Modifier
                                         .clip(RoundedCornerShape(8.dp))
                                         .clickable { memberIds.remove(profile.id) }
-                                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                                        .padding(horizontal = QqSpace.s(), vertical = 3.dp),
                                 ) {
-                                    Text("−", color = p.red, fontSize = 14.sp)
+                                    Text("−", color = p.red, fontSize = qqFontBody(14.sp))
                                 }
                             } else if (!isGroup && selected) {
-                                Text("✓", color = p.accent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                Text("✓", color = p.accent, fontSize = qqFontBody(14.sp), fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -968,16 +971,16 @@ private fun NewChatSheet(
             }
 
             if (isGroup && memberIds.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(QqSpace.s()))
                 Text(
                     "已选 ${memberIds.size} 位：" + numberedLabels().joinToString("、"),
                     color = p.t3,
-                    fontSize = 11.5.sp,
+                    fontSize = qqFontBody(11.5.sp),
                 )
             }
 
             Spacer(Modifier.height(14.dp))
-            Text("选择分组", color = p.t2, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text("选择分组", color = p.t2, fontSize = qqFontBody(12.sp), fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                 listOf("最近") .plus(known.filter { it != "最近" }).take(3).forEach { g ->
@@ -985,34 +988,34 @@ private fun NewChatSheet(
                     Text(
                         g,
                         color = if (active) Color.White else p.t2,
-                        fontSize = 12.sp,
+                        fontSize = qqFontBody(12.sp),
                         modifier = Modifier
-                            .clip(RoundedCornerShape(9.dp))
+                            .clip(QqShape.chip())
                             .background(if (active) p.accent else p.bg)
                             .clickable { group = if (g == "最近") "" else g }
                             .padding(horizontal = 11.dp, vertical = 6.dp),
                     )
                 }
             }
-            Spacer(Modifier.height(8.dp))
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(p.bg)) {
+            Spacer(Modifier.height(QqSpace.s()))
+            Box(Modifier.fillMaxWidth().clip(QqShape.chip()).background(p.bg)) {
                 BasicTextField(
                     value = group,
                     onValueChange = { group = it },
                     singleLine = true,
-                    textStyle = TextStyle(fontSize = 14.sp, color = p.t1),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                    textStyle = TextStyle(fontSize = qqFontBody(14.sp), color = p.t1),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = QqSpace.m(), vertical = 10.dp),
                 )
                 if (group.isBlank()) {
-                    Text("新分组名（留空=最近）", color = p.t3, fontSize = 14.sp,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
+                    Text("新分组名（留空=最近）", color = p.t3, fontSize = qqFontBody(14.sp),
+                        modifier = Modifier.padding(horizontal = QqSpace.m(), vertical = 10.dp))
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(QqSpace.l()))
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                 DialogButton("取消", p.t2, onDismiss)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(QqSpace.s()))
                 val ready = if (isGroup) memberIds.isNotEmpty() else singleAgent != null
                 DialogButton(if (ready) "创建" else "请选择 Agent", if (ready) p.accent else p.t3) {
                     if (!ready) return@DialogButton

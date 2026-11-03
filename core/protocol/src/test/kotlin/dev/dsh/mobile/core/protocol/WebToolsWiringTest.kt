@@ -45,7 +45,7 @@ class WebToolsWiringTest {
         }
         assertEquals(
             listOf(
-                "shell", "todo_write", "goal", "read_output", "phone", "fs_read", "fs_write", "fs_list",
+                "shell", "todo_write", "goal", "read_output", "phone", "phone_tree", "fs_read", "fs_write", "fs_list",
                 "fs_op", "channel_list", "run_bg", "bg_status", "bg_kill", "skill", "subagent",
                 "web_search", "web_fetch", "download",
             ),

@@ -47,8 +47,8 @@ class RuntimeService : Service() {
         container = (application as DshApplication).container
         AppLog.i("RuntimeService onCreate")
         promoteToForeground()
-        // 真正的连接状态在 container.runtime（LocalEngineTransport 内置引擎时
-        // runtimeHost 一直是 NotConfigured，直接读它会出现「未配置运行时」却聊得很欢）。
+        // 真正的连接状态在 container.runtime：内置引擎走 LocalEngineTransport，
+        // 那个 transport 自己的 state 才是 UI 该看的（否则会出现「未配置运行时」却聊得很欢）。
         job = AppScope.scope.launch {
             container.runtime.collect { rt ->
                 runCatching { container.ongoingCenter.onRuntime(rt) }

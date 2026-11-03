@@ -4,7 +4,8 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Narrow view of the runtime host for UI modules that must not depend on :runtime-host.
- * Implemented in :app by adapting EmbeddedRuntimeHost.
+ * Implemented in :app by node/RuntimeControlAdapter, which projects the :node
+ * engine (RemoteNodeEngine / NodeEngineService) instead of an in-process runtime host.
  */
 interface RuntimeControl {
     val state: StateFlow<RuntimeState>

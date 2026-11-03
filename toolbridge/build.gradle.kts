@@ -6,14 +6,17 @@ android {
     namespace = "dev.dsh.mobile.toolbridge"
 }
 dependencies {
-    api(project(":core:common"))
-    api(project(":core:model"))
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-    implementation("androidx.core:core-ktx:1.13.1")
+    // 公共签名全是本模块自己的 BridgeResult / Channel 类型；core:common 只用 AppLog/ProxyEnv
+    //（都只在 Channels.kt 内部）→ implementation。core:model 零引用，去掉。
+    implementation(project(":core:common"))
+    api(libs.kotlinx.coroutines.core)
+    implementation(libs.androidx.core.ktx)
     // Shizuku：可选运行时依赖，未安装 Shizuku 时相关通道自动不可用
-    implementation("dev.rikka.shizuku:api:13.1.5")
-    implementation("dev.rikka.shizuku:provider:13.1.5")
-    testImplementation("junit:junit:4.13.2")
+    implementation(libs.shizuku.api)
+    implementation(libs.shizuku.provider)
+    testImplementation(libs.junit)
+    // PhoneTreeReadTest：PhoneSelector.parse 吃 JSONObject，JVM 单测必须用真实现（AGP 的 android.jar 是桩，会报 not mocked）
+    testImplementation(libs.org.json)
     // ShellBridgeDispatchTest：runTest + StandardTestDispatcher（与 core/protocol、core/data 同版本）
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation(libs.kotlinx.coroutines.test)
 }

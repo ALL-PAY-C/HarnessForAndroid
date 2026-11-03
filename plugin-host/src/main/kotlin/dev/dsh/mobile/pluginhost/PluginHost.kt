@@ -1,27 +1,17 @@
 package dev.dsh.mobile.pluginhost
 
-import androidx.compose.material3.Text
 import android.content.Context
 import androidx.compose.runtime.Composable
 import dev.dsh.mobile.core.common.AppLog
 import dev.dsh.mobile.core.model.ChatMessage
 import dev.dsh.mobile.pluginapi.BackgroundPlugin
 import dev.dsh.mobile.pluginapi.BottomTab
-import dev.dsh.mobile.pluginapi.ComposerButton
 import dev.dsh.mobile.pluginapi.DshPlugin
-import dev.dsh.mobile.pluginapi.PluginCapability
 import dev.dsh.mobile.pluginapi.PluginManifest
 import dev.dsh.mobile.pluginapi.PluginRegistry
-import dev.dsh.mobile.pluginapi.QuickCommand
-import dev.dsh.mobile.pluginapi.SettingsItem
 import dev.dsh.mobile.pluginapi.SlotAction
 import dev.dsh.mobile.pluginapi.SlotContribution
 import dev.dsh.mobile.pluginapi.SlotId
-import dev.dsh.mobile.pluginapi.PluginUiNode
-import dev.dsh.mobile.pluginapi.PluginUiSpec
-import dev.dsh.mobile.pluginapi.UiBadgeTone
-import dev.dsh.mobile.pluginapi.UiTextEmphasis
-import dev.dsh.mobile.pluginapi.ThemeContribution
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -396,105 +386,4 @@ class PluginHost(
 @Composable
 fun PluginBoundary(pluginId: String?, content: @Composable () -> Unit) {
     content()
-}
-
-/**
- * Built-in example plugin, proves the slot mechanism end to end:
- * a message renderer, a quick command, a composer button and a settings row.
- */
-object SamplePlugin : DshPlugin {
-    override val manifest = PluginManifest(
-        id = "dsh.sample",
-        name = "示例插件",
-        version = "1.0.0",
-        description = "演示消息渲染器 / 快捷指令 / 输入框按钮 / 设置项四个槽位",
-        author = "DSH",
-        capabilities = setOf(
-            PluginCapability.MessageRenderer,
-            PluginCapability.QuickCommand,
-            PluginCapability.ComposerButton,
-            PluginCapability.SettingsItem,
-        ),
-    )
-
-    override fun register(registry: PluginRegistry) {
-        registry.quickCommand(
-            QuickCommand(
-                id = "dsh.sample.summarize",
-                label = "总结上下文",
-                payload = "请用要点总结当前会话的关键信息，控制在 10 行内。",
-                pluginId = manifest.id,
-            ),
-        )
-        registry.composerButton(
-            ComposerButton(
-                id = "dsh.sample.expand",
-                label = "润色",
-                pluginId = manifest.id,
-                transform = { text ->
-                    if (text.isBlank()) text else "$text\n\n（请把上面的内容表达得更清晰、更简洁）"
-                },
-            ),
-        )
-        registry.settingsItem(
-            SettingsItem(
-                id = "dsh.sample.about",
-                title = "示例插件已启用",
-                subtitle = "消息渲染器、快捷指令、输入框按钮、设置项均已注册",
-                pluginId = manifest.id,
-                // 走转译层的 legacy 分支：插件直画也套上宿主 tokens（需求 7）。
-                content = {
-                    PluginUiHost(
-                        spec = null,
-                        tokens = rememberHostThemeTokens(),
-                        onAction = {},
-                        legacy = { Text("插件槽位工作正常") },
-                    )
-                },
-            ),
-        )
-        registry.theme(
-            ThemeContribution(
-                id = "dsh.sample.theme",
-                name = "示例 · 靛青",
-                accent = 0xFF5B6CFF,
-                bubbleMine = 0xFF5B6CFF,
-                bubbleOther = 0xFFEFF0F6,
-                pluginId = manifest.id,
-            ),
-        )
-        // 声明式槽位（需求 7）：界面由节点树描述，宿主按当前主题 tokens 渲染。
-        registry.contribute(
-            SlotContribution(
-                slot = SlotId.Settings,
-                id = "dsh.sample.declarative",
-                label = "示例插件 · 声明式卡片",
-                subtitle = "插件不写 Compose，只描述节点树",
-                pluginId = manifest.id,
-                action = SlotAction.Prompt("示例插件：声明式 UI 已生效"),
-                ui = PluginUiSpec(
-                    root = PluginUiNode.Column(
-                        gap = 8,
-                        children = listOf(
-                            PluginUiNode.Text("声明式 UI", emphasis = UiTextEmphasis.Title),
-                            PluginUiNode.Text(
-                                "这段界面由节点树描述：颜色只给语义角色，圆角/字号/间距全部来自当前主题。",
-                            ),
-                            PluginUiNode.Row(
-                                gap = 8,
-                                children = listOf(
-                                    PluginUiNode.Badge("tokens 驱动", UiBadgeTone.Info),
-                                    PluginUiNode.Badge("可单独禁用", UiBadgeTone.Neutral),
-                                ),
-                            ),
-                            PluginUiNode.Button(
-                                label = "发送示例指令",
-                                action = SlotAction.Prompt("示例插件：声明式 UI 已生效"),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        )
-    }
 }

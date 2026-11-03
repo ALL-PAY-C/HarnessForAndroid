@@ -1,10 +1,10 @@
 package dev.dsh.mobile.feature.plugins
 
+import dev.dsh.mobile.core.common.archive.ZipExtract
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.zip.ZipInputStream
 
 /**
  * 从 GitHub 仓库 / zip 直链装一个 SKILL.md 技能。
@@ -48,7 +48,6 @@ object SkillInstaller {
         RegexOption.IGNORE_CASE,
     )
     private val SHORT_RE = Regex("""^([A-Za-z0-9._-]+)/([A-Za-z0-9._-]+)$""")
-    private val WINDOWS_ABSOLUTE_RE = Regex("^[A-Za-z]:")
 
     /** 接受 https://github.com/o/r、github.com/o/r/tree/分支、o/r、任意 http(s) zip 直链。看不懂返回 null。 */
     fun parse(input: String): Source? {
@@ -85,64 +84,28 @@ object SkillInstaller {
      * 输入是用户贴的链接，压缩包内容不可信。
      */
     fun extract(zip: File, into: File, limits: Limits = Limits()) {
-        into.mkdirs()
-        val root = into.canonicalFile
-        var count = 0
-        var total = 0L
-        val buffer = ByteArray(8192)
         try {
-            ZipInputStream(zip.inputStream().buffered()).use { zin ->
-                while (true) {
-                    val entry = zin.nextEntry ?: break
-                    count++
-                    if (count > limits.maxEntries) {
-                        throw SkillInstallException("压缩包条目太多（上限 ${limits.maxEntries} 个）")
-                    }
-                    val target = safeTarget(root, entry.name)
-                        ?: throw SkillInstallException("压缩包里有非法路径：${entry.name}")
-                    if (entry.isDirectory) {
-                        target.mkdirs()
-                        continue
-                    }
-                    target.parentFile?.mkdirs()
-                    var written = 0L
-                    target.outputStream().use { sink ->
-                        while (true) {
-                            val n = zin.read(buffer)
-                            if (n <= 0) break
-                            written += n
-                            total += n
-                            if (written > limits.maxEntryBytes) {
-                                throw SkillInstallException("单个文件太大：${entry.name}")
-                            }
-                            if (total > limits.maxTotalBytes) {
-                                throw SkillInstallException(
-                                    "解压后总大小超过 ${limits.maxTotalBytes / 1024 / 1024} MB",
-                                )
-                            }
-                            sink.write(buffer, 0, n)
-                        }
-                    }
-                    target.setReadable(true, false)
-                }
-            }
-        } catch (e: SkillInstallException) {
-            throw e
-        } catch (e: IOException) {
-            throw SkillInstallException("压缩包读不出来：${e.message ?: e.toString()}")
+            ZipExtract.extract(
+                zip.inputStream(),
+                into,
+                ZipExtract.Options(
+                    maxEntries = limits.maxEntries,
+                    maxEntryBytes = limits.maxEntryBytes,
+                    maxTotalBytes = limits.maxTotalBytes,
+                ),
+            )
+        } catch (e: ZipExtract.ZipExtractException) {
+            throw SkillInstallException(
+                when (e) {
+                    is ZipExtract.ZipExtractException.IllegalEntry -> "压缩包里有非法路径：${e.entry}"
+                    is ZipExtract.ZipExtractException.TooManyEntries -> "压缩包条目太多（上限 ${e.limit} 个）"
+                    is ZipExtract.ZipExtractException.EntryTooLarge -> "单个文件太大：${e.entry}"
+                    is ZipExtract.ZipExtractException.TotalTooLarge ->
+                        "解压后总大小超过 ${e.limit / 1024 / 1024} MB"
+                    is ZipExtract.ZipExtractException.Corrupt -> "压缩包读不出来：${e.cause?.message ?: e.message}"
+                },
+            )
         }
-    }
-
-    /** 规范化条目名并确认它落在 [root] 内；越界返回 null。 */
-    private fun safeTarget(root: File, name: String): File? {
-        val clean = name.replace('\\', '/').trim()
-        if (clean.isEmpty()) return null
-        if (clean.startsWith("/")) return null
-        if (WINDOWS_ABSOLUTE_RE.containsMatchIn(clean)) return null
-        if (clean.split('/').any { it == ".." }) return null
-        val target = File(root, clean).canonicalFile
-        val rootPath = root.canonicalPath
-        return if (target.path == rootPath || target.path.startsWith(rootPath + File.separator)) target else null
     }
 
     /**

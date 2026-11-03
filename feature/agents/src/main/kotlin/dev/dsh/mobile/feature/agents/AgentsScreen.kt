@@ -78,9 +78,12 @@ import dev.dsh.mobile.design.IconBtn
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider
 import dev.dsh.mobile.design.QqRow
+import dev.dsh.mobile.design.QqShape
+import dev.dsh.mobile.design.QqSpace
 import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.RunPill
 import dev.dsh.mobile.design.StatusCapsule
+import dev.dsh.mobile.design.qqFontBody
 import dev.dsh.mobile.toolbridge.ChannelStatus
 
 @Composable
@@ -148,7 +151,7 @@ fun AgentsScreen(
                         Row(
                             Modifier.fillMaxWidth()
                                 .clickable(onClick = onReconnect)
-                                .padding(horizontal = 13.dp, vertical = 12.dp),
+                                .padding(horizontal = 13.dp, vertical = QqSpace.m()),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Ava(
@@ -174,13 +177,13 @@ fun AgentsScreen(
                                         RuntimeState.NotConfigured -> "未启动"
                                     },
                                     color = p.t2,
-                                    fontSize = 11.5.sp,
+                                    fontSize = qqFontBody(11.5.sp),
                                 )
                             }
                             Text(
                                 if (state.runtime is RuntimeState.Ready) "重连" else "连接",
                                 color = p.accent,
-                                fontSize = 13.sp,
+                                fontSize = qqFontBody(13.sp),
                                 fontWeight = FontWeight.Medium,
                             )
                         }
@@ -200,18 +203,18 @@ fun AgentsScreen(
                     ) {
                     Column(Modifier.fillMaxWidth()) {
                         if (state.models.isEmpty()) {
-                            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                            Column(Modifier.fillMaxWidth().padding(QqSpace.l())) {
                                 Text(
                                     "还没有接入模型",
                                     color = p.t1,
-                                    fontSize = 14.sp,
+                                    fontSize = qqFontBody(14.sp),
                                     fontWeight = FontWeight.Medium,
                                 )
                                 Text(
                                     "填一个 API Key 就能让 Agent 干活（DeepSeek / OpenAI 兼容 / 第三方中转都可以）",
                                     color = p.t3,
-                                    fontSize = 11.5.sp,
-                                    modifier = Modifier.padding(top = 4.dp),
+                                    fontSize = qqFontBody(11.5.sp),
+                                    modifier = Modifier.padding(top = QqSpace.xs()),
                                 )
                             }
                         } else {
@@ -324,14 +327,14 @@ fun AgentsScreen(
         }
 
         toast?.let { text ->
-            Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.BottomCenter) {
+            Box(Modifier.fillMaxSize().padding(QqSpace.xl()), contentAlignment = Alignment.BottomCenter) {
                 Box(
                     Modifier
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(QqShape.field())
                         .background(p.t1.copy(alpha = 0.92f))
                         .padding(horizontal = 14.dp, vertical = 9.dp),
                 ) {
-                    Text(text, color = p.card, fontSize = 12.5.sp)
+                    Text(text, color = p.card, fontSize = qqFontBody(12.5.sp))
                 }
             }
         }
@@ -410,7 +413,7 @@ private fun MetaPill(text: String) {
             .background(p.hover)
             .padding(horizontal = 6.dp, vertical = 2.dp),
     ) {
-        Text(text, color = p.t2, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(text, color = p.t2, fontSize = qqFontBody(10.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -434,7 +437,7 @@ private fun ModelRow(
                 Text(
                     profile.name,
                     color = p.t1,
-                    fontSize = 14.5.sp,
+                    fontSize = qqFontBody(14.5.sp),
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -452,7 +455,7 @@ private fun ModelRow(
                 "${providerLabel(profile.providerId)} · ${profile.model} · " +
                     tokensLabel(contextWindowOf(profile.model, profile.contextWindow)),
                 color = p.t3,
-                fontSize = 11.5.sp,
+                fontSize = qqFontBody(11.5.sp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -460,29 +463,29 @@ private fun ModelRow(
         Text(
             "测试",
             color = p.accent,
-            fontSize = 11.5.sp,
+            fontSize = qqFontBody(11.5.sp),
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
                 .clickable(onClick = onTest)
-                .padding(horizontal = 8.dp, vertical = 5.dp),
+                .padding(horizontal = QqSpace.s(), vertical = 5.dp),
         )
         if (!profile.isDefault) {
             Text(
                 "设为默认",
                 color = p.accent,
-                fontSize = 11.5.sp,
+                fontSize = qqFontBody(11.5.sp),
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .clickable(onClick = onDefault)
-                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                    .padding(horizontal = QqSpace.s(), vertical = 5.dp),
             )
         }
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(QqSpace.xs()))
         // 48dp 命中区：删除不可撤销（连 API Key 一起删），不能让 17dp 小图标裸奔（M20）。
         Box(
             Modifier
                 .size(48.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(QqShape.field())
                 .clickable(onClick = onDelete),
             contentAlignment = Alignment.Center,
         ) {
@@ -509,7 +512,7 @@ private fun ChannelRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(p.hover),
+            Modifier.size(30.dp).clip(QqShape.chip()).background(p.hover),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -519,22 +522,22 @@ private fun ChannelRow(
                 modifier = Modifier.size(17.dp),
             )
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(QqSpace.m()))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(status.label, color = p.t1, fontSize = 14.5.sp, fontWeight = FontWeight.Medium)
+                Text(status.label, color = p.t1, fontSize = qqFontBody(14.5.sp), fontWeight = FontWeight.Medium)
                 if (active) {
                     Spacer(Modifier.width(6.dp))
                     RunPill("当前")
                 }
             }
-            if (status.detail.isNotBlank()) Text(status.detail, color = p.t3, fontSize = 11.5.sp)
+            if (status.detail.isNotBlank()) Text(status.detail, color = p.t3, fontSize = qqFontBody(11.5.sp))
         }
         if (!status.available && status.id == "shizuku") {
             Text(
                 "授权",
                 color = p.accent,
-                fontSize = 12.sp,
+                fontSize = qqFontBody(12.sp),
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .clickable(onClick = onAuthorize)
@@ -544,11 +547,11 @@ private fun ChannelRow(
             Text(
                 if (status.available) "可用" else "重新探测",
                 color = if (status.available) p.green else p.t3,
-                fontSize = 11.5.sp,
+                fontSize = qqFontBody(11.5.sp),
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .clickable(onClick = onRefresh)
-                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                    .padding(horizontal = QqSpace.s(), vertical = 5.dp),
             )
         }
     }
@@ -572,13 +575,13 @@ private fun AgentRow(card: AgentCard, onClick: () -> Unit) {
             Text(
                 card.session.title.ifBlank { "未命名会话" },
                 color = p.t1,
-                fontSize = 14.5.sp,
+                fontSize = qqFontBody(14.5.sp),
                 fontWeight = FontWeight.Medium,
             )
             Text(
                 card.session.preview.ifBlank { "无输出" },
                 color = p.t3,
-                fontSize = 11.5.sp,
+                fontSize = qqFontBody(11.5.sp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -590,18 +593,18 @@ private fun AgentRow(card: AgentCard, onClick: () -> Unit) {
 @Composable
 private fun FlowChips(items: List<String>) {
     val p = LocalQq.current
-    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(Modifier.fillMaxWidth().padding(QqSpace.m()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         items.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 row.forEach { item ->
                     Box(
                         Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(QqShape.chip())
                             .background(p.hover)
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                            .padding(horizontal = 10.dp, vertical = QqSpace.s()),
                     ) {
-                        Text(item, color = p.t2, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(item, color = p.t2, fontSize = qqFontBody(12.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
@@ -665,7 +668,7 @@ private fun ModelDialog(
                     items(providers, key = { it.id }) { prov ->
                         Box(
                             Modifier
-                                .clip(RoundedCornerShape(9.dp))
+                                .clip(QqShape.chip())
                                 .background(if (prov.id == provider.id) p.accent.copy(alpha = 0.14f) else p.hover)
                                 .clickable {
                                     provider = prov
@@ -682,7 +685,7 @@ private fun ModelDialog(
                             Text(
                                 prov.label,
                                 color = if (prov.id == provider.id) p.accent else p.t2,
-                                fontSize = 12.sp,
+                                fontSize = qqFontBody(12.sp),
                             )
                         }
                     }
@@ -692,7 +695,7 @@ private fun ModelDialog(
                 DialogField("API Key", apiKey, secret = true) { apiKey = it }
                 DialogField("模型名", model) { model = it }
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(QqSpace.s()),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(
@@ -717,18 +720,18 @@ private fun ModelDialog(
                         },
                         enabled = !fetching && baseUrl.isNotBlank(),
                     ) {
-                        Text(if (fetching) "拉取中…" else "拉取模型列表", color = p.accent, fontSize = 12.sp)
+                        Text(if (fetching) "拉取中…" else "拉取模型列表", color = p.accent, fontSize = qqFontBody(12.sp))
                     }
                     if (available.isNotEmpty()) {
                         Text(
                             if (picked.isEmpty()) "共 ${available.size} 个 · 可多选" else "已选 ${picked.size} 个",
                             color = p.t3,
-                            fontSize = 11.sp,
+                            fontSize = qqFontBody(11.sp),
                         )
                     }
                 }
-                fetchError?.let { Text("拉取失败：$it", color = p.red, fontSize = 11.sp) }
-                engineNote?.let { Text(it, color = p.t3, fontSize = 11.sp) }
+                fetchError?.let { Text("拉取失败：$it", color = p.red, fontSize = qqFontBody(11.sp)) }
+                engineNote?.let { Text(it, color = p.t3, fontSize = qqFontBody(11.sp)) }
                 if (available.isNotEmpty()) {
                     // 列表紧跟「拉取模型列表」，勾选就在眼前。
                     Column(Modifier.heightIn(max = 150.dp).verticalScroll(rememberScrollState())) {
@@ -751,12 +754,12 @@ private fun ModelDialog(
                                     Text(
                                         item,
                                         color = if (selected) p.accent else p.t2,
-                                        fontSize = 12.sp,
+                                        fontSize = qqFontBody(12.sp),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.weight(1f),
                                     )
-                                    if (selected) Text("✓", color = p.accent, fontSize = 12.sp)
+                                    if (selected) Text("✓", color = p.accent, fontSize = qqFontBody(12.sp))
                                 }
                             }
                         }
@@ -765,7 +768,7 @@ private fun ModelDialog(
                 DialogField("上下文窗口 tokens（留空自动判断）", contextWindow) { input ->
                     contextWindow = input.filter { ch -> ch.isDigit() }
                 }
-                Text("思考强度", color = p.t3, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp))
+                Text("思考强度", color = p.t3, fontSize = qqFontBody(11.sp), modifier = Modifier.padding(top = 10.dp))
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(top = 3.dp),
@@ -774,15 +777,15 @@ private fun ModelDialog(
                         val on = value == effort
                         Box(
                             Modifier
-                                .clip(RoundedCornerShape(9.dp))
+                                .clip(QqShape.chip())
                                 .background(if (on) p.accent.copy(alpha = 0.14f) else p.hover)
                                 .clickable { effort = value }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                                .padding(horizontal = QqSpace.m(), vertical = 6.dp),
                         ) {
                             Text(
                                 reasoningLabelOf(value),
                                 color = if (on) p.accent else p.t2,
-                                fontSize = 12.sp,
+                                fontSize = qqFontBody(12.sp),
                             )
                         }
                     }
@@ -801,12 +804,12 @@ private fun ModelDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("支持工具调用", color = p.t2, fontSize = 12.5.sp)
-                        Text("关闭后请求里不带 tools", color = p.t3, fontSize = 10.5.sp)
+                        Text("支持工具调用", color = p.t2, fontSize = qqFontBody(12.5.sp))
+                        Text("关闭后请求里不带 tools", color = p.t3, fontSize = qqFontBody(10.5.sp))
                     }
                     Switch(checked = supportsTools, onCheckedChange = { supportsTools = it })
                 }
-                Text(provider.hint, color = p.t3, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                Text(provider.hint, color = p.t3, fontSize = qqFontBody(11.sp), modifier = Modifier.padding(top = QqSpace.xs()))
             }
         },
         confirmButton = {
@@ -852,19 +855,19 @@ private fun DialogField(
     onValueChange: (String) -> Unit,
 ) {
     val p = LocalQq.current
-    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-        Text(label, color = p.t3, fontSize = 11.sp)
+    Column(Modifier.fillMaxWidth().padding(top = QqSpace.s())) {
+        Text(label, color = p.t3, fontSize = qqFontBody(11.sp))
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
             singleLine = true,
-            textStyle = TextStyle(color = p.t1, fontSize = 13.5.sp),
+            textStyle = TextStyle(color = p.t1, fontSize = qqFontBody(13.5.sp)),
             visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
             cursorBrush = SolidColor(p.accent),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 3.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(QqShape.chip())
                 .background(p.hover)
                 .padding(horizontal = 10.dp, vertical = 9.dp),
         )

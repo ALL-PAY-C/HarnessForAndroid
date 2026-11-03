@@ -6,7 +6,7 @@ import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
-import java.util.zip.ZipInputStream
+import dev.dsh.mobile.core.common.archive.ZipExtract
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -69,26 +69,25 @@ class AgentPresetImporter {
         require(bytes.size <= MAX_BYTES) { "预设超过 20MB 限制" }
         require(bytes.size >= 4 && bytes[0] == 80.toByte() && bytes[1] == 75.toByte()) { "ZIP 文件损坏或格式无效" }
         val files = mutableMapOf<String, String>()
-        var total = 0
-        var count = 0
+        val options = ZipExtract.Options(
+            maxEntries = MAX_ENTRIES,
+            maxEntryBytes = MAX_BYTES.toLong(),
+            maxTotalBytes = MAX_BYTES.toLong(),
+        )
         try {
-            ZipInputStream(bytes.inputStream()).use { zip ->
-                while (true) {
-                    val entry = zip.nextEntry ?: break
-                    require(++count <= MAX_ENTRIES) { "ZIP 条目超过 2000 限制" }
-                    val path = entry.name.replace('\\', '/')
-                    validatePath(path)
-                    if (!entry.isDirectory) {
-                        val data = limited(zip, MAX_BYTES - total)
-                        total += data.size
-                        if (path.endsWith(".json") || path.endsWith(".yml") || path.endsWith(".yaml")) {
-                            require(!files.containsKey(path)) { "ZIP 含重复文件：$path" }
-                            files[path] = data.toString(Charsets.UTF_8)
-                        }
+            ZipExtract.forEachEntry(bytes.inputStream(), options) { name, isDirectory, data ->
+                val path = ZipExtract.cleanName(name) ?: throw IllegalArgumentException("ZIP 路径穿越：$name")
+                if (!isDirectory) {
+                    // 非文本条目也要读：总解压量上限得把它们算进去，否则塞一堆 png 就能绕过。
+                    val body = data.readBytes()
+                    if (path.endsWith(".json") || path.endsWith(".yml") || path.endsWith(".yaml")) {
+                        require(!files.containsKey(path)) { "ZIP 含重复文件：$path" }
+                        files[path] = body.toString(Charsets.UTF_8)
                     }
                 }
             }
         } catch (e: IllegalArgumentException) { throw e }
+        catch (e: ZipExtract.ZipExtractException) { throw IllegalArgumentException(zipFailure(e), e) }
         catch (e: Exception) { throw IllegalArgumentException("ZIP 文件损坏：" + e.message, e) }
         val packages = files.keys.filter { it.substringAfterLast('/') == "package.json" }.sortedWith(compareBy({ it.count { c -> c == '/' } }, { it }))
         for (pkg in packages) {
@@ -165,8 +164,17 @@ class AgentPresetImporter {
         require(preset.id != "default") { "导入预设不可使用保留 id：default" }
         return preset
     }
+    /** 解包失败 → 可读的业务错误；上限类错误沿用原有措辞（测试与 UI 都按这几个串认）。 */
+    private fun zipFailure(e: ZipExtract.ZipExtractException): String = when (e) {
+        is ZipExtract.ZipExtractException.IllegalEntry -> "ZIP 路径穿越：${e.entry}"
+        is ZipExtract.ZipExtractException.TooManyEntries -> "ZIP 条目超过 ${e.limit} 限制"
+        is ZipExtract.ZipExtractException.EntryTooLarge -> "预设超过 20MB 限制"
+        is ZipExtract.ZipExtractException.TotalTooLarge -> "预设超过 20MB 限制"
+        is ZipExtract.ZipExtractException.Corrupt -> "ZIP 文件损坏：" + (e.cause?.message ?: e.message)
+    }
+
     private fun validatePath(path: String) {
-        require(path.isNotBlank() && !path.startsWith('/') && !Regex("^[A-Za-z]:").containsMatchIn(path) && path.split('/').none { it == ".." }) { "ZIP 路径穿越：$path" }
+        require(ZipExtract.cleanName(path) != null) { "ZIP 路径穿越：$path" }
     }
     private fun limited(input: InputStream, limit: Int = MAX_BYTES): ByteArray {
         val out = ByteArrayOutputStream(); val buffer = ByteArray(8192)

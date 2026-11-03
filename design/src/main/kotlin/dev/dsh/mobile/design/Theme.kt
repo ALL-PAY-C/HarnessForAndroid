@@ -54,7 +54,7 @@ data class ThemeTokens(
     val accent2: Color = Color(0xFF3CB4FF),
     val bubbleMine: Color = Color(0xFF0099FF),
     val bubbleOther: Color = Color(0xFFF1F2F5),
-    val cornerRadius: Dp = 18.dp,
+    val cornerRadius: Dp = 16.dp,
     val fontScale: Float = 1f,
     val density: Float = 1f,
     val compact: Boolean = false,
@@ -83,10 +83,26 @@ data class ThemeTokens(
     /** 背景雾化半径（Android 12 以下自动降级为 0）；材质自带的下限在 [materialPaint] 里取大。 */
     val glassBlur: Dp = 0.dp,
 ) {
+    /**
+     * 几何派生档：卡片用 [cornerRadius] 本体，其余按固定比例算。
+     *
+     * 用 getter 而不是构造参数——[ThemeTokens] 是 data class，`copy(cornerRadius = ...)` 时
+     * 构造参数形式的派生字段会保留旧值（copy 的默认实参取的是当前属性值，不是构造默认表达式），
+     * getter 永远跟着 cornerRadius 走。
+     */
+    /** 输入框 / 表单容器：0.75×（cornerRadius 16 → 12dp）。 */
+    val fieldRadius: Dp get() = cornerRadius * 0.75f
+
+    /** 芯片 / 标签 / 小徽章：0.625×（16 → 10dp）。 */
+    val chipRadius: Dp get() = cornerRadius * 0.625f
+
+    /** 底部抽屉 / 大面板：1.25×（16 → 20dp）。 */
+    val sheetRadius: Dp get() = cornerRadius * 1.25f
+
     /** 气泡主圆角：紧凑模式压到 12dp，其余一律跟用户设的 cornerRadius 走。 */
     fun bubbleRadius(isMine: Boolean): Dp = if (compact) 12.dp else cornerRadius
 
-    /** 靠头像那一侧的尖角：主圆角的 1/3（18 → 6），跟着 cornerRadius 一起缩放。 */
+    /** 靠头像那一侧的尖角：主圆角的 1/3（16 → 5.3），跟着 cornerRadius 一起缩放。 */
     fun tailRadius(isMine: Boolean): Dp = bubbleRadius(isMine) / 3
 }
 

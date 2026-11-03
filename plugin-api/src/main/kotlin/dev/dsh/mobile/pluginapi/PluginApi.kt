@@ -326,11 +326,3 @@ data class ConfigField(
     val hint: String = "",
     val options: List<String> = emptyList(),
 )
-
-/** A page a packaged plugin declares; the host renders it from [fields]. */
-data class ConfigPage(
-    val id: String,
-    val title: String,
-    val description: String = "",
-    val fields: List<ConfigField> = emptyList(),
-)

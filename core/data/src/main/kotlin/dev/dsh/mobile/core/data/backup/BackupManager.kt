@@ -1,13 +1,13 @@
 package dev.dsh.mobile.core.data.backup
 
 import android.content.Context
+import dev.dsh.mobile.core.common.archive.ZipExtract
 import dev.dsh.mobile.core.data.EndpointTokenMigration
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 /**
@@ -131,32 +131,21 @@ class BackupManager(private val context: Context) {
 
     /** Restore a snapshot. The caller is expected to restart the app afterwards. */
     fun restore(file: File): Result<Unit> = runCatching {
-        ZipInputStream(file.inputStream().buffered()).use { zip ->
-            var entry = zip.nextEntry
-            while (entry != null) {
-                val name = entry.name
-                if (!entry.isDirectory) {
-                    val bytes = zip.readBytes()
-                    when {
-                        name.startsWith("shared_prefs/") -> {
-                            val target = File(context.dataDir, name)
-                            target.parentFile?.mkdirs()
-                            target.writeBytes(bytes)
-                        }
-                        name.startsWith("db/") -> {
-                            val target = File(context.getDatabasePath(dev.dsh.mobile.core.data.db.DshDatabase.NAME).parentFile, name.removePrefix("db/"))
-                            target.parentFile?.mkdirs()
-                            target.writeBytes(bytes)
-                        }
-                        name.startsWith("plugins/") -> {
-                            val target = File(context.filesDir, name)
-                            target.parentFile?.mkdirs()
-                            target.writeBytes(bytes)
-                        }
-                    }
+        val dbDir = context.getDatabasePath(dev.dsh.mobile.core.data.db.DshDatabase.NAME).parentFile
+        ZipExtract.forEachEntry(file.inputStream().buffered(), ZipExtract.Options.pathOnly()) { name, isDirectory, data ->
+            if (!isDirectory) {
+                val clean = ZipExtract.cleanName(name) ?: throw ZipExtract.ZipExtractException.IllegalEntry(name)
+                val target = when {
+                    clean.startsWith("shared_prefs/") -> File(context.dataDir, clean)
+                    clean.startsWith("db/") -> File(dbDir, clean.removePrefix("db/"))
+                    clean.startsWith("plugins/") -> File(context.filesDir, clean)
+                    else -> null
                 }
-                zip.closeEntry()
-                entry = zip.nextEntry
+                // 流式落盘：存档里的 db 可能有几十 MB，别为了路径校验先读进内存。
+                if (target != null) {
+                    target.parentFile?.mkdirs()
+                    target.outputStream().use { out -> data.copyTo(out) }
+                }
             }
         }
         prefs.edit().putLong(KEY_BATCH, 0L).apply()

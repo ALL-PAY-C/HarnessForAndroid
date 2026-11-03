@@ -1,90 +1,58 @@
 plugins {
-    id("com.android.application")
+    id("com.android.library")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-// 产物是一个「插件包」APK：没有 launcher activity，由宿主 dsh-mobile 用
-// PathClassLoader 加载。因此 plugin-api 与 compose 全部 compileOnly ——
-// 插件 APK 里不带这两份类，运行时一律解析到宿主那一份，类型同一性才成立。
+// 插件实现本体，普通 library，两个消费方：
+//   1) :app 直接 implementation(project(":plugin-html"))，当内置插件注册（HtmlPlugin）；
+//   2) :plugin-html-apk 把它打成可独立安装的插件包 APK。
+// 以前它是 com.android.application，app 用 sourceSets 把这里的源码挂进自己的编译单元，
+// 同一份 Kotlin 编两次、插件版本与宿主版本各写一份（T1.2 去掉这两条）。
+// plugin-api 与 compose 全部 compileOnly：运行时一律解析到宿主那一份，类型同一性才成立。
 android {
     namespace = "dev.dsh.mobile.plugin.html"
-    compileSdk = 35
 
-    defaultConfig {
-        applicationId = "dev.dsh.mobile.plugin.html"
-        minSdk = 26
-        targetSdk = 35
-        versionCode = 5
-        versionName = "2.0.0"
-    }
-
-    signingConfigs {
-        // 复用宿主仓库里那把提交过的 debug key：插件包能直接 adb install，
-        // 也能被宿主 PackageManager.getPackageArchiveInfo 正常解析。
-        create("plugin") {
-            storeFile = file("../app/keystore/dsh-debug.jks")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
-        }
-    }
-
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            isShrinkResources = false
-            signingConfig = signingConfigs.getByName("plugin")
-        }
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
+    // compileSdk / minSdk / targetSdk 由根 build.gradle.kts 的 subprojects 块统一给。
+    // 本模块没有任何代码读 BuildConfig / R，关掉能少一个产物。
+    buildFeatures { buildConfig = false }
 
     lint {
-        // 插件包不是要发布的 app：compose/plugin-api 都是 compileOnly，
-        // lint 会把它们当成缺失类，跑 release 时直接关掉。
+        // 插件实现里 compose/plugin-api 都是 compileOnly，lint 会把它们当缺失类。
         checkReleaseBuilds = false
         abortOnError = false
     }
 
     packaging {
-        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        // 双保险：即使哪天有人把 plugin-api 换成 implementation，也别把宿主那份打进插件。
+        // 双保险：即使哪天有人把 plugin-api 换成 implementation，也别把宿主那份打进包里。
         resources.excludes += "**/dev/dsh/mobile/pluginapi/**"
-    }
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
 dependencies {
     compileOnly(project(":plugin-api"))
+    // AppLog 直接取自 core:common，必须显式声明：以前靠 plugin-api 的 api(core:common)
+    // 泄漏拿到，T1.2 把那条例行删了，插件这里就得自己声明（compileOnly，宿主提供实现）。
+    compileOnly(project(":core:common"))
 
-    val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
+    val composeBom = platform(libs.compose.bom)
     compileOnly(composeBom)
-    compileOnly("androidx.compose.runtime:runtime")
-    compileOnly("androidx.compose.ui:ui")
-    compileOnly("androidx.compose.foundation:foundation")
-    compileOnly("androidx.compose.material3:material3")
+    compileOnly(libs.compose.runtime)
+    compileOnly(libs.compose.ui)
+    compileOnly(libs.compose.foundation)
+    compileOnly(libs.compose.material3)
 
     // 离线构建：compose 的传递依赖会把 annotation/collection 钉到 1.8.0 / 1.4.0，
     // 而这两个版本的 jar 不在本机 gradle 缓存里（宿主其它模块解析到的是 1.8.1 / 1.4.4）。
     // 显式抬到缓存里有的版本，插件包本来也不打包它们（compileOnly）。
-    compileOnly("androidx.annotation:annotation:1.8.1")
-    compileOnly("androidx.collection:collection:1.4.4")
+    compileOnly(libs.androidx.annotation)
+    compileOnly(libs.androidx.collection)
 
-    // 只为纯 JVM 的 HTML 生成器加：DiagramHtml/PlantUml 不碰 Android，能在 JVM 单测里直接断言。
-    // 与仓库其它模块同一个版本；testImplementation 不参与插件 APK。
-    testImplementation("junit:junit:4.13.2")
+    // 纯 JVM 的 HTML 生成器（DiagramHtml/PlantUml）不碰 Android，能在 JVM 单测里直接断言。
+    testImplementation(libs.junit)
 
     // compose 编译器插件对 test 源集同样生效，它开编前要看到 compose runtime，
     // 而主源集用的是 compileOnly。照抄一份到 testCompileOnly，不引入任何新产物。
     testCompileOnly(composeBom)
-    testCompileOnly("androidx.compose.runtime:runtime")
+    testCompileOnly(libs.compose.runtime)
 }

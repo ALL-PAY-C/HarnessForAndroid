@@ -9,18 +9,18 @@ android {
 }
 
 dependencies {
-    api(project(":core:model"))
-    api(project(":core:common"))
-    api(project(":design"))
-    api(project(":plugin-api"))
+    // plugin-api 只被 RichText.kt 用来读 HtmlBlockRenderers/DiagramRenderers 槽位（实现细节，
+    // 不出现在任何公共签名里）→ implementation。:design / :core:model / :core:common
+    // 本模块零引用（grep 0 命中），整条去掉：渲染层不再反向依赖设计系统。
+    implementation(project(":plugin-api"))
 
-    val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
+    val composeBom = platform(libs.compose.bom)
     api(composeBom)
-    api("androidx.compose.ui:ui")
-    api("androidx.compose.ui:ui-graphics")
-    api("androidx.compose.foundation:foundation")
-    api("androidx.compose.material3:material3")
-    api("androidx.compose.ui:ui-tooling-preview")
-    debugApi("androidx.compose.ui:ui-tooling")
-    testImplementation("junit:junit:4.13.2")
+    api(libs.compose.ui)
+    api(libs.compose.graphics)
+    api(libs.compose.foundation)
+    api(libs.compose.material3)
+    api(libs.compose.preview)
+    debugApi(libs.compose.tooling)
+    testImplementation(libs.junit)
 }

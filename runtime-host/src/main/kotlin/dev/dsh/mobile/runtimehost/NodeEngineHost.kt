@@ -3,6 +3,7 @@ package dev.dsh.mobile.runtimehost
 import android.content.Context
 import android.os.SystemClock
 import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.common.archive.ZipExtract
 import dev.dsh.mobile.noderuntime.NodeRuntime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,11 +17,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.BufferedInputStream
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.File
-import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
@@ -29,7 +28,6 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.atomic.AtomicLong
-import java.util.zip.ZipInputStream
 
 /**
  * 进程内 Node 引擎的宿主实现。
@@ -49,8 +47,8 @@ class NodeEngineHost(
     private val appContext = context.applicationContext
 
     /** 解包目标；版本号进目录名，引擎包换了直接换 v2，不用做增量校验。 */
-    private val engineDir = File(appContext.filesDir, "runtime/engine-v1")
-    private val homeDir = File(appContext.filesDir, "runtime/home")
+    private val engineDir = engineDirFor(appContext)
+    private val homeDir = homeDirFor(appContext)
     private val portFile = File(engineDir, ".port")
     private val markerFile = File(engineDir, ".extracted")
 
@@ -386,35 +384,44 @@ class NodeEngineHost(
      * 属于会真炸的缺失。整包压成一个 zip 就绕开了 aapt 的命名规则（实测 851/851 全在）。
      */
     private fun unzipFromAssets(assetZip: String, dest: File, stats: LongArray) {
-        appContext.assets.open(assetZip).use { raw ->
-            ZipInputStream(BufferedInputStream(raw)).use { zip ->
-                var entry = zip.nextEntry
-                while (entry != null) {
-                    val name = entry.name
-                    if (name.isNotEmpty() && !name.contains("..")) {
-                        val target = File(dest, name)
-                        if (entry.isDirectory) {
-                            target.mkdirs()
-                        } else {
-                            target.parentFile?.mkdirs()
-                            FileOutputStream(target).use { out -> zip.copyTo(out, DEFAULT_BUFFER_SIZE) }
-                            stats[0]++
-                            stats[1] += target.length()
-                        }
-                    }
-                    zip.closeEntry()
-                    entry = zip.nextEntry
-                }
-            }
+        // 自己打的资产包（851 个文件），只做路径穿越防护、不设体积上限。
+        val result = appContext.assets.open(assetZip).use { raw ->
+            ZipExtract.extract(raw, dest, ZipExtract.Options.pathOnly())
         }
+        stats[0] += result.entries
+        stats[1] += result.bytes
     }
 
-    private companion object {
+    companion object {
+        /** APK 内的引擎包（构建期由 engine/ 打包生成，不进源码树）。 */
         const val ASSET_ZIP = "runtime/engine.zip"
-        const val PORT_WAIT_MS = 25_000L
-        const val POLL_INTERVAL_MS = 50L
-        const val CONNECT_TIMEOUT_MS = 3_000
-        const val READ_TIMEOUT_MS = 30_000
-        const val ERR_CODE = -1
+
+        /** 解包目录名 = 引擎打包版本。换包换 v2。 */
+        const val ENGINE_VERSION = "engine-v1"
+
+        /**
+         * 引擎在私有目录下的根：解包目录与 home 都在这里。
+         *
+         * 主进程的设置页要用同一份路径统计占用，所以路径只在这里算一遍 ——
+         * 通过 AIDL 看不到 :node 的文件路径，两边各写一份字面量迟早会漂移。
+         */
+        fun rootDirFor(context: Context): File = File(context.filesDir, "runtime")
+
+        fun engineDirFor(context: Context): File = File(rootDirFor(context), ENGINE_VERSION)
+
+        fun homeDirFor(context: Context): File = File(rootDirFor(context), "home")
+
+        /**
+         * 可能存在的日志目录。引擎日志走 logcat（libnode 的 stdout 被 native 侧重定向），
+         * 所以通常一个都不存在；设置页「清日志」只清这里的内容，不为了有日志去新建目录。
+         */
+        fun logDirsFor(context: Context): List<File> =
+            listOf(File(rootDirFor(context), "logs"), File(homeDirFor(context), "logs"))
+
+        private const val PORT_WAIT_MS = 25_000L
+        private const val POLL_INTERVAL_MS = 50L
+        private const val CONNECT_TIMEOUT_MS = 3_000
+        private const val READ_TIMEOUT_MS = 30_000
+        private const val ERR_CODE = -1
     }
 }

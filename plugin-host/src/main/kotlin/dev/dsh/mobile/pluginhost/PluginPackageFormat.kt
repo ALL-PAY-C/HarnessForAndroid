@@ -1,9 +1,9 @@
 package dev.dsh.mobile.pluginhost
 
+import dev.dsh.mobile.core.common.archive.ZipExtract
 import org.json.JSONObject
 import java.io.File
 import java.util.zip.ZipFile
-import java.util.zip.ZipInputStream
 
 /**
  * 插件包的分发格式。
@@ -32,15 +32,7 @@ object PluginPackageFormat {
     }.getOrDefault(false)
 
     fun isAndroidApk(bytes: ByteArray): Boolean = runCatching {
-        ZipInputStream(bytes.inputStream()).use { zin ->
-            var seen = 0
-            while (seen < MAX_ENTRIES) {
-                val e = zin.nextEntry ?: break
-                seen++
-                if (isApkEntry(e.name)) return@use true
-            }
-            false
-        }
+        ZipExtract.names(bytes, ZipExtract.Options.pathOnly(MAX_ENTRIES)).any { isApkEntry(it) }
     }.getOrDefault(false)
 
     /** 包入口（相对包目录）。顺序与 JsPluginRuntime.resolveEntry 一致，最后才看 plugin.json。 */

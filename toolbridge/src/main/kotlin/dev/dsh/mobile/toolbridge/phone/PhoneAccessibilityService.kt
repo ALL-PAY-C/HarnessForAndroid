@@ -19,8 +19,17 @@ class PhoneAccessibilityService : AccessibilityService() {
     private var foregroundPkg: String? = null
 
     @Volatile
+    private var foregroundClass: String? = null
+
+    @Volatile
+    private var foregroundSince: Long = 0L
+
+    @Volatile
     private var lastAction: PhoneActionRecord? = null
     private var statusView: TextView? = null
+
+    /** 树代次的唯一实例：事件回调写，读侧（tree / T4.2 的 wait_for）读。 */
+    private val generations = PhoneTreeGenerations()
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -35,11 +44,57 @@ class PhoneAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val e = event ?: return
+        // 三类事件都要记代次：配置里声明了 content/windows changed，只认 state-changed 的话
+        // 「界面变了没」就只能靠在外部轮询整棵树（见 PhoneNode.kt 的 PhoneTreeGenerations）。
+        generations.commit(fingerprintOf(e))
         if (e.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            foregroundPkg = e.packageName?.toString()
+            val pkg = e.packageName?.toString()
+            val switched = pkg != foregroundPkg
+            foregroundPkg = pkg
+            // 只有真的换台才刷新「从什么时候开始」，否则同一窗口的重复事件会把 sinceMs 一直往后推。
+            if (switched) {
+                foregroundClass = e.className?.toString()
+                foregroundSince = System.currentTimeMillis()
+            }
             statusView?.text = statusText()
         }
     }
+
+    /**
+     * 事件时刻的树指纹。
+     *
+     * 全树哈希要在回调里遍历整棵树，做不起；这里只取「窗口 + 事件源」这一层。
+     * 粗指纹的漏判方向是保守的：等待方会等到超时，不会误报「已变化」。
+     */
+    private fun fingerprintOf(e: AccessibilityEvent): Int {
+        var h = e.windowId
+        val root = rootInActiveWindow
+        h = 31 * h + (root?.packageName?.hashCode() ?: 0)
+        h = 31 * h + (root?.className?.hashCode() ?: 0)
+        h = 31 * h + (root?.childCount ?: -1)
+        val src = e.source
+        if (src != null) {
+            h = 31 * h + (src.viewIdResourceName?.hashCode() ?: 0)
+            h = 31 * h + (src.text?.hashCode() ?: 0)
+            h = 31 * h + (src.contentDescription?.hashCode() ?: 0)
+            h = 31 * h + src.childCount
+        }
+        return h
+    }
+
+    // ---- T4.1 读侧：前台快照与树代次 ----
+
+    fun foregroundPackage(): String? = foregroundPkg
+
+    fun foregroundActivity(): String? = foregroundClass
+
+    fun foregroundSinceMs(): Long = foregroundSince
+
+    fun currentGeneration(): Long = generations.current()
+
+    /** 等到界面变化（代次越过 sinceGeneration）或超时；超时返回 null，不抛。 */
+    suspend fun awaitChange(sinceGeneration: Long, timeoutMs: Long): Long? =
+        generations.awaitChange(sinceGeneration, timeoutMs)
 
     override fun onInterrupt() {}
 

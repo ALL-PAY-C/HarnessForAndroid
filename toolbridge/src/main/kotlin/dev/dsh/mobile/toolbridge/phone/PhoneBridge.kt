@@ -14,9 +14,11 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.view.Display
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import dev.dsh.mobile.toolbridge.ShizukuChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -47,6 +49,7 @@ class PhoneBridge(private val context: Context) {
         append("、openapp（package 包名或 query 应用名模糊匹配）、screenshot（Android 11+ 存本地文件）。")
         append("坐标优先用 fx/fy（0-1 相对屏幕），模型看的是缩放截图，绝对像素容易点偏。")
         append("读屏输出每行 text|desc|cx,cy|clickable|class。")
+        append("结构化读屏（viewId/bounds/节点身份/快照代次）用 phone_tree 工具。")
     }
 
     fun isEnabled(): Boolean {
@@ -126,6 +129,10 @@ class PhoneBridge(private val context: Context) {
     private fun execBlocking(json: String): PhoneResult {
         val svc = PhoneAccessibilityService.current()
         if (svc == null) {
+            // 读侧新工具要带错误码；旧 9 个动作的失败文案保持逐字符不变。
+            if (isTreeAction(json)) {
+                return treeFailure(PhoneErrorCode.A11yOff, "无障碍服务未开启")
+            }
             return PhoneResult(
                 ok = false,
                 output = "",
@@ -147,7 +154,10 @@ class PhoneBridge(private val context: Context) {
             "readscreen" -> doReadScreen(svc, obj)
             "openapp" -> doOpenApp(obj)
             "screenshot" -> doScreenshot(svc)
-            else -> PhoneResult(false, "", "未知 action: " + action + "（支持 tap/swipe/type/back/home/recents/readscreen/openapp/screenshot）")
+            // T4.1 读侧：结构化节点树。工具面是独立的 phone_tree（见 LocalEngineTransport），
+            // 但执行走这条同一通道，core:protocol 不必反向依赖 toolbridge。
+            ACTION_TREE -> doTree(svc, obj)
+            else -> PhoneResult(false, "", "未知 action: " + action + "（支持 tap/swipe/type/back/home/recents/readscreen/openapp/screenshot/tree）")
         }
     }
 
@@ -252,6 +262,216 @@ class PhoneBridge(private val context: Context) {
         return if (body != null) PhoneResult(true, body)
         else PhoneResult(false, "", "读屏超时或服务不可用")
     }
+
+    // ---- T4.1 读侧：结构化节点树（旧 readscreen 路径不受影响，见 doReadScreen / rootsOf）----
+
+    private data class TreeParams(
+        val maxNodes: Int,
+        val maxDepth: Int,
+        val includeInvisible: Boolean,
+        val excludeOwnPackage: Boolean,
+        val packageFilter: String?,
+        val onlyClickable: Boolean,
+        val selector: PhoneSelector?,
+    )
+
+    /** 数值越界只夹取不报错（模型给 5000 就是想多要节点）；filter 不是对象才算参数非法。 */
+    private fun parseTreeParams(obj: JSONObject): TreeParams? {
+        val raw = obj.opt("filter")
+        if (raw != null && raw != JSONObject.NULL && raw !is JSONObject) return null
+        return TreeParams(
+            maxNodes = obj.optInt("maxNodes", 400).coerceIn(1, 2000),
+            maxDepth = obj.optInt("maxDepth", 6).coerceIn(1, 64),
+            includeInvisible = obj.optBoolean("includeInvisible", false),
+            excludeOwnPackage = obj.optBoolean("excludeOwnPackage", true),
+            packageFilter = obj.optString("package", "").trim().takeIf { it.isNotEmpty() },
+            onlyClickable = obj.optBoolean("onlyClickable", false),
+            selector = if (raw is JSONObject) PhoneSelector.parse(raw) else null,
+        )
+    }
+
+    /**
+     * 读侧根节点：剔除自身浮层窗口与自身包名窗口。
+     *
+     * svc.windows 里包含本进程的 TYPE_ACCESSIBILITY_OVERLAY 浮层（updateOverlay 那个），
+     * 不过滤的话「手机控制已就绪 · <pkg> · ✓tap」会作为界面节点喂回模型。
+     * 旧 readscreen 走 rootsOf，行为保持不变。
+     */
+    private fun treeRoots(svc: AccessibilityService, p: TreeParams): List<AccessibilityNodeInfo> {
+        val out = ArrayList<AccessibilityNodeInfo>()
+        for (w in svc.windows) {
+            if (w.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY) continue
+            val root = w.root ?: continue
+            if (!rootPasses(root, p)) continue
+            out.add(root)
+        }
+        if (out.isEmpty()) {
+            // 部分 ROM 只在窗口有焦点时才填 windows；退回活动窗口，但同一套剔除照做。
+            val root = svc.rootInActiveWindow ?: return emptyList()
+            if (rootPasses(root, p)) out.add(root)
+        }
+        return out
+    }
+
+    private fun rootPasses(root: AccessibilityNodeInfo, p: TreeParams): Boolean {
+        val pkg = root.packageName?.toString().orEmpty()
+        if (p.excludeOwnPackage && pkg == context.packageName) return false
+        if (p.packageFilter != null && pkg != p.packageFilter) return false
+        return true
+    }
+
+    private fun buildTree(svc: AccessibilityService, snapshotId: Long, p: TreeParams): PhoneSnapshot {
+        val nodes = ArrayList<PhoneNode>()
+        var truncated = false
+        var reason: String? = null
+        val queue = java.util.ArrayDeque<Triple<AccessibilityNodeInfo, Int, Int>>()
+        for (root in treeRoots(svc, p)) queue.addLast(Triple(root, 0, -1))
+        loop@ while (queue.isNotEmpty()) {
+            if (nodes.size >= p.maxNodes) {
+                truncated = true
+                reason = "maxNodes"
+                break@loop
+            }
+            val (n, depth, parentIndex) = queue.removeFirst()
+            val seq = nodes.size
+            val node = toNode(n, snapshotId, seq, parentIndex, depth)
+            val keep = (p.includeInvisible || node.visible) &&
+                (!p.onlyClickable || node.clickable) &&
+                (p.selector == null || p.selector.matches(node))
+            if (keep) nodes.add(node)
+            if (depth >= p.maxDepth) {
+                if (n.childCount > 0) {
+                    truncated = true
+                    if (reason == null) reason = "maxDepth"
+                }
+                continue
+            }
+            // 父节点被过滤掉时子节点挂到最近的保留祖先，否则 parentId 会指向一张不存在的行。
+            val childParent = if (keep) seq else parentIndex
+            for (i in 0 until n.childCount) {
+                val child = n.getChild(i) ?: continue
+                queue.addLast(Triple(child, depth + 1, childParent))
+            }
+        }
+        return PhoneSnapshot(snapshotId, nodes, truncated, reason)
+    }
+
+    private fun toNode(n: AccessibilityNodeInfo, snapshotId: Long, seq: Int, parentIndex: Int, depth: Int): PhoneNode {
+        val r = Rect()
+        n.getBoundsInScreen(r)
+        return PhoneNode(
+            snapshotId = snapshotId,
+            seq = seq,
+            parentIndex = parentIndex,
+            depth = depth,
+            className = n.className?.toString().orEmpty(),
+            packageName = n.packageName?.toString().orEmpty(),
+            text = n.text?.toString().orEmpty(),
+            contentDesc = n.contentDescription?.toString().orEmpty(),
+            // accessibility_service_config.xml 已开 flagReportViewIds，取 resource-id 零额外权限。
+            viewId = n.viewIdResourceName.orEmpty(),
+            bounds = PhoneBounds(r.left, r.top, r.right, r.bottom),
+            clickable = n.isClickable,
+            editable = n.isEditable,
+            scrollable = n.isScrollable,
+            checkable = n.isCheckable,
+            checked = n.isChecked,
+            selected = n.isSelected,
+            enabled = n.isEnabled,
+            focused = n.isFocused,
+            visible = n.isVisibleToUser,
+        )
+    }
+
+    private fun doTree(svc: AccessibilityService, obj: JSONObject): PhoneResult {
+        val started = System.currentTimeMillis()
+        val params = parseTreeParams(obj)
+            ?: return treeFailure(PhoneErrorCode.BadArgs, "filter 必须是对象；maxNodes/maxDepth 越界会被夹取而非报错")
+        // 代次在遍历前取：nodeId 与这个代次绑定，跨代复用由调用方判 E_STALE_SNAPSHOT。
+        val snapshotId = generationOf(svc)
+        val snapshot = a11y(8000L) { buildTree(svc, snapshotId, params) }
+            ?: return treeFailure(PhoneErrorCode.Timeout, "读屏超时（无障碍线程 8s 未返回）")
+        if (params.selector != null && snapshot.nodes.isEmpty()) {
+            return treeFailure(PhoneErrorCode.NodeNotFound, "没有匹配 filter 的节点（快照 " + snapshotId + "）")
+        }
+        val drift = generationOf(svc) != snapshotId
+        return PhoneResult(true, treeEnvelope(snapshot, params, drift, System.currentTimeMillis() - started))
+    }
+
+    /** 读侧失败也走 ok=true 的 JSON 包：错误码要原样到模型手上；同时避免执行器把它当异常重试。 */
+    private fun treeFailure(code: PhoneErrorCode, message: String): PhoneResult =
+        PhoneResult(true, phoneErrorJson(code, message).toString())
+
+    private fun treeEnvelope(snapshot: PhoneSnapshot, p: TreeParams, drift: Boolean, elapsedMs: Long): String {
+        val dm = context.resources.displayMetrics
+        val nodes = JSONArray()
+        for (n in snapshot.nodes) nodes.put(nodeJson(n))
+        val fg = JSONObject()
+            .put("package", svcForeground()?.foregroundPackage() ?: JSONObject.NULL)
+            .put("activity", svcForeground()?.foregroundActivity() ?: JSONObject.NULL)
+            .put("sinceMs", svcForeground()?.foregroundSinceMs() ?: 0L)
+        return JSONObject()
+            .put("ok", true)
+            .put("snapshotId", snapshot.snapshotId.toString())
+            .put("generation", snapshot.snapshotId)
+            .put(
+                "screen",
+                JSONObject()
+                    .put("width", dm.widthPixels)
+                    .put("height", dm.heightPixels)
+                    .put("density", dm.density.toDouble()),
+            )
+            .put("foreground", fg)
+            .put("nodeCount", snapshot.nodes.size)
+            .put("truncated", snapshot.truncated)
+            .put("truncatedReason", snapshot.truncatedReason ?: JSONObject.NULL)
+            // 遍历期间界面又变了：节点仍可用，但调用方据此决定要不要重读（T40 的 E_SNAPSHOT_DRIFT 判据）。
+            .put("changedDuringRead", drift)
+            .put(
+                "params",
+                JSONObject()
+                    .put("maxNodes", p.maxNodes)
+                    .put("maxDepth", p.maxDepth)
+                    .put("includeInvisible", p.includeInvisible)
+                    .put("onlyClickable", p.onlyClickable),
+            )
+            .put("nodes", nodes)
+            .put("elapsedMs", elapsedMs)
+            .toString()
+    }
+
+    private fun svcForeground(): PhoneAccessibilityService? = PhoneAccessibilityService.current()
+
+    /** doTree 拿到的是基类句柄（旧动作签名统一用 AccessibilityService），代次只在本服务的子类上。 */
+    private fun generationOf(svc: AccessibilityService): Long =
+        (svc as? PhoneAccessibilityService)?.currentGeneration() ?: 0L
+
+    private fun nodeJson(n: PhoneNode): JSONObject = JSONObject()
+        .put("nodeId", n.nodeId)
+        .put("parentId", n.parentId ?: JSONObject.NULL)
+        .put("depth", n.depth)
+        .put("className", n.className)
+        .put("package", n.packageName)
+        .put("text", n.text)
+        .put("desc", n.contentDesc)
+        .put("viewId", n.viewId)
+        .put(
+            "bounds",
+            JSONObject()
+                .put("left", n.bounds.left)
+                .put("top", n.bounds.top)
+                .put("right", n.bounds.right)
+                .put("bottom", n.bounds.bottom),
+        )
+        .put("clickable", n.clickable)
+        .put("editable", n.editable)
+        .put("scrollable", n.scrollable)
+        .put("checkable", n.checkable)
+        .put("checked", n.checked)
+        .put("selected", n.selected)
+        .put("enabled", n.enabled)
+        .put("focused", n.focused)
+        .put("visible", n.visible)
 
     private fun doOpenApp(obj: JSONObject): PhoneResult {
         val pkg = obj.optString("package", "").trim()
@@ -397,6 +617,9 @@ class PhoneBridge(private val context: Context) {
         return listOfNotNull(root)
     }
 
+    private fun isTreeAction(json: String): Boolean =
+        runCatching { JSONObject(json).optString("action", "") == ACTION_TREE }.getOrDefault(false)
+
     private fun <T> a11y(timeoutMs: Long, block: () -> T): T? =
         try {
             a11yExecutor.submit<T> { block() }.get(timeoutMs, TimeUnit.MILLISECONDS)
@@ -429,6 +652,9 @@ class PhoneBridge(private val context: Context) {
     }
 
     companion object {
+        /** 读侧动作名；工具面叫 phone_tree，执行仍走 phone 通道（见 LocalEngineTransport 的注册）。 */
+        private const val ACTION_TREE = "tree"
+
         @Volatile
         private var serviceBound = false
 

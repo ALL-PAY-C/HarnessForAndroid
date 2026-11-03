@@ -1,5 +1,6 @@
 package dev.dsh.mobile.feature.plugins
 
+import dev.dsh.mobile.core.common.archive.ZipExtract
 import dev.dsh.mobile.pluginhost.ExternalPluginStore
 import dev.dsh.mobile.pluginhost.PluginInstaller
 import java.io.File
@@ -7,7 +8,6 @@ import java.io.FilterInputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 /**
  * 从 GitHub 仓库直接装插件。
@@ -180,33 +180,20 @@ object GitHubPlugins {
     }
 
     private fun scan(zip: File): List<String> = runCatching {
-        val names = ArrayList<String>()
-        ZipInputStream(zip.inputStream()).use { zin ->
-            var n = 0
-            while (n < MAX_ENTRIES) {
-                val e = zin.nextEntry ?: break
-                names += e.name
-                n++
-            }
-        }
-        names
+        ZipExtract.names(zip, ZipExtract.Options.pathOnly(MAX_ENTRIES))
     }.getOrElse { error("包读不出来：" + it.message) }
 
     /** 把 prefix 目录下的文件提到 zip 根，喂给只认「根 plugin.json」的安装器。 */
     private fun repackage(src: File, prefix: String, out: File) {
         ZipOutputStream(out.outputStream()).use { sink ->
-            ZipInputStream(src.inputStream()).use { zin ->
-                var n = 0
-                while (n < MAX_ENTRIES) {
-                    val e = zin.nextEntry ?: break
-                    n++
-                    if (e.isDirectory) continue
-                    if (!e.name.startsWith(prefix)) continue
-                    val rel = e.name.removePrefix(prefix)
-                    if (rel.isEmpty()) continue
-                    sink.putNextEntry(ZipEntry(rel))
-                    zin.copyTo(sink)
-                    sink.closeEntry()
+            ZipExtract.forEachEntry(src.inputStream(), ZipExtract.Options.pathOnly(MAX_ENTRIES)) { name, isDirectory, data ->
+                if (!isDirectory && name.startsWith(prefix)) {
+                    val rel = name.removePrefix(prefix)
+                    if (rel.isNotEmpty()) {
+                        sink.putNextEntry(ZipEntry(rel))
+                        data.copyTo(sink)
+                        sink.closeEntry()
+                    }
                 }
             }
         }
