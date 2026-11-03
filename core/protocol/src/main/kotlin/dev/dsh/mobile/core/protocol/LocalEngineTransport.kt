@@ -975,9 +975,25 @@ class LocalEngineTransport(
                         // 桌面的 todo_write 是整表替换，这里语义一致 —— 不是增量修补。
                         name == "todo_write" -> todoWriteTool(sessionId, args)
                         name == "goal" -> goalTool(sessionId, args)
-                        // 带上 turnId + callId：落盘目录按轮次分组（tools-output/<turnId>/<callId>.txt），
-                        // 同名工具同一轮调多次也不会互相覆盖。
-                        else -> toolRunner.run(name, args, turnId, id)
+                        else -> {
+                            // T6.1b：逐调用授权。判据在 ToolPolicy（按工具名 + 参数分档），
+                            // shell 的命令文本判据仍在上面那条，两者不重复实现。
+                            when (val verdict = ToolPolicy.verdict(name, args)) {
+                                is ToolAuth.Allow ->
+                                    // 带上 turnId + callId：落盘目录按轮次分组（tools-output/<turnId>/<callId>.txt），
+                                    // 同名工具同一轮调多次也不会互相覆盖。
+                                    toolRunner.run(name, args, turnId, id)
+
+                                is ToolAuth.Deny -> ToolExecResult(ok = false, output = "", error = verdict.reason)
+
+                                is ToolAuth.Ask ->
+                                    if (confirmTool(task, sessionId, verdict.title) == "allow") {
+                                        toolRunner.run(name, args, turnId, id)
+                                    } else {
+                                        ToolExecResult(ok = false, output = "", error = "用户未确认，已跳过该动作")
+                                    }
+                            }
+                        }
                         }
                     }.getOrElse { e ->
                         if (e is kotlinx.coroutines.CancellationException) throw e
@@ -1524,6 +1540,10 @@ class LocalEngineTransport(
      * 单聊没有执行池任务，用 [directPermissions] 挂一个 gate；群聊的任务卡交给执行池，
      * 这样「谁问的谁才能点」的语义只有一份实现。
      */
+    /** [ToolAuth.Ask] 的入口：与 shell 共用同一套权限卡语义，只有文案不同。 */
+    private suspend fun confirmTool(task: AgentTask?, sessionId: String, title: String): String =
+        confirm(task, sessionId, title)
+
     private suspend fun confirm(task: AgentTask?, sessionId: String, command: String): String {
         val auto = runCatching { autoApprove() }.getOrDefault(false)
         if (auto) return "allow"
