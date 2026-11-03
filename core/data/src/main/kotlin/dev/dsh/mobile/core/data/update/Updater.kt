@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
 import dev.dsh.mobile.core.common.RuntimeMirrors
+import dev.dsh.mobile.core.common.download.DownloadCache
+import dev.dsh.mobile.core.common.download.Downloads
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -39,8 +41,8 @@ class Updater(private val context: Context) {
 
     private val prefs by lazy { context.getSharedPreferences("dsh.update", Context.MODE_PRIVATE) }
 
-    /** 多连接分段下载器（默认 6 条 Range 连接 + 多镜像并行探测）。 */
-    private val downloader = SegmentedDownloader()
+    /** 内容寻址缓存：清单给了 sha256 时命中即跳过整次下载。 */
+    private val downloadCache by lazy { DownloadCache(File(context.cacheDir, "dl-cache")) }
 
     /**
      * 清单的三级回退链：并行拉取 → 内存 → 磁盘（TTL）。
@@ -129,7 +131,7 @@ class Updater(private val context: Context) {
     /**
      * 下载到 cacheDir。返回的 File 已经是可安装的 APK。
      *
-     * 实际的并发是 [SegmentedDownloader] 干的：多镜像并行探测 → 多段 Range 并发 → 段内断点续传。
+     * 实际的并发是 [Downloads] 里的分段下载器干的：多镜像并行探测 → 多段 Range 并发 → 段内断点续传。
      * onProgress 仍然按「已下载字节 / 总长度」给 0..100，语义与旧的单连接实现一致，回调在 IO 线程。
      */
     suspend fun download(info: UpdateInfo, onProgress: (Int) -> Unit = {}): Result<File> =
@@ -138,10 +140,13 @@ class Updater(private val context: Context) {
                 val target = File(context.cacheDir, "update-${info.versionName.ifBlank { info.versionCode.toString() }}.apk")
                 val candidates = downloadCandidates(info)
                 require(candidates.isNotEmpty()) { "下载失败：没有可用地址" }
-                downloader.download(
-                    candidates = candidates,
+                // 有 sha256 时缓存文件名就是 sha256，同一个包第二次点「更新」不再走网络。
+                Downloads.download(
+                    urls = candidates,
                     target = target,
+                    cache = downloadCache,
                     expectedSha256 = info.sha256.ifBlank { null },
+                    label = "更新包",
                     onProgress = onProgress,
                 )
                 require(target.length() > 1_000_000) { "文件不完整（${target.length()} 字节）" }

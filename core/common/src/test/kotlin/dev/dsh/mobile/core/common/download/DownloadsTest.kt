@@ -1,4 +1,4 @@
-package dev.dsh.mobile.core.data.update
+package dev.dsh.mobile.core.common.download
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertArrayEquals
@@ -8,6 +8,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.io.RandomAccessFile
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -138,7 +139,7 @@ private fun sha256(bytes: ByteArray): String =
 
 private fun rangeStart(header: String): Long? = Regex("bytes=(\\d+)-").find(header)?.groupValues?.get(1)?.toLongOrNull()
 
-class SegmentedDownloaderTest {
+class DownloadsTest {
 
     /** 6 条 Range 连接并发拉完，拼出的字节与 sha256 必须与原文件一致，进度单调收敛到 100。 */
     @Test
@@ -203,6 +204,99 @@ class SegmentedDownloaderTest {
                 }
             }
             assertTrue("错误信息应提到 sha256：" + e.message, e.message.orEmpty().contains("sha256"))
+        }
+    }
+
+    /** 清单给了 sha256：缓存文件名就是 sha256，第二次下载一个请求都不发。 */
+    @Test
+    fun strongCacheHitSkipsNetwork() {
+        val payload = ByteArray(700 * 1024).also { Random(13).nextBytes(it) }
+        val sha = sha256(payload)
+        RangeServer(payload).use { srv ->
+            val dir = tempDir()
+            val cache = DownloadCache(File(dir, "cache"))
+            val first = File(dir, "a.zip")
+            runBlocking { Downloads.download(listOf(srv.url), first, cache, sha, label = "测试包") }
+            assertArrayEquals(payload, first.readBytes())
+            assertTrue("强缓存文件应落在 <sha>.bin", File(File(dir, "cache"), sha + ".bin").isFile)
+            val before = srv.ranges.size
+            val second = File(dir, "b.zip")
+            val outcome = runBlocking { Downloads.download(listOf(srv.url), second, cache, sha, label = "测试包") }
+            assertEquals("命中缓存后不应再发任何请求", before, srv.ranges.size)
+            assertTrue("命中缓存时 usedUrls 应为空", outcome.usedUrls.isEmpty())
+            assertEquals(sha, outcome.sha256)
+            assertArrayEquals(payload, second.readBytes())
+        }
+    }
+
+    /** 缓存文件被改坏 → 重新算 sha 对不上就不算命中，必须重新下载。 */
+    @Test
+    fun corruptCacheEntryIsNotAHit() {
+        val payload = ByteArray(600 * 1024).also { Random(17).nextBytes(it) }
+        val sha = sha256(payload)
+        RangeServer(payload).use { srv ->
+            val dir = tempDir()
+            val cache = DownloadCache(File(dir, "cache"))
+            val first = File(dir, "a.zip")
+            runBlocking { Downloads.download(listOf(srv.url), first, cache, sha, label = "测试包") }
+            val cached = File(File(dir, "cache"), sha + ".bin")
+            cached.writeBytes(ByteArray(16))
+            first.delete()
+            val before = srv.ranges.size
+            runBlocking { Downloads.download(listOf(srv.url), first, cache, sha, label = "测试包") }
+            assertTrue("坏缓存必须重新下载：" + before + " -> " + srv.ranges.size, srv.ranges.size > before)
+            assertArrayEquals(payload, first.readBytes())
+            assertEquals(sha, sha256(cached.readBytes()))
+        }
+    }
+
+    /** 没有 sha256 时走 URL + 大小的弱缓存：目标被删掉后仍能命中，不再发请求。 */
+    @Test
+    fun weakCacheHitAfterTargetDeleted() {
+        val payload = ByteArray(700 * 1024).also { Random(19).nextBytes(it) }
+        RangeServer(payload).use { srv ->
+            val dir = tempDir()
+            val cache = DownloadCache(File(dir, "cache"))
+            val first = File(dir, "a.zip")
+            runBlocking { Downloads.download(listOf(srv.url), first, cache, label = "测试包") }
+            assertArrayEquals(payload, first.readBytes())
+            assertTrue("弱缓存索引应生成", File(File(dir, "cache"), "weak.index").isFile)
+            first.delete()
+            val before = srv.ranges.size
+            val second = File(dir, "b.zip")
+            runBlocking { Downloads.download(listOf(srv.url), second, cache, label = "测试包") }
+            assertEquals("弱缓存命中后不应再发请求", before, srv.ranges.size)
+            assertArrayEquals(payload, second.readBytes())
+        }
+    }
+
+    /** .part + .part.seg 现场存在时按段内已写偏移续传，不整段重下，完成后清掉状态文件。 */
+    @Test
+    fun resumeFromStateFileContinuesAtRecordedOffset() {
+        val payload = ByteArray(3 * 1024 * 1024).also { Random(23).nextBytes(it) }
+        val half = (payload.size + 1) / 2
+        RangeServer(payload).use { srv ->
+            val dir = tempDir()
+            val target = File(dir, "dsh.apk")
+            val part = File(dir, "dsh.apk.part")
+            val state = File(dir, "dsh.apk.part.seg")
+            // connections=2 → 两段 [0, half-1] / [half, len-1]；第一段假装已经写了 1MB。
+            RandomAccessFile(part, "rw").use { raf ->
+                raf.setLength(payload.size.toLong())
+                raf.seek(0)
+                raf.write(payload, 0, 1000000) // 真实写入前 1MB，模拟上次中断留下的现场
+            }
+            state.writeText(
+                "len=" + payload.size + "\n" +
+                    "0:" + (half - 1) + ":1000000\n" +
+                    half + ":" + (payload.size - 1) + ":0\n",
+            )
+            runBlocking { SegmentedDownloader(connections = 2).download(listOf(srv.url), target) }
+            assertArrayEquals(payload, target.readBytes())
+            val resumed = srv.ranges.mapNotNull { rangeStart(it) }.any { it == 1000000L }
+            assertTrue("应发出起点 1000000 的 Range（证明按状态文件续传）：" + srv.ranges, resumed)
+            assertFalse("完成后状态文件应删掉", state.exists())
+            assertFalse("完成后 .part 应改名", part.exists())
         }
     }
 }

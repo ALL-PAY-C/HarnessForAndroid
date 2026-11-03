@@ -1,12 +1,12 @@
 package dev.dsh.mobile.feature.plugins
 
+import dev.dsh.mobile.core.common.RuntimeMirrors
 import dev.dsh.mobile.core.common.archive.ZipExtract
+import dev.dsh.mobile.core.common.download.DownloadCache
+import dev.dsh.mobile.core.common.download.Downloads
 import dev.dsh.mobile.pluginhost.ExternalPluginStore
 import dev.dsh.mobile.pluginhost.PluginInstaller
 import java.io.File
-import java.io.FilterInputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 /**
@@ -92,7 +92,7 @@ object GitHubPlugins {
         val candidates = (listOfNotNull(repo.branch) + listOf("main", "master")).distinct()
         for (candidate in candidates) {
             val url = "https://codeload.github.com/" + repo.owner + "/" + repo.name + "/zip/refs/heads/" + candidate
-            val attempt = runCatching { download(url, archive) }
+            val attempt = runCatching { download(url, archive, cacheDir) }
             if (attempt.isSuccess) {
                 branch = candidate
                 last = null
@@ -134,7 +134,7 @@ object GitHubPlugins {
             if (zipEntry != null) {
                 val file = File(cacheDir, "gh-$stamp-plugin.zip")
                 val raw = "https://raw.githubusercontent.com/" + repo.owner + "/" + repo.name + "/" + branch + "/" + zipEntry
-                download(raw, file)
+                download(raw, file, cacheDir)
                 val installed = target.installArchive(file).getOrElse { file.delete(); throw it }
                 return installed.name + " " + installed.version + "（zip 插件包）"
             }
@@ -146,7 +146,7 @@ object GitHubPlugins {
             val store = externalStore ?: error("插件加载器未就绪")
             val file = File(cacheDir, "gh-$stamp.apk")
             val raw = "https://raw.githubusercontent.com/" + repo.owner + "/" + repo.name + "/" + branch + "/" + apk
-            download(raw, file)
+            download(raw, file, cacheDir)
             val entry = store.installPackage(file).getOrElse { file.delete(); throw it }
             return entry.name + " " + entry.version + "（APK 插件）"
         } finally {
@@ -154,29 +154,17 @@ object GitHubPlugins {
         }
     }
 
-    private fun download(url: String, out: File) {
-        var conn: HttpURLConnection? = null
-        try {
-            conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 15_000
-                readTimeout = 60_000
-                instanceFollowRedirects = true
-                setRequestProperty("Accept", "application/zip,application/octet-stream,*/*")
-                setRequestProperty("User-Agent", "dsh-mobile-plugin")
-            }
-            val code = conn.responseCode
-            if (code !in 200..299) error("HTTP " + code)
-            var total = 0L
-            val counter = object : FilterInputStream(conn.inputStream) {
-                override fun read(): Int = super.read().also { if (it >= 0) total++ }
-                override fun read(b: ByteArray, off: Int, len: Int): Int =
-                    super.read(b, off, len).also { if (it > 0) total += it }
-            }
-            out.outputStream().use { sink -> counter.use { it.copyTo(sink) } }
-            if (total > MAX_BYTES) error("包太大（" + (total / 1024 / 1024) + " MB），上限 96 MB")
-        } finally {
-            conn?.disconnect()
-        }
+    /** 下载实现：多镜像分段下载 + 弱缓存（仓库 zipball / 单个包都没有 sha256）。 */
+    private fun download(url: String, out: File, cacheDir: File) {
+        Downloads.downloadBlocking(
+            urls = RuntimeMirrors.downloadCandidates(url),
+            target = out,
+            cache = DownloadCache(File(cacheDir, "dl-cache")),
+            maxBytes = MAX_BYTES,
+            label = "插件包 " + url,
+            connectTimeoutMs = 15_000,
+            readTimeoutMs = 60_000,
+        )
     }
 
     private fun scan(zip: File): List<String> = runCatching {

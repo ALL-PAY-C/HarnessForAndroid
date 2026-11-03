@@ -2,11 +2,12 @@ package dev.dsh.mobile.pluginhost
 
 import android.content.Context
 import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.common.RuntimeMirrors
+import dev.dsh.mobile.core.common.download.DownloadCache
+import dev.dsh.mobile.core.common.download.Downloads
 import dev.dsh.mobile.pluginapi.DshPlugin
 import org.json.JSONObject
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -320,6 +321,9 @@ class PluginInstaller(
 
     // ---------------------------------------------------------------- 网络
 
+    /** 下载缓存：没有 sha256 可对，走 URL + 大小的弱缓存（同一个包的第二次安装不重复下）。 */
+    private val downloadCache by lazy { DownloadCache(File(context.cacheDir, "dl-cache")) }
+
     private fun downloadToCache(url: String, timeoutMs: Int = 60_000): File {
         val ext = url.substringBefore('?').let {
             when {
@@ -329,52 +333,28 @@ class PluginInstaller(
             }
         }
         val file = File(context.cacheDir, "plugin-dl-" + url.hashCode() + "." + ext)
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            // 依赖安装传 45s（单包上限），插件包本体仍用 60s：超时是墙钟上限，不是越快越好。
-            connectTimeout = minOf(15_000, timeoutMs)
-            readTimeout = timeoutMs
-            instanceFollowRedirects = true
-            setRequestProperty("Accept", "application/zip,application/gzip,application/octet-stream,*/*")
-            setRequestProperty("User-Agent", "dsh-mobile")
-        }
-        try {
-            val code = conn.responseCode
-            if (code !in 200..299) error("下载失败 HTTP " + code)
-            conn.inputStream.use { input ->
-                file.outputStream().use { output ->
-                    val buf = ByteArray(64 * 1024)
-                    var total = 0L
-                    while (true) {
-                        val n = input.read(buf)
-                        if (n <= 0) break
-                        total += n
-                        if (total > maxBytes) error("包太大（超过 200 MB）")
-                        output.write(buf, 0, n)
-                    }
-                }
-            }
-        } finally {
-            conn.disconnect()
-        }
+        // 依赖安装传 45s（单包上限），插件包本体仍用 60s：超时是墙钟上限，不是越快越好。
+        Downloads.downloadBlocking(
+            urls = RuntimeMirrors.downloadCandidates(url),
+            target = file,
+            cache = downloadCache,
+            maxBytes = MAX_PACKAGE_BYTES,
+            label = "插件包 " + url,
+            connectTimeoutMs = minOf(15_000, timeoutMs),
+            readTimeoutMs = timeoutMs,
+        )
         return file
     }
 
-    private fun fetchText(url: String): String {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 12_000
-            readTimeout = 20_000
-            instanceFollowRedirects = true
-            setRequestProperty("Accept", "application/json")
-            setRequestProperty("User-Agent", "dsh-mobile")
-        }
-        try {
-            val code = conn.responseCode
-            val text = (if (code in 200..299) conn.inputStream else conn.errorStream)
-                ?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (code !in 200..299) error("HTTP " + code + " · " + url.substringAfterLast('/'))
-            return text
-        } finally {
-            conn.disconnect()
-        }
+    private fun fetchText(url: String): String = Downloads.fetchTextBlocking(
+        urls = listOf(url),
+        label = "清单 " + url,
+        connectTimeoutMs = 12_000,
+        readTimeoutMs = 20_000,
+    )
+
+    private companion object {
+        /** 单个插件包体积上限，与旧的单连接实现保持一致。 */
+        const val MAX_PACKAGE_BYTES = 200L * 1024 * 1024
     }
 }

@@ -1,10 +1,11 @@
 package dev.dsh.mobile.feature.plugins
 
+import dev.dsh.mobile.core.common.RuntimeMirrors
 import dev.dsh.mobile.core.common.archive.ZipExtract
+import dev.dsh.mobile.core.common.download.DownloadCache
+import dev.dsh.mobile.core.common.download.Downloads
 import java.io.File
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * 从 GitHub 仓库 / zip 直链装一个 SKILL.md 技能。
@@ -133,7 +134,11 @@ object SkillInstaller {
      * [fetch] 是下载实现，默认走 HTTP；测试注入假实现即可完全离线。
      * 失败时 staging 已经清掉，成功时由调用方在 install 结束后删（管理器已经复制走文件）。
      */
-    fun install(cacheDir: File, input: String, fetch: (String, File) -> Unit = ::httpDownload): File {
+    fun install(
+        cacheDir: File,
+        input: String,
+        fetch: (String, File) -> Unit = { url, out -> httpDownload(cacheDir, url, out) },
+    ): File {
         val source = parse(input) ?: throw SkillInstallException(
             "链接看不懂：${input.take(80)}；支持 https://github.com/owner/repo、owner/repo、" +
                 "github.com/owner/repo/tree/分支，或 zip 直链",
@@ -172,40 +177,20 @@ object SkillInstaller {
         }
     }
 
-    /** 默认下载实现：跟随重定向、带 UA、20 MB 上限。 */
-    private fun httpDownload(url: String, out: File) {
-        var conn: HttpURLConnection? = null
+    /** 默认下载实现：多镜像分段下载 + 弱缓存；20 MB 上限由下载器先按探测长度拦一次。 */
+    private fun httpDownload(cacheDir: File, url: String, out: File) {
         try {
-            conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = CONNECT_TIMEOUT_MS
-                readTimeout = READ_TIMEOUT_MS
-                instanceFollowRedirects = true
-                setRequestProperty("Accept", "application/zip,application/octet-stream,*/*")
-                setRequestProperty("User-Agent", "dsh-mobile-skill-installer")
-            }
-            val code = conn.responseCode
-            if (code !in 200..299) throw SkillInstallException("HTTP $code")
-            var total = 0L
-            val buffer = ByteArray(8192)
-            out.outputStream().use { sink ->
-                conn.inputStream.use { input ->
-                    while (true) {
-                        val n = input.read(buffer)
-                        if (n <= 0) break
-                        total += n
-                        if (total > MAX_DOWNLOAD_BYTES) {
-                            throw SkillInstallException("包太大（上限 ${MAX_DOWNLOAD_BYTES / 1024 / 1024} MB）")
-                        }
-                        sink.write(buffer, 0, n)
-                    }
-                }
-            }
-        } catch (e: SkillInstallException) {
-            throw e
-        } catch (e: IOException) {
-            throw SkillInstallException("下载失败：${e.message ?: e.toString()}")
-        } finally {
-            conn?.disconnect()
+            Downloads.downloadBlocking(
+                urls = RuntimeMirrors.downloadCandidates(url),
+                target = out,
+                cache = DownloadCache(File(cacheDir, "dl-cache")),
+                maxBytes = MAX_DOWNLOAD_BYTES,
+                label = "技能包 " + url,
+                connectTimeoutMs = CONNECT_TIMEOUT_MS,
+                readTimeoutMs = READ_TIMEOUT_MS,
+            )
+        } catch (e: Exception) {
+            throw SkillInstallException("下载失败：" + (e.message ?: e.toString()))
         }
     }
 }

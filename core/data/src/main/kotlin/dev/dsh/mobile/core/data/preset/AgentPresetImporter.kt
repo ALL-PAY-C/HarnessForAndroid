@@ -3,15 +3,19 @@ package dev.dsh.mobile.core.data.preset
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
-import java.net.HttpURLConnection
 import java.net.URI
-import java.net.URL
+import dev.dsh.mobile.core.common.RuntimeMirrors
 import dev.dsh.mobile.core.common.archive.ZipExtract
+import dev.dsh.mobile.core.common.download.DownloadCache
+import dev.dsh.mobile.core.common.download.Downloads
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-class AgentPresetImporter {
+/**
+ * @param cacheDir 预设包的下载缓存目录；null 时不缓存（[importPreset] 的调用方多数没有 Context）。
+ */
+class AgentPresetImporter(private val cacheDir: File? = null) {
     private val json = Json { ignoreUnknownKeys = true }
 
     fun importPreset(input: String): AgentPreset {
@@ -43,26 +47,22 @@ class AgentPresetImporter {
         val repo = Regex("^(?:https://github[.]com/)?([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:[.]git)?/?$").matchEntire(input)
         val url = if (repo != null) "https://github.com/" + repo.groupValues[1] + "/" + repo.groupValues[2] + "/archive/HEAD.zip" else input
         require(runCatching { URI(url).scheme in listOf("http", "https") }.getOrDefault(false)) { "请输入有效的 GitHub 仓库、HTTP 链接或本地 ZIP 路径" }
-        var target = URL(url)
-        repeat(6) {
-            val connection = target.openConnection() as HttpURLConnection
-            connection.connectTimeout = 15_000
-            connection.readTimeout = 30_000
-            connection.instanceFollowRedirects = false
-            try {
-                val status = connection.responseCode
-                if (status in listOf(301, 302, 303, 307, 308)) {
-                    val next = URL(target, connection.getHeaderField("Location") ?: error("下载重定向缺少地址"))
-                    require(next.protocol in listOf("http", "https")) { "下载重定向地址无效" }
-                    target = next
-                } else {
-                    require(status in 200..299) { "预设下载失败：HTTP $status" }
-                    require(connection.contentLengthLong <= MAX_BYTES) { "预设超过 20MB 限制" }
-                    return connection.inputStream.use { limited(it) }
-                }
-            } finally { connection.disconnect() }
+        // 目标文件只是下载落点（Android 上 java.io.tmpdir 就是应用 cacheDir），读完立刻删。
+        val staging = File.createTempFile("dsh-preset-", ".zip")
+        try {
+            Downloads.downloadBlocking(
+                urls = RuntimeMirrors.downloadCandidates(url),
+                target = staging,
+                cache = cacheDir?.let { DownloadCache(File(it, "dl-cache")) },
+                maxBytes = MAX_BYTES.toLong(),
+                label = "预设 " + url,
+                connectTimeoutMs = 15_000,
+                readTimeoutMs = 30_000,
+            )
+            return staging.inputStream().use { limited(it) }
+        } finally {
+            staging.delete()
         }
-        throw IllegalArgumentException("下载重定向次数过多")
     }
 
     fun importZip(bytes: ByteArray, source: String = "ZIP"): AgentPreset {

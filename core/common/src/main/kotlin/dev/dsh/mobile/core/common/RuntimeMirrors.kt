@@ -56,4 +56,32 @@ object RuntimeMirrors {
         val prefix = githubProxy()
         return if (prefix.isEmpty()) url else prefix + url
     }
+
+    /**
+     * 一个下载 URL 的全部候选地址（去重保序）：GitHub 域名先套各反代前缀，再给原地址兜底；
+     * 非 GitHub 域名原样返回（反代只认 GitHub 的路径，套上去只会白白多几个 404 探测）。
+     *
+     * 所有下载点都从这里取候选，不许在调用方硬编码 gh-proxy 前缀。
+     */
+    fun downloadCandidates(url: String): List<String> {
+        val text = url.trim()
+        if (text.isEmpty()) return emptyList()
+        return if (isGitHubHost(text)) {
+            LinkedHashSet(githubProxies().map { it + text } + text).toList()
+        } else {
+            listOf(text)
+        }
+    }
+
+    private val GITHUB_HOSTS = listOf(
+        "github.com",
+        "raw.githubusercontent.com",
+        "codeload.github.com",
+        "objects.githubusercontent.com",
+    )
+
+    private fun isGitHubHost(url: String): Boolean {
+        val host = runCatching { java.net.URI(url).host.orEmpty() }.getOrDefault("").lowercase()
+        return GITHUB_HOSTS.any { host == it || host.endsWith("." + it) }
+    }
 }

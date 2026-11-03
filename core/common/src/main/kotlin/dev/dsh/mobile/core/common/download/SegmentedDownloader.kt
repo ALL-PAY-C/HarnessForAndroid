@@ -1,6 +1,7 @@
-package dev.dsh.mobile.core.data.update
+package dev.dsh.mobile.core.common.download
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -19,13 +20,13 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 /** 下载结果：字节数 + 实际 sha256（hex 小写）+ 参与下载的地址顺序。 */
-internal data class DownloadOutcome(val bytes: Long, val sha256: String, val usedUrls: List<String>)
+data class DownloadOutcome(val bytes: Long, val sha256: String, val usedUrls: List<String>)
 
 /**
- * APK 多连接分段下载器。
+ * 多连接分段下载器（纯 JVM，不引用 android.*）。
  *
  * 策略：
- * 1. 候选地址并行探测（`Range: bytes=0-0`），先返回的当主镜像，其余按原顺序兜底；
+ * 1. 候选地址并行探测（Range: bytes=0-0），先返回的当主镜像，其余按原顺序兜底；
  * 2. 主镜像支持 Range（HTTP 206）且长度已知：切成 [connections] 段并发下载。单段失败立刻换下一个
  *    镜像，并从该段已写入的偏移续传（Range 起点 = 段起点 + 已写字节），不是整段重下；
  *    失败一次的镜像从本轮候选里剔除，全部剔除后清空重来，最多 [maxRounds] 轮；
@@ -33,9 +34,10 @@ internal data class DownloadOutcome(val bytes: Long, val sha256: String, val use
  * 4. 进度 = 已落盘字节 / 总长度，映射成 0..100 的 Int，只在百分比变化时回调且保证单调递增；
  * 5. 落盘完成校验 sha256（调用方给了才校验），.part 改名成目标文件。
  *
- * 纯 JVM 实现（不引用 android.*），JVM 单测可直接 new 出来注入参数。
+ * 调用点：自更新 APK、插件包 / npm 依赖、技能 zip、GitHub 仓库 zipball、Agent 预设。
+ * 错误消息一律带 [label] 与失败地址，UI 上能看出是哪一个源挂了。
  */
-internal class SegmentedDownloader(
+class SegmentedDownloader(
     /** 分片并发连接数。 */
     private val connections: Int = DEFAULT_CONNECTIONS,
     private val connectTimeoutMs: Int = 12_000,
@@ -48,6 +50,7 @@ internal class SegmentedDownloader(
     private val failuresBeforeDrop: Int = 1,
     /** 镜像全灭后允许的重来轮数。 */
     private val maxRounds: Int = 3,
+    private val userAgent: String = "dsh-mobile",
 ) {
 
     private class Probe(val url: String, val length: Long, val ranges: Boolean)
@@ -57,27 +60,46 @@ internal class SegmentedDownloader(
         val size: Long get() = end - start + 1
     }
 
+    /**
+     * 下载到 [target]（同名 .part / .part.seg 作为续传现场）。
+     *
+     * [maxBytes] > 0 时先按探测到的长度拒绝超大包，落盘后再核一次。
+     */
     suspend fun download(
         candidates: List<String>,
         target: File,
         expectedSha256: String? = null,
+        maxBytes: Long = 0L,
+        label: String = "下载",
         onProgress: (Int) -> Unit = {},
-    ): DownloadOutcome = withTimeout(overallTimeoutMs) {
-        val urls = LinkedHashSet(candidates.map { it.trim() }.filter { it.isNotBlank() }).toList()
-        require(urls.isNotEmpty()) { "没有可用下载地址" }
-        val winner = probeWinner(urls) ?: throw IllegalStateException("下载失败：所有地址都不通")
-        val ordered = listOf(winner.url) + urls.filter { it != winner.url }
-        val part = File(target.parentFile, target.name + ".part")
-        withContext(Dispatchers.IO) {
-            target.delete()
-            val sha = if (winner.ranges && winner.length > 0) {
-                segmented(ordered, winner.length, part, target, onProgress)
-            } else {
-                singleStream(ordered, part, target, winner.length, onProgress)
+    ): DownloadOutcome = try {
+        withTimeout(overallTimeoutMs) {
+            val urls = LinkedHashSet(candidates.map { it.trim() }.filter { it.isNotBlank() }).toList()
+            require(urls.isNotEmpty()) { label + " 失败：没有可用下载地址" }
+            val winner = probeWinner(urls) ?: throw IllegalStateException(
+                label + " 失败：所有地址都不通（" + urls.size + " 个候选，例如 " + urls.first() + "）",
+            )
+            if (maxBytes > 0 && winner.length > maxBytes) {
+                throw IOException(label + " 超过上限：" + winner.length / 1024 / 1024 + " MB，上限 " + maxBytes / 1024 / 1024 + " MB")
             }
-            verifySha(part.let { target }, sha, expectedSha256)
-            DownloadOutcome(target.length(), sha, ordered)
+            val ordered = listOf(winner.url) + urls.filter { it != winner.url }
+            val part = File(target.parentFile, target.name + ".part")
+            withContext(Dispatchers.IO) {
+                target.delete()
+                val sha = if (winner.ranges && winner.length > 0) {
+                    segmented(ordered, winner.length, part, target, onProgress)
+                } else {
+                    singleStream(ordered, part, target, winner.length, onProgress)
+                }
+                verifySha(target, sha, expectedSha256, label)
+                if (maxBytes > 0 && target.length() > maxBytes) {
+                    throw IOException(label + " 超过上限：" + target.length() / 1024 / 1024 + " MB，上限 " + maxBytes / 1024 / 1024 + " MB")
+                }
+                DownloadOutcome(target.length(), sha, ordered)
+            }
         }
+    } catch (e: TimeoutCancellationException) {
+        throw IOException(label + " 超时：超过 " + overallTimeoutMs / 1000 + " 秒没有下完")
     }
 
     // ---- 分段并发 ----
@@ -154,7 +176,7 @@ internal class SegmentedDownloader(
             runCatching { raf.close() }
         }
         onProgress(100)
-        val sha = sha256(part)
+        val sha = sha256Of(part)
         stateFile.delete()
         renameInto(part, target, length)
         return sha
@@ -166,7 +188,7 @@ internal class SegmentedDownloader(
         try {
             val code = conn.responseCode
             val ok = code == 206 || (code in 200..299 && seg.start == 0L && seg.done == 0L)
-            if (!ok) throw IOException("HTTP " + code)
+            if (!ok) throw IOException("HTTP " + code + " · " + url)
             val buf = ByteArray(BUFFER)
             var pos = from
             var remain = seg.end - from + 1
@@ -184,7 +206,7 @@ internal class SegmentedDownloader(
                     onBytes(n.toLong())
                 }
             }
-            if (remain > 0) throw IOException("连接中断：还差 " + remain + " 字节")
+            if (remain > 0) throw IOException("连接中断：还差 " + remain + " 字节 · " + url)
         } finally {
             conn.disconnect()
         }
@@ -204,7 +226,7 @@ internal class SegmentedDownloader(
             val r = runCatching { withContext(Dispatchers.IO) { streamOne(url, part, knownLength, onProgress) } }
             if (r.isSuccess) {
                 onProgress(100)
-                val sha = sha256(part)
+                val sha = sha256Of(part)
                 renameInto(part, target, r.getOrThrow())
                 return sha
             }
@@ -225,7 +247,7 @@ internal class SegmentedDownloader(
                     part.delete()
                     false
                 }
-                else -> throw IOException("HTTP " + code)
+                else -> throw IOException("HTTP " + code + " · " + url)
             }
             val total = if (knownLength > 0) knownLength else conn.contentLengthLong + resumeAt
             FileOutputStream(part, append).use { out ->
@@ -277,10 +299,10 @@ internal class SegmentedDownloader(
         }
     }.getOrNull()
 
-    private fun verifySha(file: File, actual: String, expectedSha256: String?) {
+    private fun verifySha(file: File, actual: String, expectedSha256: String?, label: String) {
         val want = expectedSha256?.trim()?.lowercase().orEmpty()
         if (want.isBlank()) return
-        if (actual != want) throw IllegalStateException("sha256 校验失败：期望 " + want + "，实际 " + actual)
+        if (actual != want) throw IllegalStateException(label + " sha256 校验失败：期望 " + want + "，实际 " + actual)
     }
 
     private fun renameInto(part: File, target: File, expectedLength: Long) {
@@ -292,19 +314,6 @@ internal class SegmentedDownloader(
             part.copyTo(target, overwrite = true)
             part.delete()
         }
-    }
-
-    fun sha256(file: File): String {
-        val md = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buf = ByteArray(BUFFER)
-            while (true) {
-                val n = input.read(buf)
-                if (n <= 0) break
-                md.update(buf, 0, n)
-            }
-        }
-        return md.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
     }
 
     private fun planSegments(length: Long, parts: Int): List<Seg> {
@@ -356,7 +365,7 @@ internal class SegmentedDownloader(
         connectTimeout = connectTimeoutMs
         readTimeout = readTimeoutMs
         instanceFollowRedirects = true
-        setRequestProperty("User-Agent", "dsh-mobile-updater")
+        setRequestProperty("User-Agent", userAgent)
         setRequestProperty("Accept-Encoding", "identity")
     }
 
@@ -367,5 +376,19 @@ internal class SegmentedDownloader(
 
         /** 小于该体积不切段，切了也没有并行收益。 */
         private const val MIN_PART = 512L * 1024
+
+        /** 文件 sha256（hex 小写）。下载缓存与校验共用同一份实现。 */
+        fun sha256Of(file: File): String {
+            val md = MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { input ->
+                val buf = ByteArray(BUFFER)
+                while (true) {
+                    val n = input.read(buf)
+                    if (n <= 0) break
+                    md.update(buf, 0, n)
+                }
+            }
+            return md.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        }
     }
 }
