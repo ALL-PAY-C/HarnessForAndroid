@@ -9,20 +9,21 @@ import dev.dsh.mobile.core.model.SessionStatus
 import dev.dsh.mobile.core.model.TokenUsage
 import dev.dsh.mobile.core.model.ToolCall
 import dev.dsh.mobile.core.model.TransportKind
-import kotlinx.coroutines.CancellationException
+import dev.dsh.mobile.core.protocol.transport.DshCarrier
+import dev.dsh.mobile.core.protocol.transport.DshMux
+import dev.dsh.mobile.core.protocol.transport.LineCarrier
+import dev.dsh.mobile.core.protocol.transport.MuxOptions
+import dev.dsh.mobile.core.protocol.transport.MuxPhase
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -31,18 +32,19 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
 
 /**
- * ACP v1 (JSON-RPC 2.0, newline delimited) over any [LineChannel].
- * Owns request/response correlation, notification normalization, permission replies
- * and reconnect/backoff. Independent of whether the channel is a socket or a process.
+ * ACP v1 的**协议语义**层：会话、事件归一化、权限答复、prompt 终态 barrier。
+ *
+ * 连接正确性已经搬走：帧搬运在 [DshCarrier]，握手/世代/退避重连/请求-响应配对在 [DshMux]。
+ * 本类只组合「一个 carrier + 一个 mux」，不再持有 channel、不再写重连分支。
+ * 对外行为（谁先发什么、超时、错误文案）与改造前逐字一致，见 research/T64-carrier.md。
  */
 class AcpTransport(
-    private val channelProvider: suspend () -> LineChannel,
+    carrier: DshCarrier,
     private val kind: TransportKind,
-    private val scope: CoroutineScope,
-    private val reconnectPolicy: ReconnectPolicy = ReconnectPolicy(),
+    scope: CoroutineScope,
+    muxOptions: MuxOptions = MuxOptions(),
     private val defaultCwd: () -> String = { "/" },
     /**
      * 会话人设 / 额外系统提示。远程会话没有 LocalEngineTransport 的 extraSystem 字段，
@@ -50,6 +52,26 @@ class AcpTransport(
      */
     private val personaProvider: suspend (String) -> String = { "" },
 ) : DshTransport {
+
+    /**
+     * 兼容构造：一行字符串进出的 [LineChannel] 自动包成 carrier。
+     * 现有调用方与 AcpTransportTest 都走这条，行为不变。
+     */
+    constructor(
+        channelProvider: suspend () -> LineChannel,
+        kind: TransportKind,
+        scope: CoroutineScope,
+        reconnectPolicy: ReconnectPolicy = ReconnectPolicy(),
+        defaultCwd: () -> String = { "/" },
+        personaProvider: suspend (String) -> String = { "" },
+    ) : this(
+        carrier = LineCarrier(scope, channelProvider),
+        kind = kind,
+        scope = scope,
+        muxOptions = MuxOptions.from(reconnectPolicy),
+        defaultCwd = defaultCwd,
+        personaProvider = personaProvider,
+    )
 
     private val _events = MutableSharedFlow<DshEvent>(
         replay = 0,
@@ -61,95 +83,27 @@ class AcpTransport(
     private val _state = MutableStateFlow<RuntimeState>(RuntimeState.NotConfigured)
     override val state: StateFlow<RuntimeState> = _state.asStateFlow()
 
-    private val nextId = AtomicLong(1)
-    private val pending = ConcurrentHashMap<Long, CompletableDeferred<JsonObject>>()
-    private val pendingPermissions = ConcurrentHashMap<String, Long>()
     /** P5 barrier：prompt 响应后合成的终态 marker 由 collector 消费完再 ACK，保证旧 chunk 全部消费后才放 sendGate。 */
     private val turnAcks = ConcurrentHashMap<String, CompletableDeferred<Unit>>()
     /** 已注入过人设的会话 → 那次注入的原文。人设没变就不重复注入，别每轮都往历史里塞一遍。 */
     private val personaInjected = ConcurrentHashMap<String, String>()
 
-    @Volatile private var channel: LineChannel? = null
-    private var readJob: Job? = null
-    private var reconnectJob: Job? = null
-
-    @Volatile private var manualClose = false
+    private val mux = DshMux(
+        carrier = carrier,
+        scope = scope,
+        options = muxOptions,
+        onFrame = { frame -> handleFrame(frame) },
+        onPhase = { phase -> _state.value = phase.toRuntimeState() },
+    )
 
     // ---------------------------------------------------------------- lifecycle
 
     override suspend fun connect() {
-        manualClose = false
-        reconnectJob?.cancel()
-        doConnect(attempt = 1)
-    }
-
-    private suspend fun doConnect(attempt: Int) {
-        _state.value =
-            if (attempt == 1) RuntimeState.Starting("连接中") else RuntimeState.Reconnecting(attempt, "重连中")
-        val ch = try {
-            channelProvider().also { it.open() }
-        } catch (c: CancellationException) {
-            throw c
-        } catch (t: Throwable) {
-            AppLog.w("channel open failed: ${t.message}")
-            scheduleReconnect(attempt, t.message ?: "连接失败")
-            return
-        }
-        channel = ch
-        readJob?.cancel()
-        readJob = scope.launch { readLoop(ch) }
-        try {
-            val init = callInternal(
-                "initialize",
-                buildJsonObject {
-                    put("protocolVersion", 1)
-                    put(
-                        "clientCapabilities",
-                        buildJsonObject {
-                            put("fs", buildJsonObject {
-                                put("readTextFile", false)
-                                put("writeTextFile", false)
-                            })
-                            put("terminal", false)
-                        },
-                    )
-                },
-                timeoutMs = 20_000L,
-            )
-            val agentName = init.obj("agentInfo")?.str("name") ?: "dsh"
-            val version = init.obj("agentInfo")?.str("version") ?: ""
-            _state.value = RuntimeState.Ready(kind, "$agentName $version".trim())
-        } catch (c: CancellationException) {
-            throw c
-        } catch (t: Throwable) {
-            AppLog.w("initialize failed: ${t.message}")
-            scheduleReconnect(attempt, t.message ?: "初始化失败")
-        }
-    }
-
-    private fun scheduleReconnect(attempt: Int, reason: String) {
-        if (manualClose || !reconnectPolicy.enabled) {
-            _state.value = RuntimeState.Failed(reason, retryable = true)
-            return
-        }
-        if (attempt > reconnectPolicy.maxAttempts) {
-            _state.value = RuntimeState.Failed("重连失败：$reason", retryable = true)
-            return
-        }
-        _state.value = RuntimeState.Reconnecting(attempt, reason)
-        reconnectJob = scope.launch {
-            delay(reconnectPolicy.delayFor(attempt))
-            if (!manualClose) doConnect(attempt + 1)
-        }
+        mux.start()
     }
 
     override suspend fun disconnect() {
-        manualClose = true
-        reconnectJob?.cancel()
-        readJob?.cancel()
-        runCatching { channel?.close() }
-        channel = null
-        failAllPending("已断开")
+        mux.stop("已断开")
         // N-2/Q5：唤醒所有在 ack.await() 上等待的 prompt，避免断线期 30s 空等 + turnAcks 泄漏。
         // 注意：这只释放等待，不代表远端旧任务 settled —— 阻塞标记(quarantine)由 repo 层保留。
         turnAcks.values.forEach { it.completeExceptionally(IllegalStateException("已断开")) }
@@ -157,54 +111,29 @@ class AcpTransport(
         _state.value = RuntimeState.NotConfigured
     }
 
-    private fun failAllPending(msg: String) {
-        pending.forEach { (_, d) -> d.completeExceptionally(IllegalStateException(msg)) }
-        pending.clear()
+    /**
+     * mux 相位 → 对外状态。用户可见文案全部留在这里（与改造前逐字相同）：
+     * 首次建链「连接中」、重连中「重连中」、退避用尽「重连失败：<原因>」。
+     */
+    private fun MuxPhase.toRuntimeState(): RuntimeState = when (this) {
+        MuxPhase.Idle -> RuntimeState.NotConfigured
+        is MuxPhase.Connecting ->
+            if (attempt == 1) RuntimeState.Starting("连接中") else RuntimeState.Reconnecting(attempt, "重连中")
+        is MuxPhase.Reconnecting -> RuntimeState.Reconnecting(attempt, reason)
+        is MuxPhase.Ready -> RuntimeState.Ready(kind, "${generation.hostName} ${generation.hostVersion}".trim())
+        is MuxPhase.Failed ->
+            RuntimeState.Failed(if (attemptsExhausted) "重连失败：$reason" else reason, retryable = true)
     }
 
-    // ------------------------------------------------------------------ io loop
+    // ------------------------------------------------------------------ inbound
 
-    private suspend fun readLoop(ch: LineChannel) {
-        try {
-            ch.incoming.collect { line ->
-                if (line.isBlank()) return@collect
-                val el = runCatching { DshJson.parseToJsonElement(line) }.getOrNull()
-                if (el is JsonObject) handleMessage(el) else AppLog.d("non-json: ${line.take(120)}")
-            }
-            if (!manualClose) {
-                failAllPending("连接已关闭")
-                scheduleReconnect(1, "连接已关闭")
-            }
-        } catch (c: CancellationException) {
-            throw c
-        } catch (t: Throwable) {
-            if (!manualClose) {
-                val reason = t.message ?: "读取中断"
-                failAllPending(reason)
-                scheduleReconnect(1, reason)
-            }
-        }
-    }
-
-    private fun handleMessage(obj: JsonObject) {
-        val method = obj.str("method")
-        val id = obj.long("id")
-        if (method == null) {
-            if (id != null) {
-                val d = pending.remove(id) ?: return
-                val err = obj.obj("error")
-                if (err != null) {
-                    d.completeExceptionally(IllegalStateException(err.str("message") ?: "rpc error"))
-                } else {
-                    d.complete(obj.obj("result") ?: JsonObject(emptyMap()))
-                }
-            }
-            return
-        }
+    /** mux 只上抛「带 method 的帧」；响应帧由 mux 按 id 对账。 */
+    private suspend fun handleFrame(obj: JsonObject) {
+        val method = obj.str("method") ?: return
         val params = obj.obj("params") ?: JsonObject(emptyMap())
         when (method) {
             "session/update" -> handleUpdate(params)
-            "session/request_permission" -> handlePermissionRequest(params, id)
+            "session/request_permission" -> handlePermissionRequest(params, obj.long("id"))
             else -> _events.tryEmit(DshEvent.Raw(method, params))
         }
     }
@@ -290,51 +219,21 @@ class AcpTransport(
                 kind = o.str("kind") ?: "",
             )
         } ?: emptyList()
-        val reqId = rpcId?.toString() ?: nextId.getAndIncrement().toString()
-        if (rpcId != null) pendingPermissions[reqId] = rpcId
+        val reqId = rpcId?.toString() ?: mux.nextRequestId().toString()
+        if (rpcId != null) mux.registerApproval(reqId, rpcId)
         val title = params.obj("toolCall")?.str("title") ?: "请求权限"
         _events.tryEmit(DshEvent.Permission(sid, PermissionRequest(sid, reqId, title, options)))
     }
 
     // ------------------------------------------------------------------- rpc
 
-    private suspend fun callInternal(method: String, params: JsonObject, timeoutMs: Long): JsonObject {
-        val ch = channel ?: throw IllegalStateException("未连接")
-        val id = nextId.getAndIncrement()
-        val deferred = CompletableDeferred<JsonObject>()
-        pending[id] = deferred
-        val payload = buildJsonObject {
-            put("jsonrpc", "2.0")
-            put("id", id)
-            put("method", method)
-            put("params", params)
-        }
-        ch.send(DshJson.encodeToString(JsonObject.serializer(), payload))
-        return try {
-            withTimeout(timeoutMs) { deferred.await() }
-        } finally {
-            pending.remove(id)
-        }
-    }
-
-    /** 发一条 JSON-RPC 通知（无 id、无响应、不挂 pending）。用于 cancel 等 fire-and-forget 语义。 */
-    private suspend fun notify(method: String, params: JsonObject) {
-        val ch = channel ?: throw IllegalStateException("未连接")
-        val payload = buildJsonObject {
-            put("jsonrpc", "2.0")
-            put("method", method)
-            put("params", params)
-        }
-        ch.send(DshJson.encodeToString(JsonObject.serializer(), payload))
-    }
-
     override suspend fun call(method: String, params: JsonObject, timeoutMs: Long): JsonObject =
-        callInternal(method, params, timeoutMs)
+        mux.call(method, params, timeoutMs)
 
     // ------------------------------------------------------------- convenience
 
     override suspend fun listSessions(cwd: String?): List<Session> {
-        val res = callInternal(
+        val res = mux.call(
             "session/list",
             buildJsonObject { if (cwd != null) put("cwd", cwd) },
             30_000L,
@@ -344,7 +243,7 @@ class AcpTransport(
     }
 
     override suspend fun newSession(cwd: String): Session {
-        val res = callInternal(
+        val res = mux.call(
             "session/new",
             buildJsonObject {
                 put("cwd", cwd.ifBlank { defaultCwd() })
@@ -360,19 +259,19 @@ class AcpTransport(
     }
 
     override suspend fun resumeSession(sessionId: String): Session {
-        val res = callInternal("session/resume", buildJsonObject { put("sessionId", sessionId) }, 120_000L)
+        val res = mux.call("session/resume", buildJsonObject { put("sessionId", sessionId) }, 120_000L)
         return res.toSession().copy(id = sessionId)
     }
 
     override suspend fun closeSession(sessionId: String) {
         // 会话关了，人设注入记录跟着作废：同名重建时要能重新注入一次。
         personaInjected.remove(sessionId)
-        callInternal("session/close", buildJsonObject { put("sessionId", sessionId) }, 20_000L)
+        mux.call("session/close", buildJsonObject { put("sessionId", sessionId) }, 20_000L)
     }
 
     override suspend fun prompt(sessionId: String, text: String, images: List<String>, turnId: String?): String {
         val body = personaWrapped(sessionId, text)
-        val res = callInternal(
+        val res = mux.call(
             "session/prompt",
             buildJsonObject {
                 put("sessionId", sessionId)
@@ -424,7 +323,7 @@ class AcpTransport(
     override suspend fun cancel(sessionId: String) {
         // ACP cancel 是通知（服务端 .onNotification，无 id 无响应），发完即回；
         // 真正终态由 prompt 响应（settle 后 resolve "cancelled"）作为 barrier。
-        notify("session/cancel", buildJsonObject { put("sessionId", sessionId) })
+        mux.notify("session/cancel", buildJsonObject { put("sessionId", sessionId) })
     }
 
     override fun ackTurn(turnId: String) {
@@ -432,7 +331,7 @@ class AcpTransport(
     }
 
     override suspend fun setConfigOption(sessionId: String, optionId: String, value: String) {
-        callInternal(
+        mux.call(
             "session/set_config_option",
             buildJsonObject {
                 put("sessionId", sessionId)
@@ -444,34 +343,28 @@ class AcpTransport(
     }
 
     override suspend fun replyPermission(sessionId: String, requestId: String, optionId: String?) {
-        val rpcId = pendingPermissions.remove(requestId)
+        val rpcId = mux.takeApproval(requestId)
             ?: run {
                 AppLog.w("未知 permission requestId=$requestId：已答复或连接重建后 requestId 失效")
                 throw IllegalStateException("未知 permission requestId=$requestId")
             }
-        val ch = channel
-            ?: run {
-                AppLog.w("未连接，无法答复 permission requestId=$requestId")
-                throw IllegalStateException("未连接，无法答复 permission requestId=$requestId")
-            }
-        val payload = buildJsonObject {
-            put("jsonrpc", "2.0")
-            put("id", rpcId)
-            put(
-                "result",
-                buildJsonObject {
-                    if (optionId != null) {
-                        put("outcome", buildJsonObject {
-                            put("outcome", "selected")
-                            put("optionId", optionId)
-                        })
-                    } else {
-                        put("outcome", buildJsonObject { put("outcome", "cancelled") })
-                    }
-                },
-            )
+        if (!mux.isAttached) {
+            AppLog.w("未连接，无法答复 permission requestId=$requestId")
+            throw IllegalStateException("未连接，无法答复 permission requestId=$requestId")
         }
-        ch.send(DshJson.encodeToString(JsonObject.serializer(), payload))
+        mux.sendResult(
+            rpcId,
+            buildJsonObject {
+                if (optionId != null) {
+                    put("outcome", buildJsonObject {
+                        put("outcome", "selected")
+                        put("optionId", optionId)
+                    })
+                } else {
+                    put("outcome", buildJsonObject { put("outcome", "cancelled") })
+                }
+            },
+        )
     }
 
     // ------------------------------------------------------------------ mapping

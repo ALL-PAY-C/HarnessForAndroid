@@ -40,6 +40,7 @@ import dev.dsh.mobile.core.protocol.GroupPlan
 import dev.dsh.mobile.core.protocol.LocalEngineTransport
 import dev.dsh.mobile.core.protocol.DshTransport
 import dev.dsh.mobile.core.protocol.WebSocketChannel
+import dev.dsh.mobile.core.protocol.transport.LineCarrier
 import dev.dsh.mobile.core.data.backup.BackupManager
 import dev.dsh.mobile.core.data.backup.BackupScheduler
 import dev.dsh.mobile.plugin.html.HtmlPlugin
@@ -735,22 +736,22 @@ class AppContainer(private val context: Context) {
                         projections = projections,
                         summaryStore = summaryStore,
                     )
-                    TransportKind.Loopback -> AcpTransport(
-                        channelProvider = {
-                            WebSocketChannel(endpoint.url, endpoint.token, endpoint.heartbeatMs).also { it.open() }
+                    // Loopback / Remote 只差 defaultCwd：同一个 ACP transport，载体都是 WebSocket。
+                    // 载体只管搬帧（LineCarrier 负责 open/读行/断链信号），握手·重连·配对在 DshMux 里；
+                    // 这里不再手动 .also{ it.open() }——open 由 carrier.connect() 统一发起（旧代码开过两次）。
+                    TransportKind.Loopback, TransportKind.Remote -> AcpTransport(
+                        carrier = LineCarrier(scope) {
+                            WebSocketChannel(endpoint.url, endpoint.token, endpoint.heartbeatMs)
                         },
-                        kind = TransportKind.Loopback,
+                        kind = endpoint.kind,
                         scope = scope,
-                        defaultCwd = { cwd() },
-                        personaProvider = { id -> db.sessionDao().byId(id)?.persona.orEmpty() },
-                    )
-                    TransportKind.Remote -> AcpTransport(
-                        channelProvider = {
-                            WebSocketChannel(endpoint.url, endpoint.token, endpoint.heartbeatMs).also { it.open() }
+                        defaultCwd = {
+                            if (endpoint.kind == TransportKind.Remote) {
+                                endpoint.cwd.ifBlank { cwd() }
+                            } else {
+                                cwd()
+                            }
                         },
-                        kind = TransportKind.Remote,
-                        scope = scope,
-                        defaultCwd = { endpoint.cwd.ifBlank { cwd() } },
                         personaProvider = { id -> db.sessionDao().byId(id)?.persona.orEmpty() },
                     )
                 }

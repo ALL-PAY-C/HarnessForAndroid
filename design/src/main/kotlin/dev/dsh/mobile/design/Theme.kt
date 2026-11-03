@@ -123,6 +123,8 @@ data class QqPalette(
     val red: Color,
     val green: Color,
     val amber: Color,
+    /** 待用户决定 / 需要注意（warn）：比 amber 偏暖的红橙，专用于「待处理」语义。 */
+    val warn: Color,
     val dark: Boolean,
 ) {
     companion object {
@@ -141,6 +143,7 @@ data class QqPalette(
             red = Color(0xFFFF3B30),
             green = Color(0xFF22C55E),
             amber = Color(0xFFF59E0B),
+            warn = Color(0xFFF0A020),
             dark = false,
         )
 
@@ -159,6 +162,7 @@ data class QqPalette(
             red = Color(0xFFFF453A),
             green = Color(0xFF22C55E),
             amber = Color(0xFFF59E0B),
+            warn = Color(0xFFF0A020),
             dark = true,
         )
     }

@@ -350,6 +350,34 @@ class ChatViewModel(
      */
     val systemNotes: StateFlow<List<ChatMessage>> = notesState.asStateFlow()
 
+    private val pinnedSpeakerState = MutableStateFlow<String?>(null)
+
+    /**
+     * 手动指定的下一位发言人（T5.4，成员 id）。
+     *
+     * 一次有效、只活在内存里：不落库、不进 AppSettings，换页即失效 —— 「状态落在现有会话内」
+     * 就是这么理解的，不新增持久化配置。
+     */
+    val pinnedSpeaker: StateFlow<String?> = pinnedSpeakerState.asStateFlow()
+
+    fun pinSpeaker(participantId: String?) {
+        pinnedSpeakerState.value = participantId?.takeIf { it.isNotBlank() }
+    }
+
+    /**
+     * 把「下一位」落成一次 @点名。
+     *
+     * 群聊对 @名字 的解析本来就在 planGroupRound（GroupSupport.kt:609：@ 命中就直接派给它），
+     * 所以 UI 只补一个 @前缀，调度逻辑一行不动，也不新增协议字段。拼上就清空，保证一次有效。
+     */
+    private fun applyPinnedSpeaker(text: String): String {
+        if (!uiState.value.isGroup) return text
+        val target = pinnedSpeakerState.value ?: return text
+        val name = uiState.value.participants.firstOrNull { it.id == target }?.name ?: return text
+        pinnedSpeakerState.value = null
+        return if (text.contains("@" + name)) text else "@" + name + " " + text
+    }
+
     /**
      * /compact 真入口：压缩在 transport 侧落地（要调模型、读写摘要），仓库只做门面。
      * 结果回一条系统回执；没超预算 / 引擎不支持都如实透出，不假装压过。
@@ -478,6 +506,8 @@ class ChatViewModel(
      */
     fun send(text: String, mode: SendMode = SendMode.Queue, images: List<String> = emptyList()) {
         if (text.isBlank() && images.isEmpty()) return
+        // 指定了「下一位」的群聊：这条消息带上 @点名（见 [applyPinnedSpeaker]），之后自动失效。
+        val outgoing = applyPinnedSpeaker(text)
         // 上一帧还在跑（streaming 尚未回写）时，第二下发送按排队处理，不能直接再发一轮。
         if (uiState.value.streaming) {
             when (mode) {
@@ -485,24 +515,24 @@ class ChatViewModel(
                     // 打断 + 立刻发：cancelAndSend 成功时在 finally 里 drain、失败时 skip drain 保队列
                     // （core/data 已处理，见 SendQueueEngine.cancelAndSend）。这里不再额外 drain，
                     // 否则 cancel 失败时会把保留的排队项发到仍在跑的旧 remote，破坏保队列。
-                    sendQueue.submit(sessionId, exclusive = false) { deliver(text, images, interrupt = true) }
+                    sendQueue.submit(sessionId, exclusive = false) { deliver(outgoing, images, interrupt = true) }
                     return
                 }
                 SendMode.Insert -> {
                     // 不打断当前生成：消息落库后直接交给运行时，下一轮请求里生效。
-                    sendQueue.submit(sessionId, exclusive = false) { repo.interject(sessionId, text) }
+                    sendQueue.submit(sessionId, exclusive = false) { repo.interject(sessionId, outgoing) }
                     return
                 }
                 SendMode.Queue -> {
-                    val ok = sendQueue.enqueue(sessionId, text, images, uiState.value.settings.queueLimit)
+                    val ok = sendQueue.enqueue(sessionId, outgoing, images, uiState.value.settings.queueLimit)
                     if (!ok) error.value = "排队已达上限 " + uiState.value.settings.queueLimit + " 条"
                     return
                 }
             }
         }
         // 直发闸门在 SendQueue 里（sending 的替代）：同一会话已有直发在飞时转排队，不并发发第二轮。
-        if (!sendQueue.submit(sessionId) { deliver(text, images) }) {
-            sendQueue.enqueue(sessionId, text, images, uiState.value.settings.queueLimit)
+        if (!sendQueue.submit(sessionId) { deliver(outgoing, images) }) {
+            sendQueue.enqueue(sessionId, outgoing, images, uiState.value.settings.queueLimit)
         }
     }
 

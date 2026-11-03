@@ -409,7 +409,7 @@ fun SessionStatusDot(status: SessionStatus, size: Dp = 8.dp) {
     val p = LocalQq.current
     val color = when (status) {
         SessionStatus.Running -> p.accent
-        SessionStatus.WaitingPermission -> Color(0xFFF0A020)
+        SessionStatus.WaitingPermission -> p.warn
         SessionStatus.Failed -> p.red
         SessionStatus.Idle -> p.green
     }

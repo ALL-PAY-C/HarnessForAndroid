@@ -113,6 +113,7 @@ import dev.dsh.mobile.design.ContextRing
 import dev.dsh.mobile.design.SessionStatusDot
 import dev.dsh.mobile.core.model.SessionStatus
 import dev.dsh.mobile.core.protocol.ProjectedTodo
+import dev.dsh.mobile.core.protocol.group.GROUP_SCHEDULER_MODERATED
 import dev.dsh.mobile.core.protocol.SessionProjection
 import androidx.compose.ui.text.style.TextDecoration
 import kotlinx.coroutines.delay
@@ -164,6 +165,8 @@ fun ChatScreen(
     val projection by viewModel.projection.collectAsStateWithLifecycle()
     val compacting by viewModel.compacting.collectAsStateWithLifecycle()
     val systemNotes by viewModel.systemNotes.collectAsStateWithLifecycle()
+    // 手动指定的下一位发言人（一次有效，只在本会话内存里）。
+    val pinnedSpeaker by viewModel.pinnedSpeaker.collectAsStateWithLifecycle()
     // 预设选择状态机：发出第一条消息前可选，之后锁定只读（与桌面 DSH 一致）。
     val presetSelection = presetSelectionOf(state.presetId, state.messages.isNotEmpty())
     val listState = rememberLazyListState()
@@ -191,6 +194,9 @@ fun ChatScreen(
     var actionMessage by remember { mutableStateOf<ChatMessage?>(null) }
     // 待发图片：先挂在这里，点发送才真正发出去（QQ 的手感）。
     var drafts by remember { mutableStateOf<List<String>>(emptyList()) }
+    // 群聊 T5.4：点开的成员卡片、以及「指定下一位发言人」选择器（都按会话重置）。
+    var cardMember by remember(state.sessionId) { mutableStateOf<Participant?>(null) }
+    var speakerPicker by remember(state.sessionId) { mutableStateOf(false) }
 
     fun attach(uri: Uri, label: String) {
         scope.launch {
@@ -371,6 +377,11 @@ fun ChatScreen(
         }
     }
 
+    // 主持人档（设置 → 群聊编排）：只有它才会有房间级的「下一位」概念，其余档一律不露入口。
+    val moderatorMode = state.isGroup && state.settings.groupScheduler == GROUP_SCHEDULER_MODERATED
+    // 成员卡片要的「本轮说了没 / 本轮用量」全部从消息流现算，不新造状态源。
+    val roundStats = remember(state.messages) { memberRoundStats(state.messages) }
+
     Box(Modifier.fillMaxSize().background(p.bg)) {
         Column(Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
         QqTopBar(
@@ -433,6 +444,28 @@ fun ChatScreen(
             },
             trailing = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // 主持人模式（brief-then-moderated）才给「指定」：把下一位发言人钉成某个成员，
+                    // 一次有效；没指定时只是一枚安静的文字入口，不占位也不改观感。
+                    if (moderatorMode) {
+                        val pinnedName = pinnedSpeaker?.let { id ->
+                            state.participants.firstOrNull { it.id == id }?.name
+                        }
+                        Text(
+                            pinnedName?.let { "下一位：" + it } ?: "指定",
+                            color = p.accent,
+                            fontSize = qqFontBody(12.sp),
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (pinnedName != null) p.accent.copy(alpha = 0.12f) else Color.Transparent,
+                                )
+                                .clickable { speakerPicker = true }
+                                .padding(horizontal = 6.dp, vertical = 4.dp),
+                        )
+                    }
                     // 智能体预设入口：未发过消息时可点（选中即生效，没有额外开关）；发过就只读展示。
                     Text(
                         if (presetSelection.locked) presetNameOf(state.presetId)
@@ -533,26 +566,51 @@ fun ChatScreen(
                 state.participants.forEach { part ->
                     val busy = state.settings.showAgentStatus &&
                         state.busyAgents.any { it.agentId == part.id }
-                    Row(
-                        Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (busy) p.accent.copy(alpha = 0.14f) else p.bg)
-                            .padding(start = 3.dp, end = 9.dp, top = 2.dp, bottom = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Ava(seed = part.id, size = 20.dp, label = part.name)
-                        Spacer(Modifier.width(5.dp))
-                        Text(
-                            part.name,
-                            color = if (busy) p.accent else p.t2,
-                            fontSize = 11.5.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    GroupMemberChip(
+                        part = part,
+                        busy = busy,
+                        spoke = roundStats[part.id]?.spoke == true,
+                        pinned = pinnedSpeaker == part.id,
+                        onClick = { cardMember = part },
+                    )
                 }
             }
         }
+
+        // 成员卡片（设计文档 §8 MemberCard）：点成员胶囊弹出，缺的字段不显示、不编造。
+        cardMember?.let { member ->
+            GroupMemberCardDialog(
+                part = member,
+                modelName = state.models.firstOrNull { it.id == member.modelId }?.name ?: member.modelId,
+                busy = state.busyAgents.any {
+                    it.agentId == member.id &&
+                        (it.state == AgentRunState.Thinking || it.state == AgentRunState.ToolRunning)
+                },
+                waiting = state.busyAgents.any {
+                    it.agentId == member.id && it.state == AgentRunState.WaitingPermission
+                },
+                spoke = roundStats[member.id]?.spoke == true,
+                tokens = roundStats[member.id]?.tokens ?: 0L,
+                chars = roundStats[member.id]?.chars ?: 0,
+                pinned = pinnedSpeaker == member.id,
+                canPin = moderatorMode,
+                onPin = {
+                    viewModel.pinSpeaker(if (pinnedSpeaker == member.id) null else member.id)
+                    cardMember = null
+                },
+                onDismiss = { cardMember = null },
+            )
+        }
+
+        if (speakerPicker) SpeakerPickerDialog(
+            members = state.participants,
+            current = pinnedSpeaker,
+            onPick = { picked ->
+                viewModel.pinSpeaker(picked)
+                speakerPicker = false
+            },
+            onDismiss = { speakerPicker = false },
+        )
 
         // 执行状态条：谁在跑、谁在等确认。拿不到执行池（busyAgents 为空）就整条不渲染。
         if (state.busyAgents.isNotEmpty() && state.settings.showAgentStatus) {
@@ -608,6 +666,12 @@ fun ChatScreen(
             )
         }
 
+        // 系统 notice 不再进气泡（T5.4）：同一段连续 notice 合成一条可展开记录，默认只显示结论那一行。
+        val noticeRuns = remember(state.messages, state.isGroup) {
+            groupNoticeRuns(state.messages, state.isGroup)
+        }
+        val noticeFolded = remember(noticeRuns) { groupNoticeHidden(noticeRuns) }
+
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -624,6 +688,12 @@ fun ChatScreen(
                 }
             }
             state.messages.forEachIndexed { index, msg ->
+                // 段首那一条渲染合并块，段内其余整段跳过（一起并进上面那条记录里）。
+                noticeRuns[index]?.let { run ->
+                    item(key = "notice-run-" + run.firstId) { GroupNoticeBlock(run) }
+                    return@forEachIndexed
+                }
+                if (index in noticeFolded) return@forEachIndexed
                 item(key = msg.id) {
                 // QQ-style separator: only when the conversation actually pauses,
                 // so a burst of messages stays a single visual block.
@@ -708,6 +778,21 @@ fun ChatScreen(
                         }
                     }
                 }
+            }
+            // 正在发言指示（T5.4）：执行池里真心在跑的那几位，在流尾各挂一条「正在回复…」。
+            // 只读现有 busyAgents，不新造状态；等权限的已由 PermissionCard 表达，不重复占位。
+            if (state.isGroup && state.settings.showAgentStatus) {
+                state.busyAgents
+                    .filter { it.state == AgentRunState.Thinking || it.state == AgentRunState.ToolRunning }
+                    .distinctBy { it.agentId }
+                    .forEach { agent ->
+                        item(key = "typing-" + agent.agentId) {
+                            SpeakingPlaceholder(
+                                name = agent.agentName.ifBlank { state.agentName },
+                                seed = agent.agentId,
+                            )
+                        }
+                    }
             }
             // 尚未产生成员输出时，权限卡仍须可见。
             state.permissions.filter { perm ->
