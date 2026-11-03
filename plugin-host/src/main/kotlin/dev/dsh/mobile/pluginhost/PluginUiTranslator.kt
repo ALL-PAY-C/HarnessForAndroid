@@ -1,6 +1,7 @@
 package dev.dsh.mobile.pluginhost
 
 import androidx.compose.foundation.background
+import dev.dsh.mobile.pluginapi.QqContentColors
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -322,8 +323,8 @@ private fun colorFor(role: UiColorRole, tokens: HostThemeTokens): Color = when (
 private fun toneColor(tone: UiBadgeTone, tokens: HostThemeTokens): Color = when (tone) {
     UiBadgeTone.Neutral -> Color(tokens.onSurfaceVariant)
     UiBadgeTone.Info -> Color(tokens.primary)
-    UiBadgeTone.Success -> Color(0xFF2E7D32)
-    UiBadgeTone.Warning -> Color(0xFFB26A00)
+    UiBadgeTone.Success -> QqContentColors.badgeSuccess
+    UiBadgeTone.Warning -> QqContentColors.badgeWarning
     UiBadgeTone.Danger -> Color(tokens.error)
 }
 

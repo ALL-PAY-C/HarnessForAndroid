@@ -113,6 +113,12 @@ internal fun resolveRedirect(base: String, location: String): String {
  * OkHttp 实现。重定向自己走循环（不交给 OkHttp 的 followRedirects），
  * 这样才能拿到每一跳、并对每一跳做协议校验与次数上限。
  */
+/**
+ * 给没有 okhttp 依赖的模块（:core:data 只拿 :core:protocol 的 api）用的默认实现：
+ * 签名里不出现 OkHttpClient，调用方不必也不该认识 okhttp。
+ */
+fun defaultHttpTransport(): HttpTransport = OkHttpTransport()
+
 class OkHttpTransport(private val client: OkHttpClient = DEFAULT_CLIENT) : HttpTransport {
 
     override suspend fun execute(request: HttpRequest): HttpResponse = withContext(Dispatchers.IO) {

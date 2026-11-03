@@ -23,6 +23,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -248,8 +250,42 @@ class LocalEngineTransport(
     private val contextWindowProvider: suspend (String) -> Int = { ContextBudget.DEFAULT_WINDOW_TOKENS },
 ) : DshTransport, Compactor {
 
-    private val _events = MutableSharedFlow<DshEvent>(extraBufferCapacity = 512)
+    /**
+     * 事件出口（T96 P0-3）：无界缓冲的 SharedFlow。
+     *
+     * 以前是 MutableSharedFlow(extraBufferCapacity = 512)，默认 onBufferOverflow = SUSPEND，
+     * 而调用侧用的是 tryEmit —— 慢 collector 一来事件就静默丢弃：正文缺一段、TurnEnd 没送到，
+     * 界面表现成「说着说着停了」且没有任何报错。
+     *
+     * 这里把缓冲抬到 [Channel.UNLIMITED]（= Int.MAX_VALUE），与 Channel(UNLIMITED) 等价，
+     * 发送端在慢 collector 下不再失败；[post] 仍然检查 tryEmit 的返回值并计数，丢事件从无声变成可查。
+     * 没换成 Channel + receiveAsSharedFlow：kotlinx-coroutines 1.9.0 没有这个扩展
+     * （receiveAsFlow 返回的是 Flow、不是 SharedFlow）；用 shareIn 起泵协程又会在 runTest 的
+     * TestScope 里留下永不结束的子协程，测试收尾直接失败。
+     */
+    private val _events = MutableSharedFlow<DshEvent>(
+        extraBufferCapacity = Channel.UNLIMITED,
+        onBufferOverflow = BufferOverflow.SUSPEND,
+    )
+
     override val events: SharedFlow<DshEvent> = _events.asSharedFlow()
+
+    /** 累计丢弃的事件数：正常恒为 0（只有缓冲溢出时才会增长）。 */
+    private val droppedEvents = java.util.concurrent.atomic.AtomicLong()
+
+    /** 最后一次推出事件的时间戳：prompt 用它区分「这一轮真卡死了」和「只是慢」。 */
+    private val lastEventAt = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
+
+    internal fun droppedEventCount(): Long = droppedEvents.get()
+
+    /** 非挂起发送：tryEmit 失败（缓冲溢出）才计数，不让丢事件变成静默行为。 */
+    private fun post(e: DshEvent) {
+        lastEventAt.set(System.currentTimeMillis())
+        if (!_events.tryEmit(e)) {
+            droppedEvents.incrementAndGet()
+            AppLog.w("event dropped(" + droppedEvents.get() + "): " + e.javaClass.simpleName)
+        }
+    }
 
     private val _state = MutableStateFlow<RuntimeState>(RuntimeState.NotConfigured)
     override val state: StateFlow<RuntimeState> = _state.asStateFlow()
@@ -359,7 +395,7 @@ class LocalEngineTransport(
         pool = pool,
         stream = stream,
         configProvider = configProvider,
-        emit = { _events.tryEmit(it) },
+        emit = { post(it) },
         chatTurn = ::runLoop,
         takeQueuedImages = ::takeQueuedImages,
     )
@@ -472,7 +508,22 @@ class LocalEngineTransport(
                 }
             }.also { jobs[sessionId] = it }
         }
-        job.join()
+        // 空闲看门狗：runLoop 里任何一个上游读调用挂死，job 就永远不会结束，prompt 也就永远返回不了，
+        // 界面上就是「一直在生成」。等满一段没有任何新事件就直接中止，别让 UI 无限转圈。
+        var idleTimeout = false
+        while (true) {
+            if (withTimeoutOrNull(TURN_IDLE_TIMEOUT_MS) { job.join() } != null) break
+            if (System.currentTimeMillis() - lastEventAt.get() >= TURN_IDLE_TIMEOUT_MS) {
+                idleTimeout = true
+                break
+            }
+        }
+        if (idleTimeout) {
+            AppLog.w("turn idle timeout (" + TURN_IDLE_TIMEOUT_MS + "ms): " + sessionId)
+            job.cancel()
+            post(DshEvent.MessageChunk(sessionId, "（本轮超时：超过 " + TURN_IDLE_TIMEOUT_MS / 1000 + " 秒没有任何输出，已中止）", turnId = turnId))
+            post(DshEvent.TurnEnd(sessionId, "error", turnId = turnId))
+        }
         jobs.remove(sessionId)
         return "ok"
     }
@@ -645,7 +696,7 @@ class LocalEngineTransport(
                 maxRounds = MAX_ROUNDS,
                 loopDetail = loopDetail,
             ) ?: return
-            _events.tryEmit(DshEvent.MessageChunk(sessionId, notice, authorId, authorName, turnId))
+            post(DshEvent.MessageChunk(sessionId, notice, authorId, authorName, turnId))
         }
         // 兜底：万一还有异常逃出主循环（上游/工具/序列化），本轮也要给出正文并结算，
         // 否则仓库 finalizeTurn 拿不到任何正文，这一轮在库里就只剩一行 USER。
@@ -667,6 +718,9 @@ class LocalEngineTransport(
             var streamedReasoning = ""
             // 本轮上游已按 delta 推过来的正文累计量：onText 里增量上抛，收尾只补差额。
             var streamedText = ""
+            // 本轮已经上屏的正文。去重必须相对「本轮」而不是整轮对话：工具循环里下一轮是新正文，
+            // 相对整轮比对会被判成前缀失配；而同一轮断流重试是同一段话从头再说，相对本轮比对才准。
+            var roundShown = ""
             val body = buildJsonObject {
                 put("model", cfg.model)
                 if (deepSeekThinking) {
@@ -705,11 +759,12 @@ class LocalEngineTransport(
                 streamedText += text
                 if (holdForRefusal && streamedText.length <= RefusalGuard.MAX_REFUSAL_CHARS) return
                 holdForRefusal = false
-                val newDelta = incrementalDelta(emitted, streamedText)
+                val newDelta = incrementalDelta(roundShown, streamedText)
                 if (newDelta.isNotEmpty()) {
-                    emitted = streamedText
+                    roundShown = streamedText
+                    emitted += newDelta
                     visibleChars += newDelta.length
-                    _events.tryEmit(DshEvent.MessageChunk(sessionId, newDelta, authorId, authorName, turnId))
+                    post(DshEvent.MessageChunk(sessionId, newDelta, authorId, authorName, turnId))
                 }
             }
             var retriedThisRound = false
@@ -720,7 +775,7 @@ class LocalEngineTransport(
                     onReasoning = { delta ->
                         if (delta.isNotEmpty()) {
                             streamedReasoning += delta
-                            _events.tryEmit(DshEvent.ThoughtChunk(sessionId, delta, authorId, authorName, turnId))
+                            post(DshEvent.ThoughtChunk(sessionId, delta, authorId, authorName, turnId))
                         }
                     },
                     onText = { delta ->
@@ -732,10 +787,27 @@ class LocalEngineTransport(
             }.getOrElse { e ->
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                AppLog.w("llm call failed: ${e.message}")
-                _events.tryEmit(DshEvent.MessageChunk(sessionId, "\n\n[请求失败] " + stream.friendlyRequestError(e, cfg.baseUrl, userImages.isNotEmpty()), authorId, authorName, turnId))
-                _events.tryEmit(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
-                return
+                // 断连 / 读超时（SocketTimeoutException 也是 IOException）以前一步失败就收场，
+                // 网络抖一下整轮就是「[请求失败]」。本轮还没有任何工具副作用时重发一次；
+                // 重发不挂流式回调：正文只以最终结果进 incrementalDelta，已上屏的半句不会被重说一遍。
+                if (e is java.io.IOException && toolRunsThisTurn == 0 && !streamRetried) {
+                    streamRetried = true
+                    retriedThisRound = true
+                    AppLog.w("llm call failed (io), retry once: ${e.message}")
+                    runCatching { stream.post(cfg, body) }.getOrElse { second ->
+                        if (second is kotlinx.coroutines.CancellationException) throw second
+                        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                        AppLog.w("llm retry failed: ${second.message}")
+                        post(DshEvent.MessageChunk(sessionId, "\n\n[请求失败] " + stream.friendlyRequestError(second, cfg.baseUrl, userImages.isNotEmpty()), authorId, authorName, turnId))
+                        post(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
+                        return
+                    }
+                } else {
+                    AppLog.w("llm call failed: ${e.message}")
+                    post(DshEvent.MessageChunk(sessionId, "\n\n[请求失败] " + stream.friendlyRequestError(e, cfg.baseUrl, userImages.isNotEmpty()), authorId, authorName, turnId))
+                    post(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
+                    return
+                }
             }
 
             // 断流兜底：连接在 [DONE] 之前被掐断。本轮还没跑过任何工具时，同一请求静默重发一次
@@ -763,7 +835,13 @@ class LocalEngineTransport(
             val split = splitThinking(rawContent)
             // 工具调用标记也得在推 UI 之前剥掉：plain 整包（post 里提前 return 的那条）与 engine://
             // 送进来的正文都没经过流式闸门，先发后删就是让用户看见一屏 markup。
-            val dsml = stripDsmlToolCalls(split.first)
+            // 未闭合的块（上游在闭合标签前断流）在这里整段切掉并打标记：以前它原样留在正文里，
+            // 而 toolCalls 是空的，于是这一轮默默按 "stop" 收尾 —— 用户看到半截 markup、调用也没执行。
+            val guard = truncateOpenBlock(split.first)
+            // ModelStream 已经替我们剥过一次（流式闸门 + plain 整包），它切掉的未闭合块只留下标记。
+            var truncatedToolCall = guard.second || resp.bool("dsh_truncated_tool_call") == true
+            val dsml = stripDsmlToolCalls(guard.first)
+            if (dsml.first.length < guard.first.length) truncatedToolCall = true
             var content = dsml.first
             // 工具调用先算出来：下面要不要重发（重发会丢掉这一轮的 tool_calls）由它决定。
             var toolCalls = msg?.get("tool_calls")?.jsonArray
@@ -782,7 +860,7 @@ class LocalEngineTransport(
             val reasoningDelta = incrementalDelta(streamedReasoning, reasoning)
             if (reasoningDelta.isNotEmpty()) {
                 streamedReasoning += reasoningDelta
-                _events.tryEmit(DshEvent.ThoughtChunk(sessionId, reasoningDelta, authorId, authorName, turnId))
+                post(DshEvent.ThoughtChunk(sessionId, reasoningDelta, authorId, authorName, turnId))
             }
             // 人设会话被拒答、或者干脆一个字都没回：押住的正文还没上屏，直接整轮重发。
             // 只在「没有工具调用、本轮没执行过工具、不是断流」时重试：有副作用的重发是错的。
@@ -814,11 +892,12 @@ class LocalEngineTransport(
             if (content.isNotBlank()) {
                 val clean = if (roster.isEmpty()) content else sanitizeGroupText(content, authorName ?: "", roster)
                 if (clean.isNotBlank()) {
-                    val delta = incrementalDelta(emitted, clean)
+                    val delta = incrementalDelta(roundShown, clean)
                     if (delta.isNotEmpty()) {
-                        emitted = clean
+                        roundShown = clean
+                        emitted += delta
                         visibleChars += delta.length
-                        _events.tryEmit(DshEvent.MessageChunk(sessionId, delta, authorId, authorName, turnId))
+                        post(DshEvent.MessageChunk(sessionId, delta, authorId, authorName, turnId))
                     }
                     // onFinal 给的是「本轮累计正文」，群聊侧据此整段替换而不是追加。
                     onFinal(clean)
@@ -829,7 +908,7 @@ class LocalEngineTransport(
                 val why = out.refusalHit?.let { "命中「" + it + "」" } ?: "几次都是空回复"
                 AppLog.w("persona retry: gave up after " + out.attempts + " attempts, reason=" + why)
                 val note = "（人设已带上，但模型连续 " + out.attempts + " 次拒答：" + why + "）"
-                _events.tryEmit(
+                post(
                     DshEvent.MessageChunk(
                         sessionId,
                         (if (visibleChars > 0) "\n\n" else "") + note,
@@ -843,8 +922,8 @@ class LocalEngineTransport(
 
             // 断流：上游在 [DONE] 之前就关了连接。正文已流式发出，补一句标注并落到终态（不再 Running）。
             if (resp.bool("dsh_eof_without_done") == true) {
-                _events.tryEmit(DshEvent.MessageChunk(sessionId, "（回复中断 · 连接意外断开，请重试）", authorId, authorName, turnId))
-                _events.tryEmit(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
+                post(DshEvent.MessageChunk(sessionId, "（回复中断 · 连接意外断开，请重试）", authorId, authorName, turnId))
+                post(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
                 return
             }
 
@@ -855,12 +934,20 @@ class LocalEngineTransport(
                 val output = u["completion_tokens"]?.jsonPrimitive?.contentOrNullSafe()?.toIntOrNull() ?: 0
                 // 与顶栏同一口径：prompt（含缓存命中）+ 本轮 completion。
                 lastUsageTokens[sessionId] = prompt + output.toLong()
-                _events.tryEmit(
+                post(
                     DshEvent.Usage(sessionId, TokenUsage(input = (prompt - cached).coerceAtLeast(0L), output = output.toLong(), cached = cached, lastPrompt = prompt), authorId, turnId = turnId),
                 )
             }
 
             if (toolCalls.isNullOrEmpty()) {
+                // 唯一能识别的「调用」是个没闭合的块：一个工具都没执行，绝不能按 "stop" 正常收尾。
+                if (truncatedToolCall) {
+                    val note = "（本轮工具调用被截断：上游在闭合标签前断了流，这个调用没有执行。可以让我重试一次。）"
+                    post(DshEvent.MessageChunk(sessionId, if (visibleChars > 0) "\n\n" + note else note, authorId, authorName, turnId))
+                    visibleChars += note.length
+                    post(DshEvent.TurnEnd(sessionId, "truncated", authorId, turnId, truncatedToolCall = true))
+                    return
+                }
                 // 上游这一轮什么都没给（error 字段 / choices 为空 / 被长度截断 / 纯空正文）时，
                 // 以前直接 TurnEnd("stop")：界面一片空白，用户只能猜是不是网断了。
                 if (visibleChars == 0) {
@@ -870,16 +957,16 @@ class LocalEngineTransport(
                     // 群聊成员的零输出由 runMemberTask 统一写「（该成员本轮无输出）」，
                     // 这里再发一条会变成两条说明。
                     if (authorId == null) {
-                        _events.tryEmit(
+                        post(
                             DshEvent.MessageChunk(sessionId, "（本轮没有任何输出：" + cause + "）", authorId, authorName, turnId),
                         )
                     }
-                    _events.tryEmit(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
+                    post(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
                     return
                 }
                 // 模型自己收尾：工具失败后没再说话、上游只回空，都在这里交代一句。
                 emitTurnEndNotice(reason = "stop")
-                _events.tryEmit(DshEvent.TurnEnd(sessionId, "stop", authorId, turnId))
+                post(DshEvent.TurnEnd(sessionId, "stop", authorId, turnId))
                 return
             }
 
@@ -892,13 +979,51 @@ class LocalEngineTransport(
                 put("tool_calls", toolCalls)
             }
 
+            if (truncatedToolCall) {
+                // 末尾还有一个没闭合的调用块：已解析出来的照常执行，但要让用户知道少了一个。
+                val note = "（本轮末尾的工具调用被截断，最后那个调用没有执行）"
+                post(DshEvent.MessageChunk(sessionId, if (visibleChars > 0) "\n\n" + note else note, authorId, authorName, turnId))
+                visibleChars += note.length
+            }
+
             toolCalls.forEach { tc ->
                 val obj = tc.jsonObject
                 val id = obj["id"]?.jsonPrimitive?.contentOrNullSafe() ?: UUID.randomUUID().toString()
                 val fn = obj["function"]?.jsonObject
                 val name = fn?.get("name")?.jsonPrimitive?.contentOrNullSafe() ?: "shell"
                 val argsRaw = fn?.get("arguments")?.jsonPrimitive?.contentOrNullSafe() ?: "{}"
-                val args = runCatching { DshJson.parseToJsonElement(argsRaw).jsonObject }.getOrNull() ?: JsonObject(emptyMap())
+                // 参数被流截断时（`{"command":"ls -l` 这种）以前退化成空 map，shell 拿到空 command
+                // 只会回一句「参数缺失」——把「流断了」伪装成「模型没给参数」，用户无从判断。
+                val args = if (argsRaw.isBlank()) {
+                    JsonObject(emptyMap())
+                } else {
+                    runCatching { DshJson.parseToJsonElement(argsRaw).jsonObject }.getOrNull()
+                }
+                if (args == null) {
+                    AppLog.w("tool args is not json (truncated?): " + argsRaw.take(120))
+                    post(
+                        DshEvent.ToolCallEvent(
+                            sessionId,
+                            ToolCall(
+                                id,
+                                title = name + "（参数不完整）",
+                                kind = name,
+                                status = ToolStatus.Failed,
+                                detail = "工具参数不是合法 JSON（多半被流截断），本次没有执行。原始参数：" + argsRaw.take(200),
+                                args = argsRaw.take(200),
+                                requestJson = describeRequest(body, round, name, argsRaw.take(200)),
+                            ),
+                            authorId,
+                            authorName,
+                            turnId,
+                        ),
+                    )
+                    val note = "（工具参数不完整，本轮没有执行工具：可以让我重试一次）"
+                    post(DshEvent.MessageChunk(sessionId, if (visibleChars > 0) "\n\n" + note else note, authorId, authorName, turnId))
+                    visibleChars += note.length
+                    post(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
+                    return
+                }
                 // shell 用 command 字段；phone 等工具用完整参数 JSON 作为展示与去重键（含坐标，避免同动作不同坐标被误合并）。
                 val command = if (name == "shell") {
                     args["command"]?.jsonPrimitive?.contentOrNullSafe().orEmpty()
@@ -913,7 +1038,7 @@ class LocalEngineTransport(
                 // A：死循环 → 本次不执行，结束本轮；同轮重复 → 复用上次结果，不再执行。
                 val verdict = loopGuard.check(signature)
                 if (verdict is ToolVerdict.Loop) {
-                    _events.tryEmit(
+                    post(
                         DshEvent.ToolCallEvent(
                             sessionId,
                             ToolCall(
@@ -931,11 +1056,11 @@ class LocalEngineTransport(
                         ),
                     )
                     emitTurnEndNotice(reason = "tool_loop", loopDetail = verdict.detail)
-                    _events.tryEmit(DshEvent.TurnEnd(sessionId, "tool_loop", authorId, turnId))
+                    post(DshEvent.TurnEnd(sessionId, "tool_loop", authorId, turnId))
                     return
                 }
                 val output: String = if (verdict is ToolVerdict.Reuse) {
-                    _events.tryEmit(
+                    post(
                         DshEvent.ToolCallEvent(
                             sessionId,
                             ToolCall(
@@ -955,7 +1080,7 @@ class LocalEngineTransport(
                     )
                     verdict.cachedOutput
                 } else {
-                    _events.tryEmit(
+                    post(
                         DshEvent.ToolCallEvent(
                             sessionId,
                             ToolCall(
@@ -995,7 +1120,7 @@ class LocalEngineTransport(
                             // runLoop 只跑主代理/群成员这一层；再往下都由子代理递归，层级在那里 +1。
                             callerDepth = 0,
                         ) { step ->
-                            _events.tryEmit(
+                            post(
                                 DshEvent.ToolCallEvent(
                                     sessionId,
                                     ToolCall(
@@ -1069,7 +1194,7 @@ class LocalEngineTransport(
                     } else {
                         "[执行失败] " + (result.error ?: "未知错误") + "\n" + result.output
                     }
-                    _events.tryEmit(
+                    post(
                         DshEvent.ToolCallEvent(
                             sessionId,
                             ToolCall(
@@ -1105,7 +1230,7 @@ class LocalEngineTransport(
             if (e is kotlinx.coroutines.CancellationException) throw e
             currentCoroutineContext().ensureActive()
             AppLog.w("turn crashed: " + e.message)
-            _events.tryEmit(
+            post(
                 DshEvent.MessageChunk(
                     sessionId,
                     "（本轮异常结束：" + stream.friendlyRequestError(e, cfg.baseUrl) + "）",
@@ -1114,14 +1239,14 @@ class LocalEngineTransport(
                     turnId,
                 ),
             )
-            _events.tryEmit(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
+            post(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
             return
         }
 
         // 兜底：最后一轮本该无工具、正常 return；万一上游还硬塞 tool_calls，
         // 也不能让这一轮悬着不结算。
         emitTurnEndNotice(reason = "stop", roundsExhausted = true)
-        _events.tryEmit(DshEvent.TurnEnd(sessionId, "stop", authorId, turnId))
+        post(DshEvent.TurnEnd(sessionId, "stop", authorId, turnId))
     }
 
 
@@ -1131,7 +1256,23 @@ class LocalEngineTransport(
         current == previous -> ""
         current.startsWith(previous) -> current.substring(previous.length)
         previous.startsWith(current) -> ""
-        else -> current
+        else -> {
+            // 走到这里说明两次拿到的正文前缀对不上：多半是断流重试后上游从头重说了一遍。
+            // 前半句已经上屏了，整段重发就是「半句 + 整段」的双份正文，所以只补公共前缀之后的部分。
+            val shared = commonPrefixLength(previous, current)
+            AppLog.w(
+                "正文前缀失配：已上屏 " + previous.length + " 字符，本轮 " + current.length +
+                    " 字符，公共前缀 " + shared + " —— 只补差异部分，不回吐已上屏内容",
+            )
+            if (shared == 0) "" else current.substring(shared)
+        }
+    }
+
+    private fun commonPrefixLength(a: String, b: String): Int {
+        val max = if (a.length < b.length) a.length else b.length
+        var i = 0
+        while (i < max && a[i] == b[i]) i++
+        return i
     }
 
     /**
@@ -1435,7 +1576,7 @@ class LocalEngineTransport(
         }
         val verdict = subagentBudget.begin(sessionId)
         if (verdict.warn) {
-            _events.tryEmit(
+            post(
                 DshEvent.MessageChunk(
                     sessionId,
                     "[预算告急] 已用 " + verdict.percent + "%，后续子任务可能被拒",
@@ -1522,6 +1663,9 @@ class LocalEngineTransport(
         const val MAX_ROUNDS = 64
 
         const val PERMISSION_TIMEOUT_MS = 180_000L
+
+        /** 一轮对话多久没有任何事件就判定卡死（有输出会重置计时）。 */
+        const val TURN_IDLE_TIMEOUT_MS = 300_000L
         val CONFIRM_PATTERNS = listOf("rm -rf", "mkfs", "pm uninstall", "reboot", " su ", "su -", "fastboot")
     }
 }

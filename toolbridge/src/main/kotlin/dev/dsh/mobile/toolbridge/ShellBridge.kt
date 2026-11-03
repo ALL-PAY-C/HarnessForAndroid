@@ -53,11 +53,13 @@ data class ChannelListing(
 
 /**
  * 工具通道注册表：模型要"调用手机上的工具"时，DSH 侧看到的工具就是 [exec]。
- * 优先级 Shizuku > Root > Termux > App，也可显式指定通道；新增通道直接 [register]。
+ * 自动优先级 proot > shizuku > root > app > termux（唯一事实来源是 [AUTO_ORDER]），也可显式指定通道；
+ * 新增通道直接 [register]，并把名字补进 [CHANNEL_NAMES]——只加通道不加名字的话，显式点名会被
+ * [channelIdFor] 归成 null 静默回落自动序。
  *
  * ## 线程契约（H5）
  * `available()` / `detail()` 里全是真阻塞，不是纯计算：
- * - `RootChannel` 首次探测要起 `su -c id` 并 `waitFor(4s)`；
+ * - `RootChannel` 首次探测要 `which su` + `su -c id` + `su 0 sh -c id`，每个都带超时（见 PrivilegedExecutor）；
  * - `ShizukuChannel` 要 binder IPC（服务被冻结时会挂到 binder 超时）；
  * - `TermuxChannel` 要 PackageManager 跨进程查询；
  * - `AppChannel.detail()` 首次要 stat / chmod `libbusybox.so`（磁盘 IO）。
@@ -88,7 +90,7 @@ class ShellBridge private constructor(
         probeDispatcher = Dispatchers.IO,
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
         seedChannels = listOf(
-            ShizukuChannel(),
+            ShizukuChannel(context),
             RootChannel(),
             TermuxChannel(context),
             AppChannel(context),
@@ -392,9 +394,15 @@ class ShellBridge private constructor(
     private companion object {
         // proot 排第一：Linux 环境一旦激活，它就是最接近「完整 Linux」的通道。
         // 它 available() 为 false（没装/没激活）时自动落到下一条。
+        // termux 排在 app 之后：App 通道永远可用，Termux 只是它的增强版；把 termux 提前会让
+        // 装了 Termux 的用户默认多绕一次跨进程广播。
         val AUTO_ORDER = listOf("proot", "shizuku", "root", "app", "termux")
 
-        /** 模型可显式指定的通道名（顺序即 channel_list 的展示顺序）。 */
-        val CHANNEL_NAMES = listOf("proot", "app", "shizuku", "root")
+        /**
+         * 模型可显式指定的通道名（顺序即 channel_list 的展示顺序）。
+         * 必须与设置页「执行通道」选项（除 auto 外）逐项一致：SettingsScreen 的 SegmentedRow 就是用这份名单
+         * 写死的选项，漏一个名字 = 用户选了那条通道却被静默丢弃（termux 以前就是这样）。
+         */
+        val CHANNEL_NAMES = listOf("proot", "app", "shizuku", "root", "termux")
     }
 }

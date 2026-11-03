@@ -339,10 +339,56 @@ private fun scanBlocks(text: String): Pair<String, List<DsmlToolCall>> {
 
         i = lt + 1
     }
-    if (calls.isEmpty()) return text to emptyList()
-    kept.append(text, cursor, text.length)
-    return tidy(kept.toString()) to calls
+    val base = if (calls.isEmpty()) {
+        text
+    } else {
+        kept.append(text, cursor, text.length)
+        tidy(kept.toString())
+    }
+    // 未闭合的块不是正文：解析不出调用的半截块必须从正文里切掉，不能原样交给上游
+    // 当内容推上屏（T96 P0-1：断流时 `<|DSML|invoke name="shell">` 会整段涌进气泡）。
+    return truncateOpenBlock(base).first to calls
 }
+
+/** 已闭合块整段跳过；遇到开了头却没闭合的块就从那个 '<' 起切掉尾巴。 */
+internal fun truncateOpenBlock(text: String): Pair<String, Boolean> {
+    if (text.isEmpty() || text.indexOf('<') < 0) return text to false
+    var i = 0
+    while (i < text.length) {
+        val lt = text.indexOf('<', i)
+        if (lt < 0) break
+        val wrapperEnd = dsmlOpenEnd(text, lt, "tool_calls")
+        if (wrapperEnd != null) {
+            val close = dsmlCloseAt(text, wrapperEnd, "tool_calls")
+            if (close == null) return cutOpenBlock(text, lt)
+            i = close.end
+            continue
+        }
+        val invokeEnd = dsmlOpenEnd(text, lt, "invoke")
+        if (invokeEnd != null) {
+            val close = dsmlCloseAt(text, invokeEnd, "invoke")
+            if (close == null) return cutOpenBlock(text, lt)
+            i = close.end
+            continue
+        }
+        val xml = xmlOpenAt(text, lt)
+        if (xml != null) {
+            val close = "</" + xml.first + ">"
+            val at = indexOfIgnore(text, close, xml.second)
+            if (at < 0) return cutOpenBlock(text, lt)
+            i = at + close.length
+            continue
+        }
+        // 末尾一个还没写完的 DSML 开标签（长属性标签被 chunk 切断就是这种形态）。
+        val tail = text.substring(lt)
+        if (tail.indexOf('>') < 0 && tail.contains(DSML_MARK, ignoreCase = true)) return cutOpenBlock(text, lt)
+        i = lt + 1
+    }
+    return text to false
+}
+
+private fun cutOpenBlock(text: String, at: Int): Pair<String, Boolean> =
+    (if (at == 0) "" else text.substring(0, at).trimEnd()) to true
 
 private val XML_TAGS = listOf("tool_calls", "tool_call", "function_call")
 
@@ -460,7 +506,9 @@ internal class DsmlStreamFilter {
         val lt = s.lastIndexOf('<')
         if (lt < 0) return 0
         val tail = s.substring(lt)
-        if (tail.length > 48) return 0
+        // 上限 48 -> 256：`<|DSML|invoke name="write" path="/sdcard/…">` 这类长属性标签跨 chunk 时
+        // 整段都落在尾巴上，48 个字押不住就把半截标签当正文放出去了（T96 P0-2）。
+        if (tail.length > HELD_BACK_MAX) return 0
         // 还没闭合的 DSML 开标记（别名 / 空格写法都算）：先押住，别漏到正文
         if (tail.indexOf('>') < 0 && tail.contains(DSML_MARK, ignoreCase = true)) return tail.length
         val maybe = DSML_OPENS.any { flexPrefix(tail, "<|" + DSML_MARK + "|" + it) } ||
@@ -473,7 +521,7 @@ internal class DsmlStreamFilter {
         val lt = s.lastIndexOf('<')
         if (lt < 0) return 0
         val keep = s.length - lt
-        return if (keep <= 48) keep else 0
+        return if (keep <= HELD_BACK_MAX) keep else 0
     }
 
     /** tail 是否可能是 open 的前缀（竖线段一次吃掉，所以 | 和 ｜｜ 视为同一个字符）。 */
@@ -498,5 +546,8 @@ internal class DsmlStreamFilter {
 
     private companion object {
         val DSML_OPENS = listOf("tool_calls", "invoke", "parameter")
+
+        /** 尾巴押住的上限（字符）。见 [heldBack]：长属性标签要整段押得住。 */
+        const val HELD_BACK_MAX = 256
     }
 }

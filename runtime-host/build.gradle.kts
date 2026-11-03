@@ -8,11 +8,10 @@ android {
 }
 
 dependencies {
-    api(project(":core:protocol"))
-    // 公共签名只暴露 core:model 的 RuntimeState 与 core:protocol 的 LineChannel；
+    // 公共签名里没有 core:model / core:protocol 的类型（runtime-host/src 全模块 grep 0 命中）：
+    // 两条 api 已删。需要 RuntimeState / LineChannel 的模块（app、feature:*）各自直接声明。
     // core:common 仅内部 AppLog → implementation。
     implementation(project(":core:common"))
-    api(project(":core:model"))
     implementation(project(":node-runtime"))
     implementation(libs.kotlinx.coroutines.android)
     testImplementation(libs.junit)

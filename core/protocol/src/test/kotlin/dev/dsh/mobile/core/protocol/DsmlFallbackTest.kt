@@ -157,17 +157,21 @@ class DsmlFallbackTest {
     }
 
     @Test
-    fun brokenMarkerKeepsTheOriginalText() {
+    fun brokenJsonInsideClosedBlockKeepsTextButUnclosedBlockIsDropped() {
+        // 闭合的块即使 JSON 坏掉也原样保留：那是「模型写歪了」，不是流断了，删掉反而丢了证据。
         val brokenJson = "<tool_call>{not json}</tool_call>"
-        val unclosed = "<|DSML|tool_calls><|DSML|invoke name=\"shell\">"
-
         val first = stripDsmlToolCalls(brokenJson)
         assertEquals(brokenJson, first.first)
         assertTrue(first.second.isEmpty())
 
+        // 未闭合的块（上游在闭合标签前断流）必须整段丢掉并留下可观测标记。
+        // 旧断言是「原样返回」——那正是 T96 P0-1 的病灶：正文里躺着一截 markup，
+        // toolCalls 又是空的，于是这一轮静默按 stop 收尾，用户看到半截标记而调用从未执行。
+        val unclosed = "<|DSML|tool_calls><|DSML|invoke name=\"shell\">"
         val second = stripDsmlToolCalls(unclosed)
-        assertEquals(unclosed, second.first)
+        assertEquals("", second.first)
         assertTrue(second.second.isEmpty())
+        assertTrue(truncateOpenBlock(unclosed).second)
     }
 
     @Test

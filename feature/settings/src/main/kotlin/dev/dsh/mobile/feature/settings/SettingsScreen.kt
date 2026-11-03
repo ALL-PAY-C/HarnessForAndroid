@@ -1,6 +1,7 @@
 package dev.dsh.mobile.feature.settings
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -64,6 +65,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -98,9 +100,16 @@ import dev.dsh.mobile.design.StatusCapsule
 import dev.dsh.mobile.design.qqFontBody
 import dev.dsh.mobile.design.qqPageBottomInset
 import dev.dsh.mobile.toolbridge.AppStorage
+import dev.dsh.mobile.toolbridge.ShizukuChannel
 import dev.dsh.mobile.toolbridge.phone.PhoneAction
 import dev.dsh.mobile.toolbridge.phone.PhoneBridge
+import dev.dsh.mobile.toolbridge.phone.ShizukuState
+import dev.dsh.mobile.toolbridge.phone.ShizukuStatus
+import dev.dsh.mobile.toolbridge.privilege.PrivilegedExecutor
+import dev.dsh.mobile.toolbridge.privilege.RootProbe
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val README_URL = "https://github.com/ALL-PAY-C/HarnessForAndroid#readme"
 
@@ -937,7 +946,20 @@ fun SettingsScreen(
                             val a11y = remember(permTick) { permBridge.isEnabled() }
                             val notif = remember(permTick) { permBridge.isNotificationListenerEnabled() }
                             val battery = remember(permTick) { permBridge.isIgnoringBatteryOptimizations() }
-                            val shizuku = remember(permTick) { permBridge.shizukuStatus() }
+                            // 通道实例要跨重组保留：授权回调注册在它身上，每次重组重建就永远收不到结果。
+                            val shizukuChannel = remember { ShizukuChannel(ctx) }
+                            val shizuku = remember(permTick) { shizukuChannel.status() }
+                            DisposableEffect(shizukuChannel) {
+                                shizukuChannel.registerListener { permTick += 1 }
+                                onDispose { shizukuChannel.unregisterListener() }
+                            }
+                            // root 探测起真 su（最坏 2×4s），不能压在组合线程上。
+                            var rootProbe by remember(permTick) { mutableStateOf<RootProbe?>(null) }
+                            LaunchedEffect(permTick) {
+                                rootProbe = withContext(Dispatchers.IO) {
+                                    runCatching { PrivilegedExecutor.probe() }.getOrNull()
+                                }
+                            }
                             Column(Modifier.padding(QqSpace.l()), verticalArrangement = Arrangement.spacedBy(QqSpace.s())) {
                                 // 只给状态与入口，不代用户开系统权限：这类授权必须在系统界面里确认。
                                 PermissionRow(
@@ -965,8 +987,36 @@ fun SettingsScreen(
                                     title = "Shizuku",
                                     granted = shizuku.ready,
                                     label = shizuku.label + if (shizuku.detail.isBlank()) "" else " · " + shizuku.detail,
+                                    actionLabel = when (shizuku.state) {
+                                        ShizukuState.NotInstalled -> "未安装"
+                                        ShizukuState.NotRunning -> "打开 Shizuku"
+                                        ShizukuState.NoPermission -> "去授权"
+                                        ShizukuState.Ready -> "刷新"
+                                    },
+                                    // 没装时没有可执行的动作：按钮灰掉，原因写在 label 与 hint 里。
+                                    enabled = shizuku.state != ShizukuState.NotInstalled,
+                                    onAction = {
+                                        when (shizuku.state) {
+                                            ShizukuState.NotInstalled -> Unit
+                                            ShizukuState.NotRunning -> openShizukuApp(ctx)
+                                            ShizukuState.NoPermission -> shizukuChannel.requestPermission()
+                                            ShizukuState.Ready -> Unit
+                                        }
+                                        permTick += 1
+                                    },
                                 )
                                 if (shizuku.hint().isNotBlank()) Hint(shizuku.hint())
+                                PermissionRow(
+                                    title = "Root",
+                                    granted = rootProbe?.form?.available == true,
+                                    label = rootProbe?.detail ?: "检测中…",
+                                    actionLabel = if (rootProbe == null) "" else "重新检测",
+                                    enabled = rootProbe != null,
+                                    onAction = {
+                                        PrivilegedExecutor.invalidate()
+                                        permTick += 1
+                                    },
+                                )
                                 TextButton(onClick = { permTick += 1 }) { Text("刷新权限状态") }
                             }
                         }
@@ -1276,6 +1326,7 @@ private fun PermissionRow(
     granted: Boolean,
     label: String,
     actionLabel: String = "",
+    enabled: Boolean = true,
     onAction: () -> Unit = {},
 ) {
     val p = LocalQq.current
@@ -1285,7 +1336,16 @@ private fun PermissionRow(
             Text(if (granted) "已授权" else "未授权", color = if (granted) p.green else p.t2, fontSize = qqFontBody(12.sp))
         }
         Text(label, color = p.t2, fontSize = qqFontBody(12.sp))
-        if (actionLabel.isNotBlank()) TextButton(onClick = onAction) { Text(actionLabel) }
+        if (actionLabel.isNotBlank()) TextButton(onClick = onAction, enabled = enabled) { Text(actionLabel) }
+    }
+}
+
+/** 拉起 Shizuku 本体；没装或没有启动入口就静默返回，设置页不因此崩。 */
+private fun openShizukuApp(ctx: Context) {
+    runCatching {
+        ctx.packageManager.getLaunchIntentForPackage(ShizukuStatus.PACKAGE)
+            ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            ?.let { ctx.startActivity(it) }
     }
 }
 

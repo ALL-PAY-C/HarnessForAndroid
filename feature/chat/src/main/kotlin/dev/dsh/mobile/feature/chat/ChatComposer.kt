@@ -382,7 +382,7 @@ internal fun Composer(
                             contentAlignment = Alignment.Center,
                         ) {
                             Box(
-                                Modifier.size(18.dp).clip(CircleShape).background(Color(0xCC000000)),
+                                Modifier.size(18.dp).clip(CircleShape).background(p.scrim),
                                 contentAlignment = Alignment.Center,
                             ) { Text("×", color = Color.White, fontSize = 11.sp) }
                         }

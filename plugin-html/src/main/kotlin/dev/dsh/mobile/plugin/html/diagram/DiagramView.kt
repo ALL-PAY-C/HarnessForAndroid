@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.dsh.mobile.plugin.html.HtmlDocument
+import dev.dsh.mobile.pluginapi.QqContentColors
 
 /**
  * 图形/图表卡片（宿主通过 DiagramRenderers.install 注册到这里）。
@@ -280,13 +281,13 @@ private fun clampOffset(offset: Offset, scale: Float, viewW: Float, viewH: Float
 private fun FullscreenDiagram(kind: String, doc: String, onClose: () -> Unit) {
     var web by remember { mutableStateOf<WebView?>(null) }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(color = Color(0xFF0B0B0D), modifier = Modifier.fillMaxSize()) {
+        Surface(color = QqContentColors.diagramBg, modifier = Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                 Row(
                     Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(kind.uppercase(), fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = Color(0xFF9AA0A6))
+                    Text(kind.uppercase(), fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = QqContentColors.diagramLabel)
                     Spacer(Modifier.weight(1f))
                     FullscreenAction("重置缩放") { resetZoom(web) }
                     FullscreenAction("关闭") { onClose() }
@@ -302,7 +303,7 @@ private fun FullscreenAction(text: String, onClick: () -> Unit) {
     Text(
         text = text,
         fontSize = 12.sp,
-        color = Color(0xFFDADCE0),
+        color = QqContentColors.diagramAction,
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
             .clickable(onClick = onClick)

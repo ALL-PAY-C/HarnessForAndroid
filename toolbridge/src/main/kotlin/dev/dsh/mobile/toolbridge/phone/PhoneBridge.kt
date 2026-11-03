@@ -135,15 +135,8 @@ class PhoneBridge(
         android.net.Uri.parse("package:" + context.packageName),
     ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-    /** Shizuku 状态：装没装（包名）+ 服务活着没（反射 pingBinder）+ 授没授权。 */
-    fun shizukuStatus(): ShizukuStatus {
-        val installed = runCatching {
-            context.packageManager.getPackageInfo(ShizukuStatus.PACKAGE, 0)
-            true
-        }.getOrDefault(false)
-        val channel = ShizukuChannel()
-        return ShizukuStatus.of(installed, channel.binderAlive(), channel.permissionGranted())
-    }
+    /** Shizuku 状态：装没装（包名）+ 服务活着没（pingBinder）+ 授没授权，三态由 [ShizukuChannel.status] 统一判定。 */
+    fun shizukuStatus(): ShizukuStatus = ShizukuChannel(context).status()
 
     suspend fun exec(json: String): PhoneResult = withContext(Dispatchers.IO) {
         val result = execBlocking(json)

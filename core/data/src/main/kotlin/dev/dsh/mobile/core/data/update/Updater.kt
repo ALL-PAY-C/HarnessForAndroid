@@ -11,8 +11,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * App 自更新：从一个静态 JSON 清单里读版本号，比当前包高就下载 APK 并交给系统安装器。
@@ -72,7 +70,11 @@ data class UpdateCheck(
     }
 }
 
-class Updater(private val context: Context) {
+class Updater(
+    private val context: Context,
+    /** 清单出网口：默认走仓库既有 HTTP 能力（core:protocol 的 HttpTransport），测试注入 fake / 本地服务器。 */
+    private val fetcher: ManifestFetcher = DefaultManifestFetcher(),
+) {
 
     private val prefs by lazy { context.getSharedPreferences("dsh.update", Context.MODE_PRIVATE) }
 
@@ -122,7 +124,7 @@ class Updater(private val context: Context) {
                         speedStore.recordFailure(stat.url)
                     }
                 },
-            ) { httpGet(it) }
+            ) { fetcher.fetch(it) }
         }
     }
 
@@ -284,25 +286,6 @@ class Updater(private val context: Context) {
             out.add(info.apkUrl)
         }
         return out.toList()
-    }
-
-    private fun httpGet(url: String): String {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 12_000
-            readTimeout = 20_000
-            instanceFollowRedirects = true
-            setRequestProperty("User-Agent", "dsh-mobile-updater")
-            setRequestProperty("Cache-Control", "no-cache")
-        }
-        return try {
-            val code = conn.responseCode
-            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-            val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            require(code in 200..299) { "HTTP $code：${text.take(120)}" }
-            text
-        } finally {
-            conn.disconnect()
-        }
     }
 
     /** 单源超时（毫秒）。可配是因为弱网用户愿意等更久，而正常用户不想等 8s。 */

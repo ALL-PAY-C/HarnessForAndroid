@@ -42,8 +42,19 @@ sealed interface DshEvent {
     data class ConfigOptions(val sessionId: String, val options: List<ConfigOption>) : DshEvent
     data class Permission(val sessionId: String, val request: PermissionRequest) : DshEvent
     data class PermissionResolved(val sessionId: String, val requestId: String) : DshEvent
-    /** [authorId] null = the whole turn finished; non-null = that group member finished. [turnId] 让结算按代际幂等。 */
-    data class TurnEnd(val sessionId: String, val reason: String, val authorId: String? = null, val turnId: String? = null) : DshEvent
+    /**
+     * [authorId] null = the whole turn finished; non-null = that group member finished. [turnId] 让结算按代际幂等。
+     *
+     * [truncatedToolCall] = 这一轮的工具调用块被流截断（没有闭合标签），调用根本没执行。
+     * 以前这种情况走的是 TurnEnd("stop")，上层看不出「是模型收尾了」还是「话没说完就断了」。
+     */
+    data class TurnEnd(
+        val sessionId: String,
+        val reason: String,
+        val authorId: String? = null,
+        val turnId: String? = null,
+        val truncatedToolCall: Boolean = false,
+    ) : DshEvent
     /** Unknown notification, forwarded for plugin/extension consumers. */
     data class Raw(val method: String, val params: kotlinx.serialization.json.JsonObject) : DshEvent
 }

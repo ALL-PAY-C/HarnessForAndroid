@@ -2,8 +2,14 @@ package dev.dsh.mobile.toolbridge
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.ParcelFileDescriptor
 import dev.dsh.mobile.core.common.AppLog
 import dev.dsh.mobile.core.common.ProxyEnv
+import dev.dsh.mobile.toolbridge.phone.ShizukuStatus
+import dev.dsh.mobile.toolbridge.privilege.PrivilegedExecutor
+import dev.dsh.mobile.toolbridge.privilege.RootProbe
+import rikka.shizuku.Shizuku
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -12,7 +18,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import moe.shizuku.server.IRemoteProcess
+import moe.shizuku.server.IShizukuService
 
 /**
  * 应用自身沙箱内的 shell，任何设备都能用，只能访问应用私有目录。
@@ -141,81 +149,123 @@ internal object Busybox {
     }
 }
 
-/** root 通道：su -c。 */
+/**
+ * root 通道：su。形态交给 [PrivilegedExecutor] 探测 —— AOSP 的 `su 0 sh -c` 与 root 管理器的
+ * `su -c` 都支持，不再假定 `su -c` 一种写法。
+ *
+ * 不可用时返回 [RootProbe.code]：-2 = 设备上没有 su，-3 = su 在但两种形态都拿不到 uid=0。
+ * 「没 root」和「有 su 但拒绝授权」是两件不同的事，用户要做的操作也不同。
+ */
 class RootChannel : ShellChannel {
     override val id = "root"
     override val label = "Root (su)"
     override val kind = ChannelKind.Root
 
-    private val cached: Boolean by lazy {
-        runCatching {
-            val p = ProcessBuilder("su", "-c", "id").redirectErrorStream(true).start()
-            val done = p.waitFor(4, TimeUnit.SECONDS)
-            val text = if (done) p.inputStream.bufferedReader().readText() else ""
-            if (!done) p.destroy()
-            done && p.exitValue() == 0 && text.contains("uid=0")
-        }.getOrDefault(false)
-    }
+    /** 首次探测要起真 su（最坏 2×4s）；装/撤 root 后调 [PrivilegedExecutor.invalidate] 重探。 */
+    private val probe: RootProbe by lazy { PrivilegedExecutor.root() }
 
-    override fun available() = cached
-    override fun detail() = if (cached) "已获取 root，可调用系统级命令" else "未检测到 su"
-    override suspend fun exec(command: String, timeoutMs: Long) =
+    override fun available() = probe.form.available
+    override fun detail() = probe.detail
+
+    override suspend fun exec(command: String, timeoutMs: Long): ShellResult {
+        val current = PrivilegedExecutor.root()
         // su 起的是新 shell，拿不到本进程 env，代理只能写进命令串。
-        runProcess(listOf("su", "-c", ProxyEnv.prefix(command)), timeoutMs)
+        val argv = current.form.wrap(ProxyEnv.prefix(command))
+            ?: return ShellResult(current.code, "", "root 不可用（code=" + current.code + "）：" + current.detail)
+        return runProcess(argv, timeoutMs)
+    }
 }
 
 /**
  * Shizuku 通道：借 Shizuku 的 shell uid 执行命令（免 root 也能 pm/am/settings 等）。
- * 通过反射调用，Shizuku 未安装时不影响应用启动。
+ *
+ * 直接用已引入的 dev.rikka.shizuku:api 13.1.5，不再反射：pingBinder / checkSelfPermission /
+ * requestPermission / addRequestPermissionResultListener 都是公开 API，Shizuku 没装时它们只返回 false。
+ * 起进程走 api 依赖里的 IShizukuService（13.x 把 Shizuku.newProcess 收成了 private），
+ * 这是应用侧唯一还能起子进程的 binder 面。
  */
-class ShizukuChannel : ShellChannel {
+class ShizukuChannel(private val context: Context? = null) : ShellChannel {
     override val id = "shizuku"
     override val label = "Shizuku"
     override val kind = ChannelKind.Shizuku
 
-    private val clazz: Class<*>? by lazy {
-        runCatching { Class.forName("rikka.shizuku.Shizuku") }.getOrNull()
+    /** 授权回调落地：拿到 granted 之后不必再 cross-process 问一次。 */
+    @Volatile private var grantedByCallback = false
+
+    /** 界面注册的回调，权限结果回来时刷新状态用。 */
+    @Volatile private var onResult: (() -> Unit)? = null
+
+    private val listenerRegistered = AtomicBoolean(false)
+
+    private val listener = Shizuku.OnRequestPermissionResultListener { code, grant ->
+        if (code == REQUEST_CODE) {
+            grantedByCallback = grant == PackageManager.PERMISSION_GRANTED
+            AppLog.i("shizuku permission: request=" + code + " grant=" + grant)
+            onResult?.invoke()
+        }
     }
 
-    fun binderAlive(): Boolean = runCatching {
-        val c = clazz ?: return false
-        c.getMethod("pingBinder").invoke(null) as Boolean
-    }.getOrDefault(false)
+    /** 装没装：Shizuku 的包在不在。没有 Context（测试构造）时不判断，只报「运行/未运行」。 */
+    fun installed(): Boolean = context?.let { ctx ->
+        runCatching {
+            ctx.packageManager.getPackageInfo(ShizukuStatus.PACKAGE, 0)
+            true
+        }.getOrDefault(false)
+    } ?: true
 
-    fun permissionGranted(): Boolean = runCatching {
-        val c = clazz ?: return false
-        val res = c.getMethod("checkSelfPermission").invoke(null) as Int
-        res == 0 // PackageManager.PERMISSION_GRANTED
-    }.getOrDefault(false)
+    fun binderAlive(): Boolean = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
 
-    fun requestPermission(requestCode: Int = 1001): Boolean = runCatching {
-        val c = clazz ?: return false
-        c.getMethod("requestPermission", Int::class.javaPrimitiveType).invoke(null, requestCode)
-        true
-    }.getOrDefault(false)
+    fun permissionGranted(): Boolean {
+        if (grantedByCallback) return true
+        return runCatching {
+            Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        }.getOrDefault(false)
+    }
+
+    /** 三态（未安装 / 未运行 / 未授权 / 可用）走 [ShizukuStatus]，界面与通道共用一套文案。 */
+    fun status(): ShizukuStatus = ShizukuStatus.of(installed(), binderAlive(), permissionGranted())
 
     override fun available() = binderAlive() && permissionGranted()
+    override fun detail() = status().detail
 
-    override fun detail() = when {
-        clazz == null -> "未集成 Shizuku"
-        !binderAlive() -> "Shizuku 服务未运行"
-        !permissionGranted() -> "等待 Shizuku 授权"
-        else -> "已授权，shell uid 执行"
+    /**
+     * 申请授权。服务没跑就直接 false（拉起授权页也没意义），结果由 [listener] 回来。
+     * [onResult] 会在权限结果到达时被调一次，界面据此刷新。
+     */
+    fun requestPermission(requestCode: Int = REQUEST_CODE): Boolean {
+        if (!binderAlive()) return false
+        registerListener()
+        return runCatching {
+            Shizuku.requestPermission(requestCode)
+            true
+        }.getOrDefault(false)
+    }
+
+    fun registerListener(onResult: (() -> Unit)? = null) {
+        if (onResult != null) this.onResult = onResult
+        if (!listenerRegistered.compareAndSet(false, true)) return
+        val ok = runCatching { Shizuku.addRequestPermissionResultListener(listener) }.isSuccess
+        if (!ok) listenerRegistered.set(false)
+    }
+
+    fun unregisterListener() {
+        onResult = null
+        if (!listenerRegistered.compareAndSet(true, false)) return
+        runCatching { Shizuku.removeRequestPermissionResultListener(listener) }
     }
 
     override suspend fun exec(command: String, timeoutMs: Long): ShellResult {
         if (!available()) return ShellResult.unavailable(detail())
-        val proc = runCatching {
-            val c = clazz!!
-            val m = c.getMethod(
-                "newProcess",
-                Array<String>::class.java,
-                Array<String>::class.java,
-                String::class.java,
-            )
-            m.invoke(null, arrayOf("sh", "-c", ProxyEnv.prefix(command)), null, null) as Process
+        val remote = runCatching {
+            val binder = Shizuku.getBinder() ?: error("Shizuku binder 未就绪")
+            IShizukuService.Stub.asInterface(binder)
+                .newProcess(arrayOf("sh", "-c", ProxyEnv.prefix(command)), null, null)
         }.getOrElse { return ShellResult.unavailable("Shizuku 调用失败: ${it.message}") }
-        return drain(proc, timeoutMs)
+        return drainRemote(remote, timeoutMs)
+    }
+
+    private companion object {
+        const val REQUEST_CODE = 1001
     }
 }
 
@@ -332,6 +382,36 @@ internal suspend fun drain(proc: Process, timeoutMs: Long): ShellResult =
         if (result == null) {
             runCatching { proc.destroyForcibly() }
             AppLog.w("shell timeout after ${timeoutMs}ms")
+            ShellResult(-1, "", "命令超时（${timeoutMs}ms）已终止")
+        } else {
+            ShellResult(result.third, result.first, result.second)
+        }
+    }
+
+/** [drain] 的 Shizuku 版：IRemoteProcess 给的是 ParcelFileDescriptor，不是 Process。 */
+private suspend fun drainRemote(proc: IRemoteProcess, timeoutMs: Long): ShellResult =
+    withContext(Dispatchers.IO) {
+        val result = withTimeoutOrNull(timeoutMs) {
+            coroutineScope {
+                val out = async {
+                    runCatching {
+                        ParcelFileDescriptor.AutoCloseInputStream(proc.getInputStream())
+                            .use { it.readBytes().decodeToString() }
+                    }.getOrDefault("")
+                }
+                val err = async {
+                    runCatching {
+                        ParcelFileDescriptor.AutoCloseInputStream(proc.getErrorStream())
+                            .use { it.readBytes().decodeToString() }
+                    }.getOrDefault("")
+                }
+                val code = async { runCatching { proc.waitFor() }.getOrDefault(-1) }
+                Triple(out.await(), err.await(), code.await())
+            }
+        }
+        if (result == null) {
+            runCatching { proc.destroy() }
+            AppLog.w("shizuku timeout after ${timeoutMs}ms")
             ShellResult(-1, "", "命令超时（${timeoutMs}ms）已终止")
         } else {
             ShellResult(result.third, result.first, result.second)

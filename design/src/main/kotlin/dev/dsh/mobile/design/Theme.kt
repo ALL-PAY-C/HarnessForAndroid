@@ -125,6 +125,10 @@ data class QqPalette(
     val amber: Color,
     /** 待用户决定 / 需要注意（warn）：比 amber 偏暖的红橙，专用于「待处理」语义。 */
     val warn: Color,
+    /** 内嵌终端底色：终端自绘背景，亮暗主题下都是同一个近黑。 */
+    val terminalBg: Color,
+    /** 图片上的压暗遮罩（缩略图删除角标）：80% 黑。 */
+    val scrim: Color,
     val dark: Boolean,
 ) {
     companion object {
@@ -144,6 +148,8 @@ data class QqPalette(
             green = Color(0xFF22C55E),
             amber = Color(0xFFF59E0B),
             warn = Color(0xFFF0A020),
+            terminalBg = Color(0xFF0B0F14),
+            scrim = Color(0xCC000000),
             dark = false,
         )
 
@@ -163,6 +169,8 @@ data class QqPalette(
             green = Color(0xFF22C55E),
             amber = Color(0xFFF59E0B),
             warn = Color(0xFFF0A020),
+            terminalBg = Color(0xFF0B0F14),
+            scrim = Color(0xCC000000),
             dark = true,
         )
     }

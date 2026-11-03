@@ -125,8 +125,8 @@ class PhoneAccessibilityService : AccessibilityService() {
         val view = TextView(this).apply {
             text = statusText()
             textSize = 12f
-            setTextColor(0xFFFFFFFF.toInt())
-            setBackgroundColor(0xCC202124.toInt())
+            setTextColor(android.graphics.Color.WHITE)
+            setBackgroundColor(android.graphics.Color.argb(0xCC, 0x20, 0x21, 0x24))
             setPadding(24, 12, 24, 12)
             isClickable = false
             isFocusable = false

@@ -34,11 +34,14 @@ data class MuxGeneration(
 
 /**
  * 退避表是唯一的重连来源（改造前在 [ReconnectPolicy]）。
- * [readyTimeoutMs] / [pingIntervalMs] 从现有常量搬：WS 建链 15s 超时、`Endpoint.heartbeatMs` 默认 15s。
+ * [readyTimeoutMs] 从现有常量搬：WS 建链 15s 超时。
  */
 data class MuxOptions(
     val readyTimeoutMs: Long = 15_000L,
-    val pingIntervalMs: Long = 15_000L,
+    // 协议无 ping 帧：JSON-RPC over line/WS 只有 initialize 与业务帧，宿主侧 mux 也没有
+    // heartbeat 方法，凭空加一帧只会被当未知通知。空闲检测由 carrier 层读超时保证 ——
+    // WS 是 OkHttp pingInterval（WebSocketChannel.kt:29），行载体是读流中断 → CarrierLoss。
+    // 原 pingIntervalMs 全仓零调用，故删除而不是留一个假开关。
     /** 第 n 次重连前等多久；长度即最大重连次数。 */
     val retryCapsMs: List<Long> = ReconnectPolicy().retryCaps(),
     val autoReconnect: Boolean = true,

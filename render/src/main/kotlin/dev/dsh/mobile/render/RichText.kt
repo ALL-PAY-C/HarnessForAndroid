@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import dev.dsh.mobile.pluginapi.DiagramRenderers
 import dev.dsh.mobile.pluginapi.HtmlBlockRenderers
+import dev.dsh.mobile.pluginapi.QqContentColors
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
@@ -171,7 +172,7 @@ private fun buildAnnotated(
                 is MdInline.Code -> builder.withStyle(
                     SpanStyle(
                         fontFamily = FontFamily.Monospace,
-                        background = Color(0x1A808080),
+                        background = QqContentColors.codeBg,
                         fontSize = fontSize * 0.94f,
                     )
                 ) { append(span.text) }

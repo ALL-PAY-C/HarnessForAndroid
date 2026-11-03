@@ -139,17 +139,17 @@ class ShellChannelParamTest {
     // —— channel_list ——
 
     @Test
-    fun channelListReportsThreeUnusableChannelsWhenNothingIsInstalled() = runTest {
+    fun channelListReportsFourUnusableChannelsWhenNothingIsInstalled() = runTest {
         val app = FakeChannel("app", detailText = "内置 busybox")
         val dispatcher = StandardTestDispatcher(testScheduler)
         val bridge = ShellBridge(listOf(app), dispatcher, CoroutineScope(SupervisorJob() + dispatcher))
 
         val list = bridge.channelList()
 
-        assertEquals(listOf("proot", "app", "shizuku", "root"), list.map { it.name })
+        assertEquals(listOf("proot", "app", "shizuku", "root", "termux"), list.map { it.name })
         val unusable = list.filter { !it.available }
-        assertEquals("Shizuku / root / proot 都没装时应正好三项不可用", 3, unusable.size)
-        assertEquals(listOf("proot", "shizuku", "root"), unusable.map { it.name })
+        assertEquals("Shizuku / root / proot / Termux 都没装时应正好四项不可用", 4, unusable.size)
+        assertEquals(listOf("proot", "shizuku", "root", "termux"), unusable.map { it.name })
         for (entry in unusable) {
             assertTrue("不可用必须带可读 reason：" + entry.name, entry.reason.isNotBlank())
         }

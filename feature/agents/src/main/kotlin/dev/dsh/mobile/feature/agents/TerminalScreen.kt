@@ -270,7 +270,7 @@ private fun PtyArea(spec: ShellSpec, textSize: Int) {
                 .weight(1f)
                 .padding(horizontal = 10.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFF0B0F14)),
+                .background(p.terminalBg),
         ) {
             if (current == null) {
                 Text("正在启动 shell…", color = p.t3, fontSize = qqFontBody(13.sp), modifier = Modifier.align(Alignment.Center))

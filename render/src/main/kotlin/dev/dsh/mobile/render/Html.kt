@@ -11,6 +11,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.takeOrElse
+import dev.dsh.mobile.pluginapi.QqContentColors
 
 /** Tag used for clickable link annotations; shared with [RichText]. */
 internal const val LinkAnnotationTag = "URL"
@@ -24,8 +25,8 @@ internal const val LinkAnnotationTag = "URL"
  */
 object HtmlRenderer {
 
-    private val LINK_COLOR = Color(0xFF3B82F6)
-    private val CODE_BG = Color(0x1A808080)
+    private val LINK_COLOR = QqContentColors.link
+    private val CODE_BG = QqContentColors.codeBg
 
     private val VOID_TAGS = setOf("br", "hr", "img", "input", "meta", "link", "source", "col")
     private val DROP_TAGS = setOf("script", "style", "head", "title", "noscript", "template")

@@ -11,6 +11,7 @@ import dev.dsh.mobile.core.protocol.httpFailureReason
 import dev.dsh.mobile.core.protocol.reasoningOf
 import dev.dsh.mobile.core.protocol.stripDsmlToolCalls
 import dev.dsh.mobile.core.protocol.tool.contentOrNullSafe
+import dev.dsh.mobile.core.protocol.truncateOpenBlock
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -87,8 +88,14 @@ internal class ModelStream(
             var sawDone = false
             // 上游的收尾原因（length / content_filter）：空回复的原因判定全靠它。
             var finishReason: String? = null
+            // 空闲看门狗：readTimeout 只挡得住「一次读不到字节」，上游只要隔一会儿吐个保活行
+            // 就能把连接一直吊着不推进。真正的判据是「多久没有解析出实质帧」，超了就抛出去。
+            var lastFrameAt = System.currentTimeMillis()
             r.body?.source()?.use { src ->
                 while (true) {
+                    if (System.currentTimeMillis() - lastFrameAt > IDLE_TIMEOUT_MS) {
+                        throw UpstreamIdleException("上游 " + IDLE_TIMEOUT_MS / 1000 + " 秒没有任何实质输出")
+                    }
                     // 阻塞读不认协程取消：用户点停止后必须自己出圈，否则会继续把上一轮的
                     // 内容推回 UI，看起来像「已经停了还在输出」。
                     if (!currentCoroutineContext().isActive) break
@@ -102,6 +109,7 @@ internal class ModelStream(
                     val payload = line.removePrefix("data:").trim()
                     if (payload == "[DONE]") { sawDone = true; break }
                     val frame = runCatching { DshJson.parseToJsonElement(payload).jsonObject }.getOrNull() ?: continue
+                    lastFrameAt = System.currentTimeMillis()
                     frame["usage"]?.let { u -> if (u is JsonObject) usage = u }
                     val choice = (frame["choices"] as? JsonArray)?.firstOrNull() as? JsonObject
                     // finish_reason 只在最后一帧出现：正文被长度截断时它是唯一的证据。
@@ -147,8 +155,13 @@ internal class ModelStream(
             }
             // 兜底：上游有时把 DeepSeek 原生工具调用标记当正文流回来（DSML / <tool_call>）。
             // 本轮 tool_calls 为空时从正文里解析出来补进 tool_calls，并把标记文本从正文剔掉。
+            var truncatedToolCall = false
             val finalContent = if (toolCalls.isEmpty()) {
-                val stripped = stripDsmlToolCalls(content.toString())
+                // 先记「有没有被截断」再剥：stripDsmlToolCalls 内部已经会切掉未闭合块，
+                // 剥完就再也看不出当时是未闭合的了（上层要靠这个标记把静默 stop 变成可读的截断）。
+                val guard = truncateOpenBlock(content.toString())
+                if (guard.second) truncatedToolCall = true
+                val stripped = stripDsmlToolCalls(guard.first)
                 stripped.second.forEachIndexed { index, call ->
                     toolCalls[index] = call.toToolCallJson()
                 }
@@ -176,6 +189,8 @@ internal class ModelStream(
                 usage?.let { put("usage", it) }
                 // 断流标记：没收到 [DONE] 就 EOF，说明上游中途断了（非流式整包在上方已提前 return）。
                 if (!sawDone) put("dsh_eof_without_done", true)
+                // 未闭合的工具调用块被切掉了：调用没执行，上层要能说出来，不能按 "stop" 收尾。
+                if (truncatedToolCall) put("dsh_truncated_tool_call", true)
             }
         }
     }
@@ -409,6 +424,17 @@ internal class ModelStream(
         const val ENGINE_SCHEME = "engine://"
         const val ENGINE_NOT_READY = "引擎未就绪：先在插件页打开一次，让 :node 进程起来"
 
+        /** 多久没有任何实质帧就判定上游卡死（每解析出一帧就重置）。 */
+        const val IDLE_TIMEOUT_MS = 300_000L
+
         val JSON = "application/json; charset=utf-8".toMediaType()
     }
 }
+
+/**
+ * 上游长时间没有任何实质帧（不是 TCP 断了，是一直不推进）。
+ *
+ * 刻意不是 [java.net.SocketTimeoutException]：那个会被 [ModelStream.isConnectFailure] 判成连接问题，
+ * 叠上 GATEWAY_ATTEMPTS 以后再乘上层重试，用户要等十几分钟才看到一句报错。
+ */
+internal class UpstreamIdleException(message: String) : IOException(message)
