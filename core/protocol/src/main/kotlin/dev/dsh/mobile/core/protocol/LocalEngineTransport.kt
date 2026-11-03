@@ -1,9 +1,7 @@
 package dev.dsh.mobile.core.protocol
 
 import dev.dsh.mobile.core.common.AppLog
-import dev.dsh.mobile.core.common.LoopbackGateway
 import dev.dsh.mobile.core.common.PendingImageQueue
-import dev.dsh.mobile.core.model.AgentRunState
 import dev.dsh.mobile.core.model.AgentRuntimeState
 import dev.dsh.mobile.core.model.AgentTask
 import dev.dsh.mobile.core.model.ChatMessage
@@ -11,29 +9,11 @@ import dev.dsh.mobile.core.model.PermissionOption
 import dev.dsh.mobile.core.model.PermissionRequest
 import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.Session
-import dev.dsh.mobile.core.model.TaskState
 import dev.dsh.mobile.core.model.TokenUsage
 import dev.dsh.mobile.core.model.ToolCall
 import dev.dsh.mobile.core.model.ToolCall.ToolStatus
-import dev.dsh.mobile.core.protocol.group.BriefThenModeratedScheduler
-import dev.dsh.mobile.core.protocol.group.BudgetView
 import dev.dsh.mobile.core.protocol.group.GROUP_SCHEDULER_LEGACY
 import dev.dsh.mobile.core.protocol.group.GROUP_SCHEDULER_MODERATED
-import dev.dsh.mobile.core.protocol.group.LedgerView
-import dev.dsh.mobile.core.protocol.group.LegacyScheduler
-import dev.dsh.mobile.core.protocol.group.MAX_ROOM_ROUNDS
-import dev.dsh.mobile.core.protocol.group.MODERATOR_MAX_TOKENS
-import dev.dsh.mobile.core.protocol.group.MODERATOR_SYSTEM_PROMPT
-import dev.dsh.mobile.core.protocol.group.MemberState
-import dev.dsh.mobile.core.protocol.group.RoomView
-import dev.dsh.mobile.core.protocol.group.SchedulerDecision
-import dev.dsh.mobile.core.protocol.group.SilenceTracker
-import dev.dsh.mobile.core.protocol.group.StopSignals
-import dev.dsh.mobile.core.protocol.group.TranscriptLine
-import dev.dsh.mobile.core.protocol.group.contributorsOf
-import dev.dsh.mobile.core.protocol.group.evaluateStop
-import dev.dsh.mobile.core.protocol.group.explain
-import dev.dsh.mobile.core.protocol.group.transcriptOf
 import dev.dsh.mobile.core.protocol.tool.ToolCtx
 import dev.dsh.mobile.core.protocol.tool.contentOrNullSafe
 import dev.dsh.mobile.core.protocol.tool.ToolRegistry
@@ -41,8 +21,6 @@ import dev.dsh.mobile.core.protocol.web.WebToolkit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,16 +30,13 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
@@ -69,21 +44,18 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import org.json.JSONObject
-import okhttp3.Call
-import okhttp3.Callback
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
-import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
+import dev.dsh.mobile.core.protocol.context.Compaction
+import dev.dsh.mobile.core.protocol.group.GroupRunner
+import dev.dsh.mobile.core.protocol.group.MemberTurn
+import dev.dsh.mobile.core.protocol.llm.ModelStream
+import dev.dsh.mobile.core.protocol.llm.SUBAGENT_TOOLS
+import dev.dsh.mobile.core.protocol.llm.SubagentLoop
+import dev.dsh.mobile.core.protocol.llm.strOrEmpty
 
 /** 一个可接入的模型后端描述（协议层只认这些字段，不依赖数据层）。 */
 data class LlmConfig(
@@ -177,7 +149,7 @@ data class GroupPlan(
      * 上一轮因发言上限（[MAX_GROUP_SPEAKERS]）没轮到的成员 id：下一轮排最前先发言。
      *
      * 宿主每轮都从设置重建 [GroupPlan]（AppContainer.groupPlan），所以编排层另按 sessionId
-     * 存一份（见 LocalEngineTransport 的 pendingSpeakers）；这个字段是给外部调度/持久化看的载体。
+     * 存一份（见 GroupRunner 的 pendingSpeakers）；这个字段是给外部调度/持久化看的载体。
      */
     val pendingSpeakerIds: List<String> = emptyList(),
 )
@@ -289,9 +261,6 @@ class LocalEngineTransport(
      */
     private val lastUsageTokens = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
-    /** 每会话已摘要掉的历史条数：超预算时别每轮重复压同一段（省一次 LLM 请求）。 */
-    private val summarizedCount = java.util.concurrent.ConcurrentHashMap<String, Int>()
-
     // ---- 工具防抖 / 执行器 / 每 Agent 线程 / 执行池（需求 A、B、D、E） ----
     private val loopGuard = ToolLoopGuard()
 
@@ -329,30 +298,6 @@ class LocalEngineTransport(
         interjects.getOrPut(sessionId) { java.util.concurrent.ConcurrentLinkedQueue() }.add(text)
     }
     private val threads = AgentThreads()
-    private val groupTurns = mutableMapOf<String, GroupTurn>()
-
-    /** 上一个真正说完话的成员（sessionId -> agentId）：未 @ 时用来判断「是不是在追问它」。 */
-    private val lastSpeaker = mutableMapOf<String, String>()
-
-    /**
-     * sessionId -> 上一轮因发言上限没轮到的成员（下一轮优先）。
-     *
-     * 宿主每轮都从设置重建 GroupPlan，plan 上的字段带不过去，所以这里单独存一份。
-     */
-    private val pendingSpeakers = mutableMapOf<String, List<String>>()
-
-    /**
-     * taskId -> 这一棒实际执行的工具次数。执行池只留状态不留过程，
-     * 僵局检测要判断「到底有没有真的动工具」，所以单独记一份。
-     */
-    private val taskToolCallCounts = java.util.concurrent.ConcurrentHashMap<String, Int>()
-
-    /**
-     * taskId -> 该任务最终发言。执行池只留状态（Done/Failed），不留正文，
-     * 而自动机要拿上一棒的产出喂下一棒，所以这里存一份（每轮覆盖，超量直接清空）。
-     */
-    private val taskOutputs = java.util.concurrent.ConcurrentHashMap<String, String>()
-
     /**
      * 单 Agent 直跑时的权限等待队列（requestId -> 用户的选择）。
      *
@@ -369,21 +314,48 @@ class LocalEngineTransport(
      * 有界并行执行池：最多 [GROUP_MAX_PARALLEL] 个成员同时跑；同 session 同 agent 串行。
      * 以前是单协程串行消费，群里 4 个人排队 4 轮，等于串行聊天。
      */
-    private val pool = ExecutionPool(scope, maxParallelSetting = GROUP_MAX_PARALLEL, permissionEvent = { _events.emit(it) }) { task -> runMemberTask(task) }
+    private val pool = ExecutionPool(scope, maxParallelSetting = GROUP_MAX_PARALLEL, permissionEvent = { _events.emit(it) }) { task -> groupRunner.runMemberTask(task) }
     val agentStates: StateFlow<Map<String, AgentRuntimeState>> get() = pool.agents
-
-    /** 群聊本轮快照：执行池的 runner 靠它还原成员配置与上下文。 */
-    private data class GroupTurn(
-        val plan: GroupPlan,
-        val history: List<ChatMessage>,
-        val userText: String,
-        val turnId: String? = null,
-    )
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(180, TimeUnit.SECONDS)
         .build()
+
+    /**
+     * 模型 I/O（T7.1b 拆件，见 [ModelStream]）：SSE 增量、usage、引擎路由、网关自举都在里面。
+     * HTTP 客户端与端点/凭据仍由本类注入 —— 换 client 的地方只有上面一处。
+     */
+    private val stream = ModelStream(http, engineChat, engineRpc)
+
+    /** 上下文压缩（T7.1b 拆件，见 [Compaction]）：压缩实现全在里面，本类只留接口覆写。 */
+    private val compaction = Compaction(
+        threads = threads,
+        summaryStore = summaryStore,
+        projections = projections,
+        contextWindowProvider = contextWindowProvider,
+        historyProvider = historyProvider,
+        configProvider = configProvider,
+        engineRpc = engineRpc,
+        postOnce = { cfg, body -> stream.postOnce(cfg, body) },
+        usedTokensOf = { sid -> lastUsageTokens[sid]?.toInt()?.takeIf { it > 0 } },
+    )
+
+    /**
+     * 群聊编排（T7.1b 拆件，见 [GroupRunner]）。
+     *
+     * 一棒成员发言仍走本类的 [runLoop]（[MemberTurn] 传的就是 ::runLoop），
+     * 所以群成员与单聊永远是同一条执行路径；执行池留在本类，agentStates 读的仍是它。
+     */
+    private val groupRunner: GroupRunner = GroupRunner(
+        threads = threads,
+        pool = pool,
+        stream = stream,
+        configProvider = configProvider,
+        emit = { _events.tryEmit(it) },
+        chatTurn = ::runLoop,
+        takeQueuedImages = ::takeQueuedImages,
+    )
 
     override suspend fun connect() {
         _state.value = RuntimeState.Starting("读取模型配置")
@@ -436,7 +408,7 @@ class LocalEngineTransport(
             // 群聊的活挂在执行池里，取消主协程不会带走它们：单独再收一次，
             // 否则界面已经显示「已停止」，后台成员还在烧 token（用户看到的「停下没反应」）。
             pool.cancel(sessionId)
-            groupTurns.remove(sessionId)
+            groupRunner.forget(sessionId)
             interjects.remove(sessionId)
             // 不再发 TurnEnd("cancelled")：结算交给 repo.cancel 同步完成（带 turnId），
             // 这里再发一条无主 End 只会在新轮启动后迟到、把新轮误结算（H2）。
@@ -457,9 +429,6 @@ class LocalEngineTransport(
         }
         pool.resolvePermission(requestId, optionId, sessionId = sessionId)
     }
-
-    @Volatile
-    private var groupToolsEnabled: Boolean = false
 
     override suspend fun prompt(sessionId: String, text: String, images: List<String>, turnId: String?): String {
         val group = runCatching { groupProvider(sessionId) }.getOrNull()
@@ -492,7 +461,7 @@ class LocalEngineTransport(
                         turnId = turnId,
                     )
                 } else {
-                    runGroup(sessionId, group!!, history, text, turnId)
+                    groupRunner.runGroup(sessionId, group!!, history, text, turnId)
                 }
             }.also { jobs[sessionId] = it }
         }
@@ -605,7 +574,7 @@ class LocalEngineTransport(
             val budgetChars = contextBudgetProvider(sessionId)
             // P0-1：超预算先把被丢弃的最老若干轮压成结构化摘要（摘要本身也是 system 风格消息，
             // 排在保留段之前），再按预算装配 —— 不再只是「丢最老的 + 80 字截断」。
-            runCatching { maybeSummarize(sessionId, cfg, budgetChars, messages) }
+            runCatching { compaction.maybeSummarize(sessionId, cfg, budgetChars, messages) }
                 .onFailure { AppLog.w("上下文压缩失败：" + (it.message ?: it.javaClass.simpleName)) }
             val assembly = threads.assembleForSingleChat(
                 sessionId = sessionId,
@@ -625,7 +594,7 @@ class LocalEngineTransport(
                 sessionId = sessionId,
                 usedChars = ContextBudget.tokensOf(assembly.usedChars),
                 fullChars = ContextBudget.tokensOf(assembly.fullChars),
-                budgetChars = windowTokens(sessionId),
+                budgetChars = compaction.windowTokens(sessionId),
             )
         }
 
@@ -738,7 +707,7 @@ class LocalEngineTransport(
             }
             var retriedThisRound = false
             var resp = runCatching {
-                post(
+                stream.post(
                     cfg,
                     body,
                     onReasoning = { delta ->
@@ -757,7 +726,7 @@ class LocalEngineTransport(
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 kotlinx.coroutines.currentCoroutineContext().ensureActive()
                 AppLog.w("llm call failed: ${e.message}")
-                _events.tryEmit(DshEvent.MessageChunk(sessionId, "\n\n[请求失败] " + friendlyRequestError(e, cfg.baseUrl, userImages.isNotEmpty()), authorId, authorName, turnId))
+                _events.tryEmit(DshEvent.MessageChunk(sessionId, "\n\n[请求失败] " + stream.friendlyRequestError(e, cfg.baseUrl, userImages.isNotEmpty()), authorId, authorName, turnId))
                 _events.tryEmit(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
                 return
             }
@@ -768,7 +737,7 @@ class LocalEngineTransport(
                 streamRetried = true
                 retriedThisRound = true
                 AppLog.w("stream cut before [DONE]; retry once")
-                resp = runCatching { post(cfg, body) }.getOrElse {
+                resp = runCatching { stream.post(cfg, body) }.getOrElse {
                     AppLog.w("stream retry failed: ${it.message}")
                     resp
                 }
@@ -814,11 +783,11 @@ class LocalEngineTransport(
             if (holdForRefusal && toolCalls.isNullOrEmpty() && toolRunsThisTurn == 0 && resp.bool("dsh_eof_without_done") != true) {
                 val outcome = refusalRetry.run(content, cfg.model) { _, retryModel ->
                     AppLog.w("persona retry: model=" + retryModel)
-                    val framed = frameUserMessage(body, PERSONA_FRAME)
+                    val framed = stream.frameUserMessage(body, PERSONA_FRAME)
                     // 换模型的兜底重试：思考参数只有 DeepSeek 系认，别的上游会直接 400。
                     val retryBody = if (retryModel == cfg.model) framed
                     else JsonObject(framed.filterKeys { it != "thinking" && it != "reasoning_effort" })
-                    val retryResp = post(cfg.copy(model = retryModel), retryBody)
+                    val retryResp = stream.post(cfg.copy(model = retryModel), retryBody)
                     val retryRaw = retryResp["choices"]?.jsonArray?.firstOrNull()?.jsonObject
                         ?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.contentOrNullSafe().orEmpty()
                     stripDsmlToolCalls(splitThinking(retryRaw).first).first
@@ -1056,12 +1025,12 @@ class LocalEngineTransport(
                         ToolExecResult(
                             ok = false,
                             output = "",
-                            error = "工具执行失败：" + friendlyRequestError(e, cfg.baseUrl),
+                            error = "工具执行失败：" + stream.friendlyRequestError(e, cfg.baseUrl),
                         )
                     }
                     loopGuard.recordResult(signature, result.output)
                     toolRunsThisTurn++
-                    recordTaskToolCalls(task?.id, toolRunsThisTurn)
+                    groupRunner.recordTaskToolCalls(task?.id, toolRunsThisTurn)
                     // 失败摘要留给收尾用：本轮若最终没有正文，turnEndNotice 会把它写成一条说明。
                     // 这里不发 MessageChunk —— 它追加到同一个气泡，模型随后还要接着写正文，
                     // 中途插一行会把回答劈成两半（失败本身已在工具卡 detail 里可见）。
@@ -1111,7 +1080,7 @@ class LocalEngineTransport(
             _events.tryEmit(
                 DshEvent.MessageChunk(
                     sessionId,
-                    "（本轮异常结束：" + friendlyRequestError(e, cfg.baseUrl) + "）",
+                    "（本轮异常结束：" + stream.friendlyRequestError(e, cfg.baseUrl) + "）",
                     authorId,
                     authorName,
                     turnId,
@@ -1127,720 +1096,6 @@ class LocalEngineTransport(
         _events.tryEmit(DshEvent.TurnEnd(sessionId, "stop", authorId, turnId))
     }
 
-    /**
-     * 群组：拆任务 → 进执行池串行跑 → 全部结束后再发一个总 TurnEnd。
-     *
-     * 每个成员拿到的是「自己线程 + 公共历史 + 他人已完成产出」，跑完写回自己线程，
-     * 所以第二个人不会重复第一个人干过的活（需求 D）。
-     */
-    private suspend fun runGroup(
-        sessionId: String,
-        plan: GroupPlan,
-        history: List<ChatMessage>,
-        userText: String,
-        turnId: String? = null,
-    ) {
-        // 每次开跑都把当前设置灌进执行池与成员开关（设置页改完立刻生效，不用重连）。
-        pool.maxParallelSetting = plan.maxParallel
-        groupToolsEnabled = plan.allowTools
-        threads.beginTurn(sessionId)
-        // 公共历史：谁说了什么都按时间记一份，成员上下文从这里取。
-        threads.appendPublic(sessionId, "user", userText, "用户")
-        groupTurns[sessionId] = GroupTurn(plan, history, userText, turnId)
-        // 先分诊：办公室分工 / 并行 / 接力 / 自动机（一棒做、一棒验收，打回重做）。
-        val mode = detectGroupMode(userText, plan.members.size, plan.mode)
-        // 点名优先：用户 @（或直呼）了谁，就只让这几位出场。
-        // 不这样做的话，办公室/并行档会按全员分工，@ 一个人也会把整组拉起来，
-        // 群里看起来就是「@ 了没用、分不清哪段是谁的任务」。
-        val namedMembers = parseMentions(userText, plan.members).map { it.first }
-            .ifEmpty { namedMentions(userText, plan.members) }
-            .distinctBy { it.id }
-        if (mode != GroupMode.Automaton && namedMembers.isNotEmpty() &&
-            namedMembers.size < plan.members.size
-        ) {
-            val focused = plan.copy(members = namedMembers, mode = "chain")
-            val tasks = planGroupTasks(
-                sessionId = sessionId,
-                plan = focused,
-                userText = userText,
-                history = history,
-                lastSpeakerId = null,
-                mode = GroupMode.Chain,
-            )
-            dispatchGroupTasks(sessionId, tasks)
-            pool.await(sessionId)
-            groupTurns.remove(sessionId)
-            _events.tryEmit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
-            return
-        }
-        if (mode == GroupMode.Automaton) {
-            runAutomaton(sessionId, plan, userText)
-            groupTurns.remove(sessionId)
-            _events.tryEmit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
-            return
-        }
-        if (mode == GroupMode.Office) {
-            runOffice(sessionId, plan, history, userText)
-            groupTurns.remove(sessionId)
-            _events.tryEmit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
-            return
-        }
-        // 上一轮被上限挤下来的人优先；plan 上的字段带不过来（宿主每轮重建），所以优先取本会话那份。
-        val prior = synchronized(pendingSpeakers) { pendingSpeakers[sessionId] }.orEmpty()
-            .ifEmpty { plan.pendingSpeakerIds }
-        // 编排器开关（T5.2b）：默认 LegacyScheduler —— 它只回答「这一轮该不该开」，
-        // 派活仍旧走下面的 planGroupRound，所以顺序/截断/顺延规则只有一份实现，零行为变化。
-        if (plan.scheduler == GROUP_SCHEDULER_MODERATED) {
-            runModeratedRoom(sessionId, plan, history, userText)
-            groupTurns.remove(sessionId)
-            _events.tryEmit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
-            return
-        }
-        val legacyRoom = roomViewOf(
-            plan = plan,
-            userText = userText,
-            transcript = emptyList(),
-            round = 0,
-            charsUsed = userText.length,
-            elapsedMs = 0L,
-            ledger = LedgerView(),
-            lastSpeakerId = synchronized(lastSpeaker) { lastSpeaker[sessionId] },
-        )
-        if (LegacyScheduler(plan, userText, prior).next(legacyRoom) is SchedulerDecision.Done) {
-            // 一个能说话的成员都没有：旧路径走到这里同样是空任务直接收尾（不发说明）。
-            groupTurns.remove(sessionId)
-            _events.tryEmit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
-            return
-        }
-        val round = planGroupRound(
-            sessionId = sessionId,
-            plan = plan,
-            userText = userText,
-            history = history,
-            lastSpeakerId = synchronized(lastSpeaker) { lastSpeaker[sessionId] },
-            mode = mode,
-            priorityIds = prior,
-        )
-        // 被上限挤到下一轮的人：记进 GroupPlan 字段 + 本会话待发言表，并在群里留一句话说明。
-        synchronized(pendingSpeakers) { pendingSpeakers[sessionId] = round.deferred }
-        groupTurns[sessionId]?.let { it ->
-            groupTurns[sessionId] = it.copy(plan = it.plan.copy(pendingSpeakerIds = round.deferred))
-        }
-        round.notice?.let { text -> emitGroupNotice(sessionId, text) }
-        val tasks = round.tasks
-        if (tasks.isEmpty()) {
-            groupTurns.remove(sessionId)
-            _events.tryEmit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
-            return
-        }
-        // E：经执行池派活 —— 有界并行、依赖唤醒、状态同步到 agents flow。
-        dispatchGroupTasks(sessionId, tasks)
-        // 等本 session 的活全部结束（完成/失败/取消都会唤醒），不靠轮询 sleep。
-        pool.await(sessionId)
-        groupTurns.remove(sessionId)
-        _events.tryEmit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
-    }
-
-    /**
-     * brief-then-moderated 房间（T5.2b，设计文档 §4/§5/§7）。
-     *
-     * 和自动机一样在**一轮用户消息内**按轮驱动：问调度器要决策 → 派活 → 等结算 →
-     * 记进 transcript/账本 → 回顶部做终止判定。终止条件与优先级全在 evaluateStop 里，
-     * 这里只负责喂信号、把决策落成任务、把原因写进群聊 notice（任何自动行为都要能问责）。
-     *
-     * 成本控制：房间级预算沿用 plan.contextBudget（24k 字符语义），80% 喊一声，
-     * 到顶直接散会 —— 不再有「每轮广播全员」这个隐藏成本源（§7）。
-     */
-    private suspend fun runModeratedRoom(
-        sessionId: String,
-        plan: GroupPlan,
-        history: List<ChatMessage>,
-        userText: String,
-    ) {
-        // 主持人默认取召集者会话模型；设置里给了覆盖就用覆盖的。
-        val scheduler = BriefThenModeratedScheduler { prompt -> moderatorCall(sessionId, plan, prompt) }
-        val stall = StallDetector()
-        val silence = SilenceTracker()
-        val transcript = ArrayList<TranscriptLine>()
-        val ledger = LedgerView()
-        val startedAt = System.currentTimeMillis()
-        var charsUsed = userText.length
-        var round = 0
-        var warned = false
-        var lastSpeakerId: String? = synchronized(lastSpeaker) { lastSpeaker[sessionId] }
-        while (true) {
-            // 用户打断优先级最高：协程被取消就直接收手，别再派活。
-            if (!currentCoroutineContext().isActive) {
-                emitGroupNotice(sessionId, "[群聊已散会] 用户打断，立即散会。")
-                return
-            }
-            val budget = BudgetView(
-                round = round,
-                maxRounds = MAX_ROOM_ROUNDS,
-                charsUsed = charsUsed,
-                charBudget = plan.contextBudget,
-                elapsedMs = System.currentTimeMillis() - startedAt,
-            )
-            val room = roomViewOf(
-                plan = plan,
-                userText = userText,
-                transcript = transcript,
-                round = round,
-                charsUsed = charsUsed,
-                elapsedMs = budget.elapsedMs,
-                ledger = ledger,
-                lastSpeakerId = lastSpeakerId,
-            )
-            val stop = evaluateStop(
-                StopSignals(
-                    stall = stall.stalled,
-                    stallReason = stall.reason,
-                    silentStreak = silence.streak,
-                    round = round,
-                ),
-                budget,
-            )
-            if (stop != null) {
-                AppLog.w("群聊调度：" + stop.kind + " → " + stop.reason)
-                emitGroupNotice(sessionId, "[群聊已散会] " + stop.reason)
-                return
-            }
-            if (budget.tight && !warned) {
-                warned = true
-                emitGroupNotice(
-                    sessionId,
-                    "[预算告急] 房间预算已用 " + budget.percent + "%，接近上限会自动散会。",
-                )
-            }
-            val decision = scheduler.next(room)
-            val speakers: List<GroupMember> = when (decision) {
-                is SchedulerDecision.NextSpeaker ->
-                    plan.members.filter { it.id == decision.memberId }
-                is SchedulerDecision.Roundtable -> scheduler.roundtableOrder(room)
-                    .mapNotNull { state -> plan.members.firstOrNull { it.id == state.id } }
-                is SchedulerDecision.Done -> {
-                    emitGroupNotice(sessionId, "[群聊已散会] " + decision.reason)
-                    return
-                }
-                is SchedulerDecision.Escalate -> {
-                    emitGroupNotice(sessionId, "[群聊已升级] " + decision.reason)
-                    return
-                }
-                is SchedulerDecision.AskUser -> {
-                    emitGroupNotice(sessionId, "[主持人提问] " + decision.question)
-                    return
-                }
-            }
-            if (speakers.isEmpty()) {
-                emitGroupNotice(sessionId, "[群聊已散会] 调度器没给出可发言的成员。")
-                return
-            }
-            emitGroupNotice(sessionId, "主持人：" + decision.explain)
-            // 决策 → 任务仍旧走 planGroupRound：座次就是 speakers 的顺序（brief 阶段已按 id 升序）。
-            val tasks = planGroupRound(
-                sessionId = sessionId,
-                plan = plan.copy(members = speakers, pendingSpeakerIds = emptyList()),
-                userText = userText,
-                history = history,
-                lastSpeakerId = lastSpeakerId,
-                mode = GroupMode.Chain,
-            ).tasks
-            if (tasks.isEmpty()) {
-                emitGroupNotice(sessionId, "[群聊已散会] 这一轮没有可执行的任务。")
-                return
-            }
-            dispatchGroupTasks(sessionId, tasks)
-            pool.await(sessionId)
-            // 记发言必须用「成员 id」（task.agentId），不能用任务 id：
-            // RoomView.briefPhase 靠 members[i].spokeCount 判断首轮是否结束，
-            // 用任务 id 会让 spokeCount 永远为 0 → 永远停在首轮简报 → 主持人一次都不会被调用。
-            val outputs = tasks.map { Triple(it.id, it.agentId, taskOutputs[it.id].orEmpty()) }
-            outputs.forEach { (_, memberId, text) ->
-                val name = plan.members.firstOrNull { it.id == memberId }?.name.orEmpty()
-                transcript.add(transcriptOf(memberId, name, text, round))
-                charsUsed += text.length
-            }
-            lastSpeakerId = tasks.lastOrNull()?.agentId ?: lastSpeakerId
-            stall.onRound(
-                texts = outputs.map { it.third },
-                toolCalls = tasks.sumOf { taskToolCalls(it.id) },
-                newTasks = 0,
-            )
-            silence.onRound(contributorsOf(outputs.map { it.second to it.third }))
-            round++
-        }
-    }
-
-    /** 房间快照：调度器能看到的全部信息（主持人没有与会者上下文，只有这四样）。 */
-    private fun roomViewOf(
-        plan: GroupPlan,
-        userText: String,
-        transcript: List<TranscriptLine>,
-        round: Int,
-        charsUsed: Int,
-        elapsedMs: Long,
-        ledger: LedgerView,
-        lastSpeakerId: String?,
-    ): RoomView {
-        val mentioned = parseMentions(userText, plan.members).map { it.first }
-            .ifEmpty { namedMentions(userText, plan.members) }
-        val forcedIds = mentioned.map { it.id }.toSet()
-        val namedIds = namedMentions(userText, plan.members).map { it.id }.toSet()
-        val members = plan.members.map { m ->
-            val mine = transcript.filter { it.speakerId == m.id }
-            MemberState(
-                id = m.id,
-                name = m.name,
-                spokeCount = mine.size,
-                lastSpokeRound = mine.lastOrNull()?.round ?: -1,
-                pendingTasks = ledger.openTasks.count { it.contains(m.name) },
-                forced = m.id in forcedIds,
-                named = m.id in namedIds,
-            )
-        }
-        return RoomView(
-            transcript = transcript,
-            members = members,
-            ledger = ledger,
-            budgetLeft = BudgetView(
-                round = round,
-                maxRounds = MAX_ROOM_ROUNDS,
-                charsUsed = charsUsed,
-                charBudget = plan.contextBudget,
-                elapsedMs = elapsedMs,
-            ),
-            round = round,
-            lastSpeakerId = lastSpeakerId,
-        )
-    }
-
-    /**
-     * 主持人一次往返：只回一行 JSON。
-     *
-     * 空串 = 没有可用模型或调用失败（调度器据此走可解释的优先级兜底）。
-     * 单独一条通道、单独一个 max_tokens：主持人不是成员，不能借成员的上下文与预算。
-     */
-    private suspend fun moderatorCall(sessionId: String, plan: GroupPlan, prompt: String): String {
-        // 群聊会话没有单聊 config（configProvider 在群聊里返回 null，见 prompt()），
-        // 主持人只能从成员席位借一份模型配置；否则这里恒返回空串，
-        // runModeratedRoom 每轮都落进 priorityFallback，用户看到的就是「开了主持但没人主持」。
-        val base = configProvider(sessionId)
-            ?: plan.members.firstOrNull { it.cfg.model.isNotBlank() }?.cfg
-            ?: run { AppLog.w("主持人：群内没有可用模型，本轮回落到优先序仲裁"); return "" }
-        val cfg = if (plan.moderatorModel.isBlank()) base else base.copy(model = plan.moderatorModel)
-        val body = buildJsonObject {
-            put("model", cfg.model)
-            put("max_tokens", MODERATOR_MAX_TOKENS)
-            put("temperature", 0)
-            putJsonArray("messages") {
-                addJsonObject {
-                    put("role", "system")
-                    put("content", MODERATOR_SYSTEM_PROMPT)
-                }
-                addJsonObject {
-                    put("role", "user")
-                    put("content", prompt)
-                }
-            }
-        }
-        val resp = runCatching { postOnce(cfg, body) }.getOrElse { e ->
-            AppLog.w("主持人：调用失败 " + (e.message ?: e.javaClass.simpleName))
-            return ""
-        }
-        return resp["choices"]?.jsonArray?.firstOrNull()?.jsonObject
-            ?.get("message")?.jsonObject?.get("content")
-            ?.jsonPrimitive?.contentOrNullSafe().orEmpty()
-    }
-
-    /**
-     * 自动机：一棒干活、一棒验收，验收不过打回重做，直到验收者说【完成】或撞上轮次上限。
-     *
-     * 为什么不用 dependsOn 表达：dependsOn 是 DAG，跑一遍就结束；
-     * 「做一步 → 验收 → 打回 → 重做 → 再下一步」是**带环**的，只能由调度方按轮次驱动。
-     * 每一棒仍走执行池（[ExecutionPool.submitOne] + [ExecutionPool.await]），
-     * 所以忙碌态、取消、权限拦截、token 账全部照旧生效，不是另开一条旁路。
-     *
-     * 默认 worker = 第一个 @ 的人（否则第一个成员），reviewer = 第二个 @ 的人（否则另一个成员）。
-     * 用户那句「CN 算 x+1 直到 x=10，GJ 在 CN 算完后把 x 回写成 CN 算出的数」就是这种形态。
-     */
-    private suspend fun runAutomaton(sessionId: String, plan: GroupPlan, userText: String) {
-        val members = plan.members
-        val mentioned = parseMentions(userText, members).map { it.first }
-        val worker = mentioned.getOrNull(0) ?: members.firstOrNull() ?: return
-        val reviewer = mentioned.getOrNull(1)
-            ?: members.firstOrNull { it.id != worker.id }
-            ?: return
-        // 群共享上下文的总预算来自设置：预算越小，共享摘要越短（省 token）。
-        val sharedLimit = (plan.contextBudget / 120).coerceIn(120, 600)
-        val shared = digest(sharedText(userText, members), sharedLimit).ifBlank { digest(userText, 200) }
-        val rounds = automatonRounds(userText)
-        var round = 0
-        var rework = 0
-        var progress = "还没开始，起始值按用户规则来。"
-        val stall = StallDetector()
-        while (round < rounds) {
-            round++
-            val stepId = pool.submitOne(
-                sessionId,
-                autoTask(
-                    sessionId = sessionId,
-                    member = worker,
-                    prompt = "自动机第 " + round + " 轮，轮到你执行。\n" +
-                        "用户给的规则：" + shared + "\n" +
-                        "当前进度：" + progress,
-                    hint = "你是本轮执行者：只做这一轮该你做的那一步，不要跳步、" +
-                        "不要替 " + reviewer.name + " 做验收、不要一次把后面几轮全算完。" +
-                        "做完用一两句话说明这一步的结果，以及这个值现在是几。",
-                ),
-            )
-            pool.await(sessionId)
-            if (!taskSucceeded(stepId)) return
-            // 自动机档也要更新 lastSpeaker：不然「未 @ 的追问」会一直找错人（默认档早就更新了）。
-            synchronized(lastSpeaker) { lastSpeaker[sessionId] = worker.id }
-            val workerOut = taskOutputs[stepId].orEmpty()
-            val checkId = pool.submitOne(
-                sessionId,
-                autoTask(
-                    sessionId = sessionId,
-                    member = reviewer,
-                    prompt = "用户给的规则：" + shared + "\n" +
-                        "上一位 " + worker.name + " 本轮的输出：\n" + digest(workerOut, 600),
-                    hint = "你是本轮验收者：只核对和回写，不要重算一遍。" +
-                        "核对无误就把值回写进结论；有错就指出错在哪。" +
-                        "最后一行只写下面三者之一：【继续】还没到终点、【完成】整个任务已达成、【打回】<一句原因> 这一轮不合格要重做。",
-                ),
-            )
-            pool.await(sessionId)
-            if (!taskSucceeded(checkId)) return
-            synchronized(lastSpeaker) { lastSpeaker[sessionId] = reviewer.id }
-            val reviewOut = taskOutputs[checkId].orEmpty()
-            progress = digest(reviewOut, 300)
-            val verdict = automatonVerdict(reviewOut)
-            // 打回计数只统计**连续**的：任一通过轮（继续/完成）直接归零，跨轮累计不算数。
-            rework = nextReworkCount(rework, verdict)
-            when (verdict) {
-                Verdict.Rework -> {
-                    if (rework > MAX_AUTOMATON_REWORK) {
-                        AppLog.w("自动机：" + reviewer.name + " 连续打回 " + rework + " 次，提前收工")
-                        emitGroupNotice(
-                            sessionId,
-                            "自动机连续打回 " + rework + " 次（上限 " + MAX_AUTOMATON_REWORK + "），已收工，等你看一眼下一步。",
-                        )
-                        return
-                    }
-                    round-- // 这一轮不算数，重做同一轮
-                }
-                // 验收说完成就完成：Done 的优先级高于僵局判定（短发言也可能就是正确答案）。
-                Verdict.Done -> return
-                Verdict.More -> Unit
-            }
-            // 僵局：连续两轮都「没工具调用 + 短发言 + 没有新任务」，说明在原地打转，别烧到轮次上限。
-            val calls = taskToolCalls(stepId) + taskToolCalls(checkId)
-            if (stall.onRound(listOf(workerOut, reviewOut), toolCalls = calls, newTasks = 0)) {
-                AppLog.w("自动机：判定僵局（" + (stall.reason ?: "") + "），收工")
-                emitGroupNotice(
-                    sessionId,
-                    "[群聊已停下] 判定僵局：" + (stall.reason ?: "") +
-                        "。连续两轮都在原地打转，先停手，避免继续空转烧预算。",
-                )
-                return
-            }
-        }
-        AppLog.w("自动机：撞到轮次上限 " + rounds + "，收工")
-    }
-
-/**
-     * 办公室模式（office）：经理拆活 → 各自认领 → 同时干 → 经理汇总。
-     *
-     * 为什么要有它：`Parallel` 是把同一句话广播出去，每个人自己猜「我该做哪部分」，
-     * 结果四个人交了四份完整答案；`Chain` 是排队，第二个人开始的时候第一个人早跑完了。
-     * 真正的分工必须先有**一份计划**：谁做什么写清楚，再各自只做自己那条。
-     *
-     * 经理 = 第一个成员（专业名 / 第一个被 @ 的人优先），它不参与干活，只负责拆和收口。
-     * 拆出来的条目多于可干活的人数时，超出的并到同一个人身上（池里同 agent 串行，不会互相踩）。
-     */
-    private suspend fun runOffice(
-        sessionId: String,
-        plan: GroupPlan,
-        history: List<ChatMessage>,
-        userText: String,
-    ) {
-        val members = plan.members
-        if (members.size < 2) return
-        val manager = members.first()
-        val workers = members.drop(1)
-        val shared = digest(sharedText(userText, members), 400).ifBlank { digest(userText, 400) }
-        val rosterLine = members.joinToString("、") { "${it.name}（${it.cfg.model}）" }
-
-        // 1) 经理拆活。这一棒也走执行池：取消/权限/token 账照旧生效。
-        // 拆活只需要输出一张几行的分工表，推理模型不封顶会先写掉几千字思维链才动笔
-        // （实测 4 分钟才出表），这里给它一个单独的紧上限。
-        val planner = manager.copy(cfg = manager.cfg.copy(maxTokens = PLANNER_MAX_TOKENS))
-        val planTaskId = pool.submitOne(
-            sessionId,
-            autoTask(
-                sessionId = sessionId,
-                member = planner,
-                prompt = "用户请求：" + shared +
-                    "\n\n群成员：" + rosterLine +
-                    "\n\n请把这件事拆成最多 " + workers.size + " 条互不重叠的子任务，" +
-                    "一条交给一个成员。",
-                hint = "你是这个群的组织者。只输出分工表，一条一行，格式严格是：\n" +
-                    "成员名 :: 一句话任务\n" +
-                    "不要写解释、不要写编号、不要自己动手做任何一条。" +
-                    "每条任务必须能独立完成，彼此不要重叠、不要互相等待。",
-            ),
-        )
-        pool.await(sessionId)
-        if (!taskSucceeded(planTaskId)) return
-        val planText = taskOutputs[planTaskId].orEmpty()
-        val split = parseOfficeSplit(planText, workers)
-
-        // 2) 分派。经理只点了几个人时，把剩下的成员按原请求补上，
-        // 不让「分工表写漏」变成「一半人整轮摸鱼」；整张表都解析失败就全员并行。
-        val generic = { w: GroupMember ->
-            w to ("从你自己的专业角度处理这个请求，只给结论与关键细节：" + shared)
-        }
-        val assigned = split.map { it.first.id }.toSet()
-        val assignments: List<Pair<GroupMember, String>> = split +
-            workers.filter { it.id !in assigned }.map(generic)
-        val taskIds = assignments.map { (member, task) ->
-            // 成员产出会被 digest 压到 500 字再交给经理，写更长也是被扔掉；
-            // 给个上限，别让推理模型在这里把并行优势耗光。
-            val worker = member.copy(
-                cfg = member.cfg.copy(
-                    maxTokens = if (member.cfg.maxTokens > 0) minOf(member.cfg.maxTokens, WORKER_MAX_TOKENS) else WORKER_MAX_TOKENS,
-                ),
-            )
-            val id = pool.submitOne(
-                sessionId,
-                autoTask(
-                    sessionId = sessionId,
-                    member = worker,
-                    prompt = "办公室任务分配 —— 整件事是：" + shared + "\n你这一条：" + task,
-                    hint = "你是 " + member.name + "，负责其中一条子任务：" + task +
-                        "。只做这一条，做完就收；不要替别人做，也不要重复别人会做的部分。" +
-                        "输出你这条的结果即可，不要写「我的任务是」这类开场白。",
-                ),
-            )
-            id to member
-        }
-        pool.await(sessionId)
-
-        // 3) 汇总。成员产出按顺序拼给经理，由它收口成一条给用户看的答复。
-        val done = taskIds.mapNotNull { (id, member) ->
-            val out = taskOutputs[id].orEmpty().trim()
-            if (out.isEmpty() || isNoAdd(out)) null else member.name to out
-        }
-        if (done.isEmpty()) return
-        val digestText = done.joinToString("\n\n") { (name, out) ->
-            "【" + name + "】\n" + digest(out, 500)
-        }
-        // 收口同样只写结论，不写推理散文。
-        val summarizer = manager.copy(cfg = manager.cfg.copy(maxTokens = SUMMARIZER_MAX_TOKENS))
-        val summaryId = pool.submitOne(
-            sessionId,
-            autoTask(
-                sessionId = sessionId,
-                member = summarizer,
-                prompt = "用户请求：" + shared + "\n\n各成员已完成的部分：\n" + digestText,
-                hint = "你是汇总者。把上面的结果合成一条直接给用户的最终答复：" +
-                    "不要罗列谁做了什么、不要重复同一件事，按用户要看的东西组织；" +
-                    "确实有成员没给出有效内容就跳过它。",
-            ),
-        )
-        pool.await(sessionId)
-        if (!taskSucceeded(summaryId)) return
-        synchronized(lastSpeaker) { lastSpeaker[sessionId] = manager.id }
-    }
-
-    /**
-     * 解析经理的分工表。认 `名字 :: 任务` / `名字：任务` / `名字 | 任务` 三种写法；
-     * 名字允许带 @ 和括号里的模型名。同一成员被分了多条就合并成一条。
-     */
-    internal fun parseOfficeSplit(
-        output: String,
-        workers: List<GroupMember>,
-    ): List<Pair<GroupMember, String>> {
-        if (output.isBlank() || workers.isEmpty()) return emptyList()
-        val acc = LinkedHashMap<String, StringBuilder>()
-        val byId = LinkedHashMap<String, GroupMember>()
-        for (raw in output.lines()) {
-            var line = raw.trim()
-            if (line.isEmpty()) continue
-            while (line.isNotEmpty() && (line[0] == '-' || line[0] == '*' || line[0] == '•' || line[0] == '·')) {
-                line = line.substring(1).trim()
-            }
-            line = line.trimStart('1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '.', '、', ')', '）', ' ')
-            if (line.isEmpty()) continue
-            val sep = line.indexOfFirst { it == ':' || it == '：' || it == '|' || it == '｜' }
-            if (sep <= 0) continue
-            var who = line.substring(0, sep).trim().trim('@', '[', ']', '【', '】', '*', '"', '「', '」')
-            val task = line.substring(sep + 1).trim()
-            if (task.length < 2) continue
-            // 「GJ（deepseek-chat）」这种带模型名的剥掉括号。
-            who = who.substringBefore('(').substringBefore('（').trim()
-            if (who.isEmpty()) continue
-            // 单字/两字以下的名字不做包含匹配：经理常输出「A: 任务」这种编号，
-            // "A" 会被 "OpenAI 兼容 #2" 包含进去，结果整张分工表只派出一个人。
-            val member = workers.firstOrNull { it.name.equals(who, ignoreCase = true) }
-                ?: runCatching { namedMentions(who, workers).firstOrNull() }.getOrNull()
-                ?: workers.takeIf { who.length >= 3 }
-                    ?.firstOrNull { it.name.contains(who, ignoreCase = true) || who.contains(it.name, ignoreCase = true) }
-                ?: continue
-            val sb = acc.getOrPut(member.id) { StringBuilder() }
-            if (sb.isNotEmpty()) sb.append("；")
-            sb.append(task)
-            byId[member.id] = member
-        }
-        return acc.mapNotNull { (id, sb) -> byId[id]?.let { it to sb.toString() } }
-    }
-
-
-    /** 自动机的一棒：和普通群聊任务同一套字段，只是多了角色提示 [AgentTask.hint]。 */
-    private fun autoTask(sessionId: String, member: GroupMember, prompt: String, hint: String) = AgentTask(
-        id = UUID.randomUUID().toString(),
-        sessionId = sessionId,
-        agentId = member.id,
-        agentName = member.name,
-        prompt = prompt,
-        hint = hint,
-    )
-
-    /** 「（无补充）」这类收尾占位：真实产出为空，不该被当成成员成果拼进汇总。 */
-    private fun isNoAdd(text: String): Boolean {
-        val t = text.trim().trim('（', '）', '(', ')', '。', '.', ' ')
-        return t.isEmpty() || t == "无补充" || t.equals("no add", ignoreCase = true)
-    }
-
-    /** 这一棒跑成了没有：被取消/失败（用户打断、上游报错）就别再往下一棒走。 */
-    private fun taskSucceeded(taskId: String): Boolean =
-        pool.tasks.value.firstOrNull { it.id == taskId }?.state == TaskState.Done
-
-    /**
-     * 把计划好的任务交给执行池。
-     *
-     * 同一个 agent 上一轮还在跑时不再开第二条并行的活 —— 那会让它一边说一边说、自相矛盾；
-     * 改成一条排队任务，prompt 前标「（补充）」，由池按「同 agent 串行」的规则接着跑。
-     */
-    private fun dispatchGroupTasks(sessionId: String, tasks: List<AgentTask>) {
-        val agents = pool.agents.value
-        for (task in tasks) {
-            val state = agents[task.agentId]?.state
-            val busy = state == AgentRunState.Thinking || state == AgentRunState.ToolRunning
-            pool.submitOne(sessionId, if (busy) task.copy(prompt = "（补充）" + task.prompt) else task)
-        }
-    }
-
-    /** 执行池的 runner：把一条 [AgentTask] 跑成这个成员的发言。 */
-    private suspend fun runMemberTask(task: AgentTask): String {
-        val turn = groupTurns[task.sessionId] ?: return ""
-        val member = turn.plan.members.firstOrNull { it.id == task.agentId } ?: return ""
-        val roster = turn.plan.members.map { it.name }
-        val extra = buildString {
-            append("你正在一个多 Agent 群组里协作，群成员：")
-            append(turn.plan.members.joinToString("、") { "${it.name}（${it.cfg.model}）" })
-            append("。你是 ")
-            append(member.name)
-            if (task.hint.isNotBlank()) {
-                // 编排层已经说清这一棒的角色（执行 / 验收 / 并行分工），按它来。
-                append("。")
-                append(task.hint)
-            } else if (roster.size == 1) {
-                append("。这一轮由你回答，其他成员保持安静，不要替他们发言。")
-            } else if (task.dependsOn.isEmpty()) {
-                // 链首：这轮由它先答，必须答完整，不能一句「无补充」把话头丢掉。
-                append("。你是本轮第一个发言人：把用户的问题完整回答清楚，不要只丢一句「无补充」。")
-            } else {
-                // 链上后续成员：群聊是**轮流**发言，不是各自写一份答案，前面的人说过的已在公共历史。
-                append("。群聊按顺序轮流发言：你前面成员说过的话以摘要列在公共历史里。")
-                append("先读一遍他们说了什么，只补充还没被说到的部分；")
-                append("别人已经说清楚的内容不要再重复一遍，也不要另起一个话题。")
-                append("如果你确实没有新内容可说，就只输出「（无补充）」四个字。")
-            }
-            append("只输出你自己要说的话：不要写「[名字]」这样的前缀，不要替其他成员发言。")
-        }
-        // 群成员这一轮同样要看到上一轮的截图（与单聊同一条队列、同一次注入）。
-        val images = turn.history.lastOrNull { it.role == ChatMessage.Role.USER }?.attachments.orEmpty() +
-            takeQueuedImages()
-        // 本轮用户消息按「这个任务自己的 prompt」装进上下文（图片照旧带上），
-        // 不再由 runLoop 兜底追加 —— 那条兜底会和这里重复一遍。
-        val userTurn = listOf(
-            buildJsonObject {
-                put("role", "user")
-                put("content", buildUserContent(task.prompt, images))
-            },
-        )
-        // 群状态行每轮现算：谁在跑、谁空着。成员据此知道自己要不要等别人。
-        val stateLine = groupStateLine(pool.agents.value, turn.plan.members, member.id)
-        val asm = threads.buildContextReport(
-            sessionId = task.sessionId,
-            agentId = member.thread,
-            systemPrompt = member.cfg.systemPrompt + "\n\n" + extra,
-            groupState = stateLine,
-            userTurn = userTurn,
-            budgetChars = turn.plan.contextBudget,
-        )
-        // token 账：本次实际发出去的字符数 vs 按全量历史发会是多少。
-        pool.reportContext(asm.usedChars, asm.fullChars)
-        var finalText = ""
-        runLoop(
-            sessionId = task.sessionId,
-            cfg = member.cfg,
-            history = turn.history,
-            userText = task.prompt,
-            userImages = images,
-            authorId = member.id,
-            authorName = member.name,
-            // 群聊里默认成员只负责说话；用户打开「允许群组成员使用工具」时才各自跑命令。
-            useTools = groupToolsEnabled,
-            roster = roster,
-            presetMessages = asm.messages,
-            task = task,
-            onFinal = { finalText = it },
-            turnId = turn.turnId,
-        )
-        val noAdd = finalText.trim().let { it == "（无补充）" || it == "(无补充)" || it.isEmpty() }
-        recordTaskOutput(task.id, finalText)
-        threads.appendThread(task.sessionId, member.thread, "assistant", finalText)
-        if (noAdd) {
-            // 明确表示没补充：不往公共历史塞噪音，只记一条「已看过」。
-            threads.markFinished(task.sessionId, member.thread, member.name, "")
-            synchronized(lastSpeaker) { lastSpeaker[task.sessionId] = member.id }
-            return finalText
-        }
-        // 省 token 的核心：公共历史只写 200 字摘要（'名字: 摘要'），全文只进它自己的线程。
-        // 以前全文写公共历史，N 个成员下一轮各自重读 N 份全文，上下文直接爆。
-        threads.appendPublic(task.sessionId, "assistant", digest(finalText, 200), member.name)
-        threads.markFinished(task.sessionId, member.thread, member.name, finalText)
-        synchronized(lastSpeaker) { lastSpeaker[task.sessionId] = member.id }
-        return finalText
-    }
-
-    /** 记下这一棒实际调了几次工具（僵局检测用）；量大了整体清空，避免长会话里无界增长。 */
-    private fun recordTaskToolCalls(taskId: String?, count: Int) {
-        if (taskId == null) return
-        if (taskToolCallCounts.size > 200) taskToolCallCounts.clear()
-        taskToolCallCounts[taskId] = count
-    }
-
-    /** 某一棒的工具调用次数；没记录就是 0（没动过工具）。 */
-    private fun taskToolCalls(taskId: String): Int = taskToolCallCounts[taskId] ?: 0
-
-    /**
-     * 群里发一条系统说明：不调模型、不进成员上下文，走的是普通消息气泡的渲染路径，
-     * 用户看得见「为什么这轮有人没说话 / 为什么停了」。
-     */
-    private fun emitGroupNotice(sessionId: String, text: String) {
-        val turnId = groupTurns[sessionId]?.turnId
-        _events.tryEmit(DshEvent.MessageChunk(sessionId, text, "system", "系统", turnId))
-    }
-
-    /** 记下这一棒的最终发言（自动机下一棒要用）；量大了整体清空，避免长会话里无界增长。 */
-    private fun recordTaskOutput(taskId: String, text: String) {
-        if (taskOutputs.size > 200) taskOutputs.clear()
-        taskOutputs[taskId] = text
-    }
 
     /** 只取新增部分：新文本以旧文本开头就发剩余；整段重复则不发。 */
     private fun incrementalDelta(previous: String, current: String): String = when {
@@ -2047,188 +1302,11 @@ class LocalEngineTransport(
         goal.blockedReason?.takeIf { it.isNotBlank() }?.let { append("\n卡点：").append(it) }
     }
 
-    // ── P0-1 真压缩 ────────────────────────────────────────────────────────
-
-    /**
-     * 本会话模型的上下文窗口（tokens）。
-     *
-     * 与顶栏同一来源（宿主注入 [contextWindowProvider]，手机端接 ModelStore.contextWindowOf）；
-     * 取不到就按 32k 兜底，绝不回 0 —— 预算算成 0 会让每一次都判「超预算」。
-     */
-    private suspend fun windowTokens(sessionId: String): Int = ContextBudget.windowOr(
-        runCatching { contextWindowProvider(sessionId) }
-            .getOrDefault(ContextBudget.DEFAULT_WINDOW_TOKENS),
-    )
-
-    /**
-     * 装配前先压一次：超预算就把最老若干轮交 LLM 生成结构化摘要（角色/任务/已决定/未完成/关键路径）。
-     *
-     * 摘要是「有则更好」：模型不可用就退回本地节选，绝不能让一次摘要失败挡住整轮对话。
-     * 返回真正生效的摘要（没压缩返回 null）。
-     */
-    private suspend fun maybeSummarize(
-        sessionId: String,
-        cfg: LlmConfig?,
-        budgetChars: Int,
-        messages: List<JsonObject>,
-    ): String? {
-        if (messages.size < 2) return null
-        val system = messages.first()["content"]?.jsonPrimitive?.contentOrNullSafe().orEmpty()
-        val userMsg = messages.takeLast(1)
-        val history = messages.drop(1).dropLast(1)
-        val plan = threads.planCompaction(sessionId, budgetChars, system, history, userMsg) ?: return null
-        // 预算按新旧消息的字符数判定，重跑一轮还会得到同一个计划；已经压过这一段就不再花一次 LLM 请求。
-        if (threads.summary(sessionId).isNotEmpty() && plan.dropped.size <= (summarizedCount[sessionId] ?: 0)) return null
-        val summary = if (cfg == null) {
-            ""
-        } else {
-            runCatching { summarizeDropped(cfg, threads.compactionPrompt(plan)) }
-                .onFailure { AppLog.w("上下文摘要失败，退回本地节选：" + (it.message ?: it.javaClass.simpleName)) }
-                .getOrDefault("")
-                .trim()
-        }
-        val text = summary.ifBlank { localDigest(plan) }.trim()
-        if (text.isEmpty()) return null
-        applySummary(sessionId, text, plan.beforeChars)
-        summarizedCount[sessionId] = plan.dropped.size
-        return text
-    }
-
-    /** 让模型写结构化摘要：五段固定标题，避免它把历史又复述一遍。 */
-    private suspend fun summarizeDropped(cfg: LlmConfig, prompt: String): String {
-        val body = buildJsonObject {
-            put("model", cfg.model)
-            put("max_tokens", 800)
-            putJsonArray("messages") {
-                addJsonObject {
-                    put("role", "system")
-                    put(
-                        "content",
-                        "你是上下文压缩器。把给你的历史压成结构化摘要，只留后续继续干活必需的信息，" +
-                            "不要复述原文，不要加解释。严格用这五段标题输出：角色 / 任务 / 已决定 / 未完成 / 关键文件路径。",
-                    )
-                }
-                addJsonObject {
-                    put("role", "user")
-                    put("content", prompt)
-                }
-            }
-        }
-        val resp = postOnce(cfg, body)
-        val content = resp["choices"]?.jsonArray?.firstOrNull()?.jsonObject
-            ?.get("message")?.jsonObject?.get("content")
-            ?.jsonPrimitive?.contentOrNullSafe().orEmpty()
-        if (content.isBlank()) throw IOException("摘要为空")
-        return content
-    }
-
-    /** 摘要三处落点：进程内（装配立即生效）、持久存储（重启后回灌）、会话投影（UI 可见）。 */
-    private fun applySummary(sessionId: String, summary: String, beforeChars: Int) {
-        threads.setSummary(sessionId, summary)
-        runCatching { summaryStore.write(sessionId, summary) }
-            .onFailure { AppLog.w("摘要持久化失败：" + (it.message ?: it.javaClass.simpleName)) }
-        val before = ContextBudget.tokensOf(beforeChars)
-        val after = ContextBudget.tokensOf(summary.length)
-        projections.noteCompaction(sessionId, before, after, summary.length)
-        projections.noteSummaryChars(sessionId, summary.length)
-    }
-
-    /** LLM 不可用时的兜底摘要：只留最近若干条 80 字节选，比整段丢掉强。 */
-    private fun localDigest(plan: CompactionPlan): String = buildString {
-        append("（模型摘要不可用，以下为本地节选）\n")
-        plan.dropped.takeLast(12).forEach { m ->
-            val role = m["role"]?.jsonPrimitive?.contentOrNullSafe().orEmpty()
-            val text = m["content"]?.jsonPrimitive?.contentOrNullSafe().orEmpty().replace('\n', ' ').take(80)
-            append(role).append(": ").append(text).append("\n")
-        }
-    }.take(1_200)
-
-    /**
-     * P0-2：/compact 的真入口（UI 的 /compact 命令走这里）。
-     *
-     * 优先让 :node 引擎的 /commands compact 出手（与桌面同一实现）；引擎不在就本地走一次摘要。
-     * 没到压缩线时明确回报「不需要压缩」，不要假装压过。
-     *
-     * 口径（与顶栏同一套，硬要求）：
-     * - 窗口 = [windowTokens]（模型 contextWindow，默认 32k）；
-     * - 预算 = 窗口 * [ContextBudget.COMPACT_RATIO]（32k → 25600 tokens，留 20% 给回答）；
-     * - 已用优先取上游上报的 prompt+completion（与 ChatUiState.contextUsed 同源，误差 0），
-     *   从没上报过才退回字符数 /4 估算。
-     *
-     * 以前预算取 contextBudgetProvider 的字符数 /4（24000 字符 → 6000 tokens），跟顶栏的 32k
-     * 完全两套口径，于是任何会话都回「不需要压缩」——真压缩等于没接。
-     */
-    // Kotlin 不允许覆写函数再写默认值：默认值只留在 Compactor 接口上，调用方按接口签名用。
-    override suspend fun compact(sessionId: String, budgetTokens: Int): CompactResult {
-        val history = runCatching { historyProvider(sessionId) }.getOrDefault(emptyList())
-        val messages = history.map { m ->
-            buildJsonObject {
-                put("role", m.role.name.lowercase())
-                put("content", m.text)
-            }
-        }
-        val window = windowTokens(sessionId)
-        val budgetTok = if (budgetTokens > 0) budgetTokens else ContextBudget.budgetTokens(window)
-        val contentChars = messages.sumOf { m ->
-            (m["content"] as? JsonPrimitive)?.content?.length ?: 0
-        }
-        val reported = lastUsageTokens[sessionId]?.toInt()?.takeIf { it > 0 }
-        val usedTok = reported ?: ContextBudget.tokensOf(contentChars)
-        // 上游报的 token 比「字符 /4」更准：它说超了就把字符预算按同一比例收紧，
-        // 否则会出现「token 已超预算、字符还没超」→ 又一次空转回「不需要压缩」。
-        val planBudgetChars = if (reported != null && reported > budgetTok && contentChars > 0) {
-            (contentChars.toLong() * budgetTok / reported).toInt().coerceAtLeast(1)
-        } else {
-            ContextBudget.charsOf(budgetTok)
-        }
-        val system = messages.firstOrNull()?.get("content")?.jsonPrimitive?.contentOrNullSafe().orEmpty()
-        val plan = threads.planCompaction(sessionId, planBudgetChars, system, messages.drop(1).dropLast(1), messages.takeLast(1))
-            ?: return CompactResult(
-                compacted = false,
-                usedTokens = usedTok,
-                budgetTokens = budgetTok,
-                windowTokens = window,
-                message = "上下文还没到压缩线（已用 " + usedTok + " tokens，预算 " + budgetTok +
-                    " tokens，窗口 " + window + "），不需要压缩。",
-            )
-        val remoteSummary = runCatching {
-            val rpc = engineRpc ?: return@runCatching ""
-            val items = org.json.JSONArray()
-            plan.dropped.forEach { items.put(JSONObject(it.toString())) }
-            val payload = JSONObject()
-                .put("sessionId", sessionId)
-                .put("messages", items)
-                .put("options", JSONObject().put("keepRecent", 8).put("maxChars", 1_200))
-            val resp = rpc("/commands", "compact", payload)
-            ((resp.opt("value") as? JSONObject)?.optString("summary")).orEmpty()
-        }.getOrDefault("")
-        val cfg = runCatching { configProvider(sessionId) }.getOrNull()
-        val summary = remoteSummary.trim().ifBlank {
-            if (cfg == null) {
-                localDigest(plan)
-            } else {
-                runCatching { summarizeDropped(cfg, threads.compactionPrompt(plan)) }
-                    .onFailure { AppLog.w("compact 摘要失败，退回本地节选：" + (it.message ?: it.javaClass.simpleName)) }
-                    .getOrDefault("").trim().ifBlank { localDigest(plan) }
-            }
-        }
-        applySummary(sessionId, summary, plan.beforeChars)
-        summarizedCount[sessionId] = plan.dropped.size
-        // 压缩后的上下文粗估：原文减掉被摘要掉的部分，加上摘要本身；与「已用」同一套 token 口径。
-        val afterTok = ContextBudget.tokensOf((contentChars - plan.beforeChars).coerceAtLeast(0) + summary.length)
-        return CompactResult(
-            compacted = true,
-            summaryChars = summary.length,
-            beforeTokens = usedTok,
-            afterTokens = afterTok,
-            droppedMessages = plan.dropped.size,
-            usedTokens = usedTok,
-            budgetTokens = budgetTok,
-            windowTokens = window,
-            message = "已压缩 " + plan.dropped.size + " 条早期历史：" + usedTok + " → " + afterTok +
-                " tokens（预算 " + budgetTok + " / 窗口 " + window + "）。",
-        )
-    }
+    // T7.1b shim #1：Compactor 的覆写必须留在本类（接口 + 十几个测试直接构造 transport），
+    // 实现已搬到 context/Compaction.kt。本方法只做一次转发，签名与行为逐字不变。
+    // 删除时机 = Compactor 接口改成由 Compaction 直接实现、且测试不再调 transport.compact() 那天。
+    override suspend fun compact(sessionId: String, budgetTokens: Int): CompactResult =
+        compaction.compact(sessionId, budgetTokens)
 
     /** 子代理显示名：参数给了 name 就用，否则「子代理」。 */
     internal fun subagentLabel(args: JsonObject): String =
@@ -2275,7 +1353,7 @@ class LocalEngineTransport(
         val outcome = SubagentLoop(
             model = model,
             parentSystemPrompt = parentSystem,
-            chat = { body -> post(childCfg, body) },
+            chat = { body -> stream.post(childCfg, body) },
             runTool = { name, a -> toolRunner.run(name, a) },
             tools = subagentToolsJson(),
             label = label,
@@ -2298,378 +1376,21 @@ class LocalEngineTransport(
      * （"Non-stream chat request is currently not supported"）。统一要 SSE 再自己拼回整包，
      * 一条代码路径就能同时喂饱这些上游和思维链增量。
      */
-    private suspend fun postOnce(
-        cfg: LlmConfig,
-        body: JsonObject,
-        onReasoning: (String) -> Unit = {},
-        onText: (String) -> Unit = {},
-    ): JsonObject {
-        // 引擎路由：engine://<provider-id> 由 :node 引擎里插件注册的 provider 出答案，不碰网络。
-        if (isEngineRoute(cfg.baseUrl)) return postToEngine(cfg, body, onText)
-        val url = cfg.baseUrl.trimEnd('/') + "/chat/completions"
-        val streamed = JsonObject(body.toMutableMap().apply { put("stream", JsonPrimitive(true)) })
-        val req = Request.Builder()
-            .url(url)
-            .addHeader("Authorization", "Bearer " + cfg.apiKey)
-            .addHeader("Content-Type", "application/json")
-            .addHeader("Accept", "text/event-stream")
-            .post(streamed.toString().toRequestBody(JSON))
-            .build()
-        return http.newCall(req).await().use { r ->
-            if (!r.isSuccessful) throw UpstreamHttpException(r.code, r.body?.string().orEmpty())
-            val content = StringBuilder()
-            val reasoning = StringBuilder()
-            val toolCalls = mutableMapOf<Int, JsonObject>()
-            var usage: JsonObject? = null
-            val plain = StringBuilder()
-            // SSE 正常收尾必带 [DONE]；EOF 直出（连接被中途掐断）则保持 false。
-            var sawDone = false
-            // 上游的收尾原因（length / content_filter）：空回复的原因判定全靠它。
-            var finishReason: String? = null
-            r.body?.source()?.use { src ->
-                while (true) {
-                    // 阻塞读不认协程取消：用户点停止后必须自己出圈，否则会继续把上一轮的
-                    // 内容推回 UI，看起来像「已经停了还在输出」。
-                    if (!currentCoroutineContext().isActive) break
-                    val line = src.readUtf8Line() ?: break
-                    if (line.isBlank()) continue
-                    if (!line.startsWith("data:")) {
-                        // 上游无视 stream:true、直接回了一整包 JSON：留下来整体解析。
-                        plain.append(line)
-                        continue
-                    }
-                    val payload = line.removePrefix("data:").trim()
-                    if (payload == "[DONE]") { sawDone = true; break }
-                    val frame = runCatching { DshJson.parseToJsonElement(payload).jsonObject }.getOrNull() ?: continue
-                    frame["usage"]?.let { u -> if (u is JsonObject) usage = u }
-                    val choice = (frame["choices"] as? JsonArray)?.firstOrNull() as? JsonObject
-                    // finish_reason 只在最后一帧出现：正文被长度截断时它是唯一的证据。
-                    (choice?.get("finish_reason") as? JsonPrimitive)?.takeIf { it.isString }
-                        ?.let { finishReason = it.content }
-                    val delta = choice?.get("delta") as? JsonObject
-                    val message = choice?.get("message") as? JsonObject
-                    delta?.get("content")?.let {
-                        if (it is JsonPrimitive && it.isString) {
-                            content.append(it.content)
-                            onText(it.content)
-                        }
-                    }
-                    // 思维链字段各家用得不一样，统一交给 reasoningOf 认。
-                    (reasoningOf(delta) ?: reasoningOf(message) ?: reasoningOf(frame))
-                        ?.takeIf { it.isNotEmpty() }?.let {
-                        reasoning.append(it)
-                        onReasoning(it)
-                    }
-                    (delta?.get("tool_calls") as? JsonArray)?.forEach { element ->
-                        val call = runCatching { element.jsonObject }.getOrNull() ?: return@forEach
-                        val index = call["index"]?.jsonPrimitive?.intOrNull ?: 0
-                        val merged = toolCalls[index] ?: JsonObject(emptyMap())
-                        val id = call["id"]?.jsonPrimitive?.contentOrNullSafe()
-                            ?: merged["id"]?.jsonPrimitive?.contentOrNullSafe()
-                        val name = call["function"]?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNullSafe()
-                            ?: merged["function"]?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNullSafe()
-                        val argDelta = call["function"]?.jsonObject?.get("arguments")?.jsonPrimitive?.contentOrNullSafe().orEmpty()
-                        val argsSoFar = merged["function"]?.jsonObject?.get("arguments")?.jsonPrimitive?.contentOrNullSafe().orEmpty()
-                        toolCalls[index] = buildJsonObject {
-                            id?.let { put("id", it) }
-                            put("type", "function")
-                            putJsonObject("function") {
-                                name?.let { put("name", it) }
-                                put("arguments", argsSoFar + argDelta)
-                            }
-                        }
-                    }
-                }
-            }
-            if (content.isEmpty() && reasoning.isEmpty() && toolCalls.isEmpty() && plain.isNotBlank()) {
-                runCatching { DshJson.parseToJsonElement(plain.toString()).jsonObject }.getOrNull()?.let { return@use it }
-            }
-            // 兜底：上游有时把 DeepSeek 原生工具调用标记当正文流回来（DSML / <tool_call>）。
-            // 本轮 tool_calls 为空时从正文里解析出来补进 tool_calls，并把标记文本从正文剔掉。
-            val finalContent = if (toolCalls.isEmpty()) {
-                val stripped = stripDsmlToolCalls(content.toString())
-                stripped.second.forEachIndexed { index, call ->
-                    toolCalls[index] = call.toToolCallJson()
-                }
-                stripped.first
-            } else {
-                content.toString()
-            }
-            buildJsonObject {
-                putJsonArray("choices") {
-                    addJsonObject {
-                        put("index", JsonPrimitive(0))
-                        finishReason?.let { put("finish_reason", it) }
-                        putJsonObject("message") {
-                            put("role", "assistant")
-                            put("content", finalContent)
-                            if (reasoning.isNotEmpty()) put("reasoning_content", reasoning.toString())
-                            if (toolCalls.isNotEmpty()) {
-                                putJsonArray("tool_calls") {
-                                    toolCalls.toSortedMap().values.forEach { add(it) }
-                                }
-                            }
-                        }
-                    }
-                }
-                usage?.let { put("usage", it) }
-                // 断流标记：没收到 [DONE] 就 EOF，说明上游中途断了（非流式整包在上方已提前 return）。
-                if (!sawDone) put("dsh_eof_without_done", true)
-            }
-        }
-    }
-
-    /** baseUrl 是否是引擎路由（engine:// 前缀，忽略首尾空白）。 */
-    private fun isEngineRoute(baseUrl: String): Boolean =
-        baseUrl.trim().startsWith(ENGINE_SCHEME)
-
     /**
-     * 一次引擎往返：把 [body] 原样当 JSONObject 递进 :node，拿 value.content 当整段回复。
+     * 引擎里可用的 provider 模型 id 列表（/llm models）。实现在 [ModelStream.engineModels]。
      *
-     * 契约（引擎侧 /llm chat）：返回 {ok:true,value:{content,toolCalls?,usage?}}；content 是完整正文，
-     * 不流式（引擎里没有 token 级回调），所以只 onText 一次，再由调用方做增量去重；
-     * toolCalls 是插件 provider 转出来的 OpenAI 形状调用，原样塞进 choices[].message.tool_calls。
+     * T7.1b shim #2：EngineRouteTransportTest 直接调 transport.engineModels()，签名必须留在这里。
+     * 删除时机 = 测试改成注入 ModelStream 调用的那天。
      */
-    private suspend fun postToEngine(
-        cfg: LlmConfig,
-        body: JsonObject,
-        onText: (String) -> Unit = {},
-    ): JsonObject {
-        val call = engineChat ?: throw IOException(ENGINE_NOT_READY)
-        val payload = runCatching { JSONObject(body.toString()) }
-            .getOrElse { throw IOException("引擎请求体无法构造：" + it.message) }
-        payload.put("model", engineModelOf(cfg))
-        val resp = call(payload)
-        if (!resp.optBoolean("ok", true)) {
-            throw IOException("引擎回复失败：" + resp.optString("error").ifBlank { "未知错误" })
-        }
-        val value = resp.optJSONObject("value") ?: JSONObject()
-        val rawContent = value.optString("content")
-        // 插件 provider 转出来的结构化工具调用（OpenAI 形状），直接还原成 choices[].message.tool_calls。
-        val calls = mutableListOf<JsonObject>()
-        value.optJSONArray("toolCalls")?.let { arr ->
-            for (i in 0 until arr.length()) {
-                val one = arr.optJSONObject(i) ?: continue
-                runCatching { DshJson.parseToJsonElement(one.toString()).jsonObject }.getOrNull()?.let { calls += it }
-            }
-        }
-        // 插件没给结构化调用时，再从正文里捞 DSML / <tool_call> 标记（部分 provider 只会写正文），
-        // 捞到的同样进 tool_calls，标记文本从正文剔掉，避免 markup 整屏涌进 UI。
-        val content = if (calls.isEmpty()) {
-            val stripped = stripDsmlToolCalls(rawContent)
-            stripped.second.forEach { calls += it.toToolCallJson() }
-            stripped.first
-        } else {
-            rawContent
-        }
-        if (content.isNotEmpty()) onText(content)
-        // usage 各家字段不一致，原样透给调用方（那边本来就用 contentOrNullSafe 宽松取值）。
-        val usage = value.optJSONObject("usage")
-        return buildJsonObject {
-            putJsonArray("choices") {
-                addJsonObject {
-                    put("index", JsonPrimitive(0))
-                    putJsonObject("message") {
-                        put("role", "assistant")
-                        put("content", content)
-                        if (calls.isNotEmpty()) put("tool_calls", JsonArray(calls))
-                    }
-                }
-            }
-            put("usage", usageJsonOf(usage))
-        }
-    }
-
-
-    /** engine:// 后面的那段就是插件声明的模型 id；留空则退回配置里的 model 名。 */
-    private fun engineModelOf(cfg: LlmConfig): String =
-        cfg.baseUrl.trim().removePrefix(ENGINE_SCHEME).trim().ifBlank { cfg.model }
-
-    private fun usageJsonOf(usage: JSONObject?): JsonObject =
-        if (usage == null || usage.length() == 0) {
-            JsonObject(emptyMap())
-        } else {
-            runCatching { DshJson.parseToJsonElement(usage.toString()).jsonObject }
-                .getOrNull() ?: JsonObject(emptyMap())
-        }
-
-    /**
-     * 引擎里可用的 provider 模型 id 列表（/llm models）。
-     *
-     * 引擎没起来、或宿主没注入 engineRpc 时抛 IOException——探活是可选能力，
-     * 不要让它拖住主对话。
-     */
-    suspend fun engineModels(): List<String> {
-        val rpc = engineRpc ?: throw IOException(ENGINE_NOT_READY)
-        val resp = rpc("/llm", "models", JSONObject())
-        if (!resp.optBoolean("ok", true)) {
-            throw IOException("引擎回复失败：" + resp.optString("error").ifBlank { "未知错误" })
-        }
-        val value = resp.opt("value")
-        val out = mutableListOf<String>()
-        fun collect(from: org.json.JSONArray?) {
-            if (from == null) return
-            for (i in 0 until from.length()) {
-                val item = from.opt(i)
-                when (item) {
-                    is String -> if (item.isNotBlank()) out += item
-                    is JSONObject -> {
-                        val id = item.optString("id").ifBlank { item.optString("model") }
-                        if (id.isNotBlank() && id !in out) out += id
-                    }
-                }
-            }
-        }
-        if (value is JSONObject) {
-            collect(value.optJSONArray("models"))
-            collect(value.optJSONArray("data"))
-            value.optString("model").takeIf { it.isNotBlank() }?.let { if (it !in out) out += it }
-        } else if (value is org.json.JSONArray) {
-            collect(value)
-        } else if (value is String && value.isNotBlank()) {
-            out += value
-        }
-        return out
-    }
-
-    /**
-     * 请求 + 网关自举 + 只在连接类错误上退避重试。
-     *
-     * 模型地址常填本机网关（插件提供的进程）：它可能没起来、被系统杀掉、或上一次还在绑端口。
-     * 连不上时先把网关拉起来再试，别让用户看到「断断续续」。
-     */
-    private suspend fun post(
-        cfg: LlmConfig,
-        body: JsonObject,
-        onReasoning: (String) -> Unit = {},
-        onText: (String) -> Unit = {},
-    ): JsonObject {
-        val host = runCatching { java.net.URI(cfg.baseUrl.trim()).host }.getOrNull()
-        val loopback = LoopbackGateway.isLoopback(host)
-        if (loopback) LoopbackGateway.ensure()
-        var last: Throwable? = null
-        var attempt = 0
-        while (attempt < GATEWAY_ATTEMPTS) {
-            try {
-                return postOnce(cfg, body, onReasoning, onText)
-            } catch (e: Throwable) {
-                last = e
-                if (!isConnectFailure(e)) throw e
-                if (loopback) LoopbackGateway.ensure()
-                if (attempt < GATEWAY_ATTEMPTS - 1) delay(GATEWAY_BACKOFF_MS)
-                attempt++
-            }
-        }
-        throw last ?: IOException("请求失败")
-    }
-
-    private fun isConnectFailure(e: Throwable): Boolean {
-        if (e is java.net.ConnectException) return true
-        if (e is java.net.SocketTimeoutException) return true
-        val msg = e.message?.lowercase() ?: return false
-        return CONNECT_HINTS.any { msg.contains(it) }
-    }
-
-    private suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
-        enqueue(
-            object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    if (cont.isActive) cont.resumeWithException(e)
-                }
-
-                override fun onResponse(call: Call, response: Response) {
-                    if (cont.isActive) cont.resume(response) else response.close()
-                }
-            },
-        )
-        cont.invokeOnCancellation { runCatching { cancel() } }
-    }
-
-
-    /**
-     * 把重试请求里最后一条 user 消息的正文前置一段框架提示（见 [PERSONA_FRAME]）。
-     *
-     * 带图时 content 是 parts 数组：框架作为第一个 text 段插进去，图片段原样保留。
-     */
-    private fun frameUserMessage(body: JsonObject, frame: String): JsonObject {
-        val messages = (body["messages"] as? JsonArray)?.toMutableList() ?: return body
-        val index = messages.indexOfLast {
-            (it as? JsonObject)?.get("role")?.jsonPrimitive?.contentOrNullSafe() == "user"
-        }
-        if (index < 0) return body
-        val message = messages[index] as? JsonObject ?: return body
-        val framed: JsonElement = when (val content = message["content"]) {
-            null -> JsonPrimitive(frame)
-            is JsonPrimitive -> JsonPrimitive(frame + "\n\n" + content.contentOrNullSafe().orEmpty())
-            is JsonArray -> JsonArray(
-                listOf(buildJsonObject {
-                    put("type", "text")
-                    put("text", frame)
-                }) + content,
-            )
-            else -> content
-        }
-        messages[index] = buildJsonObject {
-            message.forEach { (key, value) -> if (key != "content") put(key, value) }
-            put("content", framed)
-        }
-        return buildJsonObject {
-            body.forEach { (key, value) -> if (key != "messages") put(key, value) }
-            put("messages", JsonArray(messages))
-        }
-    }
-
-    /** 把连接类错误翻成人话：本机网关没起来时，用户根本不知道要去哪点一下。 */
-    private fun friendlyRequestError(e: Throwable, baseUrl: String, hasImages: Boolean = false): String {
-        // 上游给了明确状态码：文案已经是「谁的问题、去哪改」，别再叠一层。
-        if (e is UpstreamHttpException) return e.message ?: httpFailureReason(e.status, e.body)
-        val raw = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
-        val uri = runCatching { java.net.URI(baseUrl.trim()) }.getOrNull()
-        val host = uri?.host ?: ""
-        val isLocal = host == "127.0.0.1" || host == "localhost" || host == "::1"
-        val refused = raw.contains("Failed to connect", true) ||
-            raw.contains("Connection refused", true) ||
-            raw.contains("ConnectException", true)
-        if (isLocal && refused) {
-            val port = uri?.port?.takeIf { it > 0 } ?: 80
-            return "本机网关 127.0.0.1:" + port + " 没在运行（" + raw + "）。\n" +
-                "宿主启动时会自动拉起它；仍失败就到「插件」页点一次启动，或把这个模型的地址改成上游直连。"
-        }
-        // 带图请求被上游打回时，报错文本常常只有一句 400，看不出是图片的问题。
-        if (hasImages && (raw.contains("400") || raw.contains("image", true) || raw.contains("content", true))) {
-            return raw + "\n\n这一轮带了图片：上游多半不吃图文混排（纯文本模型会把 image_url 直接打回）。" +
-                "换一个支持视觉的模型重试，或者把图里的内容打字发出来。"
-        }
-        return raw
-    }
+    suspend fun engineModels(): List<String> = stream.engineModels()
 
     private companion object {
         const val MAX_ROUNDS = 64
-        /** 引擎路由前缀：baseUrl="engine://<provider-model-id>"。 */
-        const val ENGINE_SCHEME = "engine://"
-        const val ENGINE_NOT_READY = "引擎未就绪：先在插件页打开一次，让 :node 进程起来"
-
 
         const val PERMISSION_TIMEOUT_MS = 180_000L
-        val JSON = "application/json; charset=utf-8".toMediaType()
         val CONFIRM_PATTERNS = listOf("rm -rf", "mkfs", "pm uninstall", "reboot", " su ", "su -", "fastboot")
     }
 }
-
-/** 子代理：最多 8 轮工具往返（主循环 64 轮，但子代理的结论必须能被父代理等到）。 */
-internal const val SUBAGENT_MAX_ROUNDS = 8
-
-/** 子代理总预算：180 秒。超时回可读错误，不会返回空串。 */
-internal const val SUBAGENT_BUDGET_MS = 180_000L
-
-/** 子代理工具白名单：不含 subagent，嵌套深度天然 1 层。 */
-internal val SUBAGENT_TOOLS: Set<String> = setOf("shell", "fs_read", "fs_list", "fs_write", "fs_op", "phone")
-
-/** 子代理角色说明，拼在会话系统提示词后面。 */
-internal const val SUBAGENT_ROLE = "你是被派发的子代理，只完成交给你的子任务，直接给结论；你看不到主对话历史。"
-
-/** 宽松取字符串：null / JsonNull / 非字符串一律当空串（上游字段各家不统一）。 */
-private fun JsonElement?.strOrEmpty(): String = (this as? JsonPrimitive)?.contentOrNull.orEmpty()
 
 /**
  * 上游这一轮「什么都没给」的可判定原因；返回空串 = 就是纯空回复。
@@ -2690,121 +1411,4 @@ internal fun upstreamEmptyReason(resp: JsonObject, finishReason: String?): Strin
         "content_filter" -> "上游 finish_reason=content_filter（内容被过滤）"
         else -> ""
     }
-}
-
-/** 一次委派的结果：[ok]=false 时 [text] 是可读错误，从不为空串。 */
-internal data class SubagentOutcome(val ok: Boolean, val text: String, val steps: Int)
-
-/**
- * 子代理循环：独立 messages、独立工具白名单、最多 [maxRounds] 轮、总预算 [budgetMs]。
- *
- * 为什么单独一个类：它不碰主对话的 messages、不发 TurnEnd、不弹权限卡，
- * 于是「假上游 + 假工具」就能在 JVM 单测里把整条委派路径跑通。
- */
-internal class SubagentLoop(
-    private val model: String,
-    private val parentSystemPrompt: String,
-    /** 一次上游往返（复用主代理的流式路径，含网关自举与引擎路由）。 */
-    private val chat: suspend (JsonObject) -> JsonObject,
-    /** 一次工具执行（复用主代理的 ToolExecutor）。 */
-    private val runTool: suspend (String, JsonObject) -> ToolExecResult,
-    /** 白名单工具表（不含 subagent）。 */
-    private val tools: JsonArray,
-    private val label: String = "子代理",
-    private val maxRounds: Int = SUBAGENT_MAX_ROUNDS,
-    private val budgetMs: Long = SUBAGENT_BUDGET_MS,
-    /** 每走一步的进度回调：父代理把它翻成 ToolCallEvent 的 detail。 */
-    private val onStep: (String) -> Unit = {},
-    /** 大输出落盘（P0-4）：子代理读到大文件时同样只拿头尾 + locator。 */
-    private val spill: ToolOutputSpill? = null,
-) {
-    suspend fun run(userPrompt: String): SubagentOutcome {
-        val messages = mutableListOf<JsonObject>(
-            buildJsonObject {
-                put("role", "system")
-                put("content", parentSystemPrompt.trim().ifBlank { "你是运行在用户 Android 手机上的助手。" } + "\n\n" + SUBAGENT_ROLE)
-            },
-            buildJsonObject {
-                put("role", "user")
-                put("content", userPrompt)
-            },
-        )
-        var steps = 0
-        var lastText = ""
-        val finished = withTimeoutOrNull(budgetMs) {
-            repeat(maxRounds) {
-                val resp = chat(
-                    buildJsonObject {
-                        put("model", model)
-                        put("messages", JsonArray(messages))
-                        if (tools.isNotEmpty()) put("tools", tools)
-                    },
-                )
-                val msg = (resp["choices"] as? JsonArray)?.firstOrNull()?.jsonObject
-                    ?.get("message") as? JsonObject
-                val rawContent = msg?.get("content").strOrEmpty()
-                val explicit = msg?.get("tool_calls")?.jsonArray
-                val content: String
-                val calls: JsonArray
-                if (explicit == null || explicit.isEmpty()) {
-                    // 与主循环同一套兜底：上游把原生工具标记当正文流回来。
-                    val stripped = stripDsmlToolCalls(rawContent)
-                    content = stripped.first
-                    calls = JsonArray(stripped.second.map { it.toToolCallJson() })
-                } else {
-                    content = rawContent
-                    calls = explicit
-                }
-                if (content.isNotBlank()) lastText = content
-                if (calls.isEmpty()) return@withTimeoutOrNull true
-                messages += buildJsonObject {
-                    put("role", "assistant")
-                    put("content", content)
-                    put("tool_calls", calls)
-                }
-                for (tc in calls) {
-                    val obj = tc.jsonObject
-                    val id = obj["id"].strOrEmpty().ifBlank { UUID.randomUUID().toString() }
-                    val fn = obj["function"] as? JsonObject
-                    val name = fn?.get("name").strOrEmpty()
-                    val argsRaw = fn?.get("arguments").strOrEmpty().ifBlank { "{}" }
-                    val args = runCatching { DshJson.parseToJsonElement(argsRaw).jsonObject }
-                        .getOrDefault(JsonObject(emptyMap()))
-                    val brief = if (name == "shell") args["command"].strOrEmpty() else args.toString()
-                    steps++
-                    onStep(name + "：" + brief.take(120))
-                    // 白名单二次校验：工具表里已经滤掉 subagent，模型硬写也执行不了（深度只有 1 层）。
-                    val result = if (name in SUBAGENT_TOOLS) {
-                        runTool(name, args)
-                    } else {
-                        ToolExecResult(ok = false, output = "", error = "子代理不能用工具：" + name)
-                    }
-                    messages += buildJsonObject {
-                        put("role", "tool")
-                        put("tool_call_id", id)
-                        // 子代理同样落盘：子任务里读大文件就不用把 6000 字硬截当上限了。
-                        put("content", spill?.present(resultReply(result), null, "sub-" + id) ?: resultReply(result).truncateForTool())
-                    }
-                }
-            }
-            return@withTimeoutOrNull false
-        }
-        return when {
-            finished == null -> SubagentOutcome(
-                ok = false,
-                text = "[子代理超时] 「" + label + "」跑了 " + (budgetMs / 1000) + " 秒没给结论，已中止；把任务拆小再派一次。",
-                steps = steps,
-            )
-            lastText.isBlank() -> SubagentOutcome(
-                ok = false,
-                text = "[子代理无输出] 「" + label + "」用完 " + maxRounds + " 轮工具往返也没写下结论。",
-                steps = steps,
-            )
-            else -> SubagentOutcome(ok = true, text = lastText, steps = steps)
-        }
-    }
-
-    /** 工具结果回灌：失败也把错误交回去，子代理才有机会换个做法。 */
-    private fun resultReply(r: ToolExecResult): String =
-        if (r.ok) r.output else "[执行失败] " + (r.error?.takeIf { it.isNotBlank() } ?: "未知错误") + "\n" + r.output
 }

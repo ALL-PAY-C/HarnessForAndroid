@@ -81,6 +81,16 @@ data class ContributionSpec(
      * 再用宿主自己的主题画出来 —— 第三方插件不需要认识 Compose，也不需要打包资源。
      */
     val ui: org.json.JSONObject? = null,
+    /**
+     * 声明式视图（plugin.json 的 `view` 字段，协议 v1）。
+     *
+     * 与 [ui] 的区别：`ui` 是老一辈的「宿主节点树」别名（字段名 ui/panel 都行），
+     * 这里则是新协议的独立一节 —— 带版本号、有体积/节点数/深度/字符串长度配额，
+     * 由 [PluginViewJson] 校验后经 [PluginViewAdapter] 翻成同一棵宿主节点树。
+     *
+     * 同一个贡献同时写了 `ui` 和 `view` 时以 `ui` 为准（老行为优先，见 [DeclarativePlugin]）。
+     */
+    val view: org.json.JSONObject? = null,
 )
 
 /** What tapping a contribution does. Data-only verbs, no code. */
@@ -152,29 +162,36 @@ private fun <T> JSONArray?.mapObjects(block: (JSONObject) -> T): List<T> {
     return (0 until length()).mapNotNull { i -> optJSONObject(i)?.let(block) }
 }
 
-private fun JSONObject.toContribution(): ContributionSpec = ContributionSpec(
-    slot = optString("slot"),
-    id = optString("id"),
-    label = optString("label"),
-    subtitle = optString("subtitle"),
-    icon = optString("icon").ifBlank { null },
-    ui = optJSONObject("ui") ?: optJSONObject("panel") ?: optJSONObject("view"),
-    action = optJSONObject("action")?.let { a ->
-        ActionSpec(
-            kind = a.optString("kind").ifBlank { "prompt" },
-            text = a.optString("text"),
-            method = a.optString("method").ifBlank { "GET" },
-            url = a.optString("url"),
-            body = a.optString("body"),
-            uri = a.optString("uri"),
-            pageId = a.optString("pageId"),
-            custom = a.optString("custom"),
-            key = a.optString("key"),
-            value = a.optString("value"),
-            toggle = a.optBoolean("toggle", false),
-        )
-    },
-)
+private fun JSONObject.toContribution(): ContributionSpec {
+    val viewJson = optJSONObject("view")
+    // 老包把 `view` 当 `ui` 的别名（与 DesktopUiAdapter 同款）。新协议靠版本字段自证身份：
+    // 写了 version/v 才按声明式视图读，否则照旧当 ui 子树 —— 老插件的行为一个字节都不变。
+    val declarative = viewJson?.takeIf { it.has("version") || it.has("v") }
+    return ContributionSpec(
+        slot = optString("slot"),
+        id = optString("id"),
+        label = optString("label"),
+        subtitle = optString("subtitle"),
+        icon = optString("icon").ifBlank { null },
+        ui = optJSONObject("ui") ?: optJSONObject("panel") ?: viewJson?.takeIf { declarative == null },
+        view = declarative,
+        action = optJSONObject("action")?.let { a ->
+            ActionSpec(
+                kind = a.optString("kind").ifBlank { "prompt" },
+                text = a.optString("text"),
+                method = a.optString("method").ifBlank { "GET" },
+                url = a.optString("url"),
+                body = a.optString("body"),
+                uri = a.optString("uri"),
+                pageId = a.optString("pageId"),
+                custom = a.optString("custom"),
+                key = a.optString("key"),
+                value = a.optString("value"),
+                toggle = a.optBoolean("toggle", false),
+            )
+        },
+    )
+}
 
 private fun JSONObject.toConfig(): ConfigSpec = ConfigSpec(
     key = optString("key"),

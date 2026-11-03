@@ -4,6 +4,7 @@ import dev.dsh.mobile.pluginapi.DshPlugin
 import dev.dsh.mobile.pluginapi.PluginCapability
 import dev.dsh.mobile.pluginapi.PluginManifest
 import dev.dsh.mobile.pluginapi.PluginRegistry
+import dev.dsh.mobile.pluginapi.PluginUiSpec
 import dev.dsh.mobile.pluginapi.SlotAction
 import dev.dsh.mobile.pluginapi.SlotContribution
 import dev.dsh.mobile.pluginapi.SlotId
@@ -41,6 +42,9 @@ class DeclarativePlugin(
     )
 
     override fun register(registry: PluginRegistry) {
+        // 视图里能点的动作 id 只能是本插件自己声明的贡献 id：越界的一律丢弃，
+        // 免得 A 插件的按钮点到 B 插件的动作上。
+        val knownActions = spec.contributions.map { it.id }.filter { it.isNotBlank() }.toSet()
         spec.contributions.forEach { contribution ->
             // 未知槽位不是异常：认不出就忽略它，并把原因记进协商结果（Degraded），
             // 插件管理页因此能说清「哪一条没生效」。
@@ -64,7 +68,7 @@ class DeclarativePlugin(
                     pluginId = spec.id,
                     action = action,
                     content = null,
-                    ui = contribution.ui?.let { PluginUiJson.spec(it) },
+                    ui = uiOf(contribution, registry, knownActions),
                 ),
             )
         }
@@ -85,6 +89,31 @@ class DeclarativePlugin(
                 ui = page,
             ),
         )
+    }
+
+    /**
+     * 一个贡献的界面：`ui`（老节点树）优先，其次 `view`（声明式视图 v1）。
+     *
+     * 两条路最后都落成 [PluginUiSpec] —— 渲染只有一条管线，插件用哪套写法是它自己的事。
+     * 视图被拒收时不画，把原因记进降级清单（插件管理页看得见），绝不半画一棵坏树。
+     */
+    private fun uiOf(
+        contribution: ContributionSpec,
+        registry: PluginRegistry,
+        knownActions: Set<String>,
+    ): PluginUiSpec? {
+        contribution.ui?.let { json -> PluginUiJson.spec(json)?.let { return it } }
+        val view = contribution.view ?: return null
+        val result = PluginViewJson.parse(view, knownActions)
+        val rejection = result.rejection
+        if (rejection != null) {
+            registry.degrade(spec.id, "视图被拒收：" + rejection.message() + "（id=" + contribution.id + "）")
+            return null
+        }
+        if (result.issues.isNotEmpty()) {
+            registry.degrade(spec.id, result.summary() + "（id=" + contribution.id + "）")
+        }
+        return result.spec?.let { PluginViewAdapter.toUiSpec(it) }
     }
 
     /** Value for the auto-generated form, falling back to the manifest default. */

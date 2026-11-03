@@ -1,0 +1,66 @@
+{
+  "id": "demo.view",
+  "name": "声明式视图示例",
+  "version": "1.0.0",
+  "description": "整页只由 plugin.json 的 view 一节拼成，包内没有任何代码。",
+  "author": "dsh",
+  "contributions": [
+    {
+      "slot": "plugin.page",
+      "id": "demo.view.panel",
+      "label": "视图示例",
+      "subtitle": "JSON 声明式视图",
+      "view": {
+        "version": 1,
+        "width": "fill",
+        "scrollable": true,
+        "root": {
+          "type": "column",
+          "gap": 12,
+          "children": [
+            { "type": "text", "text": "声明式视图", "emphasis": "title" },
+            {
+              "type": "text",
+              "text": "这一页全部来自 plugin.json 的 view 一节：宿主只做数据到组件的映射，没有执行插件提供的任何代码。",
+              "emphasis": "caption",
+              "color": "variant"
+            },
+            { "type": "divider" },
+            {
+              "type": "row",
+              "gap": 8,
+              "children": [
+                { "type": "chip", "text": "只读数据", "tone": "info" },
+                { "type": "chip", "text": "无代码", "tone": "success" }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": true,
+              "gap": 6,
+              "items": [
+                { "type": "text", "text": "插件交 JSON" },
+                { "type": "text", "text": "宿主校验配额" },
+                { "type": "text", "text": "宿主用自己的组件画" }
+              ]
+            },
+            { "type": "button", "label": "刷新这一页", "action": "demo.view.refresh", "style": "filled" },
+            { "type": "button", "label": "去设置", "action": "demo.view.settings", "style": "text" }
+          ]
+        }
+      }
+    },
+    {
+      "slot": "app.settings",
+      "id": "demo.view.refresh",
+      "label": "刷新示例面板",
+      "action": { "kind": "custom", "custom": "demo.view.refresh" }
+    },
+    {
+      "slot": "app.settings",
+      "id": "demo.view.settings",
+      "label": "打开插件设置",
+      "action": { "kind": "page", "pageId": "demo.view" }
+    }
+  ]
+}

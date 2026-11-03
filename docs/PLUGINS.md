@@ -48,6 +48,40 @@
 
 颜色只能写 `colorRole`，五档 `Primary` / `OnSurface` / `OnSurfaceVariant` / `Outline` / `Error`（`PluginUi.kt:13`）。按钮 `tonal`、`text|plain`、`outlined|outline` 之外落 Filled（`PluginUiJson.kt:77-82`）；badge tone 认 `info`、`success|ok`、`warning|warn`、`danger|error`，其余 Neutral（`:133-139`）。认不出的类型不抛异常：有子节点就保留子节点成 column，没有就降级一行文本（`:153-159`）。同一条贡献里 `ui` 与 `content` 都写时 `content` 被忽略（`PluginApi.kt:282-285`）。
 
+### 声明式视图协议 v1（`view`）
+
+老 `ui` 子树是「宿主节点树」的别名集，没有配额也没有版本；跨端插件需要的是「一页能装下、超了能说清为什么」的视图契约，于是另开一节 `view`（`plugin-api/PluginView.kt`）。两者并存，同一个贡献里 `ui` 优先，老插件一个字节都不用改。
+
+```json
+{
+  "slot": "plugin.page",
+  "id": "demo.view.panel",
+  "label": "视图示例",
+  "view": {
+    "version": 1,
+    "width": "fill",
+    "scrollable": true,
+    "root": {
+      "type": "column",
+      "gap": 12,
+      "children": [
+        { "type": "text", "text": "标题", "emphasis": "title" },
+        { "type": "chip", "text": "无代码", "tone": "success" },
+        { "type": "button", "label": "刷新", "action": "demo.view.refresh", "style": "text" }
+      ]
+    }
+  }
+}
+```
+
+节点只有八类：`text`、`chip`、`button`、`image`、`row`、`column`、`list`、`divider`（`PluginView.kt` 的 `PluginViewNode`）。`version` 是协议标记，**也是**「这一节归新协议」的判据：`view` 里没有 `version`/`v` 时仍按老 `ui` 子树读（`PluginPackage.kt:165-177`），所以老包写 `view` 当 ui 别名照样工作。
+
+配额（`PluginViewLimits`，校验器 `PluginViewJson.kt`）：体积 ≤ 16 KiB、节点 ≤ 256、深度 ≤ 12、单容器子节点 ≤ 64、单字符串 ≤ 512 字。判定顺序是规格的一部分——体积 → 版本 → 结构 → 语义；结构类超限整体拒收并给可读错误码（`view.too_large`、`view.too_many_nodes`、`view.too_deep`、`view.too_many_children`、`view.string_too_long`、`view.version_unsupported`、`view.version_invalid`、`view.not_object`、`view.empty`），语义类只降级不拒收（`view.unknown_node` 画灰占位、`view.unknown_action` 把动作置空）。拒收与降级都进 `PluginRegistry.degrade`，插件管理页能看见原因。
+
+动作只能写 id，且必须是本插件自己声明的贡献 id（`DeclarativePlugin.kt` 的 `knownActions`）；点击后映射成 `SlotAction.Custom(id)`，走既有 custom 通道（`AppNav.kt:881`），不新开通道、不执行插件代码。未知属性不报错也不生效：解析器只读白名单键，写 `onClick` / `script` 也没有读入口。
+
+渲染复用同一条管线：`PluginViewAdapter` 把视图翻成 `PluginUiNode`（`chip`→`Badge`、`list`→带序号的 `Column`、`image`→占位 `Text`），再交给 `PluginUiHost` 用宿主主题画，零新增 Compose 代码。
+
 ## APK 插件
 
 清单里必须有 `<meta-data android:name="dsh.plugin" android:value="true"/>`（`ExternalPlugins.kt:477`、`:316`），`assets/plugin.json` 写 `entry` 完整类名（`:342`、`:464`），缺省 `dev.dsh.mobile.plugin.html.HtmlPlugin`（`:474`）。

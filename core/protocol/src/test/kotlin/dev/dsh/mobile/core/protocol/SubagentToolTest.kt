@@ -1,5 +1,8 @@
 package dev.dsh.mobile.core.protocol
 
+import dev.dsh.mobile.core.protocol.llm.SUBAGENT_ROLE
+import dev.dsh.mobile.core.protocol.llm.SUBAGENT_TOOLS
+import dev.dsh.mobile.core.protocol.llm.SubagentLoop
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

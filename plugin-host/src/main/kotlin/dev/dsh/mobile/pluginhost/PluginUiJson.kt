@@ -181,7 +181,7 @@ object PluginUiJson {
         return (0 until arr.length()).mapNotNull { i -> node(arr.optJSONObject(i)) }
     }
 
-    private fun emphasisOf(raw: String): UiTextEmphasis = when (raw.lowercase()) {
+    internal fun emphasisOf(raw: String): UiTextEmphasis = when (raw.lowercase()) {
         "display" -> UiTextEmphasis.Display
         "title" -> UiTextEmphasis.Title
         "subtitle" -> UiTextEmphasis.Subtitle
@@ -190,7 +190,7 @@ object PluginUiJson {
         else -> UiTextEmphasis.Body
     }
 
-    private fun colorOf(raw: String): UiColorRole? = when (raw.lowercase()) {
+    internal fun colorOf(raw: String): UiColorRole? = when (raw.lowercase()) {
         "primary", "accent" -> UiColorRole.Primary
         "error", "danger" -> UiColorRole.Error
         "variant", "secondary", "muted" -> UiColorRole.OnSurfaceVariant
