@@ -24,6 +24,10 @@ enum class PhoneErrorCode(val code: String, val retryable: Boolean) {
     NoFocusedEditable("E_NO_FOCUSED_EDITABLE", retryable = true),
     NodeNoImeAction("E_NODE_NO_IME_ACTION", retryable = false),
     ArtifactWrite("E_ARTIFACT_WRITE", retryable = false),
+    /** T4.5：六类系统能力的运行时权限没给。retryable=false —— 重试同一个动作还是没权限。 */
+    PermissionDenied("E_PERMISSION_DENIED", retryable = false),
+    /** 同一资源被占用（例如正在录音时又来一条录音）。 */
+    Busy("E_BUSY", retryable = true),
     ;
 
     companion object {

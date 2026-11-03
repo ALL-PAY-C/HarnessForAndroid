@@ -49,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -68,6 +69,7 @@ import dev.dsh.mobile.design.QqSpace
 import dev.dsh.mobile.design.LocalFontRoles
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.qqFontBody
+import kotlin.math.roundToInt
 import dev.dsh.mobile.toolbridge.ShellBridge
 import dev.dsh.mobile.toolbridge.ShellSpec
 import kotlinx.coroutines.launch
@@ -176,6 +178,9 @@ private class PtyTab(val title: String, val session: TerminalSession)
 private fun PtyArea(spec: ShellSpec, textSize: Int) {
     val p = LocalQq.current
     val ctx = LocalContext.current
+    // TerminalView.setTextSize 收的是**像素**（TerminalRenderer 直接赋给 Paint.textSize），
+    // 上游注释写的 "dp" 是错的：传 13 会得到 13px≈5sp 的小字。这里统一 dp→px。
+    val density = LocalDensity.current.density
     val clipboard = remember { ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager }
     val viewRef = remember { mutableStateOf<TerminalView?>(null) }
     var exited by remember { mutableStateOf(Int.MIN_VALUE) }
@@ -213,7 +218,7 @@ private fun PtyArea(spec: ShellSpec, textSize: Int) {
         onDispose { tabs.forEach { runCatching { it.session.finishIfRunning() } } }
     }
 
-    LaunchedEffect(textSize) { viewRef.value?.setTextSize(textSize) }
+    LaunchedEffect(textSize) { viewRef.value?.setTextSize((textSize * density).roundToInt()) }
     LaunchedEffect(active) { exited = Int.MIN_VALUE }
 
     val viewClient = remember(spec) { terminalViewClient(view = viewRef) }
@@ -271,12 +276,13 @@ private fun PtyArea(spec: ShellSpec, textSize: Int) {
                 Text("正在启动 shell…", color = p.t3, fontSize = qqFontBody(13.sp), modifier = Modifier.align(Alignment.Center))
             } else {
                 AndroidView(
-                    modifier = Modifier.fillMaxSize(),
+                    // 内缩一圈：TerminalView 从 (0,0) 开始画第一行，贴边时字头会被 14dp 圆角裁掉。
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp, vertical = 6.dp),
                     factory = { c ->
                         TerminalView(c, null).apply {
                             setTerminalViewClient(viewClient)
                             // 顺序不能反：updateSize 里对 mRenderer 是非空断言
-                            setTextSize(textSize)
+                            setTextSize((textSize * density).roundToInt())
                             attachSession(current.session)
                             // 上游 activity_termux.xml 里这两个属性是终端能收键盘的前提：
                             // 没有 focusableInTouchMode，requestFocus() 在触摸模式下直接失败，

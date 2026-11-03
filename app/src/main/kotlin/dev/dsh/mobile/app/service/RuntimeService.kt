@@ -66,8 +66,27 @@ class RuntimeService : Service() {
     override fun onDestroy() {
         job?.cancel()
         runCatching { container.ongoingCenter.setForegroundUpdater(null) }
+        // 不主动降级会被系统判成「前台服务未在超时内停止」的致命异常
+        // （ForegroundServiceDidNotStopInTimeException，表现为 "DSH keeps stopping"）。
+        demote()
         AppLog.i("RuntimeService onDestroy")
         super.onDestroy()
+    }
+
+    /**
+     * Android 15+ 对前台服务类型有运行时长上限，到点先回调这里再杀进程。
+     * 主动降级成普通服务 + 停自己，比被系统打死温和得多。
+     */
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        AppLog.w("前台服务超时（type=" + fgsType + "），降级并停止")
+        demote()
+        stopSelf(startId)
+    }
+
+    private fun demote() {
+        if (!foreground) return
+        foreground = false
+        runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
     }
 
     /**

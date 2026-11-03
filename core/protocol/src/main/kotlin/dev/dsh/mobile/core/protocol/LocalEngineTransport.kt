@@ -2,6 +2,7 @@ package dev.dsh.mobile.core.protocol
 
 import dev.dsh.mobile.core.common.AppLog
 import dev.dsh.mobile.core.common.PendingImageQueue
+import dev.dsh.mobile.core.common.device.DeviceCapability
 import dev.dsh.mobile.core.model.AgentRuntimeState
 import dev.dsh.mobile.core.model.AgentTask
 import dev.dsh.mobile.core.model.ChatMessage
@@ -48,6 +49,7 @@ import kotlinx.serialization.json.putJsonObject
 import org.json.JSONObject
 import okhttp3.OkHttpClient
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import dev.dsh.mobile.core.protocol.context.Compaction
 import dev.dsh.mobile.core.protocol.group.GroupRunner
@@ -1018,7 +1020,14 @@ class LocalEngineTransport(
                         else -> {
                             // T6.1b：逐调用授权。判据在 ToolPolicy（按工具名 + 参数分档），
                             // shell 的命令文本判据仍在上面那条，两者不重复实现。
-                            when (val verdict = ToolPolicy.verdict(name, args)) {
+                            when (
+                                val verdict = ToolPolicy.verdict(
+                                    name = name,
+                                    args = args,
+                                    capabilityTiers = capabilityTiers,
+                                    sessionGranted = sessionGrants(sessionId),
+                                )
+                            ) {
                                 is ToolAuth.Allow ->
                                     // 带上 turnId + callId：落盘目录按轮次分组（tools-output/<turnId>/<callId>.txt），
                                     // 同名工具同一轮调多次也不会互相覆盖。
@@ -1028,6 +1037,8 @@ class LocalEngineTransport(
 
                                 is ToolAuth.Ask ->
                                     if (confirmTool(task, sessionId, verdict.title) == "allow") {
+                                        // T4.5：能力动作放行后记进本会话，Session 档下次不再问。
+                                        verdict.capability?.let { rememberGrant(sessionId, it) }
                                         toolRunner.run(name, args, turnId, id)
                                     } else {
                                         ToolExecResult(ok = false, output = "", error = "用户未确认，已跳过该动作")
@@ -1335,6 +1346,27 @@ class LocalEngineTransport(
     /** 设置页改深度后调这里；越界就地夹紧，写成 0 不会把 subagent 工具永久关死。 */
     fun setSubagentMaxDepth(v: Int) {
         subagentMaxDepth = v.coerceIn(1, 3)
+    }
+
+    /**
+     * 六类系统能力的档位原始串（T4.5）。AppContainer 把 SettingsStore 的值推到这里，
+     * 与 [setSubagentMaxDepth] 同一套注入方式 —— 授权判据不读全局单例，测试可以直接换档。
+     */
+    @Volatile
+    private var capabilityTiers: String = ""
+
+    /** 本会话内已被用户放行的能力项：Session 档确认一次后同会话不再问，会话没了自然失效。 */
+    private val capabilitySessionGrants = ConcurrentHashMap<String, MutableSet<DeviceCapability>>()
+
+    fun setCapabilityTiers(raw: String) {
+        capabilityTiers = raw
+    }
+
+    private fun sessionGrants(sessionId: String): Set<DeviceCapability> =
+        capabilitySessionGrants[sessionId] ?: emptySet()
+
+    private fun rememberGrant(sessionId: String, capability: DeviceCapability) {
+        capabilitySessionGrants.getOrPut(sessionId) { ConcurrentHashMap.newKeySet() }.add(capability)
     }
 
     /**

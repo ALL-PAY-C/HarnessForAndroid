@@ -1,5 +1,6 @@
 package dev.dsh.mobile.toolbridge.phone
 
+import dev.dsh.mobile.core.common.device.CapabilityActions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -68,10 +69,14 @@ class PhonePermissionTest {
                 "tap", "swipe", "type", "key", "back", "home", "recents",
                 "scroll", "pinch", "drag", "readscreen", "tree", "wait_for",
                 "currentapp", "apps", "sequence", "openapp", "screenshot",
+                // T4.5 六类系统能力动作
+                "contacts", "sms_list", "sms_send", "dial", "location", "audio_record",
             ),
             PhoneAction.entries.map { it.id }.toSet(),
         )
         assertEquals(PhoneAction.entries.size, PhoneAction.entries.map { it.id }.toSet().size)
+        // 六个能力动作的词表来自 CapabilityActions，这里再核一次，防止三处分叉。
+        assertEquals(CapabilityActions.PHONE_ACTIONS.toSet(), PhoneAction.entries.map { it.id }.filter { CapabilityActions.isCapabilityAction(it) }.toSet())
         assertEquals(PhoneAction.Tap, PhoneAction.of("tap"))
         assertEquals(null, PhoneAction.of("nope"))
     }

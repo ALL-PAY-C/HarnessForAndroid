@@ -129,6 +129,8 @@ data class AppSettings(
     val groupModeratorModel: String = "",
     /** 子代理最多嵌套几层（1 = 主代理能派、子代理不能再派；默认 2）。 */
     val subagentMaxDepth: Int = 2,
+    /** 六类系统能力的三档授权，落盘形态见 [dev.dsh.mobile.core.common.device.CapabilityTiers]；空串 = 全 Ask。 */
+    val capabilityTiers: String = "",
 
     // ---- 工具通道 ----
     /** 手机工具执行通道：auto / shizuku / root / app / termux。 */
@@ -277,6 +279,7 @@ class SettingsStore(private val context: Context) {
         val shellChannel = stringPreferencesKey("shell_channel")
         val groupContextBudget = intPreferencesKey("group_context_budget")
         val subagentMaxDepth = intPreferencesKey("subagent_max_depth")
+        val capabilityTiers = stringPreferencesKey("capability_tiers")
         val groupScheduler = stringPreferencesKey("group_scheduler")
         val groupModeratorModel = stringPreferencesKey("group_moderator_model")
         val collapsedGroups = stringPreferencesKey("collapsed_groups")
@@ -367,6 +370,7 @@ class SettingsStore(private val context: Context) {
         groupIsolateMembers = p[K.groupIsolateMembers] ?: d.groupIsolateMembers,
             groupScheduler = p[K.groupScheduler] ?: d.groupScheduler,
             subagentMaxDepth = p[K.subagentMaxDepth] ?: d.subagentMaxDepth,
+            capabilityTiers = p[K.capabilityTiers] ?: d.capabilityTiers,
             groupModeratorModel = p[K.groupModeratorModel] ?: d.groupModeratorModel,
         shellChannel = p[K.shellChannel] ?: d.shellChannel,
         appIconStyle = p[K.appIconStyle] ?: d.appIconStyle,
@@ -468,6 +472,9 @@ class SettingsStore(private val context: Context) {
 
     /** 子代理嵌套深度：1..3，越界就地夹紧（滑杆/预置写错不会把工具永久关死）。 */
     suspend fun setSubagentMaxDepth(v: Int) = edit { it[K.subagentMaxDepth] = v.coerceIn(1, 3) }
+
+    /** 六类能力档位：整表覆盖写。读侧解析失败只会回落 Ask，配置坏了也不会静默放行。 */
+    suspend fun setCapabilityTiers(v: String) = edit { it[K.capabilityTiers] = v }
     suspend fun setGroupIsolateMembers(v: Boolean) = edit { it[K.groupIsolateMembers] = v }
     suspend fun setGroupScheduler(v: String) = edit { it[K.groupScheduler] = v }
     suspend fun setGroupModeratorModel(v: String) = edit { it[K.groupModeratorModel] = v }

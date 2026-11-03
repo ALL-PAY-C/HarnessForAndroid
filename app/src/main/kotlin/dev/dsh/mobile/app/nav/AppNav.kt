@@ -87,6 +87,7 @@ import dev.dsh.mobile.feature.chat.PresetDrawerViewModel
 import dev.dsh.mobile.feature.sessions.SessionsScreen
 import dev.dsh.mobile.feature.sessions.SessionsViewModel
 import dev.dsh.mobile.feature.settings.AppAppearanceScreen
+import dev.dsh.mobile.feature.settings.AppCapabilityScreen
 import dev.dsh.mobile.feature.settings.AppGatewayScreen
 import dev.dsh.mobile.feature.settings.ExtrasScreen
 import dev.dsh.mobile.feature.settings.SettingsScreen
@@ -109,6 +110,7 @@ private object Routes {
     const val SETTINGS_SECTION = "settings/section/{section}"
     const val SETTINGS_APPEARANCE = "settings/appearance"
     const val SETTINGS_GATEWAY = "settings/gateway"
+    const val SETTINGS_CAPABILITY = "settings/capability"
     const val PLUGIN_PAGE = "plugin-page/{pageId}"
     fun chat(id: String) = "chat/$id"
     fun chatSettings(id: String) = "chat/$id/settings"
@@ -638,6 +640,7 @@ fun AppNav(container: AppContainer) {
                             gatewayCard = { dev.dsh.mobile.app.gateway.GatewayCard(container) },
                             onOpenGateway = { nav.navigate(Routes.SETTINGS_GATEWAY) { launchSingleTop = true } },
                             onOpenAppearance = { nav.navigate(Routes.SETTINGS_APPEARANCE) { launchSingleTop = true } },
+                            onOpenCapability = { nav.navigate(Routes.SETTINGS_CAPABILITY) { launchSingleTop = true } },
                             onOpenSection = { id -> nav.navigate(Routes.settingsSection(id)) { launchSingleTop = true } },
                             tabBarVisible = true,
                         )
@@ -673,6 +676,17 @@ fun AppNav(container: AppContainer) {
                         AppGatewayScreen(
                             onBack = { nav.popBackStack() },
                             gatewayCard = { dev.dsh.mobile.app.gateway.GatewayCard(container) },
+                        )
+                    }
+
+                    // T4.5 手机能力授权：三档开关 + 运行时权限申请（弹窗只能在 app 模块发起）。
+                    composable(Routes.SETTINGS_CAPABILITY) {
+                        val caps = dev.dsh.mobile.app.phone.rememberCapabilityPermissionsUi()
+                        AppCapabilityScreen(
+                            viewModel = settingsSubViewModel(container, "settings-capability"),
+                            grantedOf = { capability -> caps.granted(capability) },
+                            onRequest = { capability -> caps.requestMissing(capability) },
+                            onBack = { nav.popBackStack() },
                         )
                     }
 

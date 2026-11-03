@@ -2,7 +2,9 @@
 // 改动后需重新产出 ChatScreenKt 门面类，勿只 touch。
 package dev.dsh.mobile.feature.chat
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import dev.dsh.mobile.core.data.preset.AgentPresets
 import dev.dsh.mobile.core.data.repo.SendQueue
@@ -84,6 +86,7 @@ import dev.dsh.mobile.core.data.settings.SendMode
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.dsh.mobile.core.model.AgentRunState
@@ -226,6 +229,24 @@ fun ChatScreen(
     val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val uri = cameraUri
         if (ok && uri != null) attach(uri, "照片") else notice = "没有拍照"
+    }
+    // 相机是运行时权限：manifest 声明了 CAMERA 之后，没授权就 launch IMAGE_CAPTURE
+    // 会被系统抛 SecurityException 打死进程（"DSH keeps stopping"）。先问权限再拍照。
+    val startCapture: () -> Unit = {
+        val file = File(context.cacheDir, "cam-" + System.currentTimeMillis() + ".jpg")
+        val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+        cameraUri = uri
+        runCatching { takePhoto.launch(uri) }
+            .onFailure { notice = "打不开相机：" + it.javaClass.simpleName }
+    }
+    val cameraPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            startCapture()
+        } else {
+            notice = "需要相机权限：系统设置 → 应用 → DSH Mobile → 权限 → 相机"
+        }
     }
 
     var follow by rememberSaveable(state.sessionId) { mutableStateOf(true) }
@@ -528,10 +549,9 @@ fun ChatScreen(
             },            onPickFile = { pickFile.launch("*/*") },
             onPickImage = { pickImage.launch("image/*") },
             onTakePhoto = {
-                val file = File(context.cacheDir, "cam-${System.currentTimeMillis()}.jpg")
-                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                cameraUri = uri
-                takePhoto.launch(uri)
+                val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED
+                if (granted) startCapture() else cameraPermission.launch(Manifest.permission.CAMERA)
             },
             onSend = {
                 follow = true

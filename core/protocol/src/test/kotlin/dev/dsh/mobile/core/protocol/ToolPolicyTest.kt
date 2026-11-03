@@ -1,5 +1,8 @@
 package dev.dsh.mobile.core.protocol
 
+import dev.dsh.mobile.core.common.device.CapabilityTier
+import dev.dsh.mobile.core.common.device.CapabilityTiers
+import dev.dsh.mobile.core.common.device.DeviceCapability
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
@@ -58,6 +61,63 @@ class ToolPolicyTest {
     fun shellAndSubagentStayIrreversible() {
         assertTrue(ToolPolicy.verdict("shell", args("command" to "ls")) is ToolAuth.Ask)
         assertTrue(ToolPolicy.verdict("subagent", args("task" to "x")) is ToolAuth.Ask)
+    }
+
+    // ---- T4.5：六类系统能力的三档 ----
+
+    @Test
+    fun capabilityDefaultsToAsk() {
+        // 没配置过（空串）就是每次询问，绝不静默放行。
+        val verdict = ToolPolicy.verdict("phone", args("action" to "contacts"))
+        assertTrue("默认档应逐次确认，实际 " + verdict, verdict is ToolAuth.Ask)
+        assertEquals(DeviceCapability.Contacts, (verdict as ToolAuth.Ask).capability)
+    }
+
+    @Test
+    fun capabilityAlwaysTierAllows() {
+        val tiers = CapabilityTiers.encode(mapOf(DeviceCapability.Contacts to CapabilityTier.Always))
+        assertEquals(
+            ToolAuth.Allow,
+            ToolPolicy.verdict("phone", args("action" to "contacts"), capabilityTiers = tiers),
+        )
+    }
+
+    @Test
+    fun capabilitySessionTierAllowsOnlyAfterGrant() {
+        val tiers = CapabilityTiers.encode(mapOf(DeviceCapability.Location to CapabilityTier.Session))
+        val before = ToolPolicy.verdict("phone", args("action" to "location"), capabilityTiers = tiers)
+        assertTrue("本会话还没确认过，应问：" + before, before is ToolAuth.Ask)
+        val after = ToolPolicy.verdict(
+            "phone",
+            args("action" to "location"),
+            capabilityTiers = tiers,
+            sessionGranted = setOf(DeviceCapability.Location),
+        )
+        assertEquals(ToolAuth.Allow, after)
+    }
+
+    @Test
+    fun capabilityAskTierStaysAskEvenIfGranted() {
+        // Ask 档不看本会话记录：每次都问。
+        val tiers = CapabilityTiers.encode(mapOf(DeviceCapability.Sms to CapabilityTier.Ask))
+        val verdict = ToolPolicy.verdict(
+            "phone",
+            args("action" to "sms_send"),
+            capabilityTiers = tiers,
+            sessionGranted = setOf(DeviceCapability.Sms),
+        )
+        assertTrue("Ask 档应每次都问，实际 " + verdict, verdict is ToolAuth.Ask)
+    }
+
+    @Test
+    fun brokenCapabilityTiersFallBackToAsk() {
+        // 配置串坏了只该多问一次，不能变成放行。
+        val verdict = ToolPolicy.verdict(
+            "phone",
+            args("action" to "audio_record"),
+            capabilityTiers = "{\"microphone\":}",
+        )
+        assertTrue("坏配置应回落 Ask，实际 " + verdict, verdict is ToolAuth.Ask)
     }
 
     @Test

@@ -1,6 +1,9 @@
 package dev.dsh.mobile.feature.settings
 
 import dev.dsh.mobile.core.common.ProxyEnv
+import dev.dsh.mobile.core.common.device.CapabilityTier
+import dev.dsh.mobile.core.common.device.CapabilityTiers
+import dev.dsh.mobile.core.common.device.DeviceCapability
 import dev.dsh.mobile.core.data.secret.EndpointSecretStore
 import dev.dsh.mobile.core.data.settings.WebSecretKeys
 import kotlinx.coroutines.CancellationException
@@ -405,6 +408,15 @@ class SettingsViewModel(
     fun setGroupMode(v: String) = launch { settingsStore.setGroupMode(v) }
     fun setGroupScheduler(v: String) = launch { settingsStore.setGroupScheduler(v) }
     fun setSubagentMaxDepth(v: Int) = launch { settingsStore.setSubagentMaxDepth(v) }
+
+    /**
+     * T4.5：改一类系统能力的档位。整表写回（读旧表 → 改一项 → 编码），
+     * 解析/编码都在 CapabilityTiers 里，坏值只会回落 Ask。
+     */
+    fun setCapabilityTier(capability: DeviceCapability, tier: CapabilityTier) = launch {
+        val current = CapabilityTiers.parse(settingsStore.settings.first().capabilityTiers)
+        settingsStore.setCapabilityTiers(CapabilityTiers.encode(CapabilityTiers.with(current, capability, tier)))
+    }
     fun setGroupOfficePrompt(v: Boolean) = launch { settingsStore.setGroupOfficePrompt(v) }
     fun setGroupContextBudget(v: Int) = launch { settingsStore.setGroupContextBudget(v) }
     fun setGroupIsolateMembers(v: Boolean) = launch { settingsStore.setGroupIsolateMembers(v) }

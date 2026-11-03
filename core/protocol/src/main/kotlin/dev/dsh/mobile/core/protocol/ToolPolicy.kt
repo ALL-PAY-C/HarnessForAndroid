@@ -1,5 +1,9 @@
 package dev.dsh.mobile.core.protocol
 
+import dev.dsh.mobile.core.common.device.CapabilityActions
+import dev.dsh.mobile.core.common.device.CapabilityTier
+import dev.dsh.mobile.core.common.device.CapabilityTiers
+import dev.dsh.mobile.core.common.device.DeviceCapability
 import dev.dsh.mobile.core.protocol.tool.ToolCatalog
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -34,7 +38,11 @@ enum class ToolSensitivity {
 sealed interface ToolAuth {
     data object Allow : ToolAuth
     data class Deny(val reason: String) : ToolAuth
-    data class Ask(val title: String) : ToolAuth
+    /**
+     * [capability] 非空表示这次问的是「六类系统能力」的档位（T4.5）：用户点允许后
+     * 调用点按 Session 档把这项能力记进本会话，后续同一会话不再问。
+     */
+    data class Ask(val title: String, val capability: DeviceCapability? = null) : ToolAuth
 }
 
 /**
@@ -65,7 +73,14 @@ object ToolPolicy {
      * shell 不走这里 —— 它的判据是命令文本（[LocalEngineTransport.needsConfirmation]），
      * 同一条规则两处实现会分叉，所以 shell 仍由调用点先判。
      */
-    fun verdict(name: String, args: JsonObject): ToolAuth {
+    fun verdict(
+        name: String,
+        args: JsonObject,
+        capabilityTiers: String = "",
+        sessionGranted: Set<DeviceCapability> = emptySet(),
+    ): ToolAuth {
+        // T4.5：六类系统能力先按三档判，判完就不再走「不可逆才问」的老规则。
+        capabilityVerdict(name, args, capabilityTiers, sessionGranted)?.let { return it }
         val sensitivity = sensitivity(name, args)
         if (sensitivity != ToolSensitivity.Irreversible) return ToolAuth.Allow
         val title = when (name) {
@@ -75,6 +90,30 @@ object ToolPolicy {
             else -> "确认执行：" + name
         }
         return ToolAuth.Ask(title)
+    }
+
+    /**
+     * 六类系统能力的三档裁决；不是能力动作就返回 null，交回老规则。
+     *
+     * Always 直接放行；Session 在本会话确认过就放行；Ask（也是默认档）每次都问。
+     * 档位串解析不出来时 [CapabilityTiers] 回落 Ask —— 配置坏了只会多问一次，不会静默放行。
+     */
+    private fun capabilityVerdict(
+        name: String,
+        args: JsonObject,
+        capabilityTiers: String,
+        sessionGranted: Set<DeviceCapability>,
+    ): ToolAuth? {
+        if (name != "phone") return null
+        val action = toolArg(args, "action") ?: return null
+        val capability = CapabilityActions.capabilityOf(action) ?: return null
+        // 调用点的确认卡会自己加「确认执行：」前缀，这里不再重复写「确认」。
+        val ask = ToolAuth.Ask("使用「" + capability.label + "」能力：" + action, capability)
+        return when (CapabilityTiers.tierOf(capabilityTiers, capability)) {
+            CapabilityTier.Always -> ToolAuth.Allow
+            CapabilityTier.Session -> if (capability in sessionGranted) ToolAuth.Allow else ask
+            CapabilityTier.Ask -> ask
+        }
     }
 
 }

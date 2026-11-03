@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.Icon
@@ -40,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.dsh.mobile.core.common.device.DeviceCapability
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider
 import dev.dsh.mobile.design.QqPalette
@@ -71,6 +73,8 @@ fun PhoneControlScreen(phone: PhoneBridge) {
     var probe by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     val records by PhoneActionLog.records.collectAsStateWithLifecycle()
+    // T4.5：六类系统能力的运行时权限（查 + 弹系统框）。
+    val capabilities = rememberCapabilityPermissionsUi()
 
     fun refresh() {
         state = phone.permissionState()
@@ -120,6 +124,29 @@ fun PhoneControlScreen(phone: PhoneBridge) {
                                     PhoneStepStatus.Off -> step.actionLabel
                                 },
                                 color = statusColor(p, status),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        },
+                    )
+                }
+            }
+            // T4.5：六类系统能力。给权限是「按需」的 —— 不点这一行就永远不弹窗。
+            SectionTitle("系统能力权限", DeviceCapability.entries.size)
+            SectionCard {
+                DeviceCapability.entries.forEachIndexed { index, capability ->
+                    if (index > 0) QqCardDivider()
+                    val granted = capabilities.granted(capability)
+                    QqRow(
+                        icon = Icons.Filled.Lock,
+                        title = capability.label,
+                        subtitle = if (granted) "已授权" else capability.hint + "（点一下申请）",
+                        tint = if (granted) p.green else p.t3,
+                        onClick = { capabilities.requestMissing(capability) },
+                        trailing = {
+                            Text(
+                                if (granted) "已授权" else "未授权",
+                                color = if (granted) p.green else p.t3,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
                             )

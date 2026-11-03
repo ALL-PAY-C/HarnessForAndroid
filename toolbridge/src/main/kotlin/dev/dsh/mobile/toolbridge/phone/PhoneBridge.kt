@@ -9,13 +9,19 @@ import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.graphics.Path
 import android.graphics.Rect
+import android.location.LocationManager
+import android.media.MediaRecorder
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
+import android.provider.ContactsContract
 import android.provider.Settings
+import android.telephony.SmsManager
 import android.view.Display
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import dev.dsh.mobile.core.common.device.CapabilityActions
 import dev.dsh.mobile.toolbridge.ShizukuChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -40,7 +46,20 @@ data class PhoneResult(
     val imageQueueReason: String? = null,
 )
 
-class PhoneBridge(private val context: Context) {
+class PhoneBridge(
+    private val context: Context,
+    /**
+     * T4.5：六类系统能力的档位来源（SettingsStore 里存的原始串）。由 AppContainer 注入；
+     * 默认空串 = 全 Ask，也就是「没配置就按最保守的来」。
+     */
+    private val capabilityTiers: () -> String = { "" },
+) {
+
+    /** 能力动作的准入闸门：只查运行时权限，问不问用户由 core:protocol 的 ToolPolicy 决定。 */
+    private val capabilityGate = CapabilityGate(context, capabilityTiers)
+
+    @Volatile
+    private var recording = false
 
     private val a11yExecutor = Executors.newSingleThreadExecutor { r ->
         Thread(r, "phone-a11y").apply { isDaemon = true }
@@ -63,6 +82,9 @@ class PhoneBridge(private val context: Context) {
         append("、pinch（双指缩放，center 或 centerTarget + scale 或 fromRadius/toRadius）、drag（拖拽，from/to 或 fromTarget/toTarget，也可给 dx/dy 位移）")
         append("、key（enter/delete/tab 打在聚焦输入框；back/home/recents 走系统键）、currentapp（当前前台应用）、apps（已装可启动应用，query/limit/offset 分页）")
         append("、sequence（steps 数组一次下发，单步失败即停并回第几步）。type 另支持 target、mode=set|append|clear、perChar 逐字（intervalMs）。")
+        append("系统能力动作（不依赖无障碍，但要运行时权限，缺权限回 E_PERMISSION_DENIED + needsPermission）：")
+        append("contacts（query 查联系人）、sms_list（读收件箱）、sms_send（number + text）、")
+        append("dial（number，直接拨出）、location（最近已知位置）、audio_record（durationMs 录音到缓存目录）。")
     }
 
     fun isEnabled(): Boolean {
@@ -140,6 +162,9 @@ class PhoneBridge(private val context: Context) {
     }
 
     private fun execBlocking(json: String): PhoneResult {
+        // T4.5 六类系统能力走系统 API，不依赖无障碍，也不依赖前台界面 ——
+        // 必须排在 svc 判空之前，否则没开无障碍就永远用不了这六个动作。
+        capabilityBlocking(json)?.let { return it }
         val svc = PhoneAccessibilityService.current()
         if (svc == null) {
             // 读侧新工具要带错误码；旧 9 个动作的失败文案保持逐字符不变。
@@ -193,9 +218,167 @@ class PhoneBridge(private val context: Context) {
                 "",
                 "未知 action: " + action +
                     "（支持 tap/swipe/type/back/home/recents/readscreen/openapp/screenshot/tree/" +
-                    "scroll/pinch/drag/wait_for/currentapp/apps/sequence/key）",
+                    "scroll/pinch/drag/wait_for/currentapp/apps/sequence/key/" +
+                    "contacts/sms_list/sms_send/dial/location/audio_record）",
             )
         }
+    }
+
+    // ---- T4.5 六类系统能力：直接调系统 API，不走无障碍 ----
+
+    /**
+     * 能力动作入口。返回 null = 不是能力动作，交回无障碍主通道。
+     *
+     * 缺权限不抛异常，回 E_PERMISSION_DENIED + needsPermission，模型据此提示用户去授权；
+     * 系统 API 抛的异常同样翻成错误包 —— 抛出去会被执行器当可重试错误，副作用可能已经落地。
+     */
+    private fun capabilityBlocking(json: String): PhoneResult? {
+        val obj = runCatching { JSONObject(json) }.getOrNull() ?: return null
+        val action = obj.optString("action", "")
+        if (!CapabilityActions.isCapabilityAction(action)) return null
+        val started = System.currentTimeMillis()
+        if (!capabilityGate.granted(action)) return capabilityGate.deniedResult(action)
+        return try {
+            when (action) {
+                CapabilityActions.CONTACTS -> doContacts(obj, started)
+                CapabilityActions.SMS_LIST -> doSmsList(obj, started)
+                CapabilityActions.SMS_SEND -> doSmsSend(obj, started)
+                CapabilityActions.DIAL -> doDial(obj, started)
+                CapabilityActions.LOCATION -> doLocation(started)
+                CapabilityActions.AUDIO_RECORD -> doAudioRecord(obj, started)
+                else -> null
+            }
+        } catch (t: Throwable) {
+            failResult(PhoneErrorCode.ActionRejected, action + " 失败：" + (t.message ?: t.javaClass.simpleName))
+        }
+    }
+
+    private fun doContacts(obj: JSONObject, started: Long): PhoneResult {
+        val limit = obj.optInt("limit", 20).coerceIn(1, 200)
+        val query = obj.optString("query", "").trim()
+        val projection = arrayOf(
+            ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+            ContactsContract.CommonDataKinds.Phone.NUMBER,
+        )
+        val selection = if (query.isEmpty()) null else ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " LIKE ?"
+        val selectionArgs = if (query.isEmpty()) null else arrayOf("%" + query + "%")
+        val rows = JSONArray()
+        context.contentResolver.query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            projection,
+            selection,
+            selectionArgs,
+            ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC",
+        )?.use { c ->
+            while (rows.length() < limit && c.moveToNext()) {
+                rows.put(
+                    JSONObject()
+                        .put("name", c.getString(0) ?: "")
+                        .put("number", c.getString(1) ?: ""),
+                )
+            }
+        }
+        return okEnvelope(started, JSONObject().put("contacts", rows).put("count", rows.length()))
+    }
+
+    private fun doSmsList(obj: JSONObject, started: Long): PhoneResult {
+        val limit = obj.optInt("limit", 10).coerceIn(1, 100)
+        val rows = JSONArray()
+        context.contentResolver.query(
+            Uri.parse("content://sms/inbox"),
+            arrayOf("address", "body", "date"),
+            null,
+            null,
+            "date DESC",
+        )?.use { c ->
+            while (rows.length() < limit && c.moveToNext()) {
+                rows.put(
+                    JSONObject()
+                        .put("address", c.getString(0) ?: "")
+                        .put("body", c.getString(1) ?: "")
+                        .put("date", c.getLong(2)),
+                )
+            }
+        }
+        return okEnvelope(started, JSONObject().put("messages", rows).put("count", rows.length()))
+    }
+
+    private fun doSmsSend(obj: JSONObject, started: Long): PhoneResult {
+        val number = obj.optString("number", "").trim()
+        val text = obj.optString("text", "")
+        if (number.isEmpty()) return failResult(PhoneErrorCode.BadArgs, "sms_send 需要 number")
+        if (text.isEmpty()) return failResult(PhoneErrorCode.BadArgs, "sms_send 需要 text")
+        val manager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            context.getSystemService(SmsManager::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            SmsManager.getDefault()
+        } ?: return failResult(PhoneErrorCode.ActionRejected, "拿不到 SmsManager")
+        val parts = manager.divideMessage(text)
+        manager.sendMultipartTextMessage(number, null, parts, null, null)
+        return okEnvelope(started, JSONObject().put("sent", true).put("number", number).put("parts", parts.size))
+    }
+
+    private fun doDial(obj: JSONObject, started: Long): PhoneResult {
+        val number = obj.optString("number", "").trim()
+        if (number.isEmpty()) return failResult(PhoneErrorCode.BadArgs, "dial 需要 number")
+        context.startActivity(
+            Intent(Intent.ACTION_CALL, Uri.parse("tel:" + Uri.encode(number)))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+        return okEnvelope(started, JSONObject().put("dialed", number))
+    }
+
+    private fun doLocation(started: Long): PhoneResult {
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+            ?: return failResult(PhoneErrorCode.ActionRejected, "拿不到 LocationManager")
+        val providers = listOf(
+            LocationManager.GPS_PROVIDER,
+            LocationManager.NETWORK_PROVIDER,
+            LocationManager.PASSIVE_PROVIDER,
+        )
+        val best = providers.mapNotNull { provider -> runCatching { lm.getLastKnownLocation(provider) }.getOrNull() }
+            .maxByOrNull { it.time }
+            ?: return failResult(PhoneErrorCode.ActionRejected, "没有可用的最近位置（先让系统拿到一次定位）")
+        return okEnvelope(
+            started,
+            JSONObject()
+                .put("lat", best.latitude)
+                .put("lon", best.longitude)
+                .put("accuracyM", best.accuracy.toDouble())
+                .put("provider", best.provider ?: "")
+                .put("ageMs", System.currentTimeMillis() - best.time),
+        )
+    }
+
+    private fun doAudioRecord(obj: JSONObject, started: Long): PhoneResult {
+        if (recording) return failResult(PhoneErrorCode.Busy, "正在录音，等这一条结束")
+        val durationMs = obj.optLong("durationMs", 3000L).coerceIn(500L, 15_000L)
+        val dir = File(context.cacheDir, "recordings").apply { mkdirs() }
+        val out = File(dir, "rec-" + System.currentTimeMillis() + ".m4a")
+        val recorder = MediaRecorder()
+        recording = true
+        try {
+            recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            recorder.setOutputFile(out.absolutePath)
+            recorder.prepare()
+            recorder.start()
+            Thread.sleep(durationMs)
+            recorder.stop()
+        } catch (t: Throwable) {
+            runCatching { recorder.reset() }
+            return failResult(PhoneErrorCode.ArtifactWrite, "录音失败：" + (t.message ?: t.javaClass.simpleName))
+        } finally {
+            runCatching { recorder.release() }
+            recording = false
+        }
+        if (!out.exists() || out.length() == 0L) return failResult(PhoneErrorCode.ArtifactWrite, "录音文件为空")
+        return okEnvelope(
+            started,
+            JSONObject().put("path", out.absolutePath).put("bytes", out.length()).put("durationMs", durationMs),
+        )
     }
 
     private fun screenSize(): Pair<Int, Int> {

@@ -268,6 +268,8 @@ class AppContainer(private val context: Context) {
                     ProxyEnv.set(st.proxyUrl)
                     bridge.preferred = st.shellChannel
                     bridge.refresh()
+                    // T4.5：能力档位镜像给同步侧的 PhoneBridge（空串 = 全 Ask）。
+                    capabilityTiersCache = st.capabilityTiers
                 }
             }
         }
@@ -364,7 +366,15 @@ class AppContainer(private val context: Context) {
         }
     }
 
-    val phone: PhoneBridge by lazy { PhoneBridge(context) }
+    /**
+     * T4.5：六类能力的档位缓存。PhoneBridge 的判定是同步的（exec 前就要答案），
+     * 不能在里面 await DataStore，所以由 [settingsMirror] 这个常驻 collector 推一份进来。
+     */
+    @Volatile
+    private var capabilityTiersCache: String = ""
+
+    // 能力档位从 SettingsStore 注入（不在工具层读全局），空串 = 全 Ask。
+    val phone: PhoneBridge by lazy { PhoneBridge(context) { capabilityTiersCache } }
 
     val pluginStore: PluginStore by lazy { PluginStore(context) }
 
@@ -738,6 +748,8 @@ class AppContainer(private val context: Context) {
                     ).also { t ->
                         // 子代理嵌套深度跟着设置走（默认 2）：设置页改完下一次派发即生效，不用重连运行时。
                         scope.launch { settings.settings.collect { t.setSubagentMaxDepth(it.subagentMaxDepth) } }
+                        // T4.5：六类能力的档位同理跟着设置走，改完下一次工具调用即生效。
+                        scope.launch { settings.settings.collect { t.setCapabilityTiers(it.capabilityTiers) } }
                     }
                     // Loopback / Remote 只差 defaultCwd：同一个 ACP transport，载体都是 WebSocket。
                     // 载体只管搬帧（LineCarrier 负责 open/读行/断链信号），握手·重连·配对在 DshMux 里；

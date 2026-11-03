@@ -29,6 +29,13 @@ enum class PhoneAction(val id: String, val label: String, val hint: String) {
     Sequence("sequence", "批量步骤", "一次下发多步，失败即停"),
     OpenApp("openapp", "打开应用", "按包名启动应用"),
     Screenshot("screenshot", "截图", "截当前屏幕到文件"),
+    // T4.5：六类系统能力动作。id 与 CapabilityActions.PHONE_ACTIONS 逐字一致。
+    Contacts("contacts", "联系人", "按 query 查联系人姓名与号码"),
+    SmsList("sms_list", "读短信", "读最近收到的短信"),
+    SmsSend("sms_send", "发短信", "按号码发一条短信"),
+    Dial("dial", "拨号", "按号码直接拨出（要 CALL_PHONE）"),
+    Location("location", "定位", "读最近一次已知位置"),
+    AudioRecord("audio_record", "录音", "录一段音频到应用缓存目录"),
     ;
 
     companion object {

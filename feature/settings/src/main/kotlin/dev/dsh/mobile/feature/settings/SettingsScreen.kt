@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
@@ -97,6 +98,7 @@ import dev.dsh.mobile.design.StatusCapsule
 import dev.dsh.mobile.design.qqFontBody
 import dev.dsh.mobile.design.qqPageBottomInset
 import dev.dsh.mobile.toolbridge.AppStorage
+import dev.dsh.mobile.toolbridge.phone.PhoneAction
 import dev.dsh.mobile.toolbridge.phone.PhoneBridge
 import kotlinx.coroutines.launch
 
@@ -142,6 +144,8 @@ fun SettingsScreen(
     gatewaySummary: String? = null,
     /** 外观有独立页面（AppAppearanceScreen），走自己的路由。 */
     onOpenAppearance: () -> Unit = {},
+    /** 手机能力授权（T4.5）也有独立页面（AppCapabilityScreen），走自己的路由。 */
+    onOpenCapability: () -> Unit = {},
     /** null = 根列表；否则是当前子页的分类 id。 */
     section: String? = null,
     /** 宿主是否已经为底部 tab 栏单独留过位置（根页 true，子页 false）。 */
@@ -419,6 +423,19 @@ fun SettingsScreen(
                             icon = Icons.Filled.Palette,
                             tint = p.accent2,
                             onClick = onOpenAppearance,
+                        )
+                    }
+                }
+
+                // 手机能力授权：六类系统能力的三档开关，同样只在根列表留入口。
+                if (section == null) {
+                    item {
+                        SectionNavRow(
+                            title = "手机能力授权",
+                            subtitle = "相机 / 麦克风 / 联系人 / 短信 / 拨号 / 定位",
+                            icon = Icons.Filled.Lock,
+                            tint = p.accent,
+                            onClick = onOpenCapability,
                         )
                     }
                 }
@@ -843,7 +860,8 @@ fun SettingsScreen(
                                 tint = p.accent,
                                 onClick = { ctx.startActivity(PhoneBridge(ctx).overlaySettingsIntent()) },
                             )
-                            Hint("支持动作：点击、滑动、输入、读屏；另支持返回、主页、最近任务、打开应用与截图。")
+                            // 文案由动作目录派生：以前手写 9 项，实际早就 24 项，加动作没人记得改文案。
+                            Hint("支持动作：" + PhoneAction.entries.joinToString("、") { it.label } + "。")
                             QqCardDivider()
                             SegmentedRow(
                                 label = "执行通道",

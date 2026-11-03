@@ -1,5 +1,6 @@
 package dev.dsh.mobile.core.protocol.tool
 
+import dev.dsh.mobile.core.common.device.CapabilityActions
 import dev.dsh.mobile.core.protocol.ToolSensitivity
 import dev.dsh.mobile.core.protocol.str
 import dev.dsh.mobile.core.protocol.ToolSensitivity.DeviceControl
@@ -33,9 +34,18 @@ object ToolCatalog {
     /** phone 里能改写别的 App 内容或一步到位做很多事的动作，逐次确认。 */
     private val PHONE_ASK = setOf("type", "sequence", "pinch", "drag")
 
-    private fun phoneSensitivity(action: String?): ToolSensitivity = when (action) {
-        in PHONE_ALLOW -> ReadOnly
-        in PHONE_ASK -> Irreversible
+    /**
+     * T4.5：要运行时权限的六个系统能力动作。词表来自 [CapabilityActions]，与 PhoneActions 目录、
+     * PhoneBridge 的分派分支共用同一份，不在这里另抄一遍。
+     */
+    private val PHONE_CAPABILITY: Set<String> = CapabilityActions.PHONE_ACTIONS.toSet()
+
+    private fun phoneSensitivity(action: String?): ToolSensitivity = when {
+        action in PHONE_ALLOW -> ReadOnly
+        action in PHONE_ASK -> Irreversible
+        // 能力动作触碰用户真实数据（联系人/短信/位置），一律按「操控设备」记；
+        // 问不问由 ToolPolicy 的三档决定，不再由敏感度决定。
+        action in PHONE_CAPABILITY -> DeviceControl
         else -> DeviceControl
     }
 
@@ -300,13 +310,17 @@ private fun decl_phone(): JsonObject = buildJsonObject {
                                     add("recents"); add("readscreen"); add("openapp"); add("screenshot")
                                     add("scroll"); add("pinch"); add("drag"); add("wait_for")
                                     add("currentapp"); add("apps"); add("sequence"); add("key")
+                                    // T4.5 六类系统能力（与 CapabilityActions.PHONE_ACTIONS 逐字一致）
+                                    add("contacts"); add("sms_list"); add("sms_send")
+                                    add("dial"); add("location"); add("audio_record")
                                 }
                                 put(
                                     "description",
                                     "动作：tap 点击 / swipe 滑动 / type 输入 / back 返回 / home 主页 / recents 最近任务 / " +
                                         "readscreen 读屏 / openapp 开应用 / screenshot 截图 / " +
                                         "scroll 滚可滚容器 / pinch 双指缩放 / drag 拖拽 / wait_for 等条件成立 / " +
-                                        "currentapp 当前应用 / apps 已装可启动应用 / sequence 批量步骤 / key 系统键或输入框键",
+                                        "currentapp 当前应用 / apps 已装可启动应用 / sequence 批量步骤 / key 系统键或输入框键 / " +
+                                        "contacts 联系人 / sms_list 读短信 / sms_send 发短信 / dial 拨号 / location 定位 / audio_record 录音",
                                 )
                             }
                             putJsonObject("fx") { put("type", "number"); put("description", "起点横坐标（分数 0-1，相对屏幕宽，优先于 x）") }
@@ -615,6 +629,9 @@ private fun decl_subagent(): JsonObject = buildJsonObject {
         append("、key（enter/delete/tab 打在聚焦输入框；back/home/recents 走系统键）、currentapp（当前前台应用）")
         append("、apps（已装可启动应用，query/limit/offset 分页）、sequence（steps 一次下发，单步失败带步骤号即停）")
         append("、type 另支持 target + mode=set/append/clear + perChar 逐字（intervalMs）。")
+        append("六类系统能力动作（不依赖无障碍，需运行时权限，缺权限回 E_PERMISSION_DENIED + needsPermission）：")
+        append("contacts（query 查联系人）、sms_list（读收件箱）、sms_send（number+text）、dial（number 直接拨出）、")
+        append("location（最近已知位置）、audio_record（durationMs 录音）。这三档授权在 设置→手机能力授权 里配。")
         append("新动作外层恒 ok=true，真实成败与错误码在内层 {ok,code,message,retryable,effectLanded}；手机动作不重试。")
     }
 

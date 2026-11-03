@@ -33,6 +33,20 @@
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
 
+    <!--
+      T4.5 六类系统能力：全部运行时申请（Android 6+），默认全 Ask 档。
+      这里只声明，实际申请由设置页「手机能力授权」按需触发——不点就不弹窗，
+      权限没给时 phone 动作返回 E_PERMISSION_DENIED，不抛异常、不静默失败。
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
     <queries>
         <intent>
             <action android:name="dev.dsh.mobile.plugin.DSH_PLUGIN" />
