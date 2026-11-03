@@ -6,9 +6,43 @@
 
 `plugin.json` 缺 `id` 直接拒装，`name` 缺省回 id、`version` 缺省 `0.0.0`（`PluginPackage.kt:45-49`）。`contributions[]` 字段 `slot`、`id`、`label`、`subtitle`、`icon`、`action`、`ui`（`PluginPackage.kt:59-73`）；`config[]` 字段 `key`、`label`、`type`、`default`、`hint`、`options`（`:87-94`）。`type` 是自由字符串，缺省 `text`，没有取值校验（`:125`）；`ConfigFieldType` 里那套 Text/Secret/Switch/Number/Select（`PluginApi.kt:289`）目前无人引用。
 
-槽位七个 wire 值（`PluginApi.kt:214-235`）：`chat.composer.plus`、`chat.topbar.menu`、`session.row.menu`、`app.drawer`、`app.settings`、`plugin.page`、`agent.preset`。
+槽位十个 wire 值（`PluginApi.kt:307-343`）：`chat.composer.plus`（输入框「+」面板）、`chat.topbar.menu`（聊天页 ⋯ 菜单）、`session.row.menu`（会话行菜单）、`app.drawer`（左抽屉）、`app.settings`（设置行）、`plugin.page`（插件中心整页）、`agent.preset`（会话「配置智能体」里的人设预设）、`chat.bottom`（输入框上方常驻横条）、`chat.settings`（会话设置整页空白区）、`session.list`（会话列表贴边浮动区）。每个槽位吃哪一类配额见下面的配额表。
 
-声明式插件的动作只认四种（`DeclarativePlugin.kt:81-87`）：`http`（method/url/body）、`link`（uri）、`page`（pageId）、`custom`（仅 APK 插件）。其余一律按 `prompt`（text，submit 默认 true）处理，`kind` 缺省也是 `prompt`（`PluginPackage.kt:110`）；`request`、`uri`、`open`、`navigate`、`send` 这些同义写法在这条路径上不存在。
+清单两个可选版本字段 `apiVersion`（缺省 = 宿主当前版本）、`minHostApi`（缺省 0，不要求）（`PluginApi.kt:22-25`）。老包不写这两项零改动照旧加载。
+
+动作七种（`SlotAction` 子类，`PluginApi.kt:351-388`），`kind` 字符串 → 子类：空/`prompt` → `Prompt`（text，submit 默认 true）、`http`（method/url/body）、`link`（uri）、`page`（pageId）、`custom`（custom，仅 APK 插件）、`setconfig`|`set_config`|`config`|`toggle` → `SetConfig`（只写插件自己的 config，`toggle` 取反）、`setpersona`|`set_persona`|`persona` → `SetPersona`（写会话人设，前两个是开关、`persona` 照写）（映射 `DeclarativePlugin.kt:100-108`、`JsBackedPlugin.kt:190-198`，两个 `set*` 的同义写法在 `PluginPackage.kt:109-134`）。
+
+认不出的 `kind` **不再降级成 `prompt`**：该项被忽略、动作留空，并把「未知动作 X」记进协商结果（`DeclarativePlugin.kt:52-55`、`JsBackedPlugin.kt:65-68`）——降级成 prompt 等于替插件把一条它没打算发的消息发出去。`request`、`uri`、`open`、`navigate`、`send` 这些同义写法在这条路径上不存在。
+
+## 版本、能力协商与硬配额
+
+`PLUGIN_API_VERSION = 1`（`PluginCompat.kt:12`）是整套契约的版本号，说的是一件事：宿主认多少槽位、多少动作、多少个 Rhino 宿主函数（12 个，`PLUGIN_HOST_FUNCTIONS`，`PluginCompat.kt:20-23`）。加槽位/动作/宿主函数必须同步 +1 并改这份文档。
+
+协商三态 `Compat`（`PluginCompat.kt:31-50`，判定 `PluginCompat.negotiate` `:89-103`，宿主入口 `PluginHost.compatOf`）：
+
+| 态 | 触发 | 行为 |
+| --- | --- | --- |
+| `Compatible` | 清单每一项都落在本版能力内 | 正常加载 |
+| `Degraded(reasons)` | 未知槽位 / 未知动作 / 某一条超配额 | 照常加载，那些项被忽略，`reasons` 逐条写明哪一项没生效、为什么 |
+| `Rejected(reason)` | `apiVersion` 或 `minHostApi` 高过 `PLUGIN_API_VERSION` | 拒载，`register()` 一次都不调（`PluginHost.kt:154-158`） |
+
+协商结果挂在 `LoadedPlugin.compat`（`PluginHost.kt:33-42`），`Compat.summary()` 就是插件管理页显示的那一行。拒载与降级都不抛异常：一个插件写错名字带不走宿主。
+
+硬配额七类（`PluginCompat.kt:112-138`，槽位映射 `:145-153`）：同一插件每类只放行这么多条，超出的那一条**不注册**，原因同时进 `PluginRegistry.rejections` 与协商结果（`PluginApi.kt:164-185`）：
+
+| 配额 key | 上限 | 谁吃 |
+| --- | --- | --- |
+| `composer.actions` | 2 | `chat.composer.plus`、`composerButton` |
+| `message.actions` | 2 | `chat.topbar.menu`、`session.row.menu`、会话行扩展 |
+| `composer.strip` | 1 | `chat.bottom` |
+| `panels` | 4 | `plugin.page`、`configPage` |
+| `media` | 2 | 消息渲染器 |
+| `micro` | 2 | 快捷指令 |
+| `overlays` | 2 | `session.list`、`chat.settings` |
+
+`app.drawer`、`app.settings`、`agent.preset` 不设上限：它们由宿主的清单页承载，条数不会挤压别人的界面。`pluginId` 为空的贡献来自进程内内置插件，不参与配额。
+
+撤销是「注册即记录」：每个注册动作当场记下自己的撤销闭包（`PluginApi.kt:152-155`），`clearPlugin` 只逆序跑它再清配额计数（`:292-295`）。所以新增槽位只改注册函数，不用回来补一行 `removeAll`。
 
 `ui` 子树由宿主翻成原生 Compose（`PluginUiJson.kt:47-160`）。节点名大小写不敏感，别名并列：`column|vstack|vertical|panel|view|container|stack|box|div`、`row|hstack|horizontal`、`text|label|paragraph|heading|title|caption`、`button|action`、`iconbutton|icon`、`toggle|switch|checkbox`、`slider|range`、`textfield|input|editor`、`card`、`section|group`、`divider|hr|line`、`spacer|gap|space`、`badge|tag|chip`、`menu|dropdown|list`；富节点另有 `markdown|md|richtext`、`html|htm|rawhtml`、`code|pre|codeblock|snippet`。
 
@@ -22,13 +56,13 @@
 
 同理 `:plugin-api` 与 Compose 必须全部 `compileOnly`（`plugin-html/build.gradle.kts:67`、`:70-74`），打进包会和宿主那份冲突。后台常驻再实现 `BackgroundPlugin.ensureStarted(context)`（`BackgroundPlugin.kt:17-18`），冷启动与热重载各调一次（`AppContainer.kt:326`、`:345`），实现必须幂等。
 
-能力枚举 `PluginCapability` 十档：Theme、Layout、BubbleStyle、QuickCommand、SettingsItem、BottomTab、SessionRow、AgentCard、ComposerButton、MessageRenderer（`PluginApi.kt:24-27`）。消息渲染器按 `rendererId` 命中 `registry.messageRenderers`，命中后整条正文交给插件，宿主只包一层 `PluginBoundary`（`PluginHost.kt:210-211`；字段定义 `Message.kt:13`）。内置 HTML 渲染器占 `html.web`（`HtmlPlugin.kt:39`），自己在 `fillMaxWidth()` 下按内容测高（`HtmlMessageView.kt:66`）。
+能力枚举 `PluginCapability` 十档：Theme、Layout、BubbleStyle、QuickCommand、SettingsItem、BottomTab、SessionRow、AgentCard、ComposerButton、MessageRenderer（`PluginApi.kt:28-31`）。消息渲染器按 `rendererId` 命中 `registry.messageRenderers`，命中后整条正文交给插件，宿主只包一层 `PluginBoundary`（`PluginHost.kt:210-211`；字段定义 `Message.kt:13`）。内置 HTML 渲染器占 `html.web`（`HtmlPlugin.kt:39`），自己在 `fillMaxWidth()` 下按内容测高（`HtmlMessageView.kt:66`）。
 
 ## Rhino 脚本
 
 入口按 `dsh.main` → `dsh.entry` → `main` → `index.js` → `lib/index.js` 取第一个真实存在的（`JsPluginRuntime.kt:138-155`）。
 
-`ctx` 只有这些成员（`JsPluginRuntime.kt:233-315`）：`pluginId`、`log`、`config` / `setConfig`、`registerContribution`、`command`、`composerButton`、`renderer({id,template})`（模板里 `{{text}}` 换正文，`:389`）、`http`（同步，10 s 超时，`:164`）、`prompt`；没有文件、进程和 Java 对象（`:179-180` 用 `initSafeStandardObjects` 起的沙箱）。
+`ctx` 只有这些成员（`JsPluginRuntime.kt:246-364`）：`pluginId`、`log`、`config` / `setConfig`、`registerContribution`、`command`、`composerButton`、`renderer({id,template})`（模板里 `{{text}}` 换正文，`:389`）、`http`（同步，10 s 超时，`:164`）、`prompt`；没有文件、进程和 Java 对象（`:179-180` 用 `initSafeStandardObjects` 起的沙箱）。这 12 个函数名是宿主 ABI 的一部分（`PLUGIN_HOST_FUNCTIONS`，`PluginCompat.kt:20-23`；`JsPluginRuntime.API_VERSION` / `HOST_FUNCTIONS` 只是版本元数据），增删任一个都要升 `PLUGIN_API_VERSION`。
 
 ESM 先降级成普通脚本（`EsmTransform.kt:3-28`）：认 default / namespace / named / `as` / bare import、`export default`、`export const|let|var|function|class`、`export {a as b}`、`import.meta.url`。`export *`、`export {x} from`、动态 `import()` 抛 `UnsupportedException` 带 `file:line`，不静默改。
 

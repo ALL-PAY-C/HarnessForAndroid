@@ -36,11 +36,24 @@ class DeclarativePlugin(
         author = spec.author,
         capabilities = setOf(PluginCapability.QuickCommand),
         enabledByDefault = true,
+        apiVersion = spec.apiVersion,
+        minHostApi = spec.minHostApi,
     )
 
     override fun register(registry: PluginRegistry) {
         spec.contributions.forEach { contribution ->
-            val slot = SlotId.of(contribution.slot) ?: return@forEach
+            // 未知槽位不是异常：认不出就忽略它，并把原因记进协商结果（Degraded），
+            // 插件管理页因此能说清「哪一条没生效」。
+            val slot = SlotId.of(contribution.slot)
+            if (slot == null) {
+                registry.degrade(spec.id, "未知槽位 " + contribution.slot + "，已忽略（id=" + contribution.id + "）")
+                return@forEach
+            }
+            val action = contribution.action?.toSlotAction()
+            if (contribution.action != null && action == null) {
+                registry.degrade(spec.id, "未知动作 " + contribution.action.kind + "，已忽略（id=" + contribution.id + "）")
+            }
+            // 超配额的贡献由 registry 直接拒收并把原因记进 rejections/compat，这里不必再判一次。
             registry.contribute(
                 SlotContribution(
                     slot = slot,
@@ -49,7 +62,7 @@ class DeclarativePlugin(
                     subtitle = contribution.subtitle,
                     icon = contribution.icon,
                     pluginId = spec.id,
-                    action = contribution.action?.toSlotAction(),
+                    action = action,
                     content = null,
                     ui = contribution.ui?.let { PluginUiJson.spec(it) },
                 ),
@@ -80,11 +93,17 @@ class DeclarativePlugin(
 
     fun setValue(key: String, value: String) = onConfigChange(key, value)
 
-    private fun ActionSpec.toSlotAction(): SlotAction = configAction(spec.id) ?: personaAction() ?: when (kind) {
-        "http" -> SlotAction.Http(method = method, url = url, body = body)
-        "link" -> SlotAction.Link(uri)
-        "page" -> SlotAction.Page(pageId)
-        "custom" -> SlotAction.Custom(custom)
-        else -> SlotAction.Prompt(text, submit = true)
-    }
+    /**
+     * action kind → 宿主动作。认不出的 kind 返回 null（调用方记 Degraded 并忽略），
+     * **不再降级成 prompt** —— 那等于替插件把一条它没打算发的消息发出去。
+     */
+    private fun ActionSpec.toSlotAction(): SlotAction? =
+        configAction(spec.id) ?: personaAction() ?: when (kind.trim().lowercase()) {
+            "", "prompt" -> SlotAction.Prompt(text, submit = true)
+            "http" -> SlotAction.Http(method = method, url = url, body = body)
+            "link" -> SlotAction.Link(uri)
+            "page" -> SlotAction.Page(pageId)
+            "custom" -> SlotAction.Custom(custom)
+            else -> null
+        }
 }

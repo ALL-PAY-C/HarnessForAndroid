@@ -1,5 +1,7 @@
 package dev.dsh.mobile.pluginhost
 
+import dev.dsh.mobile.pluginapi.PLUGIN_API_VERSION
+import dev.dsh.mobile.pluginapi.PLUGIN_HOST_FUNCTIONS
 import org.json.JSONArray
 import org.json.JSONObject
 import org.mozilla.javascript.BaseFunction
@@ -141,6 +143,17 @@ class JsPluginRuntime(
     data class JsEntry(val path: String, val source: String)
 
     companion object {
+
+        /**
+         * 宿主函数 ABI 的版本：整套契约在 plugin-api（[PLUGIN_API_VERSION] / [PLUGIN_HOST_FUNCTIONS]）。
+         *
+         * 这里只作版本元数据存在 —— 加/删 [install] 里的任何一个宿主函数都要升 plugin-api 的
+         * 版本号并同步 docs/PLUGINS.md，脚本作者据此判断手里的插件能不能跑。
+         */
+        const val API_VERSION: Int = PLUGIN_API_VERSION
+
+        /** install() 装进 `dsh.ctx` 的 12 个宿主函数名，与 [PLUGIN_HOST_FUNCTIONS] 同一份清单。 */
+        val HOST_FUNCTIONS: Set<String> get() = PLUGIN_HOST_FUNCTIONS
 
         const val STAGE_ENTRY = "解析入口"
         const val STAGE_COMPILE = "编译"

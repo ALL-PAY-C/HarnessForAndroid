@@ -6,7 +6,10 @@ import dev.dsh.mobile.core.common.AppLog
 import dev.dsh.mobile.core.model.ChatMessage
 import dev.dsh.mobile.pluginapi.BackgroundPlugin
 import dev.dsh.mobile.pluginapi.BottomTab
+import dev.dsh.mobile.pluginapi.Compat
 import dev.dsh.mobile.pluginapi.DshPlugin
+import dev.dsh.mobile.pluginapi.PluginCompat
+import dev.dsh.mobile.pluginapi.PluginDeclaration
 import dev.dsh.mobile.pluginapi.PluginManifest
 import dev.dsh.mobile.pluginapi.PluginRegistry
 import dev.dsh.mobile.pluginapi.SlotAction
@@ -31,6 +34,11 @@ data class LoadedPlugin(
      * 注册成功、引擎 import 时才炸）。插件管理列表只认这两个字段，绝不按「安装目录存在」猜状态。
      */
     val loadError: String? = null,
+    /**
+     * 版本/能力协商结果：全量兼容、降级（[Compat.Degraded]，列出没生效的槽位/动作/超配额项）、
+     * 拒载（[Compat.Rejected]，apiVersion 比宿主新）。插件管理页直接显示 [Compat.summary]。
+     */
+    val compat: Compat = Compat.Compatible,
 )
 
 /**
@@ -105,6 +113,9 @@ class PluginHost(
     /** 运行期加载失败回执：插件 id → 原因。来自引擎真实加载结果，不来自目录探测。 */
     private val runtimeFailures = LinkedHashMap<String, String>()
 
+    /** 版本拒载回执：插件 id → 原因。协商不过的插件不进注册表，register() 一次都不跑。 */
+    private val versionRejections = LinkedHashMap<String, String>()
+
     /**
      * 槽位版本号。`registry` 里的列表是普通可变集合，Compose 看不见它的变化；
      * 每次注册/注销插件就自增一次，界面 collect 它即可在禁用插件后立刻把对应的
@@ -140,8 +151,11 @@ class PluginHost(
         instances[m.id] = plugin
         // 是否启用由 isEnabled 统一算（安全模式只放行内置，否则按 store 启用态）。
         val wanted = isEnabled(m.id, m.enabledByDefault)
-        var error: String? = null
-        if (wanted) {
+        // 版本协商先于注册：清单声明的 apiVersion 比宿主新就拒载，register() 一次都不调，
+        // 免得插件按新版契约写的槽位在旧宿主上跑出半个界面。
+        val rejected = versionReject(m)
+        var error: String? = rejected
+        if (rejected == null && wanted) {
             val failure = runCatching { plugin.register(registry) }.exceptionOrNull()
             if (failure != null) {
                 registry.clearPlugin(m.id)
@@ -214,8 +228,30 @@ class PluginHost(
             enabled = on && registerError == null && loadError == null,
             error = registerError,
             loadError = loadError,
+            compat = compatOf(id),
         )
     }
+
+    /**
+     * 清单版本协商；拒载时把原因记进 [versionRejections]，重装/改好后自动清掉。
+     *
+     * 只判版本（apiVersion / minHostApi）；槽位与动作的对账在注册期由 registry 记降级原因。
+     */
+    private fun versionReject(m: PluginManifest): String? {
+        val compat = PluginCompat.negotiate(
+            PluginDeclaration(apiVersion = m.apiVersion, minHostApi = m.minHostApi),
+        )
+        if (compat is Compat.Rejected) {
+            versionRejections[m.id] = compat.reason
+            return compat.reason
+        }
+        versionRejections.remove(m.id)
+        return null
+    }
+
+    /** 插件当前的协商结果：版本拒载优先，否则看注册期记下的降级原因。 */
+    fun compatOf(pluginId: String): Compat =
+        versionRejections[pluginId]?.let { Compat.Rejected(it) } ?: registry.compat(pluginId)
 
     fun loadAll(plugins: List<DshPlugin>, force: Boolean = false) = plugins.forEach { load(it, force) }
 
@@ -253,11 +289,16 @@ class PluginHost(
         store?.setEnabled(id, enabled)
         if (enabled) {
             registry.clearPlugin(id)
-            val err = runCatching { plugin.register(registry) }
-                .onFailure { registry.clearPlugin(id) }
-                .exceptionOrNull()
+            val rejected = versionReject(plugin.manifest)
+            val err = if (rejected != null) {
+                rejected
+            } else {
+                runCatching { plugin.register(registry) }
+                    .onFailure { registry.clearPlugin(id) }
+                    .exceptionOrNull()?.message
+            }
             _plugins.update { list ->
-                list.map { if (it.manifest.id == id) recompute(it, null, err?.message) else it }
+                list.map { if (it.manifest.id == id) recompute(it, null, err) else it }
             }
             bump()
         } else {
@@ -271,8 +312,9 @@ class PluginHost(
         onUninstall(id)
         registry.clearPlugin(id)
         instances.remove(id)
-        // 卸载后旧回执必须一起丢掉：同名重装时不能继承上一份的「加载失败」。
+        // 卸载后旧回执必须一起丢掉：同名重装时不能继承上一份的「加载失败」/「拒载」。
         runtimeFailures.remove(id)
+        versionRejections.remove(id)
         _plugins.update { list -> list.filterNot { it.manifest.id == id } }
         bump()
     }
@@ -290,6 +332,7 @@ class PluginHost(
             registry.clearPlugin(it)
             instances.remove(it)
             runtimeFailures.remove(it)
+            versionRejections.remove(it)
         }
         _plugins.update { list -> list.filter { it.manifest.id in keep } }
         bump()

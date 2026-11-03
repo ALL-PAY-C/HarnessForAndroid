@@ -19,6 +19,10 @@ data class PluginManifest(
     val author: String = "",
     val capabilities: Set<PluginCapability> = emptySet(),
     val enabledByDefault: Boolean = true,
+    /** 清单声明的插件 API 版本；缺省 = 宿主当前版本，老插件零改动可加载。 */
+    val apiVersion: Int = PLUGIN_API_VERSION,
+    /** 插件要求的最低宿主 API 版本；缺省 0 = 不要求。高过 [PLUGIN_API_VERSION] 即拒载。 */
+    val minHostApi: Int = 0,
 )
 
 enum class PluginCapability {
@@ -116,10 +120,6 @@ class PluginRegistry {
     val messageRenderers = LinkedHashMap<String, MessageRenderer>()
     val sessionRowExtras = mutableListOf<SessionRowExtra>()
     val agentCardExtras = mutableListOf<AgentCardExtra>()
-    // 6e：对外列表保持 List<@Composable> 不变（消费方 AppNav/SessionsScreen/AgentsScreen 无感），
-    // 用平行 owner 列表记住每个 extra/card 属于哪个插件，clearPlugin 才能按 owner 摘掉。
-    private val sessionRowExtraOwners = mutableListOf<Pair<String, SessionRowExtra>>()
-    private val agentCardExtraOwners = mutableListOf<Pair<String, AgentCardExtra>>()
     val settingsItems = mutableListOf<SettingsItem>()
     val bottomTabs = mutableListOf<BottomTab>()
     val composerButtons = mutableListOf<ComposerButton>()
@@ -129,76 +129,171 @@ class PluginRegistry {
     val themes = mutableListOf<ThemeContribution>()
     val contributions = mutableListOf<SlotContribution>()
 
-    fun messageRenderer(id: String, pluginId: String, render: MessageRenderer) {
-        messageRenderers[id] = render
+    /**
+     * 统一撤销清单：注册即记录「怎么撤」，[clearPlugin] 只跑它。
+     *
+     * 以前是 12 行手写 removeAll，加一个槽位就得回来补一行（漏一次就是禁用插件后残留）。
+     * 现在撤销动作跟着注册动作一起写，新增槽位只改注册函数。
+     */
+    private val undoLog = LinkedHashMap<String, MutableList<() -> Unit>>()
+
+    /** 配额占用：pluginId → 配额 → 已占用的注册 key。 */
+    private val quotaUse = LinkedHashMap<String, MutableMap<PluginQuota, LinkedHashSet<String>>>()
+
+    /** 每一次被拒的注册（超配额 / 未知槽位 / 未知动作）。界面照抄 [RegistrationRejection.reason]。 */
+    val rejections = mutableListOf<RegistrationRejection>()
+
+    /** 降级原因：pluginId → 原因。三态协商 [compat] 读的就是它。 */
+    private val degradeNotes = LinkedHashMap<String, MutableList<String>>()
+
+    /** 注册序号，给没有 id 的槽位（会话行扩展）当配额 key，保证每条注册各占名额。 */
+    private var seq = 0
+
+    /** 记一条撤销动作；同一个插件注册多少次就记多少条，撤销时逆序跑。 */
+    private fun record(pluginId: String, undo: () -> Unit) {
+        undoLog.getOrPut(pluginId) { mutableListOf() } += undo
     }
 
-    fun sessionRowExtra(pluginId: String, extra: SessionRowExtra) {
+    /**
+     * 占一个配额名额。
+     *
+     * 返回 null = 放行；否则是可直接显示的拒收原因，同时记进 [rejections] 与降级原因。
+     * pluginId 为空的贡献来自进程内内置插件（宿主自己的代码），不受配额约束 —— 内置插件
+     * 不是这个开关要防的对象，共用同一个空 owner 也会让它们互相挤掉。
+     */
+    fun claim(pluginId: String, quota: PluginQuota, key: String): String? {
+        if (pluginId.isBlank()) return null
+        val keys = quotaUse.getOrPut(pluginId) { mutableMapOf() }.getOrPut(quota) { linkedSetOf() }
+        if (key in keys) return null
+        if (keys.size >= quota.max) {
+            val reason = "超过 " + quota.key + " 配额（上限 " + quota.max + " 条），已拒绝：" + key
+            reject(pluginId, quota.key, reason)
+            return reason
+        }
+        keys += key
+        return null
+    }
+
+    /** 该插件在某类配额上已用掉的名额。 */
+    fun quotaUsed(pluginId: String, quota: PluginQuota): Int =
+        quotaUse[pluginId]?.get(quota)?.size ?: 0
+
+    /** 记一条拒收：既进 [rejections] 也进降级原因，两处都能读到原因。 */
+    fun reject(pluginId: String, key: String, reason: String) {
+        rejections += RegistrationRejection(pluginId, key, reason)
+        degrade(pluginId, reason)
+    }
+
+    /** 记一条降级原因（未知槽位 / 未知动作 / 超配额）。同一句不重复记。 */
+    fun degrade(pluginId: String, reason: String) {
+        val notes = degradeNotes.getOrPut(pluginId) { mutableListOf() }
+        if (reason !in notes) notes += reason
+    }
+
+    fun degradedReasons(pluginId: String): List<String> = degradeNotes[pluginId]?.toList().orEmpty()
+
+    /** 注册完之后的协商结果：没有任何降级原因就是 [Compat.Compatible]。 */
+    fun compat(pluginId: String): Compat {
+        val reasons = degradedReasons(pluginId)
+        return if (reasons.isEmpty()) Compat.Compatible else Compat.Degraded(reasons)
+    }
+
+    fun messageRenderer(id: String, pluginId: String, render: MessageRenderer): String? {
+        claim(pluginId, PluginQuota.Media, "renderer:" + id)?.let { return it }
+        messageRenderers[id] = render
+        record(pluginId) { messageRenderers.remove(id) }
+        return null
+    }
+
+    fun sessionRowExtra(pluginId: String, extra: SessionRowExtra): String? {
+        claim(pluginId, PluginQuota.MessageActions, "session.row:" + (++seq))?.let { return it }
         sessionRowExtras += extra
-        sessionRowExtraOwners += pluginId to extra
+        record(pluginId) { sessionRowExtras.removeAll { it === extra } }
+        return null
     }
 
     fun agentCard(pluginId: String, card: AgentCardExtra) {
         agentCardExtras += card
-        agentCardExtraOwners += pluginId to card
+        record(pluginId) { agentCardExtras.removeAll { it === card } }
     }
 
     fun settingsItem(item: SettingsItem) {
         settingsItems += item
+        record(item.pluginId) { settingsItems.removeAll { it === item } }
     }
 
     fun bottomTab(tab: BottomTab) {
         bottomTabs += tab
+        record(tab.pluginId) { bottomTabs.removeAll { it === tab } }
     }
 
-    fun composerButton(button: ComposerButton) {
+    fun composerButton(button: ComposerButton): String? {
+        claim(button.pluginId, PluginQuota.ComposerButtons, "composer.button:" + button.id)?.let { return it }
         composerButtons += button
+        record(button.pluginId) { composerButtons.removeAll { it === button } }
+        return null
     }
 
-    fun quickCommand(command: QuickCommand) {
+    fun quickCommand(command: QuickCommand): String? {
+        claim(command.pluginId, PluginQuota.Micro, "quick:" + command.id)?.let { return it }
         quickCommands += command
+        record(command.pluginId) { quickCommands.removeAll { it === command } }
+        return null
     }
 
-    fun configPage(page: PluginConfigPage) {
+    fun configPage(page: PluginConfigPage): String? {
+        claim(page.pluginId, PluginQuota.Panels, "page:" + page.id)?.let { return it }
         configPages.removeAll { it.id == page.id }
         configPages += page
+        record(page.pluginId) { configPages.removeAll { it.id == page.id } }
+        return null
     }
 
     fun drawerEntry(entry: DrawerEntry) {
         drawerEntries.removeAll { it.id == entry.id }
         drawerEntries += entry
+        record(entry.pluginId) { drawerEntries.removeAll { it.id == entry.id } }
     }
 
     fun theme(theme: ThemeContribution) {
         themes += theme
+        record(theme.pluginId) { themes.removeAll { it === theme } }
     }
 
-    /** Puts [c] into its slot, in-place replacing any earlier contribution with the same id+slot+pluginId. */
-    fun contribute(c: SlotContribution) {
+    /**
+     * Puts [c] into its slot, in-place replacing any earlier contribution with the same id+slot+pluginId.
+     *
+     * 超配额时**不注册**并返回可读原因（[rejections] / [compat] 里也能看到），
+     * 调用方据此显示「这一条没生效」而不是静默丢掉。
+     */
+    fun contribute(c: SlotContribution): String? {
+        c.slot.quota?.let { quota ->
+            claim(c.pluginId, quota, c.slot.wire + ":" + c.id)?.let { return it }
+        }
         // 6d：同 slot 同 id 按 owner 去重 —— 两个插件可各自贡献同名 id，互不覆盖；
         // 就地替换保留注册顺序：重新贡献 = 更新原位，不把条目挪到列表末尾。
         val idx = contributions.indexOfFirst { it.id == c.id && it.slot == c.slot && it.pluginId == c.pluginId }
         if (idx >= 0) contributions[idx] = c else contributions += c
+        // 撤销按三元组摘，不管中途替换过几次：列表里当前那一条一定被摘掉。
+        record(c.pluginId) {
+            contributions.removeAll { it.id == c.id && it.slot == c.slot && it.pluginId == c.pluginId }
+        }
+        return null
     }
 
     /** Everything addressed to [slot], in registration order. */
     fun inSlot(slot: SlotId): List<SlotContribution> = contributions.filter { it.slot == slot }
 
+    /**
+     * 摘掉一个插件的全部注册。
+     *
+     * 只跑 [undoLog]：注册过的每一项都记着自己的撤销动作，所以这里不存在「漏写一行」的槽位。
+     */
     fun clearPlugin(pluginId: String) {
-        settingsItems.removeAll { it.pluginId == pluginId }
-        bottomTabs.removeAll { it.pluginId == pluginId }
-        composerButtons.removeAll { it.pluginId == pluginId }
-        quickCommands.removeAll { it.pluginId == pluginId }
-        drawerEntries.removeAll { it.pluginId == pluginId }
-        configPages.removeAll { it.pluginId == pluginId }
-        contributions.removeAll { it.pluginId == pluginId }
-        messageRenderers.keys.filter { it.startsWith("$pluginId.") }.forEach { messageRenderers.remove(it) }
-        // 6e：主题、会话行扩展、Agent 卡按 owner 清理（以前漏掉，禁用/卸载后残留）。
-        themes.removeAll { it.pluginId == pluginId }
-        sessionRowExtras.removeAll(sessionRowExtraOwners.filter { it.first == pluginId }.map { it.second })
-        sessionRowExtraOwners.removeAll { it.first == pluginId }
-        agentCardExtras.removeAll(agentCardExtraOwners.filter { it.first == pluginId }.map { it.second })
-        agentCardExtraOwners.removeAll { it.first == pluginId }
+        undoLog.remove(pluginId)?.asReversed()?.forEach { runCatching(it) }
+        quotaUse.remove(pluginId)
+        // 降级原因跟着注册一起清：重新装载的同一插件应当从 Compatible 重新协商。
+        degradeNotes.remove(pluginId)
     }
 }
 

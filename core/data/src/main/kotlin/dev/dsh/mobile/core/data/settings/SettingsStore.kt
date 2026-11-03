@@ -123,6 +123,10 @@ data class AppSettings(
     val groupContextBudget: Int = 24_000,
     /** 群聊里同一个人被多次拉入时，允许每个实例独立上下文（关掉就退化成共享，一般别关）。 */
     val groupIsolateMembers: Boolean = true,
+    /** 房间编排器：legacy（默认，首轮固定+轮转）/ brief-moderated（T5.2b 主持人调度）。 */
+    val groupScheduler: String = "legacy",
+    /** 主持人模型 id；空串 = 跟召集者会话的模型走。 */
+    val groupModeratorModel: String = "",
 
     // ---- 工具通道 ----
     /** 手机工具执行通道：auto / shizuku / root / app / termux。 */
@@ -270,6 +274,8 @@ class SettingsStore(private val context: Context) {
         val groupIsolateMembers = booleanPreferencesKey("group_isolate_members")
         val shellChannel = stringPreferencesKey("shell_channel")
         val groupContextBudget = intPreferencesKey("group_context_budget")
+        val groupScheduler = stringPreferencesKey("group_scheduler")
+        val groupModeratorModel = stringPreferencesKey("group_moderator_model")
         val collapsedGroups = stringPreferencesKey("collapsed_groups")
     val customFolders = stringPreferencesKey("custom_folders")
         val webSearchEngine = stringPreferencesKey("web_search_engine")
@@ -356,6 +362,8 @@ class SettingsStore(private val context: Context) {
             groupOfficePrompt = p[K.groupOfficePrompt] ?: d.groupOfficePrompt,
             groupContextBudget = p[K.groupContextBudget] ?: d.groupContextBudget,
         groupIsolateMembers = p[K.groupIsolateMembers] ?: d.groupIsolateMembers,
+            groupScheduler = p[K.groupScheduler] ?: d.groupScheduler,
+            groupModeratorModel = p[K.groupModeratorModel] ?: d.groupModeratorModel,
         shellChannel = p[K.shellChannel] ?: d.shellChannel,
         appIconStyle = p[K.appIconStyle] ?: d.appIconStyle,
         customIconUri = p[K.customIconUri] ?: d.customIconUri,
@@ -454,6 +462,8 @@ class SettingsStore(private val context: Context) {
     suspend fun setGroupOfficePrompt(v: Boolean) = edit { it[K.groupOfficePrompt] = v }
     suspend fun setGroupContextBudget(v: Int) = edit { it[K.groupContextBudget] = v }
     suspend fun setGroupIsolateMembers(v: Boolean) = edit { it[K.groupIsolateMembers] = v }
+    suspend fun setGroupScheduler(v: String) = edit { it[K.groupScheduler] = v }
+    suspend fun setGroupModeratorModel(v: String) = edit { it[K.groupModeratorModel] = v }
     suspend fun setShellChannel(v: String) = edit { it[K.shellChannel] = v }
     suspend fun setCollapsedGroups(v: List<String>) = edit { it[K.collapsedGroups] = v.joinToString("\u0001") }
 

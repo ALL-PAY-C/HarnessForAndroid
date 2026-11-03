@@ -5,12 +5,16 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+
+/** 无障碍事件去抖窗口：这段时间内的连续内容事件合并成一次代次自增（12.5 次/秒上限）。 */
+private const val GENERATION_DEBOUNCE_MS = 80L
 
 /** 无障碍交互入口；悬浮状态只在用户已授予悬浮窗权限时显示。 */
 class PhoneAccessibilityService : AccessibilityService() {
@@ -31,6 +35,9 @@ class PhoneAccessibilityService : AccessibilityService() {
     /** 树代次的唯一实例：事件回调写，读侧（tree / T4.2 的 wait_for）读。 */
     private val generations = PhoneTreeGenerations()
 
+    /** 上一次 bump 代次的 uptime，用来给高频内容事件去抖（见 onAccessibilityEvent 注释）。 */
+    private var lastGenerationAt = 0L
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
@@ -46,8 +53,18 @@ class PhoneAccessibilityService : AccessibilityService() {
         val e = event ?: return
         // 三类事件都要记代次：配置里声明了 content/windows changed，只认 state-changed 的话
         // 「界面变了没」就只能靠在外部轮询整棵树（见 PhoneNode.kt 的 PhoneTreeGenerations）。
-        generations.commit(fingerprintOf(e))
-        if (e.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+        //
+        // 代次只用事件本身算，绝不在这里读 rootInActiveWindow / e.source：两者都是跨进程阻塞调用
+        // （AccessibilityInteractionClient 会一直等到 5s 超时），而这个回调跑在应用主线程上，
+        // 卡住它等于卡住输入分发 —— 实测每敲一个字都会取出事件源，连续输入 5s 无响应触发 ANR。
+        // 代价是代次变成「可能多报」的粗信号：等待方只会因此更早返回，不会漏掉真实变化。
+        val nowUptime = SystemClock.uptimeMillis()
+        val stateChanged = e.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+        if (stateChanged || nowUptime - lastGenerationAt >= GENERATION_DEBOUNCE_MS) {
+            lastGenerationAt = nowUptime
+            generations.bump()
+        }
+        if (stateChanged) {
             val pkg = e.packageName?.toString()
             val switched = pkg != foregroundPkg
             foregroundPkg = pkg
@@ -66,28 +83,6 @@ class PhoneAccessibilityService : AccessibilityService() {
             }
             statusView?.text = statusText()
         }
-    }
-
-    /**
-     * 事件时刻的树指纹。
-     *
-     * 全树哈希要在回调里遍历整棵树，做不起；这里只取「窗口 + 事件源」这一层。
-     * 粗指纹的漏判方向是保守的：等待方会等到超时，不会误报「已变化」。
-     */
-    private fun fingerprintOf(e: AccessibilityEvent): Int {
-        var h = e.windowId
-        val root = rootInActiveWindow
-        h = 31 * h + (root?.packageName?.hashCode() ?: 0)
-        h = 31 * h + (root?.className?.hashCode() ?: 0)
-        h = 31 * h + (root?.childCount ?: -1)
-        val src = e.source
-        if (src != null) {
-            h = 31 * h + (src.viewIdResourceName?.hashCode() ?: 0)
-            h = 31 * h + (src.text?.hashCode() ?: 0)
-            h = 31 * h + (src.contentDescription?.hashCode() ?: 0)
-            h = 31 * h + src.childCount
-        }
-        return h
     }
 
     // ---- T4.1 读侧：前台快照与树代次 ----

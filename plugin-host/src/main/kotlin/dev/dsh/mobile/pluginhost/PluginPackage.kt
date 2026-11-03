@@ -1,5 +1,6 @@
 package dev.dsh.mobile.pluginhost
 
+import dev.dsh.mobile.pluginapi.PLUGIN_API_VERSION
 import dev.dsh.mobile.pluginapi.SlotAction
 import org.json.JSONArray
 import org.json.JSONObject
@@ -41,6 +42,10 @@ data class PluginManifestFile(
     val config: List<ConfigSpec> = emptyList(),
     /** 插件主页/控制台地址；plugin.json 写 homepage，旧包可能只写 url。 */
     val homepage: String = "",
+    /** 插件 API 版本；缺省 = 宿主当前版本，老包不写这一项也照旧加载。 */
+    val apiVersion: Int = PLUGIN_API_VERSION,
+    /** 插件要求的最低宿主 API 版本；缺省 0 = 不要求，高过宿主即拒载。 */
+    val minHostApi: Int = 0,
 ) {
     companion object {
         fun parse(text: String): Result<PluginManifestFile> = runCatching {
@@ -55,6 +60,8 @@ data class PluginManifestFile(
                 contributions = root.optJSONArray("contributions").mapObjects { it.toContribution() },
                 config = root.optJSONArray("config").mapObjects { it.toConfig() },
                 homepage = root.optString("homepage").ifBlank { root.optString("url") },
+                apiVersion = root.optInt("apiVersion", PLUGIN_API_VERSION),
+                minHostApi = root.optInt("minHostApi", 0),
             )
         }
     }

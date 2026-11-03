@@ -53,6 +53,9 @@ class GatewayManager(private val context: Context) {
         private const val KEY_ENABLED = "autostart"
     }
 
+    /** 二进制不在包内（当前 ABI 没有对应 native）：不可重试，见 [binaryUnsupported]。 */
+    private class MissingBinaryException(message: String) : IOException(message)
+
     /** 网关状态：UI 与插件只读这个。 */
     sealed class State {
         object Stopped : State()
@@ -87,6 +90,14 @@ class GatewayManager(private val context: Context) {
     @Volatile
     private var startingAt = 0L
 
+    /**
+     * ABI 不支持/二进制不在包内：这是一次性事实，不是可重试故障。
+     * 以前每次启动都重试并打一整条 E 级堆栈，debug 包在 x86_64 上刷屏十余条；
+     * 现在只告警一次，之后 start() 直接返回 false。
+     */
+    @Volatile
+    private var binaryUnsupported = false
+
     /** 客户端 key：首次随机生成后固定，config.yaml 与模型配置都用它。 */
     val apiKey: String
         get() = prefs.getString(KEY_API, null) ?: randomKey().also { prefs.edit().putString(KEY_API, it).apply() }
@@ -120,6 +131,7 @@ class GatewayManager(private val context: Context) {
 
     /** 幂等启动。已经有存活进程就直接探活返回。 */
     suspend fun start(): Boolean = lock.withLock {
+        if (binaryUnsupported) return@withLock false
         val alive = process?.takeIf { it.isAlive }
         if (alive != null) {
             _state.value = State.Running(probeModels())
@@ -148,6 +160,11 @@ class GatewayManager(private val context: Context) {
             watch(p)
             AppLog.i("gateway up, port=${PORT} models=${(state.value as? State.Running)?.models ?: -1} log=${logFile.absolutePath}")
             true
+        } catch (e: MissingBinaryException) {
+            binaryUnsupported = true
+            AppLog.w("网关已停用：${e.message}")
+            _state.value = State.Failed(e.message ?: "当前 ABI 不在包内")
+            false
         } catch (e: Exception) {
             AppLog.e("gateway start failed: ${e.message}", e)
             _state.value = State.Failed(e.message ?: e.javaClass.simpleName)
@@ -232,7 +249,7 @@ class GatewayManager(private val context: Context) {
         cleanup()
         // 装包时由 PackageManager 解压到 nativeLibraryDir，这里只校验在位可执行（缺 ABI 时也能说清原因）。
         if (!binary.isFile || !binary.canExecute()) {
-            throw IOException("网关二进制缺失：${binary.absolutePath}（当前 ABI 不在包内，请换机或重装）")
+            throw MissingBinaryException("网关二进制缺失：${binary.absolutePath}（当前 ABI 不在包内，请换机或重装）")
         }
         seedAuth()
         writeConfig()

@@ -50,11 +50,35 @@ class JsBackedPlugin(
             if (run.renderers.isNotEmpty()) add(PluginCapability.MessageRenderer)
         },
         enabledByDefault = true,
+        apiVersion = spec.apiVersion,
+        minHostApi = spec.minHostApi,
     )
 
     override fun register(registry: PluginRegistry) {
         (spec.contributions + run.contributions).forEach { c ->
-            c.toSlotContribution(spec.id)?.let { registry.contribute(it) }
+            // 与 DeclarativePlugin 同一条规矩：认不出的槽位/动作忽略并记进协商结果，绝不抛。
+            val slot = SlotId.of(c.slot)
+            if (slot == null) {
+                registry.degrade(spec.id, "未知槽位 " + c.slot + "，已忽略（id=" + c.id + "）")
+                return@forEach
+            }
+            val action = c.action?.toSlotAction(spec.id)
+            if (c.action != null && action == null) {
+                registry.degrade(spec.id, "未知动作 " + c.action.kind + "，已忽略（id=" + c.id + "）")
+            }
+            registry.contribute(
+                SlotContribution(
+                    slot = slot,
+                    id = c.id,
+                    label = c.label,
+                    subtitle = c.subtitle,
+                    icon = c.icon,
+                    pluginId = spec.id,
+                    action = action,
+                    content = null,
+                    ui = c.ui?.let { PluginUiJson.spec(it) },
+                ),
+            )
         }
 
         // 插件自带的整页界面（dsh.ui / panel.html）→ 插件中心与左侧抽屉里的一页。
@@ -120,21 +144,6 @@ class JsBackedPlugin(
 
     fun setValue(key: String, value: String) = onConfigChange(key, value)
 
-    private fun ContributionSpec.toSlotContribution(pluginId: String): SlotContribution? {
-        val slot = SlotId.of(slot) ?: return null
-        return SlotContribution(
-            slot = slot,
-            id = id,
-            label = label,
-            subtitle = subtitle,
-            icon = icon,
-            pluginId = pluginId,
-            action = action?.toSlotAction(pluginId),
-            content = null,
-            ui = ui?.let { PluginUiJson.spec(it) },
-        )
-    }
-
     /**
      * 插件没有自带界面时的信息页：版本、作者、执行结果、注册了什么。
      *
@@ -177,13 +186,15 @@ class JsBackedPlugin(
         ),
     )
 
-    private fun ActionSpec.toSlotAction(pluginId: String): SlotAction =
-        configAction(pluginId) ?: personaAction() ?: when (kind) {
+    /** 认不出的 kind 返回 null（调用方记 Degraded 并忽略），不降级成 prompt。 */
+    private fun ActionSpec.toSlotAction(pluginId: String): SlotAction? =
+        configAction(pluginId) ?: personaAction() ?: when (kind.trim().lowercase()) {
+            "", "prompt" -> SlotAction.Prompt(text, submit = true)
             "http" -> SlotAction.Http(method = method, url = url, body = body)
             "link" -> SlotAction.Link(uri)
             "page" -> SlotAction.Page(pageId)
             "custom" -> SlotAction.Custom(custom)
-            else -> SlotAction.Prompt(text, submit = true)
+            else -> null
         }
 }
 

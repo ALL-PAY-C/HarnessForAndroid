@@ -15,6 +15,25 @@ import dev.dsh.mobile.core.model.TaskState
 import dev.dsh.mobile.core.model.TokenUsage
 import dev.dsh.mobile.core.model.ToolCall
 import dev.dsh.mobile.core.model.ToolCall.ToolStatus
+import dev.dsh.mobile.core.protocol.group.BriefThenModeratedScheduler
+import dev.dsh.mobile.core.protocol.group.BudgetView
+import dev.dsh.mobile.core.protocol.group.GROUP_SCHEDULER_LEGACY
+import dev.dsh.mobile.core.protocol.group.GROUP_SCHEDULER_MODERATED
+import dev.dsh.mobile.core.protocol.group.LedgerView
+import dev.dsh.mobile.core.protocol.group.LegacyScheduler
+import dev.dsh.mobile.core.protocol.group.MAX_ROOM_ROUNDS
+import dev.dsh.mobile.core.protocol.group.MODERATOR_MAX_TOKENS
+import dev.dsh.mobile.core.protocol.group.MODERATOR_SYSTEM_PROMPT
+import dev.dsh.mobile.core.protocol.group.MemberState
+import dev.dsh.mobile.core.protocol.group.RoomView
+import dev.dsh.mobile.core.protocol.group.SchedulerDecision
+import dev.dsh.mobile.core.protocol.group.SilenceTracker
+import dev.dsh.mobile.core.protocol.group.StopSignals
+import dev.dsh.mobile.core.protocol.group.TranscriptLine
+import dev.dsh.mobile.core.protocol.group.contributorsOf
+import dev.dsh.mobile.core.protocol.group.evaluateStop
+import dev.dsh.mobile.core.protocol.group.explain
+import dev.dsh.mobile.core.protocol.group.transcriptOf
 import dev.dsh.mobile.core.protocol.web.WebToolkit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -146,6 +165,13 @@ data class GroupPlan(
     val maxParallel: Int = 3,
     /** 群上下文预算（字符）。群成员共享的对话摘要在超过这个量时压缩得更狠。 */
     val contextBudget: Int = 24_000,
+    /**
+     * 编排器开关（T5.2b）：[GROUP_SCHEDULER_LEGACY] 默认，逐字段等价于旧实现（零行为变化）；
+     * [GROUP_SCHEDULER_MODERATED] 走 brief-then-moderated 主持人调度。
+     */
+    val scheduler: String = GROUP_SCHEDULER_LEGACY,
+    /** 主持人模型覆盖；空串 = 用召集者会话的模型（不额外指定旗舰模型，避免成本失控）。 */
+    val moderatorModel: String = "",
     /**
      * 上一轮因发言上限（[MAX_GROUP_SPEAKERS]）没轮到的成员 id：下一轮排最前先发言。
      *
@@ -1169,6 +1195,30 @@ class LocalEngineTransport(
         // 上一轮被上限挤下来的人优先；plan 上的字段带不过来（宿主每轮重建），所以优先取本会话那份。
         val prior = synchronized(pendingSpeakers) { pendingSpeakers[sessionId] }.orEmpty()
             .ifEmpty { plan.pendingSpeakerIds }
+        // 编排器开关（T5.2b）：默认 LegacyScheduler —— 它只回答「这一轮该不该开」，
+        // 派活仍旧走下面的 planGroupRound，所以顺序/截断/顺延规则只有一份实现，零行为变化。
+        if (plan.scheduler == GROUP_SCHEDULER_MODERATED) {
+            runModeratedRoom(sessionId, plan, history, userText)
+            groupTurns.remove(sessionId)
+            _events.tryEmit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
+            return
+        }
+        val legacyRoom = roomViewOf(
+            plan = plan,
+            userText = userText,
+            transcript = emptyList(),
+            round = 0,
+            charsUsed = userText.length,
+            elapsedMs = 0L,
+            ledger = LedgerView(),
+            lastSpeakerId = synchronized(lastSpeaker) { lastSpeaker[sessionId] },
+        )
+        if (LegacyScheduler(plan, userText, prior).next(legacyRoom) is SchedulerDecision.Done) {
+            // 一个能说话的成员都没有：旧路径走到这里同样是空任务直接收尾（不发说明）。
+            groupTurns.remove(sessionId)
+            _events.tryEmit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
+            return
+        }
         val round = planGroupRound(
             sessionId = sessionId,
             plan = plan,
@@ -1196,6 +1246,217 @@ class LocalEngineTransport(
         pool.await(sessionId)
         groupTurns.remove(sessionId)
         _events.tryEmit(DshEvent.TurnEnd(sessionId, "stop", turnId = turnId))
+    }
+
+    /**
+     * brief-then-moderated 房间（T5.2b，设计文档 §4/§5/§7）。
+     *
+     * 和自动机一样在**一轮用户消息内**按轮驱动：问调度器要决策 → 派活 → 等结算 →
+     * 记进 transcript/账本 → 回顶部做终止判定。终止条件与优先级全在 evaluateStop 里，
+     * 这里只负责喂信号、把决策落成任务、把原因写进群聊 notice（任何自动行为都要能问责）。
+     *
+     * 成本控制：房间级预算沿用 plan.contextBudget（24k 字符语义），80% 喊一声，
+     * 到顶直接散会 —— 不再有「每轮广播全员」这个隐藏成本源（§7）。
+     */
+    private suspend fun runModeratedRoom(
+        sessionId: String,
+        plan: GroupPlan,
+        history: List<ChatMessage>,
+        userText: String,
+    ) {
+        // 主持人默认取召集者会话模型；设置里给了覆盖就用覆盖的。
+        val scheduler = BriefThenModeratedScheduler { prompt -> moderatorCall(sessionId, plan, prompt) }
+        val stall = StallDetector()
+        val silence = SilenceTracker()
+        val transcript = ArrayList<TranscriptLine>()
+        val ledger = LedgerView()
+        val startedAt = System.currentTimeMillis()
+        var charsUsed = userText.length
+        var round = 0
+        var warned = false
+        var lastSpeakerId: String? = synchronized(lastSpeaker) { lastSpeaker[sessionId] }
+        while (true) {
+            // 用户打断优先级最高：协程被取消就直接收手，别再派活。
+            if (!currentCoroutineContext().isActive) {
+                emitGroupNotice(sessionId, "[群聊已散会] 用户打断，立即散会。")
+                return
+            }
+            val budget = BudgetView(
+                round = round,
+                maxRounds = MAX_ROOM_ROUNDS,
+                charsUsed = charsUsed,
+                charBudget = plan.contextBudget,
+                elapsedMs = System.currentTimeMillis() - startedAt,
+            )
+            val room = roomViewOf(
+                plan = plan,
+                userText = userText,
+                transcript = transcript,
+                round = round,
+                charsUsed = charsUsed,
+                elapsedMs = budget.elapsedMs,
+                ledger = ledger,
+                lastSpeakerId = lastSpeakerId,
+            )
+            val stop = evaluateStop(
+                StopSignals(
+                    stall = stall.stalled,
+                    stallReason = stall.reason,
+                    silentStreak = silence.streak,
+                    round = round,
+                ),
+                budget,
+            )
+            if (stop != null) {
+                AppLog.w("群聊调度：" + stop.kind + " → " + stop.reason)
+                emitGroupNotice(sessionId, "[群聊已散会] " + stop.reason)
+                return
+            }
+            if (budget.tight && !warned) {
+                warned = true
+                emitGroupNotice(
+                    sessionId,
+                    "[预算告急] 房间预算已用 " + budget.percent + "%，接近上限会自动散会。",
+                )
+            }
+            val decision = scheduler.next(room)
+            val speakers: List<GroupMember> = when (decision) {
+                is SchedulerDecision.NextSpeaker ->
+                    plan.members.filter { it.id == decision.memberId }
+                is SchedulerDecision.Roundtable -> scheduler.roundtableOrder(room)
+                    .mapNotNull { state -> plan.members.firstOrNull { it.id == state.id } }
+                is SchedulerDecision.Done -> {
+                    emitGroupNotice(sessionId, "[群聊已散会] " + decision.reason)
+                    return
+                }
+                is SchedulerDecision.Escalate -> {
+                    emitGroupNotice(sessionId, "[群聊已升级] " + decision.reason)
+                    return
+                }
+                is SchedulerDecision.AskUser -> {
+                    emitGroupNotice(sessionId, "[主持人提问] " + decision.question)
+                    return
+                }
+            }
+            if (speakers.isEmpty()) {
+                emitGroupNotice(sessionId, "[群聊已散会] 调度器没给出可发言的成员。")
+                return
+            }
+            emitGroupNotice(sessionId, "主持人：" + decision.explain)
+            // 决策 → 任务仍旧走 planGroupRound：座次就是 speakers 的顺序（brief 阶段已按 id 升序）。
+            val tasks = planGroupRound(
+                sessionId = sessionId,
+                plan = plan.copy(members = speakers, pendingSpeakerIds = emptyList()),
+                userText = userText,
+                history = history,
+                lastSpeakerId = lastSpeakerId,
+                mode = GroupMode.Chain,
+            ).tasks
+            if (tasks.isEmpty()) {
+                emitGroupNotice(sessionId, "[群聊已散会] 这一轮没有可执行的任务。")
+                return
+            }
+            dispatchGroupTasks(sessionId, tasks)
+            pool.await(sessionId)
+            // 记发言必须用「成员 id」（task.agentId），不能用任务 id：
+            // RoomView.briefPhase 靠 members[i].spokeCount 判断首轮是否结束，
+            // 用任务 id 会让 spokeCount 永远为 0 → 永远停在首轮简报 → 主持人一次都不会被调用。
+            val outputs = tasks.map { Triple(it.id, it.agentId, taskOutputs[it.id].orEmpty()) }
+            outputs.forEach { (_, memberId, text) ->
+                val name = plan.members.firstOrNull { it.id == memberId }?.name.orEmpty()
+                transcript.add(transcriptOf(memberId, name, text, round))
+                charsUsed += text.length
+            }
+            lastSpeakerId = tasks.lastOrNull()?.agentId ?: lastSpeakerId
+            stall.onRound(
+                texts = outputs.map { it.third },
+                toolCalls = tasks.sumOf { taskToolCalls(it.id) },
+                newTasks = 0,
+            )
+            silence.onRound(contributorsOf(outputs.map { it.second to it.third }))
+            round++
+        }
+    }
+
+    /** 房间快照：调度器能看到的全部信息（主持人没有与会者上下文，只有这四样）。 */
+    private fun roomViewOf(
+        plan: GroupPlan,
+        userText: String,
+        transcript: List<TranscriptLine>,
+        round: Int,
+        charsUsed: Int,
+        elapsedMs: Long,
+        ledger: LedgerView,
+        lastSpeakerId: String?,
+    ): RoomView {
+        val mentioned = parseMentions(userText, plan.members).map { it.first }
+            .ifEmpty { namedMentions(userText, plan.members) }
+        val forcedIds = mentioned.map { it.id }.toSet()
+        val namedIds = namedMentions(userText, plan.members).map { it.id }.toSet()
+        val members = plan.members.map { m ->
+            val mine = transcript.filter { it.speakerId == m.id }
+            MemberState(
+                id = m.id,
+                name = m.name,
+                spokeCount = mine.size,
+                lastSpokeRound = mine.lastOrNull()?.round ?: -1,
+                pendingTasks = ledger.openTasks.count { it.contains(m.name) },
+                forced = m.id in forcedIds,
+                named = m.id in namedIds,
+            )
+        }
+        return RoomView(
+            transcript = transcript,
+            members = members,
+            ledger = ledger,
+            budgetLeft = BudgetView(
+                round = round,
+                maxRounds = MAX_ROOM_ROUNDS,
+                charsUsed = charsUsed,
+                charBudget = plan.contextBudget,
+                elapsedMs = elapsedMs,
+            ),
+            round = round,
+            lastSpeakerId = lastSpeakerId,
+        )
+    }
+
+    /**
+     * 主持人一次往返：只回一行 JSON。
+     *
+     * 空串 = 没有可用模型或调用失败（调度器据此走可解释的优先级兜底）。
+     * 单独一条通道、单独一个 max_tokens：主持人不是成员，不能借成员的上下文与预算。
+     */
+    private suspend fun moderatorCall(sessionId: String, plan: GroupPlan, prompt: String): String {
+        // 群聊会话没有单聊 config（configProvider 在群聊里返回 null，见 prompt()），
+        // 主持人只能从成员席位借一份模型配置；否则这里恒返回空串，
+        // runModeratedRoom 每轮都落进 priorityFallback，用户看到的就是「开了主持但没人主持」。
+        val base = configProvider(sessionId)
+            ?: plan.members.firstOrNull { it.cfg.model.isNotBlank() }?.cfg
+            ?: run { AppLog.w("主持人：群内没有可用模型，本轮回落到优先序仲裁"); return "" }
+        val cfg = if (plan.moderatorModel.isBlank()) base else base.copy(model = plan.moderatorModel)
+        val body = buildJsonObject {
+            put("model", cfg.model)
+            put("max_tokens", MODERATOR_MAX_TOKENS)
+            put("temperature", 0)
+            putJsonArray("messages") {
+                addJsonObject {
+                    put("role", "system")
+                    put("content", MODERATOR_SYSTEM_PROMPT)
+                }
+                addJsonObject {
+                    put("role", "user")
+                    put("content", prompt)
+                }
+            }
+        }
+        val resp = runCatching { postOnce(cfg, body) }.getOrElse { e ->
+            AppLog.w("主持人：调用失败 " + (e.message ?: e.javaClass.simpleName))
+            return ""
+        }
+        return resp["choices"]?.jsonArray?.firstOrNull()?.jsonObject
+            ?.get("message")?.jsonObject?.get("content")
+            ?.jsonPrimitive?.contentOrNullSafe().orEmpty()
     }
 
     /**

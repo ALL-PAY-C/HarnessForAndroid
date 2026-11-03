@@ -926,6 +926,8 @@ class AppContainer(private val context: Context) {
             allowTools = s.groupAllowTools,
             maxParallel = s.groupMaxParallel,
             contextBudget = s.groupContextBudget,
+            scheduler = s.groupScheduler,
+            moderatorModel = s.groupModeratorModel,
         )
     }
 

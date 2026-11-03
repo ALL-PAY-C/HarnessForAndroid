@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Link
@@ -525,6 +526,18 @@ fun SettingsScreen(
                                 onSelect = { viewModel.setGroupMode(it) },
                             )
                             Hint("自动＝按成员数挑；并行＝同时开工；串行＝依次接力；验收＝执行者与验收者交替。")
+                            QqCardDivider()
+                            SegmentedRow(
+                                label = "房间调度",
+                                icon = Icons.Filled.Forum,
+                                options = listOf(
+                                    "legacy" to "轮转",
+                                    "brief-moderated" to "主持",
+                                ),
+                                selected = state.settings.groupScheduler,
+                                onSelect = { viewModel.setGroupScheduler(it) },
+                            )
+                            Hint("轮转＝首轮全员发言后按优先序接力；主持＝由主持人模型逐步决定下一个发言者（每步多一次轻量请求）。")
                             QqCardDivider()
                             SwitchRow("办公室式自主分工", "群聊时让 Agent 自己认领任务、互相交接", state.settings.groupOfficePrompt) {
                                 viewModel.setGroupOfficePrompt(it)
