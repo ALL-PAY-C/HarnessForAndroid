@@ -61,6 +61,15 @@ cd engine && npm install --no-audit --no-fund && cd ..   # engine/node_modules �
 
 产物落在 `app/build/outputs/apk/release/HarnessForAndroid-release-<版本>.apk`，文件名取 `dshAppVersionName` 第一段，改版本只改 `gradle.properties` 的 `dshAppVersionName` / `dshAppVersionCode`。
 
+签名有两张正式证书，用 `-PdshSigning` 选，默认 `legacy`（已装机器的旧包只认它）：
+
+```bash
+./gradlew assembleRelease                      # legacy 证书，可覆盖升级旧安装
+./gradlew assembleRelease -PdshSigning=release # 新正式证书（keystore 在仓库外）
+```
+
+两张证书的 DN、指纹、口令来源与生成步骤见 [docs/signing.md](docs/signing.md)。缺口令时逐级降级到仓库内 debug 证书，构建不会中断但证书不同——发版前用 `apksigner verify --print-certs` 复核。
+
 ## 已知限制
 
 - 没有 32 位 ARM；release 只发 `arm64-v8a`。
@@ -88,12 +97,14 @@ cd engine && npm install --no-audit --no-fund && cd ..   # engine/node_modules �
 | `linux-runtime` | rootfs 与 proot 工具链、内核归档、Linux 环境补齐 |
 | `terminal` | 终端内核与视图 |
 | `plugin-api` `plugin-host` | 插件契约；加载隔离、市场、安装与槽位 |
-| `plugin-html` | 内置 HTML 渲染 |
+| `plugin-html` `plugin-html-apk` | 内置 HTML 渲染（库）；独立 APK 外壳（`applicationId dev.dsh.mobile.plugin.html`） |
+| `build-logic` | included build：`DownloadVerifiedArtifact`（镜像前缀 + sha256 内容寻址缓存）等构建插件 |
+| `gradle/libs.versions.toml` | 版本目录：AGP/Kotlin/KSP/Compose BOM/依赖坐标的单一真源 |
 | `feature/*` | 会话列表、消息流与导出、Agent 页、设置、市场与插件页 |
 | `engine/` | Node 插件宿主源码树，构建期打成 `assets/runtime/engine.zip` |
 | `scripts/` `tools/` | rootfs 与内核抓取、proot 构建、`engine.zip` 打包、图标脚本 |
 
-其余文档：[docs/PLUGINS.md](docs/PLUGINS.md)、[docs/settings.md](docs/settings.md)、[docs/update.md](docs/update.md)、[CHANGELOG.md](CHANGELOG.md)。
+其余文档：[docs/PLUGINS.md](docs/PLUGINS.md)、[docs/settings.md](docs/settings.md)、[docs/update.md](docs/update.md)、[docs/signing.md](docs/signing.md)、[docs/design/group-orchestration-v2.md](docs/design/group-orchestration-v2.md)、[docs/REFACTOR-NOTES.md](docs/REFACTOR-NOTES.md)、[CHANGELOG.md](CHANGELOG.md)。
 
 ## 声明
 

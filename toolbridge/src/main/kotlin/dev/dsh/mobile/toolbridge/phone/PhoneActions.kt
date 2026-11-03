@@ -11,13 +11,22 @@ enum class PhoneActionStatus { Ok, Failed }
  * 页面上的动作列表由这里驱动，不再各处手写一遍。
  */
 enum class PhoneAction(val id: String, val label: String, val hint: String) {
-    Tap("tap", "点击", "按坐标点一下屏幕"),
+    Tap("tap", "点击", "按坐标或选择器点一下屏幕"),
     Swipe("swipe", "滑动", "两点之间滑动"),
     Type("type", "输入", "往当前焦点输入文本"),
+    Key("key", "按键", "系统键或输入框键（back/home/enter…）"),
     Back("back", "返回", "全局返回"),
     Home("home", "主页", "回到桌面"),
     Recents("recents", "最近任务", "打开任务列表"),
-    ReadScreen("readscreen", "读屏", "导出当前界面节点"),
+    Scroll("scroll", "滚动", "滚可滚容器直到内容真的动"),
+    Pinch("pinch", "缩放", "以某点为中心双指缩放"),
+    Drag("drag", "拖拽", "从起点拖到终点（可按住）"),
+    ReadScreen("readscreen", "读屏", "导出当前界面节点（纯文本）"),
+    ReadTree("tree", "读屏树", "导出带 viewId/坐标的结构化节点树"),
+    WaitFor("wait_for", "等待条件", "等节点/文本/前台应用出现"),
+    CurrentApp("currentapp", "当前应用", "读前台包名与 activity"),
+    Apps("apps", "应用列表", "列出可启动的已装应用"),
+    Sequence("sequence", "批量步骤", "一次下发多步，失败即停"),
     OpenApp("openapp", "打开应用", "按包名启动应用"),
     Screenshot("screenshot", "截图", "截当前屏幕到文件"),
     ;

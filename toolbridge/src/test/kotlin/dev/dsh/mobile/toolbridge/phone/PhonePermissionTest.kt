@@ -62,8 +62,13 @@ class PhonePermissionTest {
 
     @Test
     fun actionCatalogMatchesBridgeVerbs() {
+        // 与 core:protocol ToolCatalog 里 phone 的 action 枚举保持同一组词（那里是模型看的声明，这里是页面看的目录）。
         assertEquals(
-            setOf("tap", "swipe", "type", "back", "home", "recents", "readscreen", "openapp", "screenshot"),
+            setOf(
+                "tap", "swipe", "type", "key", "back", "home", "recents",
+                "scroll", "pinch", "drag", "readscreen", "tree", "wait_for",
+                "currentapp", "apps", "sequence", "openapp", "screenshot",
+            ),
             PhoneAction.entries.map { it.id }.toSet(),
         )
         assertEquals(PhoneAction.entries.size, PhoneAction.entries.map { it.id }.toSet().size)

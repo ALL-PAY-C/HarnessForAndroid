@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Delete
@@ -538,6 +539,19 @@ fun SettingsScreen(
                                 onSelect = { viewModel.setGroupScheduler(it) },
                             )
                             Hint("轮转＝首轮全员发言后按优先序接力；主持＝由主持人模型逐步决定下一个发言者（每步多一次轻量请求）。")
+                            QqCardDivider()
+                            SegmentedRow(
+                                label = "子代理嵌套",
+                                icon = Icons.Filled.AccountTree,
+                                options = listOf(
+                                    "1" to "一层",
+                                    "2" to "两层",
+                                    "3" to "三层",
+                                ),
+                                selected = state.settings.subagentMaxDepth.coerceIn(1, 3).toString(),
+                                onSelect = { viewModel.setSubagentMaxDepth(it.toInt()) },
+                            )
+                            Hint("主代理派子代理算第 1 层。开太深会成倍放大调用量，默认两层。")
                             QqCardDivider()
                             SwitchRow("办公室式自主分工", "群聊时让 Agent 自己认领任务、互相交接", state.settings.groupOfficePrompt) {
                                 viewModel.setGroupOfficePrompt(it)

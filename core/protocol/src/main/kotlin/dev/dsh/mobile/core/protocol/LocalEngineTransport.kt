@@ -1327,10 +1327,15 @@ class LocalEngineTransport(
 
     /**
      * 子代理嵌套上限（T5.3）：默认 2。深度口径 = 当前执行者层级，主代理第 0 层。
-     * 设置项（1/2/3）还没接进来 —— core/data 的 SettingsStore 不在本次改动范围，先留这个可写入口。
+     * 由设置项「子代理嵌套」经 [setSubagentMaxDepth] 写入，取值 1..3。
      */
     @Volatile
     internal var subagentMaxDepth: Int = SUBAGENT_MAX_DEPTH
+
+    /** 设置页改深度后调这里；越界就地夹紧，写成 0 不会把 subagent 工具永久关死。 */
+    fun setSubagentMaxDepth(v: Int) {
+        subagentMaxDepth = v.coerceIn(1, 3)
+    }
 
     /**
      * 子代理预算闸门（T5.3）：用量读既有 [lastUsageTokens]，预算读房间预算 / settings 上下文预算。

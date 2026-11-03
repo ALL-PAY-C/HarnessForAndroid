@@ -404,6 +404,7 @@ class SettingsViewModel(
     fun setGroupAllowTools(v: Boolean) = launch { settingsStore.setGroupAllowTools(v) }
     fun setGroupMode(v: String) = launch { settingsStore.setGroupMode(v) }
     fun setGroupScheduler(v: String) = launch { settingsStore.setGroupScheduler(v) }
+    fun setSubagentMaxDepth(v: Int) = launch { settingsStore.setSubagentMaxDepth(v) }
     fun setGroupOfficePrompt(v: Boolean) = launch { settingsStore.setGroupOfficePrompt(v) }
     fun setGroupContextBudget(v: Int) = launch { settingsStore.setGroupContextBudget(v) }
     fun setGroupIsolateMembers(v: Boolean) = launch { settingsStore.setGroupIsolateMembers(v) }

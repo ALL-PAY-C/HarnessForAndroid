@@ -735,7 +735,10 @@ class AppContainer(private val context: Context) {
                         spill = toolOutputSpill,
                         projections = projections,
                         summaryStore = summaryStore,
-                    )
+                    ).also { t ->
+                        // 子代理嵌套深度跟着设置走（默认 2）：设置页改完下一次派发即生效，不用重连运行时。
+                        scope.launch { settings.settings.collect { t.setSubagentMaxDepth(it.subagentMaxDepth) } }
+                    }
                     // Loopback / Remote 只差 defaultCwd：同一个 ACP transport，载体都是 WebSocket。
                     // 载体只管搬帧（LineCarrier 负责 open/读行/断链信号），握手·重连·配对在 DshMux 里；
                     // 这里不再手动 .also{ it.open() }——open 由 carrier.connect() 统一发起（旧代码开过两次）。

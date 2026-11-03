@@ -127,6 +127,8 @@ data class AppSettings(
     val groupScheduler: String = "legacy",
     /** 主持人模型 id；空串 = 跟召集者会话的模型走。 */
     val groupModeratorModel: String = "",
+    /** 子代理最多嵌套几层（1 = 主代理能派、子代理不能再派；默认 2）。 */
+    val subagentMaxDepth: Int = 2,
 
     // ---- 工具通道 ----
     /** 手机工具执行通道：auto / shizuku / root / app / termux。 */
@@ -274,6 +276,7 @@ class SettingsStore(private val context: Context) {
         val groupIsolateMembers = booleanPreferencesKey("group_isolate_members")
         val shellChannel = stringPreferencesKey("shell_channel")
         val groupContextBudget = intPreferencesKey("group_context_budget")
+        val subagentMaxDepth = intPreferencesKey("subagent_max_depth")
         val groupScheduler = stringPreferencesKey("group_scheduler")
         val groupModeratorModel = stringPreferencesKey("group_moderator_model")
         val collapsedGroups = stringPreferencesKey("collapsed_groups")
@@ -363,6 +366,7 @@ class SettingsStore(private val context: Context) {
             groupContextBudget = p[K.groupContextBudget] ?: d.groupContextBudget,
         groupIsolateMembers = p[K.groupIsolateMembers] ?: d.groupIsolateMembers,
             groupScheduler = p[K.groupScheduler] ?: d.groupScheduler,
+            subagentMaxDepth = p[K.subagentMaxDepth] ?: d.subagentMaxDepth,
             groupModeratorModel = p[K.groupModeratorModel] ?: d.groupModeratorModel,
         shellChannel = p[K.shellChannel] ?: d.shellChannel,
         appIconStyle = p[K.appIconStyle] ?: d.appIconStyle,
@@ -461,6 +465,9 @@ class SettingsStore(private val context: Context) {
     suspend fun setGroupMode(v: String) = edit { it[K.groupMode] = v }
     suspend fun setGroupOfficePrompt(v: Boolean) = edit { it[K.groupOfficePrompt] = v }
     suspend fun setGroupContextBudget(v: Int) = edit { it[K.groupContextBudget] = v }
+
+    /** 子代理嵌套深度：1..3，越界就地夹紧（滑杆/预置写错不会把工具永久关死）。 */
+    suspend fun setSubagentMaxDepth(v: Int) = edit { it[K.subagentMaxDepth] = v.coerceIn(1, 3) }
     suspend fun setGroupIsolateMembers(v: Boolean) = edit { it[K.groupIsolateMembers] = v }
     suspend fun setGroupScheduler(v: String) = edit { it[K.groupScheduler] = v }
     suspend fun setGroupModeratorModel(v: String) = edit { it[K.groupModeratorModel] = v }
