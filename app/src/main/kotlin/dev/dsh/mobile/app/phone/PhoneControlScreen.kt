@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.TouchApp
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,7 +45,6 @@ import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider
 import dev.dsh.mobile.design.QqPalette
 import dev.dsh.mobile.design.QqRow
-import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.SectionCard
 import dev.dsh.mobile.design.SectionTitle
 import dev.dsh.mobile.toolbridge.phone.PhoneAccessibilityService
@@ -87,10 +85,8 @@ fun PhoneControlScreen(phone: PhoneBridge) {
         onPauseOrDispose { }
     }
 
+    // 顶栏由宿主的 DrawerPage 画（单一真源）；这里只画内容，否则页面上会出现两条「手机控制」。
     Column(Modifier.fillMaxSize().background(p.bg)) {
-        QqTopBar {
-            Text("手机控制", color = p.t1, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-        }
         Column(
             Modifier
                 .fillMaxSize()

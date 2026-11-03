@@ -27,6 +27,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -46,9 +47,7 @@ import dev.dsh.mobile.design.EmptyState
 import dev.dsh.mobile.design.IconBtn
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider
-import dev.dsh.mobile.design.QqShape
 import dev.dsh.mobile.design.QqSpace
-import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.SectionCard
 import dev.dsh.mobile.design.SectionTitle
 import dev.dsh.mobile.design.qqFontBody
@@ -69,20 +68,43 @@ import org.json.JSONObject
  *
  * 引擎不内置（[engine] == null）时这一屏只解释原因，不去碰运行时的生命周期。
  */
+/**
+ * 技能中心顶栏的两个动作（安装、刷新）由宿主页顶栏承载，状态留在这里。
+ *
+ * 页面自己画顶栏会和宿主叠成两条标题（手机控制页就踩过），所以把「按钮要触发什么」
+ * 提升成这个对象：宿主用 [SkillCenterBarActions] 画按钮，页面读同一份状态。
+ */
+@Stable
+class SkillCenterBarState {
+    internal var reload by mutableIntStateOf(0)
+    internal var installOpen by mutableStateOf(false)
+}
+
+@Composable
+fun rememberSkillCenterBarState(): SkillCenterBarState = remember { SkillCenterBarState() }
+
+/** 宿主顶栏右上角的「安装 / 刷新」按钮。 */
+@Composable
+fun SkillCenterBarActions(bar: SkillCenterBarState) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        IconBtn(Icons.Filled.Add, "安装技能") { bar.installOpen = true }
+        IconBtn(Icons.Filled.Refresh, "刷新") { bar.reload++ }
+    }
+}
+
 @Composable
 fun SkillCenterScreen(
     engine: NodeEngine?,
     pluginDirs: List<File>,
     modifier: Modifier = Modifier,
+    bar: SkillCenterBarState = rememberSkillCenterBarState(),
 ) {
     val p = LocalQq.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
-    var reload by remember { mutableIntStateOf(0) }
     var state by remember { mutableStateOf<SkillUiState>(SkillUiState.Loading) }
     var busy by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var installOpen by remember { mutableStateOf(false) }
     var installInput by remember { mutableStateOf("") }
     var installBusy by remember { mutableStateOf(false) }
     var installError by remember { mutableStateOf<String?>(null) }
@@ -101,7 +123,7 @@ fun SkillCenterScreen(
         bundledNames = withContext(Dispatchers.IO) { bundledSkillNames(context.assets) }
     }
 
-    LaunchedEffect(engine, dirs, reload) {
+    LaunchedEffect(engine, dirs, bar.reload) {
         state = SkillUiState.Loading
         // 首启把随包技能铺进技能库（幂等：有 .builtin-bootstrapped 就直接返回空）
         val seeded = withContext(Dispatchers.IO) {
@@ -193,10 +215,10 @@ fun SkillCenterScreen(
             runCatching { staged?.deleteRecursively() }
             installBusy = false
             if (failure == null) {
-                installOpen = false
+                bar.installOpen = false
                 installInput = ""
                 snackbar.showSnackbar("技能已安装")
-                reload++
+                bar.reload++
             } else {
                 installError = (failure as? NodeEngineException)?.message ?: failure.message ?: failure.toString()
             }
@@ -232,24 +254,12 @@ fun SkillCenterScreen(
                 return@launch
             }
             val refreshed = reply?.let { catalogState(it) }
-            if (refreshed is SkillUiState.Ready) state = refreshed else reload++
+            if (refreshed is SkillUiState.Ready) state = refreshed else bar.reload++
             snackbar.showSnackbar(removedNotice(entry.name))
         }
     }
 
     Column(modifier.fillMaxSize().background(p.bg)) {
-        QqTopBar(
-            content = { Text("技能中心", color = p.t1, fontWeight = FontWeight.SemiBold) },
-            trailing = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconBtn(Icons.Filled.Add, "安装技能") {
-                        installError = null
-                        installOpen = true
-                    }
-                    IconBtn(Icons.Filled.Refresh, "刷新") { reload++ }
-                }
-            },
-        )
         Box(Modifier.fillMaxSize()) {
             when (val s = state) {
                 is SkillUiState.Loading -> LoadingBody()
@@ -257,7 +267,7 @@ fun SkillCenterScreen(
                     title = "未内置 Node 运行时",
                     subtitle = "这个构建里没有打包 libnode，技能列表读不到",
                 )
-                is SkillUiState.Failed -> FailureBody(stage = s.stage, message = s.message) { reload++ }
+                is SkillUiState.Failed -> FailureBody(stage = s.stage, message = s.message) { bar.reload++ }
                 is SkillUiState.Ready -> if (s.entries.isEmpty()) {
                     EmptyState(
                         title = "还没有安装任何技能",
@@ -287,14 +297,14 @@ fun SkillCenterScreen(
             }
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
         }
-        if (installOpen) {
+        if (bar.installOpen) {
             InstallSkillDialog(
                 input = installInput,
                 onInputChange = { installInput = it },
                 busy = installBusy,
                 error = installError,
                 onConfirm = { installSkill(installInput.trim()) },
-                onDismiss = { if (!installBusy) installOpen = false },
+                onDismiss = { if (!installBusy) bar.installOpen = false },
             )
         }
         deleteTarget?.let { target ->

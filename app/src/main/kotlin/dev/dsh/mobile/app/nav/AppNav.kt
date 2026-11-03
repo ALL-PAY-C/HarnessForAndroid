@@ -45,19 +45,18 @@ import dev.dsh.mobile.app.phone.PhoneControlScreen
 import dev.dsh.mobile.app.update.AutoUpdatePrompt
 import dev.dsh.mobile.core.model.RuntimeState
 import androidx.compose.foundation.background
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import dev.dsh.mobile.design.IconBtn
 import dev.dsh.mobile.design.LocalQq
-import dev.dsh.mobile.design.QqTopBar
+import dev.dsh.mobile.design.QqScreenTopBar
 import dev.dsh.mobile.design.SlotEditState
 import dev.dsh.mobile.design.QqTabBar
 import dev.dsh.mobile.design.TabSpec
 import dev.dsh.mobile.design.UiLayoutPrefs
 import dev.dsh.mobile.feature.plugins.PluginHubScreen
 import dev.dsh.mobile.feature.plugins.pluginSettingsEntries
+import dev.dsh.mobile.feature.plugins.SkillCenterBarActions
 import dev.dsh.mobile.feature.plugins.SkillCenterScreen
+import dev.dsh.mobile.feature.plugins.rememberSkillCenterBarState
 import java.io.File
 import dev.dsh.mobile.feature.plugins.PluginMarketScreen
 import dev.dsh.mobile.feature.plugins.PluginsScreen
@@ -194,6 +193,9 @@ fun AppNav(container: AppContainer) {
         .collectAsStateWithLifecycle(initialValue = false)
     LaunchedEffect(pluginUiExtend) { SlotEditState.enabled = pluginUiExtend }
 
+    // 技能中心的安装/刷新按钮画在宿主顶栏（DrawerPage 的 actions），页面本身不再自绘顶栏；
+    // 所以这份状态提到 AppNav 作用域，抽屉条目 content 与 drawer/* 路由共用同一个实例。
+    val skillBar = rememberSkillCenterBarState()
     val pluginRevision by container.pluginHost.revision.collectAsStateWithLifecycle()
     val placementRevision = container.pluginHost.placements(drawerContext).revision
     val drawerEntries = remember(drawerContext, pluginRevision, placementRevision, presetState.defaultName) {
@@ -242,7 +244,7 @@ fun AppNav(container: AppContainer) {
             label = "技能中心",
             subtitle = if (skillDirs.isEmpty()) "未装技能插件" else skillDirs.size.toString() + " 个技能插件",
             pluginId = "app",
-            content = { SkillCenterScreen(engine = container.nodeEngine, pluginDirs = skillDirs) },
+            content = { SkillCenterScreen(engine = container.nodeEngine, pluginDirs = skillDirs, bar = skillBar) },
         )
         // 手机控制页（T1）：权限引导 + 动作列表 + 状态可视化。免 root/免 ADB，
         // 页面本身就是「无障碍服务开没开」的真实读数，所以固定摆在抽屉里。
@@ -692,7 +694,16 @@ fun AppNav(container: AppContainer) {
 
                     drawerEntries.forEach { entry ->
                         composable("drawer/${entry.id}") {
-                            DrawerPage(entry.label, onBack = { nav.popBackStack() }) { entry.content() }
+                            // 面板自带动作（技能中心）交给宿主顶栏画，面板自己不画第二条栏。
+                            val actions: (@Composable () -> Unit)? =
+                                if (entry.id == "skills") {
+                                    { SkillCenterBarActions(skillBar) }
+                                } else {
+                                    null
+                                }
+                            DrawerPage(entry.label, onBack = { nav.popBackStack() }, actions = actions) {
+                                entry.content()
+                            }
                         }
                     }
 
@@ -969,16 +980,24 @@ private fun settingsSubViewModel(container: AppContainer, key: String): Settings
     )
 }
 
+/**
+ * 抽屉面板的宿主页：顶栏只有这一处。
+ *
+ * 面板（手机控制 / 技能中心 / Agent 预设 / 插件声明的抽屉页）只画内容，自己再画一条顶栏
+ * 就会叠成两条标题——手机控制页曾经就是这样。面板要放右上角动作，走 [actions] 槽，
+ * 不许为了留按钮另起一条栏。
+ */
 @Composable
-private fun DrawerPage(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
+private fun DrawerPage(
+    title: String,
+    onBack: () -> Unit,
+    actions: (@Composable () -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
     val p = LocalQq.current
     Box(Modifier.fillMaxSize().background(p.bg)) {
         Column(Modifier.fillMaxSize()) {
-            QqTopBar(
-                leading = { IconBtn(Icons.AutoMirrored.Filled.ArrowBack, "返回", onBack) },
-            ) {
-                Text(title, color = p.t1, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-            }
+            QqScreenTopBar(title = title, isBack = true, onNavigationClick = onBack, actions = actions)
             content()
         }
     }

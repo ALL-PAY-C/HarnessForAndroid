@@ -1188,7 +1188,10 @@ private fun SectionSlot(
 ) {
     when {
         section == null -> SectionNavRow(title, subtitle, icon, tint) { onOpen(id) }
-        section == id -> SectionFrame(title, icon, tint, content)
+        // 子页顶栏（:222 的 QqScreenTopBar 用 SECTION_TITLES[section]）已经写了分类名，
+        // 这里再传 title 就是同一页两处页级标题；标题行原本撑出的上间距由卡片内首行
+        // 自带的内边距（QqRow/SwitchRow 11dp、SubGroup 12dp）承担，首行不会贴到卡片顶边。
+        section == id -> SectionFrame(title = null, icon = icon, tint = tint, content = content)
     }
 }
 

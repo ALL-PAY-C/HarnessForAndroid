@@ -241,13 +241,13 @@ fun PluginMarketScreen(
                 .background(p.card)
                 .border(1.dp, p.line, RoundedCornerShape(20.dp)),
         ) {
-        // 红框第一行：左标题 + 搜索框 + 右端箭头（箭头管整块收起）
+        // 红框第一行：搜索框 + 右端箭头（箭头管整块收起）；页级标题在宿主顶栏，行内不再重复
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 12.dp),
         ) {
-            Text("插件市场", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.width(10.dp))
+            // 页级标题只由宿主顶栏给（PluginHubScreen 的 QqScreenTopBar「插件安装」）；
+            // 这里再写一行「插件市场」等于同一页两个标题，且与顶栏不一致，故只留搜索框。
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
