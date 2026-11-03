@@ -40,11 +40,13 @@ export ANDROID_HOME=/path/to/AndroidSDK               # 或写 local.properties 
 export DSH_LIBNODE_ZIP=/path/android-libnode.zip      # 可选，离线时用
 export DSH_KERNEL_ASSETS_DIR=/path/kernel-assets      # 可选，离线时用
 
-cd engine && npm ci && cd ..        # engine/node_modules 不进版本库
+cd engine && npm install --no-audit --no-fund && cd ..   # engine/node_modules 不进版本库
 ./gradlew assembleDebug             # 含 x86_64
 ./gradlew assembleRelease           # 只打 arm64-v8a
 ./gradlew testDebugUnitTest
 ```
+
+这里只能装、不能锁定安装：`engine/package-lock.json` 里仍留着 `@deepseek-ai/dsh-agent`，而 `engine/package.json` 的依赖里已经没有它，两者不同步，CI 模式（按 lock 精确重装）会直接 EUSAGE / 「Missing: … from lock file」退出。`npm install --no-audit --no-fund` 会按 `package.json` 重写 lock —— 改完请把 `engine/package-lock.json` 一起提交。
 
 首次构建联网补四样东西，之后走 Gradle 缓存：
 
@@ -55,9 +57,9 @@ cd engine && npm ci && cd ..        # engine/node_modules 不进版本库
 | `downloadLibnode` | `android-libnode-v22.23.2.zip`（arm64 117,824,576 B / x86_64 122,936,592 B） | `~/.gradle/caches/dsh-nodejs-mobile/`，解到 `node-runtime/src/main/jniLibs/<abi>/` |
 | `downloadKernelArchives` | 内核 2 个 + musl node 2 个归档 | `~/.gradle/caches/dsh-kernel/` |
 
-两个下载任务走自己的 HTTP 客户端，`--offline` 拦不住；要完全断网就用上面两个环境变量（或 `-PdshLibnodeZip` / `-PdshKernelAssetsDir`）。libnode 解包后仍验 sha256，对不上中止构建。
+上面两个下载任务（`downloadLibnode` / `downloadKernelArchives`）是 `DownloadVerifiedArtifact`：按 sha256 内容寻址落在 `~/.gradle/caches/` 下，校验通过才原子改名，对不上就删掉换下一个源。`--offline` 时本地没有副本会**立即失败**并打印预置指引，不会偷偷发请求；要离线就预置到缓存目录，或用上面两个环境变量（等价 `-PdshLibnodeZip` / `-PdshKernelAssetsDir`）。
 
-产物落在 `app/build/outputs/apk/release/HarnessForAndroid-release-<版本>.apk`，文件名取 `appVersionName` 第一段，改版本只改 `app/build.gradle.kts` 顶部的 `appVersionName` / `appVersionCode`。
+产物落在 `app/build/outputs/apk/release/HarnessForAndroid-release-<版本>.apk`，文件名取 `dshAppVersionName` 第一段，改版本只改 `gradle.properties` 的 `dshAppVersionName` / `dshAppVersionCode`。
 
 ## 已知限制
 
