@@ -22,8 +22,10 @@ class DshApplication : Application() {
         }
         // 富内容渲染槽：:render 的实现注入 plugin-api，plugin-host 只持接口（T1.2 分层）。
         // 必须在任何插件 UI 上屏之前装好，否则 markdown 会先画成纯文本再重组。
+        val t0 = android.os.SystemClock.uptimeMillis()
         RichContentInstaller.install()
         container = AppContainer(this)
+        AppLog.i("AppContainer built in " + (android.os.SystemClock.uptimeMillis() - t0) + "ms")
         // abi 以前由已删除的进程内运行时宿主提供：直接用系统 ABI，只用于日志。
         AppLog.i("DshApplication start, abi=" + (Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"))
         // Native UI must never wait on the runtime: kick the connection off in the background.

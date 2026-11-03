@@ -30,10 +30,21 @@ class T1ExitScopeTest {
         return f.readText()
     }
 
+    /** 目录下所有 .kt 按文件名排序拼接：拆分后单个文件里已找不到完整实现。 */
+    private fun repoSource(relativeDir: String): String {
+        val dir = File(projectRoot, relativeDir)
+        require(dir.isDirectory) { "源码目录不存在: ${dir.path}" }
+        return dir.listFiles { f -> f.isFile && f.name.endsWith(".kt") }
+            .orEmpty()
+            .sortedBy { it.name }
+            .joinToString("\n") { it.readText() }
+    }
+
     private val chatViewModel =
         "feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/ChatViewModel.kt"
+    // T7.3：ChatRepository 已按职责拆到同包的多个 .kt，取「整包源码」而非单个文件。
     private val chatRepository =
-        "core/data/src/main/kotlin/dev/dsh/mobile/core/data/repo/ChatRepository.kt"
+        "core/data/src/main/kotlin/dev/dsh/mobile/core/data/repo"
     private val appNav =
         "app/src/main/kotlin/dev/dsh/mobile/app/nav/AppNav.kt"
 
@@ -67,7 +78,7 @@ class T1ExitScopeTest {
     /** 3) 「真调用方取消」分支不得把半截正文定稿成完整回答 + Idle。 */
     @Test
     fun callerCancellationMustNotFinalizeTurnAsComplete() {
-        val text = source(chatRepository)
+        val text = repoSource(chatRepository)
         val marker = "if (!currentCoroutineContext().isActive)"
         val at = text.indexOf(marker)
         require(at > 0) { "ChatRepository 的取消分支变了，先核对基线" }

@@ -33,15 +33,30 @@ private const val REQ_NOTIFY = 1002
 
 class MainActivity : ComponentActivity() {
 
+    /** 首帧耗时诊断用：onCreate 起点（uptimeMillis）。 */
+    private var tCreate: Long = 0L
+
+    /** 首帧是否已经过去（onStart 早于首帧，据此决定 refresh 放哪）。 */
+    private var firstFrameDrawn = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        tCreate = android.os.SystemClock.uptimeMillis()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val container = (application as DshApplication).container
-        RuntimeService.start(this)
-        requestTermuxPermission()
-        requestNotifyPermission()
-        // 通知点击进会话：冷启动走 onCreate，热启动走 onNewIntent。
-        container.openSessionFromNotification(intent?.getStringExtra(NotificationCenter.EXTRA_SESSION_ID))
+        // 这几件事都不影响第一帧长什么样，别压在第一帧的关键路径上：
+        // 前台服务启动、两个权限弹窗、通知点进来的会话跳转，统一等首帧画完再做（T7.4 冷启动优化）。
+        val pendingSessionId = intent?.getStringExtra(NotificationCenter.EXTRA_SESSION_ID)
+        afterFirstFrame {
+            RuntimeService.start(this)
+            requestTermuxPermission()
+            requestNotifyPermission()
+            // 通知点击进会话：冷启动走 onCreate，热启动走 onNewIntent。
+            container.openSessionFromNotification(pendingSessionId)
+            // onStart 里那次 refresh（构造 OngoingCenter + render + notify）在首帧前被跳过，
+            // 这里补上：面板状态照样刷新，只是不再挤进首绘窗口。
+            container.ongoingCenter.refresh()
+        }
 
         // 仅 debug：进程内 Node 引擎自检（am start --ez dsh_engine_selftest true）。
         if (BuildConfig.DEBUG && intent?.getBooleanExtra("dsh_engine_selftest", false) == true) {
@@ -125,6 +140,31 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** 首帧画完再跑：比 View.post 更准，动画/组合都已完成一次遍历。 */
+    private fun afterFirstFrame(block: () -> Unit) {
+        val choreographer = android.view.Choreographer.getInstance()
+        choreographer.postFrameCallback(
+            object : android.view.Choreographer.FrameCallback {
+                override fun doFrame(frameTimeNanos: Long) {
+                    AppLog.i("first frame since onCreate " + (android.os.SystemClock.uptimeMillis() - tCreate) + "ms")
+                    firstFrameDrawn = true
+                    // 再等一帧：这个回调还挂在「首帧」的 animation 阶段上，首次 composition/
+                    // draw 与它的 EGL 初始化都在同一帧里。业务块（service 启动、权限弹窗、
+                    // 会话跳转）留在这里会和首绘抢主线程，推到下一帧的空档里执行。
+                    choreographer.postFrameCallback(
+                        object : android.view.Choreographer.FrameCallback {
+                            override fun doFrame(frameTimeNanos: Long) {
+                                runCatching(block).onFailure {
+                                    AppLog.w("afterFirstFrame failed: " + it.message)
+                                }
+                            }
+                        },
+                    )
+                }
+            },
+        )
+    }
+
     /**
      * Termux 通道用的是 com.termux.permission.RUN_COMMAND 这个第三方自定义权限：
      * 系统不会自动弹，装了 Termux 也只会在清单里声明而已，必须显式申请一次。
@@ -160,7 +200,9 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         NotificationCenter.appInForeground = true
-        (application as DshApplication).container.ongoingCenter.refresh()
+        // 冷启动的 onStart 跑在首帧之前：此刻 refresh() 会同步构造 OngoingCenter（lazy）
+        // 并做一次 render + notify IPC，正好压进首帧窗口。首帧后由 afterFirstFrame 补一次。
+        if (firstFrameDrawn) (application as DshApplication).container.ongoingCenter.refresh()
     }
 
     override fun onStop() {

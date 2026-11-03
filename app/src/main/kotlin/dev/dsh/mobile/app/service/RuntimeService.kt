@@ -94,18 +94,25 @@ class RuntimeService : Service() {
      * （Android 12+ 重复调用会抛 ForegroundServiceStartNotAllowedException）。
      */
     private fun promoteToForeground() {
-        val n = runCatching {
-            container.ongoingCenter.onRuntime(container.runtime.value)
-            container.ongoingCenter.foregroundNotification()
-        }
-            .getOrElse { minimalNotification() }
-        foreground = push(n)
+        // 冷启动时 service 创建正好落在首帧的 draw 窗口里：富内容通知要同步构造
+        // OngoingCenter（lazy）+ tracesOf + Notification.Builder + 若干 PendingIntent，
+        // 和首次 composition 抢同一段主线程。这里先同步推最简通知满足
+        // 「onCreate 里必须 startForeground」的时序要求，富内容挪到本轮消息之后再做。
+        foreground = push(minimalNotification())
         // 前台服务那条通知只能靠 startForeground 反复刷新：
         // 同 ID 的 NotificationManager.notify() 在前台服务占用时会静默失效。
         runCatching {
             container.ongoingCenter.setForegroundUpdater { latest ->
                 if (foreground) main.post { foreground = push(latest) }
             }
+        }
+        main.post {
+            if (!foreground) return@post
+            val n = runCatching {
+                container.ongoingCenter.onRuntime(container.runtime.value)
+                container.ongoingCenter.foregroundNotification()
+            }.getOrNull() ?: return@post
+            foreground = push(n)
         }
     }
 
