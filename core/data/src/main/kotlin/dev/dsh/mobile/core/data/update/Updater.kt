@@ -6,6 +6,7 @@ import androidx.core.content.FileProvider
 import dev.dsh.mobile.core.common.RuntimeMirrors
 import dev.dsh.mobile.core.common.download.DownloadCache
 import dev.dsh.mobile.core.common.download.Downloads
+import dev.dsh.mobile.core.common.download.SegmentedDownloader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -37,6 +38,40 @@ data class UpdateInfo(
     val sha256: String = "",
 )
 
+/** sha256 校验结论。清单没给 sha256 时是 [NotProvided]：不算通过，但也不拦安装。 */
+sealed class ShaStatus {
+    data class Verified(val sha256: String) : ShaStatus()
+    object NotProvided : ShaStatus()
+}
+
+/** 下载结果：可安装的文件 + 校验结论。失败（含校验不过）一律走 Result.failure，不在这里。 */
+data class DownloadReport(val file: File, val sha: ShaStatus)
+
+/** 下载完成但 sha256 对不上：文件已删除，调用方拿不到 File 就装不成。 */
+class ShaMismatchException(message: String) : IllegalStateException(message)
+
+/**
+ * 一次检查的完整结果：清单判断 + 实际用了哪个源 + 每源耗时/失败原因。
+ *
+ * [info] 为 null 表示已是最新；[origin] 区分「刚拉的」与「内存/磁盘回退」——
+ * 回退时 [sourceUrl] 为 null，界面那一行小字不能编一个源出来。
+ */
+data class UpdateCheck(
+    val info: UpdateInfo?,
+    val origin: ManifestOrigin,
+    val sourceUrl: String?,
+    val elapsedMs: Long,
+    val failures: List<SourceFailure> = emptyList(),
+    val stats: List<SourceStat> = emptyList(),
+) {
+    /** 界面那行小字。Live 给「源：gh-proxy.com · 486ms」，回退明确说不是网络来的。 */
+    fun sourceLine(): String = when (origin) {
+        ManifestOrigin.Live -> "源：" + sourceLabel(sourceUrl.orEmpty()) + " · " + elapsedMs + "ms"
+        ManifestOrigin.Memory -> "源：本地内存副本（本轮全部源不可用）"
+        ManifestOrigin.Disk -> "源：本地磁盘副本（本轮全部源不可用）"
+    }
+}
+
 class Updater(private val context: Context) {
 
     private val prefs by lazy { context.getSharedPreferences("dsh.update", Context.MODE_PRIVATE) }
@@ -57,12 +92,36 @@ class Updater(private val context: Context) {
         )
     }
 
+    /**
+     * 源测速记忆：键就落在这份 prefs 里（带 v1.speed. 前缀），换语义换前缀即可，
+     * 不做迁移也不怕旧数据。
+     */
+    private val speedStore: SourceSpeedStore by lazy {
+        SourceSpeedStore(
+            read = { key -> prefs.getString(key, null) },
+            write = { key, value -> prefs.edit().putString(key, value).apply() },
+        )
+    }
+
+    /**
+     * 发车顺序由 [speedStore] 的「罚分 + EMA」决定：有历史时只先发最快的两个，
+     * 其余推迟 1.5s；没有历史时 [SourceSpeedStore.plan] 返回全发，行为与加测速之前一致。
+     * 每个源的实测耗时经 [SourceSpeedStore.recordSuccess] / recordFailure 回写，不多发一次请求。
+     */
     private val manifestResolver: ManifestResolver by lazy {
         ManifestResolver(manifestStore) { sources ->
             ManifestRace.race(
                 sources = sources,
                 perSourceTimeoutMs = manifestTimeoutMs(),
                 totalBudgetMs = manifestBudgetMs(),
+                plan = { speedStore.plan(it) },
+                onStat = { stat ->
+                    if (stat.failure == null) {
+                        speedStore.recordSuccess(stat.url, stat.elapsedMs)
+                    } else {
+                        speedStore.recordFailure(stat.url)
+                    }
+                },
             ) { httpGet(it) }
         }
     }
@@ -99,12 +158,22 @@ class Updater(private val context: Context) {
 
     /**
      * 拉清单并判断有没有新版。返回 null 表示已是最新。
+     *
+     * [checkDetailed] 的窄化视图：启动时的静默检查只要信息，不需要「用的哪个源」。
      */
-    suspend fun check(): Result<UpdateInfo?> = withContext(Dispatchers.IO) {
+    suspend fun check(): Result<UpdateInfo?> = checkDetailed().map { it.info }
+
+    /**
+     * 拉清单并判断有没有新版，同时把「实际用了哪个源 / 耗时 / 各源失败原因」交回去。
+     *
+     * 这些都是本轮竞速已经拿到的数据，不为可观测性多发任何请求。
+     */
+    suspend fun checkDetailed(): Result<UpdateCheck> = withContext(Dispatchers.IO) {
         runCatching {
             val sources = sourceCandidates()
             require(sources.isNotEmpty()) { "还没配置更新源" }
-            val body = when (val resolved = manifestResolver.resolve(sources)) {
+            val resolved = manifestResolver.resolve(sources)
+            val body = when (resolved) {
                 is ManifestResult.Ok -> resolved.body
                 // 全挂且本地没有可用副本才走到这里；消息里带每一个源的原因，不只第一个。
                 is ManifestResult.Failed -> error("清单拉取失败：" + describeFailures(resolved.failures))
@@ -124,7 +193,14 @@ class Updater(private val context: Context) {
             require(info.versionCode > 0) { "清单里没有有效的 versionCode" }
             require(info.apkUrl.isNotBlank()) { "清单里没有 apkUrl" }
             val (current, _) = installedVersion()
-            if (info.versionCode > current) info else null
+            UpdateCheck(
+                info = if (info.versionCode > current) info else null,
+                origin = (resolved as ManifestResult.Ok).origin,
+                sourceUrl = resolved.sourceUrl,
+                elapsedMs = resolved.elapsedMs,
+                failures = resolved.failures,
+                stats = resolved.stats,
+            )
         }
     }
 
@@ -135,23 +211,57 @@ class Updater(private val context: Context) {
      * onProgress 仍然按「已下载字节 / 总长度」给 0..100，语义与旧的单连接实现一致，回调在 IO 线程。
      */
     suspend fun download(info: UpdateInfo, onProgress: (Int) -> Unit = {}): Result<File> =
+        downloadChecked(info, onProgress).map { it.file }
+
+    /**
+     * 带校验结论的下载。[download] 只是它的 File 视图，老的调用点不用改。
+     *
+     * sha256 对不上时抛 [ShaMismatchException] 并删掉文件：调用方拿不到 File，装不成。
+     * 「校验失败禁止安装」靠类型保证，不靠每个界面都记得判断。
+     */
+    suspend fun downloadChecked(
+        info: UpdateInfo,
+        onProgress: (Int) -> Unit = {},
+    ): Result<DownloadReport> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val target = File(context.cacheDir, "update-${info.versionName.ifBlank { info.versionCode.toString() }}.apk")
                 val candidates = downloadCandidates(info)
                 require(candidates.isNotEmpty()) { "下载失败：没有可用地址" }
+                val expected = info.sha256.trim().lowercase().takeIf { it.length == 64 }
                 // 有 sha256 时缓存文件名就是 sha256，同一个包第二次点「更新」不再走网络。
-                Downloads.download(
-                    urls = candidates,
-                    target = target,
-                    cache = downloadCache,
-                    expectedSha256 = info.sha256.ifBlank { null },
-                    label = "更新包",
-                    onProgress = onProgress,
-                )
+                try {
+                    Downloads.download(
+                        urls = candidates,
+                        target = target,
+                        cache = downloadCache,
+                        expectedSha256 = expected,
+                        label = "更新包",
+                        onProgress = onProgress,
+                    )
+                } catch (e: Throwable) {
+                    // 分段下载器自己就会校验；把它的失败翻译成可识别类型，界面才能显式红字。
+                    val msg = e.message.orEmpty()
+                    if (e !is ShaMismatchException && msg.contains("sha256 校验失败")) {
+                        target.delete()
+                        throw ShaMismatchException(msg)
+                    }
+                    throw e
+                }
                 require(target.length() > 1_000_000) { "文件不完整（${target.length()} 字节）" }
+                // 再算一遍：缓存命中路径（分段下载器直接返回）不会经过上面的 verifySha。
+                val actual = SegmentedDownloader.sha256Of(target)
+                if (expected != null && actual != expected) {
+                    target.delete()
+                    throw ShaMismatchException(
+                        "更新包 sha256 校验失败：期望 " + expected.take(16) + "…，实际 " + actual.take(16) + "…",
+                    )
+                }
                 onProgress(100)
-                target
+                DownloadReport(
+                    file = target,
+                    sha = if (expected == null) ShaStatus.NotProvided else ShaStatus.Verified(actual),
+                )
             }
         }
 

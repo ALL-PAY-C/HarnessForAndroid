@@ -10,6 +10,12 @@ sealed class ManifestResult {
         val body: String,
         val origin: ManifestOrigin,
         val failures: List<SourceFailure>,
+        /** 实际胜出的源；回退到内存/磁盘时为 null —— 界面要能说清「这一版是哪来的」。 */
+        val sourceUrl: String? = null,
+        /** 胜出源耗时；非 Live 时为 0。 */
+        val elapsedMs: Long = 0L,
+        /** 本轮每源耗时/失败原因，只读上报，不参与判定。 */
+        val stats: List<SourceStat> = emptyList(),
     ) : ManifestResult()
 
     class Failed(val failures: List<SourceFailure>) : ManifestResult()
@@ -95,7 +101,14 @@ class ManifestResolver(
         val attempt = fetch(sources)
         if (attempt is ManifestAttempt.Ok) {
             store.save(attempt.body)
-            return ManifestResult.Ok(attempt.body, ManifestOrigin.Live, attempt.failures)
+            return ManifestResult.Ok(
+                body = attempt.body,
+                origin = ManifestOrigin.Live,
+                failures = attempt.failures,
+                sourceUrl = attempt.url,
+                elapsedMs = attempt.elapsedMs,
+                stats = attempt.stats,
+            )
         }
         val failures = (attempt as ManifestAttempt.Failed).failures
         store.memory()?.let { return ManifestResult.Ok(it, ManifestOrigin.Memory, failures) }

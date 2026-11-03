@@ -266,15 +266,42 @@ fun SettingsScreen(
                             QqCardDivider()
                             Column(Modifier.padding(horizontal = 13.dp, vertical = 10.dp)) {
                                 Text(state.updateStatus.orEmpty(), color = p.t2, fontSize = qqFontBody(12.5.sp))
+                                // 新增：本轮实际用了哪个源、花了多久（回退时写明是内存/磁盘副本）
+                                state.updateSourceLine?.let { line ->
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(line, color = p.t3, fontSize = qqFontBody(11.5.sp))
+                                }
                                 state.updateInfo?.notes?.takeIf { it.isNotBlank() }?.let { notes ->
                                     Spacer(Modifier.height(QqSpace.xs()))
                                     Text(notes, color = p.t3, fontSize = qqFontBody(12.sp))
                                 }
                                 if (state.updateProgress in 1..99) {
                                     Spacer(Modifier.height(6.dp))
-                                    LinearProgressIndicator(
-                                        progress = { state.updateProgress / 100f },
-                                        modifier = Modifier.fillMaxWidth(),
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        LinearProgressIndicator(
+                                            progress = { state.updateProgress / 100f },
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        // 新增：百分比数字，进度条之外再给一个能读的读数
+                                        Text(
+                                            "${state.updateProgress}%",
+                                            color = p.t2,
+                                            fontSize = qqFontBody(11.5.sp),
+                                        )
+                                    }
+                                }
+                                // 新增：sha256 校验结论。不通过时红字，且下面的「安装」不出现（updateReady 恒 false）
+                                state.updateDigest?.let { digest ->
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        digest,
+                                        color = when (state.updateDigestOk) {
+                                            true -> Color(0xFF22C55E)
+                                            false -> p.red
+                                            null -> p.t3
+                                        },
+                                        fontSize = qqFontBody(11.5.sp),
                                     )
                                 }
                                 Spacer(Modifier.height(QqSpace.s()))
@@ -282,7 +309,8 @@ fun SettingsScreen(
                                     if (state.updateInfo != null && !state.updateReady) {
                                         AccentChip("下载") { viewModel.downloadUpdate() }
                                     }
-                                    if (state.updateReady) {
+                                    // 校验不通过时即便 updateReady 被误置也不给安装入口
+                                    if (state.updateReady && state.updateDigestOk != false) {
                                         AccentChip("安装") {
                                             viewModel.installIntent()?.let { intent ->
                                                 runCatching { ctx.startActivity(intent) }

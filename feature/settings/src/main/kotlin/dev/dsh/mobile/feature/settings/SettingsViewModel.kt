@@ -14,6 +14,8 @@ import dev.dsh.mobile.core.data.settings.AppSettings
 import dev.dsh.mobile.core.data.settings.SendMode
 import dev.dsh.mobile.core.data.settings.SettingsStore
 import dev.dsh.mobile.core.data.settings.ThemeMode
+import dev.dsh.mobile.core.data.update.ShaMismatchException
+import dev.dsh.mobile.core.data.update.ShaStatus
 import dev.dsh.mobile.core.data.update.UpdateInfo
 import dev.dsh.mobile.core.data.update.Updater
 import java.io.File
@@ -55,6 +57,12 @@ data class SettingsUiState(
     val updateStatus: String? = null,
     val updateProgress: Int = 0,
     val updateReady: Boolean = false,
+    /** 「源：gh-proxy.com · 486ms」；检查还没跑或回退到本地副本时也非空（见 Updater.sourceLine）。 */
+    val updateSourceLine: String? = null,
+    /** sha256 结论那一行；未校验时为 null。 */
+    val updateDigest: String? = null,
+    /** true = 校验通过，false = 不通过（此时 updateReady 恒为 false）。 */
+    val updateDigestOk: Boolean? = null,
 )
 
 class SettingsViewModel(
@@ -75,7 +83,13 @@ class SettingsViewModel(
     private val updateStatus = MutableStateFlow<String?>(null)
     private val updateProgress = MutableStateFlow(0)
     private val updateReady = MutableStateFlow(false)
+    private val updateSourceLine = MutableStateFlow<String?>(null)
+    private val updateDigest = MutableStateFlow<String?>(null)
+    private val updateDigestOk = MutableStateFlow<Boolean?>(null)
     private var downloaded: File? = null
+    private val updateTail = combine(updateReady, updateSourceLine, updateDigest, updateDigestOk) { r, l, d, ok ->
+        UpdateTail(r, l, d, ok)
+    }
 
     /**
      * 运行时版本归一化（一次性、幂等）。
@@ -100,8 +114,8 @@ class SettingsViewModel(
         endpoints.observeEndpoints(),
         runtime.state,
         combine(busy, message, storage) { b, m, s -> Triple(b, m, s) },
-        combine(updateSource, updateInfo, updateStatus, updateProgress, updateReady) { src, info, st, pr, ready ->
-            UpdateSlice(src, info, st, pr, ready)
+        combine(updateSource, updateInfo, updateStatus, updateProgress, updateTail) { src, info, st, pr, tail ->
+            UpdateSlice(src, info, st, pr, tail)
         },
     ) { s, e, r, extra, upd ->
         SettingsUiState(
@@ -117,7 +131,10 @@ class SettingsViewModel(
             updateInfo = upd.info,
             updateStatus = upd.status,
             updateProgress = upd.progress,
-            updateReady = upd.ready,
+            updateReady = upd.tail.ready,
+            updateSourceLine = upd.tail.sourceLine,
+            updateDigest = upd.tail.digest,
+            updateDigestOk = upd.tail.digestOk,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -126,8 +143,17 @@ class SettingsViewModel(
         val info: UpdateInfo?,
         val status: String?,
         val progress: Int,
-        val ready: Boolean,
+        val tail: UpdateTail,
     )
+
+    /** combine 只有 5 个参数的重载是强类型的，第 6 个起就退化成数组：所以先收成一个。 */
+    private data class UpdateTail(
+        val ready: Boolean,
+        val sourceLine: String?,
+        val digest: String?,
+        val digestOk: Boolean?,
+    )
+
 
     private val _linuxState = MutableStateFlow(LinuxSettingsState())
     val linuxState: StateFlow<LinuxSettingsState> = _linuxState.asStateFlow()
@@ -220,9 +246,15 @@ class SettingsViewModel(
     fun checkUpdate() = viewModelScope.launch {
         updateStatus.value = "检查中…"
         updateReady.value = false
-        updater.check()
-            .onSuccess { info ->
+        updateSourceLine.value = null
+        updateDigest.value = null
+        updateDigestOk.value = null
+        updater.checkDetailed()
+            .onSuccess { check ->
+                val info = check.info
                 updateInfo.value = info
+                // 失败切换的可观测性：不管有没有新版，都告诉用户这轮实际用了哪个源、花了多久。
+                updateSourceLine.value = check.sourceLine()
                 updateStatus.value = if (info == null) {
                     "已经是最新版本（${updater.installedVersion().second}）"
                 } else {
@@ -237,13 +269,35 @@ class SettingsViewModel(
         viewModelScope.launch {
             updateStatus.value = "下载中…"
             updateProgress.value = 0
-            updater.download(info) { pct -> updateProgress.value = pct }
-                .onSuccess { file ->
-                    downloaded = file
+            updateDigest.value = null
+            updateDigestOk.value = null
+            updater.downloadChecked(info) { pct -> updateProgress.value = pct }
+                .onSuccess { report ->
+                    downloaded = report.file
                     updateReady.value = true
                     updateStatus.value = "下载完成，可以安装"
+                    when (val sha = report.sha) {
+                        is ShaStatus.Verified -> {
+                            updateDigestOk.value = true
+                            updateDigest.value = "sha256 校验通过 · " + sha.sha256.take(12)
+                        }
+                        ShaStatus.NotProvided -> {
+                            updateDigest.value = "清单未提供 sha256，本次跳过校验"
+                        }
+                    }
                 }
-                .onFailure { updateStatus.value = "下载失败：${it.message}" }
+                .onFailure { err ->
+                    // 校验不过就走这里：文件已被删除，updateReady 保持 false，安装入口不出现。
+                    downloaded = null
+                    updateReady.value = false
+                    if (err is ShaMismatchException) {
+                        updateDigestOk.value = false
+                        updateDigest.value = err.message ?: "sha256 校验失败"
+                        updateStatus.value = "下载校验失败：文件已删除，不能安装"
+                    } else {
+                        updateStatus.value = "下载失败：" + err.message
+                    }
+                }
         }
     }
 
