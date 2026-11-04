@@ -69,6 +69,8 @@ import dev.dsh.mobile.design.QqSpace
 import dev.dsh.mobile.design.LocalFontRoles
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.qqFontBody
+import dev.dsh.mobile.design.R as DesignR
+import androidx.compose.ui.res.stringResource
 import kotlin.math.roundToInt
 import dev.dsh.mobile.toolbridge.ShellBridge
 import dev.dsh.mobile.toolbridge.ShellSpec
@@ -96,7 +98,7 @@ fun TerminalScreen(shell: ShellBridge, onBack: () -> Unit) {
     LaunchedEffect(Unit) {
         runCatching { shell.terminalSpec() }
             .onSuccess { spec = it }
-            .onFailure { failure = it.message ?: "终端初始化失败"; pty = false }
+            .onFailure { failure = it.message ?: ctx.getString(DesignR.string.term_init_failed); pty = false }
     }
 
     Column(
@@ -111,10 +113,10 @@ fun TerminalScreen(shell: ShellBridge, onBack: () -> Unit) {
             Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = QqSpace.s()),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconBtn(Icons.AutoMirrored.Filled.ArrowBack, "返回", onBack)
+            IconBtn(Icons.AutoMirrored.Filled.ArrowBack, stringResource(DesignR.string.common_back), onBack)
             Spacer(Modifier.width(QqSpace.s()))
             ModePill(
-                label = (spec?.label ?: "shell") + " · " + if (pty) "PTY" else "简易",
+                label = (spec?.label ?: "shell") + " · " + if (pty) "PTY" else stringResource(DesignR.string.term_mode_simple),
                 onClick = { pty = !pty },
             )
             Spacer(Modifier.weight(1f))
@@ -131,7 +133,7 @@ fun TerminalScreen(shell: ShellBridge, onBack: () -> Unit) {
             }
 
             spec == null -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                Text("正在启动 shell…", color = p.t3, fontSize = qqFontBody(13.sp))
+                Text(stringResource(DesignR.string.term_starting), color = p.t3, fontSize = qqFontBody(13.sp))
             }
 
             pty -> PtyArea(spec!!, textSize)
@@ -205,7 +207,7 @@ private fun PtyArea(spec: ShellSpec, textSize: Int) {
             TerminalEmulator.DEFAULT_TERMINAL_TRANSCRIPT_ROWS,
             sessionClient,
         )
-        val tab = PtyTab("终端 " + serial, s)
+        val tab = PtyTab(ctx.getString(DesignR.string.term_tab_title, serial), s)
         serial += 1
         return tab
     }
@@ -260,7 +262,7 @@ private fun PtyArea(spec: ShellSpec, textSize: Int) {
             ) {
                 Icon(Icons.Filled.Add, null, tint = p.accent, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(3.dp))
-                Text("新建", color = p.accent, fontSize = qqFontBody(12.5.sp))
+                Text(stringResource(DesignR.string.term_new), color = p.accent, fontSize = qqFontBody(12.5.sp))
             }
         }
 
@@ -273,7 +275,7 @@ private fun PtyArea(spec: ShellSpec, textSize: Int) {
                 .background(p.terminalBg),
         ) {
             if (current == null) {
-                Text("正在启动 shell…", color = p.t3, fontSize = qqFontBody(13.sp), modifier = Modifier.align(Alignment.Center))
+                Text(stringResource(DesignR.string.term_starting), color = p.t3, fontSize = qqFontBody(13.sp), modifier = Modifier.align(Alignment.Center))
             } else {
                 AndroidView(
                     // 内缩一圈：TerminalView 从 (0,0) 开始画第一行，贴边时字头会被 14dp 圆角裁掉。
@@ -315,7 +317,7 @@ private fun PtyArea(spec: ShellSpec, textSize: Int) {
                     .padding(horizontal = QqSpace.m(), vertical = QqSpace.s()),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("shell 已退出（" + exited + "）· 点这里新开一个", color = p.amber, fontSize = qqFontBody(12.sp))
+                Text(stringResource(DesignR.string.term_shell_exited, exited), color = p.amber, fontSize = qqFontBody(12.sp))
             }
         }
 
@@ -358,7 +360,7 @@ private fun TabChip(title: String, selected: Boolean, onSelect: () -> Unit, onCl
             ) {
                 Icon(
                     Icons.Filled.Close,
-                    contentDescription = "关闭",
+                    contentDescription = stringResource(DesignR.string.common_close),
                     tint = if (selected) p.accent else p.t3,
                     modifier = Modifier.size(12.dp),
                 )
@@ -395,7 +397,7 @@ private fun KeyBar(onKey: (ByteArray) -> Unit, onScroll: (Int) -> Unit) {
         KeyChip("^L") { onKey(byteArrayOf(12)) }
         KeyChip("PgUp") { onScroll(10) }
         KeyChip("PgDn") { onScroll(-10) }
-        KeyChip("清屏", accent = true) { send("clear\n") }
+        KeyChip(stringResource(DesignR.string.term_clear), accent = true) { send("clear\n") }
     }
 }
 
@@ -425,6 +427,7 @@ private data class SimpleLine(val text: String, val command: Boolean)
 
 @Composable
 private fun SimpleArea(shell: ShellBridge, spec: ShellSpec) {
+    val ctx = LocalContext.current
     val p = LocalQq.current
     val scope = rememberCoroutineScope()
     val lines = remember { mutableStateListOf<SimpleLine>() }
@@ -443,7 +446,11 @@ private fun SimpleArea(shell: ShellBridge, spec: ShellSpec) {
         scope.launch {
             val r = runCatching { shell.exec(c, timeoutMs = 30_000) }
             val out = r.getOrNull()?.asToolOutput(limit = 60_000)?.trimEnd().orEmpty()
-            lines += SimpleLine(out.ifBlank { "(无输出)" } + (r.getOrNull()?.let { if (it.code != 0) "\n(退出码 " + it.code + ")" else "" } ?: ""), false)
+            lines += SimpleLine(
+                out.ifBlank { ctx.getString(DesignR.string.term_no_output) } +
+                    (r.getOrNull()?.let { if (it.code != 0) "\n" + ctx.getString(DesignR.string.term_exit_code, it.code) else "" } ?: ""),
+                false,
+            )
             busy = false
         }
     }
@@ -478,7 +485,7 @@ private fun SimpleArea(shell: ShellBridge, spec: ShellSpec) {
                 Spacer(Modifier.height(QqSpace.xs()))
             }
             if (busy) {
-                Text("执行中…", color = p.t3, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                Text(stringResource(DesignR.string.term_running), color = p.t3, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
             }
         }
 
@@ -504,13 +511,13 @@ private fun SimpleArea(shell: ShellBridge, spec: ShellSpec) {
                 keyboardActions = KeyboardActions(onSend = { run() }),
                 modifier = Modifier.weight(1f),
                 decorationBox = { inner ->
-                    if (cmd.isEmpty()) Text("输入命令，回车执行", color = p.t3, fontSize = 13.sp)
+                    if (cmd.isEmpty()) Text(stringResource(DesignR.string.term_input_hint), color = p.t3, fontSize = 13.sp)
                     inner()
                 },
             )
             Spacer(Modifier.width(QqSpace.s()))
             Text(
-                if (busy) "…" else "执行",
+                if (busy) "…" else stringResource(DesignR.string.term_execute),
                 color = p.accent,
                 fontSize = qqFontBody(12.5.sp),
                 modifier = Modifier.clip(QqShape.pill()).clickable { run() }

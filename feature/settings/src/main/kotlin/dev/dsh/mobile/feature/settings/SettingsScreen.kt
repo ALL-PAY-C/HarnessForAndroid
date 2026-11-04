@@ -102,6 +102,8 @@ import dev.dsh.mobile.design.SectionSpacing
 import dev.dsh.mobile.design.StatusCapsule
 import dev.dsh.mobile.design.qqFontBody
 import dev.dsh.mobile.design.qqPageBottomInset
+import dev.dsh.mobile.design.resolve
+import dev.dsh.mobile.design.text
 import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.toolbridge.AppStorage
 import dev.dsh.mobile.toolbridge.ShizukuChannel
@@ -217,7 +219,7 @@ fun SettingsScreen(
 
     LaunchedEffect(state.message) {
         state.message?.let {
-            snackbar.showSnackbar(it)
+            snackbar.showSnackbar(it.resolve(ctx))
             viewModel.dismissMessage()
         }
     }
@@ -298,7 +300,7 @@ fun SettingsScreen(
                         if (state.updateStatus != null || state.updateInfo != null) {
                             QqCardDivider()
                             Column(Modifier.padding(horizontal = 13.dp, vertical = 10.dp)) {
-                                Text(state.updateStatus.orEmpty(), color = p.t2, fontSize = qqFontBody(12.5.sp))
+                                Text(state.updateStatus?.text().orEmpty(), color = p.t2, fontSize = qqFontBody(12.5.sp))
                                 // 新增：本轮实际用了哪个源、花了多久（回退时写明是内存/磁盘副本）
                                 state.updateSourceLine?.let { line ->
                                     Spacer(Modifier.height(2.dp))
@@ -328,7 +330,7 @@ fun SettingsScreen(
                                 state.updateDigest?.let { digest ->
                                     Spacer(Modifier.height(4.dp))
                                     Text(
-                                        digest,
+                                        digest.text(),
                                         color = when (state.updateDigestOk) {
                                             true -> p.green
                                             false -> p.red
@@ -1094,16 +1096,16 @@ fun SettingsScreen(
                         QqCardDivider()
                         SubGroup(
                             title = stringResource(DesignR.string.settings_linux),
-                            subtitle = linux.rootfs,
+                            subtitle = linux.rootfs ?: stringResource(DesignR.string.settings_linux_not_installed),
                         ) {
                             Column(Modifier.padding(QqSpace.l()), verticalArrangement = Arrangement.spacedBy(QqSpace.s())) {
-                                Text(stringResource(DesignR.string.settings_linux_rootfs, linux.rootfs), color = p.t1)
-                                Text(stringResource(DesignR.string.settings_linux_kernel, linux.kernel), color = p.t1)
-                                Text(linux.health, color = p.t2)
+                                Text(stringResource(DesignR.string.settings_linux_rootfs, linux.rootfs ?: stringResource(DesignR.string.settings_linux_not_installed)), color = p.t1)
+                                Text(stringResource(DesignR.string.settings_linux_kernel, linux.kernel ?: stringResource(DesignR.string.settings_linux_not_installed)), color = p.t1)
+                                Text(linux.health ?: stringResource(DesignR.string.settings_linux_not_selfchecked), color = p.t2)
                                 Text(stringResource(DesignR.string.settings_linux_usage, linux.usageBytes), color = p.t2)
                                 if (linux.busy) {
                                     LinearProgressIndicator(Modifier.fillMaxWidth())
-                                    Text(linux.progress ?: stringResource(DesignR.string.settings_processing), color = p.t2)
+                                    Text(linux.progress?.text() ?: stringResource(DesignR.string.settings_processing), color = p.t2)
                                 }
                                 TextButton(onClick = viewModel::installLinux, enabled = !linux.busy) { Text(stringResource(DesignR.string.settings_linux_install)) }
                                 Row {

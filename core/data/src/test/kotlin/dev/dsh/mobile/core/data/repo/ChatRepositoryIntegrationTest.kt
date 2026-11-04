@@ -288,12 +288,13 @@ class ChatRepositoryIntegrationTest {
         val db = FakeDshDatabase()
         val repo = ChatRepository(db, backgroundScope)
 
-        val session = repo.createSession("/cwd").orThrow()
+        val session = repo.createSession("/cwd", title = "New chat").orThrow()
 
         val row = db.sessions.byId(session.id)
         assertEquals(SessionStatus.Idle.name, row?.status)
         assertEquals("/cwd", row?.cwd)
-        assertEquals("新会话", row?.title)
+        // 标题由调用方传入并原样落库：仓库层不再自带任何语言的默认文案。
+        assertEquals("New chat", row?.title)
     }
 
     /**

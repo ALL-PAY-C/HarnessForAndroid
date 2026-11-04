@@ -146,8 +146,11 @@ class ChatRepository(
 
     suspend fun refreshSessions(cwd: String?): DshResult<Int> = refreshSessionsImpl(cwd)
 
-    suspend fun createSession(cwd: String, agentId: String? = null): DshResult<Session> =
-        createSessionImpl(cwd, agentId)
+    suspend fun createSession(
+        cwd: String,
+        agentId: String? = null,
+        title: String = "",
+    ): DshResult<Session> = createSessionImpl(cwd, agentId, title)
 
     suspend fun createGroup(
         cwd: String,

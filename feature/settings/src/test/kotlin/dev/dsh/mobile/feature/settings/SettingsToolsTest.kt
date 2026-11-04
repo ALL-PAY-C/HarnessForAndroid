@@ -14,18 +14,15 @@ class SettingsToolsTest {
         }
     }
     @Test fun installationLabelRequiresVersionAndAbi() {
-        assertEquals("未安装", linuxInstallationLabel(null, null))
+        assertNull(linuxInstallationLabel(null, null))
         assertEquals("3.21 / arm64-v8a", linuxInstallationLabel("3.21", "arm64-v8a"))
     }
     @Test fun partialInstallationDoesNotClaimInstalled() {
-        assertEquals("未安装", linuxInstallationLabel("3.21", ""))
-        assertEquals("未安装", linuxInstallationLabel("", "arm64-v8a"))
+        assertNull(linuxInstallationLabel("3.21", ""))
+        assertNull(linuxInstallationLabel("", "arm64-v8a"))
     }
     @Test fun downloadInputTrimsWhitespace() {
         assertEquals(1024L * 1024, downloadLimitBytes(" 1 "))
-    }
-    @Test fun missingManifestPreservesActualAbi() {
-        assertEquals("缺少 Linux 制品清单：x86_64", missingLinuxManifest("x86_64"))
     }
     @Test fun blankProxyMeansDirect() {
         assertFalse(proxyInvalid(""))

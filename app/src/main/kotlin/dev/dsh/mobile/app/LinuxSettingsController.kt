@@ -3,6 +3,7 @@ package dev.dsh.mobile.app
 import android.content.Context
 import java.io.File
 import java.time.Instant
+import dev.dsh.mobile.design.R as DesignR
 import kotlinx.coroutines.CancellationException
 import dev.dsh.mobile.linux.appendBounded
 import dev.dsh.mobile.linux.readTail
@@ -10,7 +11,6 @@ import dev.dsh.mobile.linux.cleanupInactive
 import dev.dsh.mobile.feature.settings.LinuxSettingsActions
 import dev.dsh.mobile.feature.settings.LinuxSettingsState
 import dev.dsh.mobile.feature.settings.linuxInstallationLabel
-import dev.dsh.mobile.feature.settings.missingLinuxManifest
 import dev.dsh.mobile.linux.LinuxAbis
 import dev.dsh.mobile.linux.LinuxAssets
 import dev.dsh.mobile.linux.LinuxBootstrap
@@ -103,7 +103,7 @@ class LinuxSettingsController(
     }
 
     private fun installer() = DshKernelInstaller(
-        rootfs = checkNotNull(container.linux.active()) { "请先安装 Linux 环境" }.rootfs,
+        rootfs = checkNotNull(container.linux.active()) { context.getString(DesignR.string.settings_linux_install_first) }.rootfs,
         open = { context.assets.open(it) },
     )
 
@@ -114,20 +114,27 @@ class LinuxSettingsController(
         val health = if (channel != null && installed != null) DshKernel(channel, installed).health() else null
         return LinuxSettingsState(
             rootfs = linuxInstallationLabel(active?.version, active?.abi),
-            kernel = installed?.let { it.version + " / " + it.entry } ?: "未安装",
+            kernel = installed?.let { it.version + " / " + it.entry },
             health = health?.let {
-                if (it.ok) "Node " + it.nodeVersion + " / 内核 " + it.version + " · 正常"
-                else "健康检查失败：" + (it.error ?: "退出码 " + it.exitCode)
-            } ?: "Node / 内核尚未安装或自检",
+                if (it.ok) context.getString(DesignR.string.settings_linux_health_ok, it.nodeVersion, it.version)
+                else context.getString(
+                    DesignR.string.settings_linux_health_fail,
+                    it.error ?: context.getString(DesignR.string.term_exit_code, it.exitCode),
+                )
+            } ?: context.getString(DesignR.string.settings_linux_health_unset),
             usageBytes = container.linux.usage().bytes,
-            error = health?.takeUnless { it.ok }?.let { it.error ?: "内核健康检查失败：" + it.exitCode },
+            error = health?.takeUnless { it.ok }?.let {
+                it.error ?: context.getString(DesignR.string.settings_linux_health_failed_code, it.exitCode)
+            },
         )
     }
 
     private suspend fun prepareEnvironment(progress: (String) -> Unit): LinuxSettingsState {
         progress("读取 Linux 制品清单")
-        val abi = checkNotNull(LinuxAbis.current()) { "当前 ABI 不支持 Linux 环境" }
-        val manifest = checkNotNull(LinuxAssets.forAbi(context.assets, abi)) { missingLinuxManifest(abi) }
+        val abi = checkNotNull(LinuxAbis.current()) { context.getString(DesignR.string.settings_linux_abi_unsupported) }
+        val manifest = checkNotNull(LinuxAssets.forAbi(context.assets, abi)) {
+            context.getString(DesignR.string.settings_linux_missing_manifest, abi)
+        }
         progress("下载、校验并解包 rootfs")
         when (val result = container.linux.prepare(manifest)) {
             is LinuxResult.Err -> throw IllegalStateException(result.reason, result.cause)

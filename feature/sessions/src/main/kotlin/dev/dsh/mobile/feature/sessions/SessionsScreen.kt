@@ -86,6 +86,7 @@ import dev.dsh.mobile.design.SwipeableRow
 import dev.dsh.mobile.design.TokenPill
 import dev.dsh.mobile.design.UiEditSlotPlusRow
 import dev.dsh.mobile.design.qqFontBody
+import dev.dsh.mobile.feature.sessions.groupLabel
 import dev.dsh.mobile.pluginapi.SlotAction
 import dev.dsh.mobile.pluginapi.SlotContribution
 import dev.dsh.mobile.pluginhost.PluginSlotItem
@@ -293,7 +294,7 @@ fun SessionsScreen(
                         val collapsible = state.isCollapsible(group)
                         val isCollapsed = collapsible && group in state.collapsed
                         val depth = depthOf[group] ?: 0
-                        val label = folderPathFromGroup(group).substringAfterLast('/')
+                        val label = groupLabel(ctx, folderPathFromGroup(group).substringAfterLast('/'))
                         val count = countOf[group] ?: sessions.size
                         val open = !isCollapsed && sessions.isNotEmpty()
 
@@ -652,7 +653,7 @@ fun SessionsScreen(
                     stringResource(
                         DesignR.string.sessions_delete_folder_body,
                         count,
-                        SessionsUiState.ARCHIVE_GROUP,
+                        groupLabel(SessionsUiState.ARCHIVE_GROUP),
                     ),
                 )
             },
@@ -880,7 +881,7 @@ private fun GroupDialog(
                             .padding(horizontal = QqSpace.s(), vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(name, color = p.t1, fontSize = qqFontBody(14.sp), modifier = Modifier.weight(1f))
+                        Text(groupLabel(name), color = p.t1, fontSize = qqFontBody(14.sp), modifier = Modifier.weight(1f))
                         if (name == current) {
                             Text(
                                 stringResource(DesignR.string.sessions_current),
@@ -1133,7 +1134,7 @@ private fun NewChatSheet(
                     val isRecent = g == Session.DEFAULT_GROUP
                     val active = group == g || (group.isBlank() && isRecent)
                     Text(
-                        if (isRecent) recentLabel else g,
+                        if (isRecent) recentLabel else groupLabel(g),
                         color = if (active) Color.White else p.t2,
                         fontSize = qqFontBody(12.sp),
                         modifier = Modifier

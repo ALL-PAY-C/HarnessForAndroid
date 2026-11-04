@@ -88,7 +88,12 @@ internal suspend fun ChatRepository.refreshSessionsImpl(cwd: String?): DshResult
  * 新建会话：本地先行。运行时没起来也能立刻建出一条会话并进入聊天页，
  * 等运行时 Ready 后再懒补建远端会话（[ensureRemoteSession]，首次发送前触发）。
  */
-internal suspend fun ChatRepository.createSessionImpl(cwd: String, agentId: String? = null): DshResult<Session> = runCatchingDsh {
+internal suspend fun ChatRepository.createSessionImpl(
+    cwd: String,
+    agentId: String? = null,
+    /** 默认标题由调用方（带 Context 的 UI 层）按当前语言取资源传进来，core:data 不带文案。 */
+    title: String = "",
+): DshResult<Session> = runCatchingDsh {
     val now = System.currentTimeMillis()
     val gen = sessionIds.currentGeneration
     val endpointId = sessionIds.currentEndpointId
@@ -102,7 +107,8 @@ internal suspend fun ChatRepository.createSessionImpl(cwd: String, agentId: Stri
     val localId = if (isRemote) java.util.UUID.randomUUID().toString() else (remote?.id ?: java.util.UUID.randomUUID().toString())
     val model = Session(
         id = localId,
-        title = remote?.title?.ifBlank { "新会话" } ?: "新会话",
+        // 调用方给的标题优先，其次远端会话自带的标题；典型情况下两者都空，UI 显示「未命名会话」。
+        title = remote?.title?.ifBlank { title } ?: title,
         cwd = cwd,
         createdAt = remote?.createdAt ?: now,
         updatedAt = now,
@@ -124,7 +130,7 @@ internal suspend fun ChatRepository.createGroupImpl(
     val now = System.currentTimeMillis()
     val model = Session(
         id = UUID.randomUUID().toString(),
-        title = title.ifBlank { "新群组" },
+        title = title,
         cwd = cwd,
         createdAt = now,
         updatedAt = now,

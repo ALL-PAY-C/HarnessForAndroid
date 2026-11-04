@@ -4,6 +4,8 @@
 // ChatViewModel.pinnedSpeaker 读；不新造全局状态、不碰 core:protocol 调度。
 package dev.dsh.mobile.feature.chat
 
+import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.R as DesignR
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -302,10 +304,10 @@ internal fun GroupMemberCardDialog(
                     Text(part.name, color = p.t1, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
                         when {
-                            busy -> "正在发言"
-                            waiting -> "等待确认"
-                            spoke -> "本轮已发言"
-                            else -> "空闲"
+                            busy -> stringResource(DesignR.string.group_speaking)
+                            waiting -> stringResource(DesignR.string.common_waiting_confirm)
+                            spoke -> stringResource(DesignR.string.group_spoke)
+                            else -> stringResource(DesignR.string.agents_idle)
                         },
                         color = if (busy) p.accent else p.t3,
                         fontSize = 11.5.sp,
@@ -315,16 +317,16 @@ internal fun GroupMemberCardDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                MemberCardRow("模型", modelName.ifBlank { "未指定" })
+                MemberCardRow(stringResource(DesignR.string.group_field_model), modelName.ifBlank { stringResource(DesignR.string.group_unset) })
                 // persona 是成员自带的角色设定；空就整栏不出现，不留「角色：—」这种空壳。
                 part.persona.trim().lineSequence().firstOrNull { it.isNotBlank() }?.let { role ->
-                    MemberCardRow("角色", role.trim())
+                    MemberCardRow(stringResource(DesignR.string.group_field_role), role.trim())
                 }
-                MemberCardRow("本轮", if (spoke) "已发言" else "还没轮到")
+                MemberCardRow(stringResource(DesignR.string.group_field_round), if (spoke) stringResource(DesignR.string.group_spoke_short) else stringResource(DesignR.string.group_not_yet))
                 if (spoke) {
                     MemberCardRow(
-                        "本轮用量",
-                        if (tokens > 0) compact(tokens) + " tokens · " + chars + " 字" else chars.toString() + " 字",
+                        stringResource(DesignR.string.group_round_usage),
+                        if (tokens > 0) stringResource(DesignR.string.group_usage_tokens, compact(tokens), chars) else stringResource(DesignR.string.group_usage_chars, chars),
                     )
                 }
             }
@@ -332,11 +334,11 @@ internal fun GroupMemberCardDialog(
         confirmButton = {
             if (canPin) {
                 TextButton(onClick = onPin) {
-                    Text(if (pinned) "取消指定" else "指定为下一位", color = p.accent)
+                    Text(if (pinned) stringResource(DesignR.string.group_pin_cancel) else stringResource(DesignR.string.group_pin_set), color = p.accent)
                 }
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("关闭", color = p.t2) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(DesignR.string.common_close), color = p.t2) } },
     )
 }
 
@@ -365,7 +367,7 @@ internal fun SpeakingPlaceholder(name: String, seed: String) {
         Text(name, color = p.t2, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.width(6.dp))
         Text(
-            "正在回复…",
+            stringResource(DesignR.string.group_replying),
             color = p.accent.copy(alpha = 0.5f + pulse),
             fontSize = 11.5.sp,
         )
@@ -455,21 +457,21 @@ internal fun SpeakerPickerDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = p.card,
-        title = { Text("指定下一位发言人", color = p.t1) },
+        title = { Text(stringResource(DesignR.string.group_pick_next_title), color = p.t1) },
         text = {
             Column(
                 Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
-                    "只对下一次发送生效：这条消息点名它先答，之后回到主持人调度。",
+                    stringResource(DesignR.string.group_pick_next_hint),
                     color = p.t3,
                     fontSize = 11.sp,
                     lineHeight = 15.sp,
                 )
                 Spacer(Modifier.height(4.dp))
                 if (members.isEmpty()) {
-                    Text("群里还没有 Agent", color = p.t3, fontSize = 12.sp)
+                    Text(stringResource(DesignR.string.group_no_agents), color = p.t3, fontSize = 12.sp)
                 }
                 members.forEach { part ->
                     val selected = part.id == current
@@ -492,13 +494,13 @@ internal fun SpeakerPickerDialog(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
-                        if (selected) Text("下一位", color = p.accent, fontSize = 11.sp)
+                        if (selected) Text(stringResource(DesignR.string.group_next_badge), color = p.accent, fontSize = 11.sp)
                     }
                 }
                 if (current != null) {
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "取消指定",
+                        stringResource(DesignR.string.group_pin_cancel),
                         color = p.red,
                         fontSize = 12.sp,
                         modifier = Modifier.clickable { onPick(null) }.padding(vertical = 6.dp),
@@ -506,7 +508,7 @@ internal fun SpeakerPickerDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭", color = p.accent) } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(DesignR.string.common_close), color = p.accent) } },
     )
 }
 
@@ -537,7 +539,7 @@ internal fun GroupLedgerChip(
     ) {
         Box(Modifier.size(5.dp).clip(QqShape.pill()).background(p.warn))
         Spacer(Modifier.width(QqSpace.xs()))
-        Text("待办 " + pending, color = p.warn, fontSize = qqFontBody(11.5.sp), maxLines = 1)
+        Text(stringResource(DesignR.string.group_todo_count, pending), color = p.warn, fontSize = qqFontBody(11.5.sp), maxLines = 1)
     }
     if (open) {
         LedgerSheet(snapshot = snapshot, memberNames = memberNames) { open = false }
@@ -563,10 +565,10 @@ internal fun LedgerSheet(
         containerColor = p.card,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("房间账本", color = p.t1, fontSize = qqFontBody(15.sp), fontWeight = FontWeight.SemiBold)
+                Text(stringResource(DesignR.string.group_ledger), color = p.t1, fontSize = qqFontBody(15.sp), fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.width(QqSpace.s()))
                 Text(
-                    "未完成 " + snapshot.open.size + " · 问题 " + snapshot.questions.size,
+                    stringResource(DesignR.string.group_ledger_summary, snapshot.open.size, snapshot.questions.size),
                     color = p.t3,
                     fontSize = qqFontBody(11.sp),
                     maxLines = 1,
@@ -575,21 +577,21 @@ internal fun LedgerSheet(
         },
         text = {
             Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
-                LedgerGroupTitle("未完成")
+                LedgerGroupTitle(stringResource(DesignR.string.group_ledger_open))
                 if (snapshot.open.isEmpty()) {
-                    Text("没有未完成的事", color = p.t3, fontSize = qqFontBody(12.sp))
+                    Text(stringResource(DesignR.string.group_ledger_empty), color = p.t3, fontSize = qqFontBody(12.sp))
                 }
                 snapshot.open.forEach { item ->
                     val owner = item.ownerId?.let { memberNames[it] }.orEmpty()
                     val tail = buildList {
                         if (owner.isNotEmpty()) add(owner)
-                        if (item.state == LedgerState.Reworked) add("已打回")
+                        if (item.state == LedgerState.Reworked) add(stringResource(DesignR.string.group_ledger_reworked))
                     }.joinToString(" · ")
                     LedgerLine(dot = ledgerDot(item.state), text = item.title, tail = tail)
                 }
                 if (snapshot.questions.isNotEmpty()) {
                     QqCardDivider()
-                    LedgerGroupTitle("未解问题")
+                    LedgerGroupTitle(stringResource(DesignR.string.group_ledger_questions))
                     snapshot.questions.forEach { q -> LedgerLine(dot = p.warn, text = q, tail = "") }
                 }
                 if (snapshot.done.isNotEmpty()) {
@@ -602,13 +604,13 @@ internal fun LedgerSheet(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            "已完成 " + snapshot.done.size + " 条",
+                            stringResource(DesignR.string.group_ledger_done, snapshot.done.size),
                             color = p.t2,
                             fontSize = qqFontBody(12.sp),
                             modifier = Modifier.weight(1f),
                         )
                         Text(
-                            if (showDone) "收起" else "最近 5 条",
+                            if (showDone) stringResource(DesignR.string.common_collapse) else stringResource(DesignR.string.group_ledger_show_recent),
                             color = p.accent,
                             fontSize = qqFontBody(11.sp),
                         )
@@ -622,14 +624,14 @@ internal fun LedgerSheet(
                 if (snapshot.reworkCount > 0) {
                     Spacer(Modifier.height(QqSpace.s()))
                     Text(
-                        "累计打回 " + snapshot.reworkCount + " 次",
+                        stringResource(DesignR.string.group_ledger_rework_total, snapshot.reworkCount),
                         color = p.t3,
                         fontSize = qqFontBody(10.5.sp),
                     )
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭", color = p.accent) } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(DesignR.string.common_close), color = p.accent) } },
     )
 }
 

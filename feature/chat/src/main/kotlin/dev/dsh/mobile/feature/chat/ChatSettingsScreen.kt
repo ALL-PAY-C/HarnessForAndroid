@@ -1,5 +1,7 @@
 package dev.dsh.mobile.feature.chat
 
+import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.R as DesignR
 import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.compose.foundation.background
@@ -115,7 +117,7 @@ fun ChatSettingsScreen(
     // 预设名优先；没有预设 VM 时保持原来的 agentName 逻辑。
     val agentLabel = (if (presetViewModel != null) presetState.defaultName else "")
         .ifBlank { state.agentName }
-        .ifBlank { "未选择 Agent" }
+        .ifBlank { stringResource(DesignR.string.chat_no_agent_selected) }
 
     // 会话设置槽里 kind = setpersona 的那一条就是「破甲注入」开关：渲染成开关行放在
     // 「特殊格式渲染」下面，不再当 chip 出现。checked 读会话真实 persona，不存本地临时值。
@@ -125,11 +127,11 @@ fun ChatSettingsScreen(
     Box(Modifier.fillMaxSize().background(p.bg)) {
         Column(Modifier.fillMaxSize().navigationBarsPadding()) {
             QqTopBar(
-                leading = { IconBtn(Icons.AutoMirrored.Filled.ArrowBack, "返回", onBack) },
-                trailing = { IconBtn(Icons.Filled.Search, "搜索", onSearch) },
+                leading = { IconBtn(Icons.AutoMirrored.Filled.ArrowBack, stringResource(DesignR.string.common_back), onBack) },
+                trailing = { IconBtn(Icons.Filled.Search, stringResource(DesignR.string.common_search), onSearch) },
             ) {
                 Text(
-                    state.title.ifBlank { "会话设置" },
+                    state.title.ifBlank { stringResource(DesignR.string.chat_settings_title) },
                     color = p.t1,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -154,20 +156,20 @@ fun ChatSettingsScreen(
                     // 有预设 VM 时点这行是「换 Agent 预设」（选了就用），没有时退回成员选择。
                     SettingRow(
                         icon = Icons.Filled.SmartToy,
-                        label = "智能体",
+                        label = stringResource(DesignR.string.chat_agent_label),
                         value = agentLabel,
                     ) { if (presetViewModel != null) choosingPreset = true else picking = true }
                     DividerRow()
                     SettingRow(
                         icon = Icons.Filled.Create,
-                        label = "会话名",
-                        value = state.title.ifBlank { "新会话" },
+                        label = stringResource(DesignR.string.chat_field_title),
+                        value = state.title.ifBlank { stringResource(DesignR.string.chat_untitled) },
                     ) { renaming = state.title }
                     DividerRow()
                     SettingRow(
                         icon = Icons.Filled.Folder,
-                        label = "工作区",
-                        value = state.cwd.ifBlank { "默认工作区" },
+                        label = stringResource(DesignR.string.chat_field_workspace),
+                        value = state.cwd.ifBlank { stringResource(DesignR.string.chat_workspace_default) },
                     ) { editingWorkspace = state.cwd }
                 }
 
@@ -183,9 +185,9 @@ fun ChatSettingsScreen(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("特殊格式渲染", color = p.t1, fontSize = qqFontBody(14.sp))
+                            Text(stringResource(DesignR.string.chat_render_special), color = p.t1, fontSize = qqFontBody(14.sp))
                             Text(
-                                "HTML / LaTeX / Markdown / 代码块",
+                                stringResource(DesignR.string.chat_render_special_hint),
                                 color = p.t3,
                                 fontSize = qqFontBody(11.5.sp),
                                 modifier = Modifier.padding(top = 2.dp),
@@ -201,9 +203,9 @@ fun ChatSettingsScreen(
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
-                                Text(personaLabelOf(slot.label), color = p.t1, fontSize = qqFontBody(14.sp))
+                                Text(personaLabelOf(slot.label, stringResource(DesignR.string.chat_injection_default)), color = p.t1, fontSize = qqFontBody(14.sp))
                                 Text(
-                                    if (personaOn) "已开启，下一条消息起生效" else "关闭状态，点一下写入本会话人设",
+                                    if (personaOn) stringResource(DesignR.string.chat_render_on_hint) else stringResource(DesignR.string.chat_render_off_hint),
                                     color = p.t3,
                                     fontSize = qqFontBody(11.5.sp),
                                     modifier = Modifier.padding(top = 2.dp),
@@ -245,7 +247,7 @@ fun ChatSettingsScreen(
                                 }
                             }
                             if (SlotEditState.enabled) {
-                                SlotPlusButton(label = "编辑会话设置") { pickingSlot = true }
+                                SlotPlusButton(label = stringResource(DesignR.string.chat_edit_settings)) { pickingSlot = true }
                             }
                         }
                     }
@@ -270,11 +272,11 @@ fun ChatSettingsScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                BottomAction("清空", danger = true) { confirmingClear = true }
-                BottomAction(if (state.archived) "取消归档" else "归档") {
+                BottomAction(stringResource(DesignR.string.chat_clear_action), danger = true) { confirmingClear = true }
+                BottomAction(if (state.archived) stringResource(DesignR.string.chat_unarchive) else stringResource(DesignR.string.chat_archive)) {
                     viewModel.setArchived(!state.archived)
                 }
-                BottomAction(if (exporting) "导出中…" else "导出长图", enabled = !exporting) {
+                BottomAction(if (exporting) stringResource(DesignR.string.chat_exporting) else stringResource(DesignR.string.chat_export_image), enabled = !exporting) {
                     if (exporting) return@BottomAction
                     exporting = true
                     val exportTitle = state.title
@@ -293,9 +295,9 @@ fun ChatSettingsScreen(
 
     renaming?.let { current ->
         EditDialog(
-            title = "重命名会话",
+            title = stringResource(DesignR.string.chat_rename_title),
             initial = current,
-            hint = "会话名称",
+            hint = stringResource(DesignR.string.chat_field_chat_name),
             onDismiss = { renaming = null },
         ) { value ->
             if (value.isNotBlank()) viewModel.rename(value.trim())
@@ -305,10 +307,10 @@ fun ChatSettingsScreen(
 
     editingWorkspace?.let { current ->
         EditDialog(
-            title = "修改工作区",
+            title = stringResource(DesignR.string.chat_edit_workspace),
             pickFolder = true,
             initial = current,
-            hint = "例如 /sdcard/DSH 或 D:/work",
+            hint = stringResource(DesignR.string.chat_workspace_example),
             onDismiss = { editingWorkspace = null },
         ) { value ->
             viewModel.setWorkspace(value.trim())
@@ -346,9 +348,9 @@ fun ChatSettingsScreen(
 
     if (pickingSlot) {
         SlotPickerDialog(
-            title = "添加到会话设置",
+            title = stringResource(DesignR.string.chat_add_to_settings),
             items = slotCandidates,
-            emptyHint = "还没有可放置的插件组件：先到「插件」里安装并启用插件。",
+            emptyHint = stringResource(DesignR.string.chat_no_slots),
             onPick = { item ->
                 onSlotAdd(item)
                 pickingSlot = false
@@ -360,15 +362,15 @@ fun ChatSettingsScreen(
     if (confirmingClear) {
         AlertDialog(
             onDismissRequest = { confirmingClear = false },
-            title = { Text("清空聊天记录") },
-            text = { Text("只删除本地消息，运行时与 Agent 配置保持不变。") },
+            title = { Text(stringResource(DesignR.string.chat_clear_title)) },
+            text = { Text(stringResource(DesignR.string.chat_clear_body)) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.clear()
                     confirmingClear = false
-                }) { Text("清空") }
+                }) { Text(stringResource(DesignR.string.chat_clear_action)) }
             },
-            dismissButton = { TextButton(onClick = { confirmingClear = false }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { confirmingClear = false }) { Text(stringResource(DesignR.string.common_cancel)) } },
         )
     }
 }
@@ -477,10 +479,10 @@ private fun AgentPresetDialog(
                 .background(p.card)
                 .padding(QqSpace.l()),
         ) {
-            Text("Agent 预设", color = p.t1, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(DesignR.string.chat_preset_section), color = p.t1, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(QqSpace.xs()))
             Text(
-                "选中的预设从下一轮请求开始生效",
+                stringResource(DesignR.string.chat_preset_apply_hint),
                 color = p.t3,
                 fontSize = qqFontBody(11.5.sp),
             )
@@ -527,7 +529,7 @@ private fun AgentPresetDialog(
                             Spacer(Modifier.width(QqSpace.s()))
                             Icon(
                                 Icons.Filled.Check,
-                                "当前预设",
+                                stringResource(DesignR.string.chat_current_preset),
                                 tint = p.accent,
                                 modifier = Modifier.size(16.dp),
                             )
@@ -544,7 +546,7 @@ private fun AgentPresetDialog(
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "管理成员",
+                    stringResource(DesignR.string.chat_manage_members),
                     color = p.accent,
                     fontSize = qqFontBody(13.sp),
                     modifier = Modifier
@@ -554,7 +556,7 @@ private fun AgentPresetDialog(
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    "关闭",
+                    stringResource(DesignR.string.common_close),
                     color = p.t3,
                     fontSize = qqFontBody(13.sp),
                     modifier = Modifier
@@ -579,5 +581,5 @@ internal fun personaSlotOf(slots: List<SlotContribution>): SlotContribution? =
  * 开关标题：插件给的 label 里可能嵌了它自己记的状态（「破甲注入：开（本会话）」），
  * 状态由本行的 Switch 表达，再显示一遍就会在关掉时自相矛盾 —— 取冒号前的部分。
  */
-internal fun personaLabelOf(label: String): String =
-    label.substringBefore("：").trim().ifBlank { "破甲注入（本会话）" }
+internal fun personaLabelOf(label: String, fallback: String): String =
+    label.substringBefore("：").trim().ifBlank { fallback }

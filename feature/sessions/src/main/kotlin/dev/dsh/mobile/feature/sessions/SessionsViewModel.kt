@@ -74,6 +74,10 @@ class SessionsViewModel(
     private val settingsStore: SettingsStore,
     private val modelStore: ModelStore,
     private val cwdProvider: () -> String,
+    /** 新会话的默认标题：由 UI 层按当前语言取资源传入，仓库层只接受已有标题。 */
+    private val defaultChatTitle: String = "",
+    /** 新群组的默认标题，同上。 */
+    private val defaultGroupTitle: String = "",
 ) : ViewModel() {
 
     /** Agent（模型接入）列表，用于新建会话时的选择器。 */
@@ -199,6 +203,11 @@ class SessionsViewModel(
         onCreated: (String) -> Unit,
     ) {
         val workspace = cwd?.takeIf { it.isNotBlank() } ?: cwdProvider()
+        // 标题默认值在这里补：调用方空标题时用当前语言的资源文案建标题，仓库层不再自造文案。
+        val callerTitle = title.trim()
+        val effectiveTitle = callerTitle.ifBlank {
+            if (participants.isEmpty()) defaultChatTitle else defaultGroupTitle
+        }
         // 没选 agent 就用默认的：否则新会话发消息时没有模型可绑，看起来像「默认 agent 没用」。
         val resolvedAgent = agentId
             ?: models.value.firstOrNull { it.isDefault }?.id
@@ -206,14 +215,14 @@ class SessionsViewModel(
         viewModelScope.launch {
             busy.value = true
             val result = if (participants.isEmpty()) {
-                repo.createSession(workspace, resolvedAgent)
+                repo.createSession(workspace, resolvedAgent, effectiveTitle)
             } else {
-                repo.createGroup(workspace, title, participants)
+                repo.createGroup(workspace, effectiveTitle, participants)
             }
             when (result) {
                 is DshResult.Ok -> {
-                    if (title.isNotBlank() && participants.isEmpty()) {
-                        repo.rename(result.value.id, title.trim())
+                    if (callerTitle.isNotBlank() && participants.isEmpty()) {
+                        repo.rename(result.value.id, callerTitle)
                     }
                     if (group.isNotBlank()) repo.setGroup(result.value.id, group.trim())
                     onCreated(result.value.id)

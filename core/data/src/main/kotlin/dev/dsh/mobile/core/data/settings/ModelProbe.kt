@@ -8,10 +8,10 @@ import dev.dsh.mobile.core.common.net.HttpJson
 import dev.dsh.mobile.core.common.net.HttpJsonException
 import java.net.SocketTimeoutException
 
-/**
- * 「测试连接」的结果。纯数据，展示文案交给 [ModelProbe.formatResult]，这样格式化逻辑
- * 可以在 JVM 单测里直接验证，不用起网络。
- */
+/** 探测失败的分类。展示文案由 UI 层按资源拼接（core:data 不带中文）。 */
+enum class ProbeFailure { EmptyBaseUrl, Timeout, Transport, Unknown }
+
+/** 「测试连接」的结果。纯数据，展示文案在 UI 层按资源拼。 */
 data class ProbeResult(
     val ok: Boolean,
     val elapsedMs: Long,
@@ -21,8 +21,10 @@ data class ProbeResult(
     val httpCode: Int = 0,
     /** 失败原因（异常信息或响应体片段）。 */
     val error: String = "",
-    /** 成功时的补充说明（例如本地引擎插件不用联网）。 */
-    val note: String = "",
+    /** 失败的分类；成功或只有原始错误串时为 null。 */
+    val failure: ProbeFailure? = null,
+    /** 设备内引擎插件（engine:// ...）不需要联网，成功时直接算通过。 */
+    val engineOffline: Boolean = false,
 )
 
 /**
@@ -55,7 +57,7 @@ object ModelProbe {
         timeoutMs: Int = DEFAULT_TIMEOUT_MS,
     ): ProbeResult {
         val root = baseUrl.trim().trimEnd('/')
-        if (root.isEmpty()) return ProbeResult(ok = false, elapsedMs = 0, error = "Base URL 为空")
+        if (root.isEmpty()) return ProbeResult(ok = false, elapsedMs = 0, failure = ProbeFailure.EmptyBaseUrl)
         // engine:// 是设备内引擎插件（engine/host/llm.js），没有 HTTP 端点：
         // 以前这里直接 new URL(engine://...) 会抛 unknown protocol: engine，测试按钮永远红。
         if (!root.startsWith("http://") && !root.startsWith("https://")) {
@@ -63,7 +65,7 @@ object ModelProbe {
                 ok = true,
                 elapsedMs = 0,
                 models = listOfNotNull(model.trim().takeIf { it.isNotEmpty() }),
-                note = "引擎插件，免网络",
+                engineOffline = true,
             )
         }
         val started = System.currentTimeMillis()
@@ -98,11 +100,10 @@ object ModelProbe {
         val chatOut = chatAttempt.getOrNull()
         val elapsed = System.currentTimeMillis() - started
         return when {
-            chatOut == null -> ProbeResult(
-                ok = false,
-                elapsedMs = elapsed,
-                error = describe(chatAttempt.exceptionOrNull(), timeoutMs),
-            )
+            chatOut == null -> {
+                val (failure, detail) = describe(chatAttempt.exceptionOrNull())
+                ProbeResult(ok = false, elapsedMs = elapsed, error = detail, failure = failure)
+            }
 
             chatOut.code in 200..299 -> ProbeResult(ok = true, elapsedMs = elapsed)
 
@@ -113,22 +114,6 @@ object ModelProbe {
                 error = chatOut.body.take(160),
             )
         }
-    }
-
-    /** 成功 · 320ms · 模型 a,b / 失败 · HTTP 401 —— 纯函数，单测覆盖。 */
-    fun formatResult(result: ProbeResult): String {
-        if (result.ok) {
-            val head = if (result.note.isNotBlank()) "成功 · " + result.note
-            else "成功 · " + result.elapsedMs + "ms"
-            return if (result.models.isEmpty()) head
-            else head + " · 模型 " + result.models.joinToString(",")
-        }
-        val why = when {
-            result.httpCode > 0 -> "HTTP " + result.httpCode
-            result.error.isNotBlank() -> result.error
-            else -> "未知错误"
-        }
-        return "失败 · " + why
     }
 
     /** 兼容 {data:[{id}]} / {models:[...]} / {models:[{id|name}]} / 纯数组。 */
@@ -178,9 +163,9 @@ object ModelProbe {
         }
     }
 
-    private fun describe(t: Throwable?, timeoutMs: Int): String = when {
-        t == null -> "未知错误"
-        t is SocketTimeoutException -> "连接超时（" + timeoutMs + "ms）"
-        else -> (t.message ?: t.javaClass.simpleName).take(120)
+    private fun describe(t: Throwable?): Pair<ProbeFailure, String> = when {
+        t == null -> ProbeFailure.Unknown to ""
+        t is SocketTimeoutException -> ProbeFailure.Timeout to ""
+        else -> ProbeFailure.Transport to (t.message ?: t.javaClass.simpleName).take(120)
     }
 }

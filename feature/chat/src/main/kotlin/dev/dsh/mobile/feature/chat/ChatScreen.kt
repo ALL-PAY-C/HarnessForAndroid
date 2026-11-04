@@ -2,6 +2,8 @@
 // 改动后需重新产出 ChatScreenKt 门面类，勿只 touch。
 package dev.dsh.mobile.feature.chat
 
+import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.R as DesignR
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -208,14 +210,22 @@ fun ChatScreen(
     var ledgerOpen by remember(state.sessionId) { mutableStateOf(false) }
     val groupLedger by viewModel.groupLedger.collectAsStateWithLifecycle()
 
-    fun attach(uri: Uri, label: String) {
+    val fileLabel = stringResource(DesignR.string.common_file)
+    val imageLabel = stringResource(DesignR.string.common_image)
+    val photoLabel = stringResource(DesignR.string.common_photo)
+    val readFailedTemplate = stringResource(DesignR.string.chat_attach_read_failed)
+    val cameraFailedTemplate = stringResource(DesignR.string.chat_camera_open_failed)
+    val cameraPermissionHint = stringResource(DesignR.string.chat_camera_permission_hint)
+    val noPhotoNotice = stringResource(DesignR.string.chat_no_photo)
+
+    fun attach(uri: Uri, label: String, image: Boolean) {
         scope.launch {
             val file = withContext(Dispatchers.IO) { Attachments.copy(context, uri) }
             if (file == null) {
-                notice = "读取$label 失败"
+                notice = readFailedTemplate.format(label)
                 return@launch
             }
-            if (label == "图片" || label == "照片") {
+            if (image) {
                 // 只挂进待发区，等用户点发送。draft 里存相对 filesDir 的路径，
                 // 发送那一刻再还原成绝对路径给 Agent（Attachments.abs）。
                 val rel = Attachments.rel(context, file)
@@ -228,14 +238,14 @@ fun ChatScreen(
     }
 
     val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let { attach(it, "文件") }
+        uri?.let { attach(it, fileLabel, image = false) }
     }
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let { attach(it, "图片") }
+        uri?.let { attach(it, imageLabel, image = true) }
     }
     val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val uri = cameraUri
-        if (ok && uri != null) attach(uri, "照片") else notice = "没有拍照"
+        if (ok && uri != null) attach(uri, photoLabel, image = true) else notice = noPhotoNotice
     }
     // 相机是运行时权限：manifest 声明了 CAMERA 之后，没授权就 launch IMAGE_CAPTURE
     // 会被系统抛 SecurityException 打死进程（"DSH keeps stopping"）。先问权限再拍照。
@@ -244,7 +254,7 @@ fun ChatScreen(
         val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
         cameraUri = uri
         runCatching { takePhoto.launch(uri) }
-            .onFailure { notice = "打不开相机：" + it.javaClass.simpleName }
+            .onFailure { notice = cameraFailedTemplate.format(it.javaClass.simpleName) }
     }
     val cameraPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -252,7 +262,7 @@ fun ChatScreen(
         if (granted) {
             startCapture()
         } else {
-            notice = "需要相机权限：系统设置 → 应用 → DSH Mobile → 权限 → 相机"
+            notice = cameraPermissionHint
         }
     }
 
@@ -319,9 +329,9 @@ fun ChatScreen(
 
     renaming?.let { current ->
         EditDialog(
-            title = "重命名会话",
+            title = stringResource(DesignR.string.chat_rename_title),
             initial = current,
-            hint = "会话名称",
+            hint = stringResource(DesignR.string.chat_field_chat_name),
             onDismiss = { renaming = null },
         ) { value ->
             if (value.isNotBlank()) viewModel.rename(value.trim())
@@ -331,10 +341,10 @@ fun ChatScreen(
 
     editingWorkspace?.let { current ->
         EditDialog(
-            title = "修改工作区",
+            title = stringResource(DesignR.string.chat_edit_workspace),
             pickFolder = true,
             initial = current,
-            hint = "例如 /sdcard/DSH 或 D:/work",
+            hint = stringResource(DesignR.string.chat_workspace_example),
             onDismiss = { editingWorkspace = null },
         ) { value ->
             viewModel.setWorkspace(value.trim())
@@ -522,6 +532,9 @@ fun ChatScreen(
         )
 
         // 斜杠指令留在本地执行，不发给模型。
+        val recallUsage = stringResource(DesignR.string.chat_recall_usage)
+        val newChatHint = stringResource(DesignR.string.chat_new_chat_hint)
+        val unknownCmdTemplate = stringResource(DesignR.string.chat_unknown_command)
         val handleCommand: (String) -> Boolean = { cmd ->
             when (cmd) {
                 "/clear" -> { confirmingClear = true; true }
@@ -538,15 +551,15 @@ fun ChatScreen(
                 }
                 // T9.8-S4 手动回捞：带参数的形式在下面的发送闸门里分流（含空格也算指令）。
                 "/recall", "/回捞" -> {
-                    notice = "用法：/recall <词> 或 /recall R<序号>"
+                    notice = recallUsage
                     true
                 }
                 "/new" -> {
-                    notice = "新建会话请回到会话列表点右上角 ＋"
+                    notice = newChatHint
                     true
                 }
                 else -> {
-                    notice = "未知指令 $cmd · 可在设置里修改快捷指令"
+                    notice = unknownCmdTemplate.format(cmd)
                     true
                 }
             }
@@ -655,16 +668,16 @@ internal suspend fun exportChatToGallery(
     withContext(Dispatchers.IO) {
         exportChatToPng(context, title, messages.map { msg ->
             ExportMsg(msg.authorName ?: when (msg.role) {
-                ChatMessage.Role.USER -> "我"
-                ChatMessage.Role.ASSISTANT -> agentName.ifBlank { "助手" }
-                ChatMessage.Role.SYSTEM -> "系统"
-                ChatMessage.Role.TOOL -> "工具"
+                ChatMessage.Role.USER -> context.getString(DesignR.string.common_me)
+                ChatMessage.Role.ASSISTANT -> agentName.ifBlank { context.getString(DesignR.string.common_assistant) }
+                ChatMessage.Role.SYSTEM -> context.getString(DesignR.string.common_system)
+                ChatMessage.Role.TOOL -> context.getString(DesignR.string.common_tool)
             }, msg.text)
-        }) ?: error("相册未返回文件地址")
+        }) ?: error(context.getString(DesignR.string.chat_gallery_no_uri))
     }
-    "已导出到相册 Pictures/DSH"
+    context.getString(DesignR.string.chat_export_saved)
 } catch (error: kotlinx.coroutines.CancellationException) {
     throw error
 } catch (error: Exception) {
-    "导出失败：" + (error.localizedMessage ?: error.javaClass.simpleName)
+    context.getString(DesignR.string.chat_export_failed, error.localizedMessage ?: error.javaClass.simpleName)
 }

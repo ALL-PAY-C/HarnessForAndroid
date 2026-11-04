@@ -1,6 +1,8 @@
 // 会话顶栏区：标题栏/运行态/用量环、右上菜单入口、错误条、成员条、执行状态条与 todo 投影面板。
 package dev.dsh.mobile.feature.chat
 
+import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.R as DesignR
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
@@ -101,7 +103,7 @@ internal fun ProjectionPanel(
             if (goal?.objective.isNullOrBlank()) Spacer(Modifier.weight(1f))
             Icon(
                 if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                contentDescription = if (expanded) "收起待办" else "展开待办",
+                contentDescription = if (expanded) stringResource(DesignR.string.chat_todo_collapse) else stringResource(DesignR.string.chat_todo_expand),
                 tint = p.t3,
                 modifier = Modifier.size(16.dp),
             )
@@ -112,7 +114,7 @@ internal fun ProjectionPanel(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             goal?.blockedReason?.takeIf { it.isNotBlank() }?.let { reason ->
-                Text("受阻：$reason", color = p.red, fontSize = 11.sp)
+                Text(stringResource(DesignR.string.chat_blocked, reason), color = p.red, fontSize = 11.sp)
             }
             todoGroups(projection.todos).forEach { group ->
                 Text(
@@ -178,7 +180,7 @@ internal fun ChatHeader(
         leadingExpanded = true,
         leading = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconBtn(Icons.AutoMirrored.Filled.ArrowBack, "返回", onBack)
+                IconBtn(Icons.AutoMirrored.Filled.ArrowBack, stringResource(DesignR.string.common_back), onBack)
                 // 最左侧仍是运行态圆点（思考/等待/结束/出错），呼吸动效保留。
                 SessionStatusDot(
                     when {
@@ -192,7 +194,7 @@ internal fun ChatHeader(
                 Column(Modifier.weight(1f).clickable { onOpenUsage() }, horizontalAlignment = Alignment.Start) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            state.title.ifBlank { "新会话" },
+                            state.title.ifBlank { stringResource(DesignR.string.chat_untitled) },
                             color = p.t1,
                             fontSize = qqFontBody(17.sp),
                             fontWeight = FontWeight.SemiBold,
@@ -221,7 +223,7 @@ internal fun ChatHeader(
                         ContextRing(usagePercent(projection.usage) ?: state.contextPercent.toInt())
                         Spacer(Modifier.width(5.dp))
                         Text(
-                            if (state.streaming) "正在输出 · ${usageLine(state, projection.usage)}"
+                            if (state.streaming) stringResource(DesignR.string.chat_streaming_line, usageLine(state, projection.usage))
                             else usageLine(state, projection.usage),
                             color = p.t2,
                             fontSize = qqFontBody(11.sp),
@@ -238,7 +240,7 @@ internal fun ChatHeader(
                 // 规划书入口（T9.7a）：群聊才有；条数是未完成数，全清时不显示 0。
                 if (state.isGroup) {
                     Text(
-                        if (ledgerOpen > 0) "规划 " + ledgerOpen else "规划",
+                        if (ledgerOpen > 0) stringResource(DesignR.string.chat_planning_count, ledgerOpen) else stringResource(DesignR.string.chat_planning),
                         color = if (ledgerOpen > 0) p.accent else p.t2,
                         fontSize = qqFontBody(12.sp),
                         fontWeight = FontWeight.Medium,
@@ -259,7 +261,7 @@ internal fun ChatHeader(
                         state.participants.firstOrNull { it.id == id }?.name
                     }
                     Text(
-                        pinnedName?.let { "下一位：" + it } ?: "指定",
+                        pinnedName?.let { stringResource(DesignR.string.chat_next_speaker, it) } ?: stringResource(DesignR.string.chat_assign),
                         color = p.accent,
                         fontSize = qqFontBody(12.sp),
                         fontWeight = FontWeight.Medium,
@@ -277,7 +279,7 @@ internal fun ChatHeader(
                 // 智能体预设入口：未发过消息时可点（选中即生效，没有额外开关）；发过就只读展示。
                 Text(
                     if (presetSelection.locked) presetNameOf(state.presetId)
-                    else "预设：" + presetNameOf(state.presetId),
+                    else stringResource(DesignR.string.chat_preset_label, presetNameOf(state.presetId)),
                     color = if (presetSelection.locked) p.t3 else p.accent,
                     fontSize = qqFontBody(12.sp),
                     fontWeight = FontWeight.Medium,
@@ -287,7 +289,7 @@ internal fun ChatHeader(
                         .clickable(enabled = !presetSelection.locked) { onOpenPreset() }
                         .padding(horizontal = 6.dp, vertical = 4.dp),
                 )
-                IconBtn(Icons.Filled.Menu, "会话菜单") { onOpenSettings() }
+                IconBtn(Icons.Filled.Menu, stringResource(DesignR.string.chat_session_menu)) { onOpenSettings() }
             }
         },
     ) {}
@@ -352,7 +354,7 @@ internal fun ChatMemberStrip(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (state.participants.isEmpty()) {
-                Text("还没有 Agent，点右上角拉人", color = p.t3, fontSize = 11.5.sp)
+                Text(stringResource(DesignR.string.chat_no_agents_pull), color = p.t3, fontSize = 11.5.sp)
             }
             state.participants.forEach { part ->
                 val busy = state.settings.showAgentStatus &&
@@ -378,6 +380,8 @@ internal fun ChatMemberStrip(
 @Composable
 internal fun ChatBusyStrip(state: ChatUiState) {
     val p = LocalQq.current
+    val waitingText = stringResource(DesignR.string.common_waiting_confirm)
+    val runningText = stringResource(DesignR.string.chat_running)
     // 执行状态条：谁在跑、谁在等确认。拿不到执行池（busyAgents 为空）就整条不渲染。
     if (state.busyAgents.isNotEmpty() && state.settings.showAgentStatus) {
         Row(
@@ -386,7 +390,7 @@ internal fun ChatBusyStrip(state: ChatUiState) {
         ) {
             Text(
                 state.busyAgents.joinToString(" · ") { agent ->
-                    val what = if (agent.state == AgentRunState.WaitingPermission) "等待确认" else "执行中"
+                    val what = if (agent.state == AgentRunState.WaitingPermission) waitingText else runningText
                     agent.agentName.ifBlank { "Agent" } + " " + what
                 },
                 color = p.accent,
@@ -440,7 +444,7 @@ private fun HeaderSlotActions(slots: List<SlotContribution>, onSlot: (SlotContri
                     .padding(horizontal = 6.dp, vertical = 4.dp),
             )
         }.isSuccess
-        if (!ok) failed = "顶栏插件按钮「" + slot.label + "」没能显示"
+        if (!ok) failed = stringResource(DesignR.string.chat_header_slot_failed, slot.label)
     }
 }
 
@@ -453,7 +457,7 @@ internal fun ChatPlanStrip(state: ChatUiState) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "计划 ${state.plan.count { it.startsWith("✓") }}/${state.plan.size}",
+                stringResource(DesignR.string.chat_plan_progress, state.plan.count { it.startsWith("✓") }, state.plan.size),
                 color = p.accent,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,

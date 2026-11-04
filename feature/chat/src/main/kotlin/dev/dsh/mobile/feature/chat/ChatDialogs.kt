@@ -1,6 +1,8 @@
 // 会话内弹窗：消息操作、用量明细、清空确认、重命名/工作区编辑、人设、Agent 选择、成员重命名与预设选择。
 package dev.dsh.mobile.feature.chat
 
+import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.R as DesignR
 import android.content.Intent
 import dev.dsh.mobile.core.data.preset.AgentPresets
 import dev.dsh.mobile.core.model.GroupRole
@@ -69,19 +71,19 @@ internal fun MessageActionDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("消息操作") },
+        title = { Text(stringResource(DesignR.string.chat_msg_actions)) },
         text = {
             Column {
-                TextButton(onClick = { onCopy(message.text) }) { Text("复制") }
+                TextButton(onClick = { onCopy(message.text) }) { Text(stringResource(DesignR.string.common_copy)) }
                 if (message.role == ChatMessage.Role.ASSISTANT) {
-                    TextButton(enabled = !streaming, onClick = onRegenerate) { Text("重新生成") }
+                    TextButton(enabled = !streaming, onClick = onRegenerate) { Text(stringResource(DesignR.string.chat_regenerate)) }
                 }
                 if (message.role == ChatMessage.Role.USER) {
-                    TextButton(onClick = { onEditResend(message.text) }) { Text("编辑重发") }
+                    TextButton(onClick = { onEditResend(message.text) }) { Text(stringResource(DesignR.string.chat_edit_resend)) }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(DesignR.string.common_close)) } },
     )
 }
 
@@ -96,16 +98,16 @@ internal fun UsageDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = p.card,
-        title = { Text("Token 用量", color = p.t1) },
+        title = { Text(stringResource(DesignR.string.chat_token_usage), color = p.t1) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 listOf(
-                    "输入（未命中）" to compact(state.usage.input),
-                    "输入（缓存命中）" to compact(state.usage.cached),
-                    "输出" to compact(state.usage.output),
-                    "总计" to compact(state.sessionTotalTokens),
-                    "缓存命中率" to "${state.usage.cachePercent}%",
-                    "当前上下文占用" to state.contextUsageText,
+                    stringResource(DesignR.string.chat_tokens_in_miss) to compact(state.usage.input),
+                    stringResource(DesignR.string.chat_tokens_in_cached) to compact(state.usage.cached),
+                    stringResource(DesignR.string.chat_tokens_out) to compact(state.usage.output),
+                    stringResource(DesignR.string.chat_tokens_total) to compact(state.sessionTotalTokens),
+                    stringResource(DesignR.string.chat_cache_hit_rate) to "${state.usage.cachePercent}%",
+                    stringResource(DesignR.string.chat_context_usage) to state.contextUsageText,
                 ).forEach { (label, value) ->
                     Column {
                         Text(label, color = p.t2, fontSize = 12.sp)
@@ -114,12 +116,12 @@ internal fun UsageDialog(
                 }
                 // 压缩明细也挂在同一个弹窗里：没压过就不加这两行。
                 if (projection.compaction.count > 0) Column {
-                    Text("上下文压缩", color = p.t2, fontSize = 12.sp)
+                    Text(stringResource(DesignR.string.chat_context_compaction), color = p.t2, fontSize = 12.sp)
                     Text(compactionDetail(projection.compaction), color = p.t1, fontSize = 14.sp)
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭", color = p.accent) } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(DesignR.string.common_close), color = p.accent) } },
         dismissButton = { TextButton(onClick = onOpenAgentSheet) { Text(state.agentName, color = p.accent) } },
     )
 }
@@ -128,15 +130,15 @@ internal fun UsageDialog(
 internal fun ClearConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("清空聊天记录") },
-        text = { Text("只删除本地消息，运行时与 Agent 配置保持不变。") },
+        title = { Text(stringResource(DesignR.string.chat_clear_title)) },
+        text = { Text(stringResource(DesignR.string.chat_clear_body)) },
         confirmButton = {
             TextButton(onClick = {
                 onConfirm()
                     onDismiss()
-            }) { Text("清空") }
+            }) { Text(stringResource(DesignR.string.chat_clear_action)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(DesignR.string.common_cancel)) } },
     )
 }
 
@@ -182,12 +184,12 @@ internal fun EditDialog(
                     Text(hint, color = p.t3, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
                 }
                 if (pickFolder) Box(Modifier.align(Alignment.CenterEnd)) {
-                    IconBtn(Icons.Filled.Description, "选择文件夹") { folderPicker.launch(null) }
+                    IconBtn(Icons.Filled.Description, stringResource(DesignR.string.common_pick_folder)) { folderPicker.launch(null) }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(value) }) { Text("确定") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = { TextButton(onClick = { onConfirm(value) }) { Text(stringResource(DesignR.string.common_ok)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(DesignR.string.common_cancel)) } },
     )
 }
 
@@ -216,9 +218,9 @@ internal fun PersonaDialog(
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(p.card).padding(16.dp),
         ) {
-            Text("配置智能体", color = p.t1, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(DesignR.string.chat_agent_config_title), color = p.t1, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Text(
-                if (agentName.isBlank()) "给这个会话写人设，或点下面的预设" else "当前：$agentName",
+                if (agentName.isBlank()) stringResource(DesignR.string.chat_agent_config_hint) else stringResource(DesignR.string.chat_agent_current, agentName),
                 color = p.t3,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
@@ -256,7 +258,7 @@ internal fun PersonaDialog(
                 )
                 if (value.isBlank()) {
                     Text(
-                        "例如：你是我的安卓助手，回答简短，先给命令再解释",
+                        stringResource(DesignR.string.chat_agent_example_hint),
                         color = p.t3,
                         fontSize = 14.sp,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -268,10 +270,10 @@ internal fun PersonaDialog(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = { value = "" }) { Text("清空") }
+                TextButton(onClick = { value = "" }) { Text(stringResource(DesignR.string.chat_clear_action)) }
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onDismiss) { Text("取消") }
-                TextButton(onClick = { onConfirm(value) }) { Text("保存") }
+                TextButton(onClick = onDismiss) { Text(stringResource(DesignR.string.common_cancel)) }
+                TextButton(onClick = { onConfirm(value) }) { Text(stringResource(DesignR.string.common_save)) }
             }
         }
     }
@@ -336,15 +338,15 @@ internal fun AgentSheet(
                 .padding(16.dp),
         ) {
             Text(
-                if (state.isGroup) "群成员" else "选择 Agent",
+                if (state.isGroup) stringResource(DesignR.string.chat_group_members) else stringResource(DesignR.string.chat_select_agent),
                 color = p.t1,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                if (state.isGroup) "同一个 Agent 可以重复拉入，各自独立并行；点名字可以改名"
-                else "这个会话使用哪个 Agent",
+                if (state.isGroup) stringResource(DesignR.string.chat_members_hint)
+                else stringResource(DesignR.string.chat_agent_pick_hint),
                 color = p.t3,
                 fontSize = 11.5.sp,
             )
@@ -376,7 +378,7 @@ internal fun AgentSheet(
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                         ) {
                             Text(
-                                part.role.takeIf { it.isNotBlank() }?.let(GroupRole::of)?.label ?: "选角色",
+                                part.role.takeIf { it.isNotBlank() }?.let(GroupRole::of)?.label ?: stringResource(DesignR.string.chat_pick_role),
                                 color = if (part.role.isBlank()) p.t3 else p.t2,
                                 fontSize = 12.sp,
                             )
@@ -385,7 +387,7 @@ internal fun AgentSheet(
                             Modifier.clip(RoundedCornerShape(8.dp)).clickable { onRemove(part.id) }
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                         ) {
-                            Text("移除", color = p.red, fontSize = 12.sp)
+                            Text(stringResource(DesignR.string.common_remove), color = p.red, fontSize = 12.sp)
                         }
                     }
                 }
@@ -397,7 +399,7 @@ internal fun AgentSheet(
             }
 
             Text(
-                if (state.isGroup) "拉入 Agent" else "可用 Agent",
+                if (state.isGroup) stringResource(DesignR.string.chat_pull_agent) else stringResource(DesignR.string.chat_available_agents),
                 color = p.t2,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -427,25 +429,25 @@ internal fun AgentSheet(
                         }
                         when {
                             state.isGroup && count > 0 -> Text(
-                                "已加入 ×" + count,
+                                stringResource(DesignR.string.chat_added_count, count),
                                 color = p.accent,
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.SemiBold,
                             )
-                            state.isGroup -> Text("＋ 拉入", color = p.accent, fontSize = 12.sp)
+                            state.isGroup -> Text(stringResource(DesignR.string.chat_pull_in), color = p.accent, fontSize = 12.sp)
                             profile.id == state.agentId -> Text("✓", color = p.accent, fontSize = 14.sp)
                             else -> Unit
                         }
                     }
                 }
                 if (state.models.isEmpty()) {
-                    EmptyState(icon = Icons.Filled.SmartToy, title = "暂无模型", subtitle = "先去 Agent 页添加 API Key")
+                    EmptyState(icon = Icons.Filled.SmartToy, title = stringResource(DesignR.string.chat_no_models), subtitle = stringResource(DesignR.string.chat_no_models_hint))
                 }
             }
             Spacer(Modifier.height(14.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 Text(
-                    "关闭",
+                    stringResource(DesignR.string.common_close),
                     color = p.accent,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -469,7 +471,7 @@ private fun RenameMemberDialog(
     var value by remember { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("修改成员名字", color = p.t1) },
+        title = { Text(stringResource(DesignR.string.chat_rename_member), color = p.t1) },
         text = {
             Column {
                 Box(Modifier.fillMaxWidth().clip(QqShape.chip()).background(p.bg)) {
@@ -488,9 +490,9 @@ private fun RenameMemberDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(value) }) { Text("保存", color = p.accent) }
+            TextButton(onClick = { onConfirm(value) }) { Text(stringResource(DesignR.string.common_save), color = p.accent) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = p.t2) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(DesignR.string.common_cancel), color = p.t2) } },
         containerColor = p.card,
     )
 }
@@ -520,10 +522,10 @@ internal fun PresetPickDialog(currentId: String, onDismiss: () -> Unit, onPick: 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = p.card,
-        title = { Text("智能体预设", color = p.t1) },
+        title = { Text(stringResource(DesignR.string.chat_agent_presets), color = p.t1) },
         text = {
             Column {
-                Text("发出第一条消息后锁定，不能再改", color = p.t3, fontSize = 11.5.sp)
+                Text(stringResource(DesignR.string.chat_preset_locked_hint), color = p.t3, fontSize = 11.5.sp)
                 Spacer(Modifier.height(6.dp))
                 AgentPresets.builtins.forEach { preset ->
                     val active = preset.id == currentId
@@ -540,12 +542,12 @@ internal fun PresetPickDialog(currentId: String, onDismiss: () -> Unit, onPick: 
                             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                             modifier = Modifier.weight(1f),
                         )
-                        if (active) Text("当前", color = p.accent, fontSize = 11.5.sp)
+                        if (active) Text(stringResource(DesignR.string.chat_badge_current), color = p.accent, fontSize = 11.5.sp)
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭", color = p.accent) } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(DesignR.string.common_close), color = p.accent) } },
     )
 }
 
@@ -559,7 +561,7 @@ private fun RolePickerDialog(
     val p = LocalQq.current
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("席位角色", color = p.t1, fontSize = 16.sp) },
+        title = { Text(stringResource(DesignR.string.chat_seat_role), color = p.t1, fontSize = 16.sp) },
         text = {
             Column {
                 listOf<GroupRole?>(
@@ -579,16 +581,16 @@ private fun RolePickerDialog(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            role?.label ?: "未指定（不参与编排）",
+                            role?.label ?: stringResource(DesignR.string.chat_role_unset),
                             color = if (role == current) p.t1 else p.t2,
                             fontSize = 14.sp,
                             modifier = Modifier.weight(1f),
                         )
-                        if (role == current) Text("当前", color = p.t3, fontSize = 11.sp)
+                        if (role == current) Text(stringResource(DesignR.string.chat_badge_current), color = p.t3, fontSize = 11.sp)
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(DesignR.string.common_close)) } },
     )
 }

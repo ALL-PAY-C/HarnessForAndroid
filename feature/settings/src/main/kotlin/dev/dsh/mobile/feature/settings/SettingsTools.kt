@@ -1,14 +1,13 @@
 package dev.dsh.mobile.feature.settings
 
 import dev.dsh.mobile.core.common.ProxyEnv
+import dev.dsh.mobile.design.UiText
 
 internal fun downloadLimitBytes(text: String): Long? =
     text.trim().toLongOrNull()?.takeIf { it in 1L..4096L }?.times(1024L * 1024L)
 
-fun linuxInstallationLabel(version: String?, abi: String?): String =
-    if (version.isNullOrBlank() || abi.isNullOrBlank()) "未安装" else "$version / $abi"
-
-fun missingLinuxManifest(abi: String): String = "缺少 Linux 制品清单：$abi"
+fun linuxInstallationLabel(version: String?, abi: String?): String? =
+    if (version.isNullOrBlank() || abi.isNullOrBlank()) null else "$version / $abi"
 
 /**
  * 「所有文件访问权限」设置页的 action。写成字面量而不是引用 android.provider.Settings：
@@ -32,13 +31,15 @@ fun proxyInvalid(raw: String): Boolean = raw.isNotBlank() && ProxyEnv.normalize(
 fun proxyLabel(raw: String): String? = if (raw.isBlank()) null else raw.trim()
 
 data class LinuxSettingsState(
-    val rootfs: String = "未安装",
-    val kernel: String = "未安装",
-    val health: String = "尚未自检",
+    /** null = 未安装；安装信息由 linux 工具链给，界面按 null 换成本地化文案。 */
+    val rootfs: String? = null,
+    val kernel: String? = null,
+    /** null = 尚未自检。 */
+    val health: String? = null,
     val usageBytes: Long = 0,
     val checks: List<String> = emptyList(),
     val busy: Boolean = false,
-    val progress: String? = null,
+    val progress: UiText? = null,
     val error: String? = null,
     val message: String? = null,
     val diagnostics: String = "",

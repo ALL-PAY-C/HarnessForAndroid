@@ -367,10 +367,19 @@ fun AppNav(container: AppContainer) {
                 ) {
 
                     composable(Routes.SESSIONS) {
+                        // 新会话/新群组的默认标题按当前语言取资源；LocalContext 已被 UiLocale 包过。
+                        val vmCtx = LocalContext.current
                         val vm: SessionsViewModel = viewModel(
                             factory = viewModelFactory {
                                 initializer {
-                                    SessionsViewModel(container.repo, container.settings, container.models) { container.cwd() }
+                                    SessionsViewModel(
+                                        container.repo,
+                                        container.settings,
+                                        container.models,
+                                        { container.cwd() },
+                                        defaultChatTitle = vmCtx.getString(DesignR.string.sessions_default_title),
+                                        defaultGroupTitle = vmCtx.getString(DesignR.string.sessions_default_group_title),
+                                    )
                                 }
                             },
                         )

@@ -3147,5 +3147,1331 @@
     "en": "Group %1$d",
     "zh": "群 %1$d",
     "where": "design"
+  },
+  {
+    "key": "chat_msg_actions",
+    "en": "Message actions",
+    "zh": "消息操作",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "common_copy",
+    "en": "Copy",
+    "zh": "复制",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_regenerate",
+    "en": "Regenerate",
+    "zh": "重新生成",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_edit_resend",
+    "en": "Edit & resend",
+    "zh": "编辑重发",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_token_usage",
+    "en": "Token usage",
+    "zh": "Token 用量",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_tokens_in_miss",
+    "en": "Input (uncached)",
+    "zh": "输入（未命中）",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_tokens_in_cached",
+    "en": "Input (cache hit)",
+    "zh": "输入（缓存命中）",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_tokens_out",
+    "en": "Output",
+    "zh": "输出",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_tokens_total",
+    "en": "Total",
+    "zh": "总计",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_cache_hit_rate",
+    "en": "Cache hit rate",
+    "zh": "缓存命中率",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_context_usage",
+    "en": "Current context usage",
+    "zh": "当前上下文占用",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_context_compaction",
+    "en": "Context compaction",
+    "zh": "上下文压缩",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_clear_title",
+    "en": "Clear chat history",
+    "zh": "清空聊天记录",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_clear_body",
+    "en": "Deletes local messages only; the runtime and agent config stay unchanged.",
+    "zh": "只删除本地消息，运行时与 Agent 配置保持不变。",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "common_pick_folder",
+    "en": "Choose folder",
+    "zh": "选择文件夹",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_agent_config_title",
+    "en": "Configure agent",
+    "zh": "配置智能体",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_agent_config_hint",
+    "en": "Write a persona for this chat, or pick a preset below",
+    "zh": "给这个会话写人设，或点下面的预设",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_agent_current",
+    "en": "Current: %1$s",
+    "zh": "当前：%1$s",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_agent_example_hint",
+    "en": "e.g. You are my Android assistant. Answer briefly: command first, then the reason",
+    "zh": "例如：你是我的安卓助手，回答简短，先给命令再解释",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_group_members",
+    "en": "Group members",
+    "zh": "群成员",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_select_agent",
+    "en": "Select agent",
+    "zh": "选择 Agent",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_members_hint",
+    "en": "The same agent can be pulled in more than once and each copy runs in parallel; tap a name to rename it",
+    "zh": "同一个 Agent 可以重复拉入，各自独立并行；点名字可以改名",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_agent_pick_hint",
+    "en": "Which agent this chat uses",
+    "zh": "这个会话使用哪个 Agent",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_pick_role",
+    "en": "Pick role",
+    "zh": "选角色",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "common_remove",
+    "en": "Remove",
+    "zh": "移除",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_pull_agent",
+    "en": "Pull in agent",
+    "zh": "拉入 Agent",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_available_agents",
+    "en": "Available agents",
+    "zh": "可用 Agent",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_added_count",
+    "en": "Added ×%1$d",
+    "zh": "已加入 ×%1$d",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_pull_in",
+    "en": "+ Pull in",
+    "zh": "＋ 拉入",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_no_models",
+    "en": "No models yet",
+    "zh": "暂无模型",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_no_models_hint",
+    "en": "Add an API key on the Agent page first",
+    "zh": "先去 Agent 页添加 API Key",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_rename_member",
+    "en": "Rename member",
+    "zh": "修改成员名字",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_agent_presets",
+    "en": "Agent presets",
+    "zh": "智能体预设",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_preset_locked_hint",
+    "en": "Locked once the first message is sent",
+    "zh": "发出第一条消息后锁定，不能再改",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_badge_current",
+    "en": "Current",
+    "zh": "当前",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_seat_role",
+    "en": "Seat role",
+    "zh": "席位角色",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_role_unset",
+    "en": "Unassigned (not orchestrated)",
+    "zh": "未指定（不参与编排）",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_clear_action",
+    "en": "Clear",
+    "zh": "清空",
+    "where": "ChatDialogs.kt"
+  },
+  {
+    "key": "chat_no_agent_selected",
+    "en": "No agent selected",
+    "zh": "未选择 Agent",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "common_search",
+    "en": "Search",
+    "zh": "搜索",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_settings_title",
+    "en": "Chat settings",
+    "zh": "会话设置",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_agent_label",
+    "en": "Agent",
+    "zh": "智能体",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_field_title",
+    "en": "Chat name",
+    "zh": "会话名",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_untitled",
+    "en": "New chat",
+    "zh": "新会话",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_field_workspace",
+    "en": "Workspace",
+    "zh": "工作区",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_workspace_default",
+    "en": "Default workspace",
+    "zh": "默认工作区",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_render_special",
+    "en": "Special format rendering",
+    "zh": "特殊格式渲染",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_render_special_hint",
+    "en": "HTML / LaTeX / Markdown / code blocks",
+    "zh": "HTML / LaTeX / Markdown / 代码块",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_render_on_hint",
+    "en": "On; takes effect from the next message",
+    "zh": "已开启，下一条消息起生效",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_render_off_hint",
+    "en": "Off; tap to write the persona into this chat",
+    "zh": "关闭状态，点一下写入本会话人设",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_edit_settings",
+    "en": "Edit chat settings",
+    "zh": "编辑会话设置",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_unarchive",
+    "en": "Unarchive",
+    "zh": "取消归档",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_archive",
+    "en": "Archive",
+    "zh": "归档",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_exporting",
+    "en": "Exporting…",
+    "zh": "导出中…",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_export_image",
+    "en": "Export long image",
+    "zh": "导出长图",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_rename_title",
+    "en": "Rename chat",
+    "zh": "重命名会话",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_field_chat_name",
+    "en": "Chat name",
+    "zh": "会话名称",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_edit_workspace",
+    "en": "Change workspace",
+    "zh": "修改工作区",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_workspace_example",
+    "en": "e.g. /sdcard/DSH or D:/work",
+    "zh": "例如 /sdcard/DSH 或 D:/work",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_add_to_settings",
+    "en": "Add to chat settings",
+    "zh": "添加到会话设置",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_no_slots",
+    "en": "No plugin widgets to place yet — install and enable a plugin under Plugins first.",
+    "zh": "还没有可放置的插件组件：先到「插件」里安装并启用插件。",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_preset_section",
+    "en": "Agent presets",
+    "zh": "Agent 预设",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_preset_apply_hint",
+    "en": "The selected preset takes effect from the next request",
+    "zh": "选中的预设从下一轮请求开始生效",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_current_preset",
+    "en": "Current preset",
+    "zh": "当前预设",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_manage_members",
+    "en": "Manage members",
+    "zh": "管理成员",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_injection_default",
+    "en": "Armor-break injection (this chat)",
+    "zh": "破甲注入（本会话）",
+    "where": "ChatSettingsScreen.kt"
+  },
+  {
+    "key": "chat_queued_head",
+    "en": "Queued %1$d · sent automatically after this round",
+    "zh": "已排队 %1$d 条 · 等这一轮结束自动发",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_pending_head",
+    "en": "Pending %1$d",
+    "zh": "待发送 %1$d 条",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "common_collapse",
+    "en": "Collapse",
+    "zh": "收起",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "common_expand",
+    "en": "Expand",
+    "zh": "展开",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_images_count",
+    "en": "(%1$d images)",
+    "zh": "（%1$d 张图片）",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_jump_queue",
+    "en": "Jump queue",
+    "zh": "插队",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_send_short",
+    "en": "Send",
+    "zh": "发",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_tools_collapse",
+    "en": "Collapse tool panel",
+    "zh": "收起工具面板",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_tools_expand",
+    "en": "Expand tool panel",
+    "zh": "展开工具面板",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_drafts_count",
+    "en": "%1$d",
+    "zh": "%1$d 张",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_image_unit",
+    "en": "img",
+    "zh": "图",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_empty_prompt",
+    "en": "How can I help?",
+    "zh": "有什么可以帮你的？",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "common_file",
+    "en": "File",
+    "zh": "文件",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "common_image",
+    "en": "Image",
+    "zh": "图片",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "common_take_photo",
+    "en": "Take photo",
+    "zh": "拍照",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_mode_queue",
+    "en": "Queue",
+    "zh": "排队",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_mode_insert",
+    "en": "Insert",
+    "zh": "插入",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_stop",
+    "en": "Stop",
+    "zh": "停止",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_send",
+    "en": "Send",
+    "zh": "发送",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_quick_commands",
+    "en": "Quick commands",
+    "zh": "快捷指令",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_prompt_templates",
+    "en": "Prompt templates",
+    "zh": "提示词模板",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "common_plugins",
+    "en": "Plugins",
+    "zh": "插件",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_add_to_bottom",
+    "en": "Add to chat bottom",
+    "zh": "添加到会话底部",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_no_slots_add",
+    "en": "No plugin widgets to add — install plugins in the plugin center first",
+    "zh": "没有可添加的插件组件，先去插件中心装插件",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_plugin_slot_failed",
+    "en": "Plugin button \"%1$s\" could not be displayed",
+    "zh": "插件按钮「%1$s」没能显示",
+    "where": "ChatComposer.kt"
+  },
+  {
+    "key": "chat_todo_collapse",
+    "en": "Collapse todos",
+    "zh": "收起待办",
+    "where": "ChatHeader.kt"
+  },
+  {
+    "key": "chat_todo_expand",
+    "en": "Expand todos",
+    "zh": "展开待办",
+    "where": "ChatHeader.kt"
+  },
+  {
+    "key": "chat_blocked",
+    "en": "Blocked: %1$s",
+    "zh": "受阻：%1$s",
+    "where": "ChatHeader.kt"
+  },
+  {
+    "key": "chat_streaming_line",
+    "en": "Streaming · %1$s",
+    "zh": "正在输出 · %1$s",
+    "where": "ChatHeader.kt"
+  },
+  {
+    "key": "chat_planning",
+    "en": "Planning",
+    "zh": "规划",
+    "where": "ChatHeader.kt"
+  },
+  {
+    "key": "chat_planning_count",
+    "en": "Planning %1$d",
+    "zh": "规划 %1$d",
+    "where": "ChatHeader.kt"
+  },
+  {
+    "key": "chat_next_speaker",
+    "en": "Next: %1$s",
+    "zh": "下一位：%1$s",
+    "where": "ChatHeader.kt"
+  },
+  {
+    "key": "chat_assign",
+    "en": "Assign",
+    "zh": "指定",
+    "where": "ChatHeader.kt"
+  },
+  {
+    "key": "chat_preset_label",
+    "en": "Preset: %1$s",
+    "zh": "预设：%1$s",
+    "where": "ChatHeader.kt"
+  },
+  {
+    "key": "chat_session_menu",
+    "en": "Chat menu",
+    "zh": "会话菜单",
+    "where": "ChatHeader.kt"
+  },
+  {
+    "key": "chat_no_agents_pull",
+    "en": "No agents yet — tap the top right to pull one in",
+    "zh": "还没有 Agent，点右上角拉人",
+    "where": "ChatHeader.kt"
+  },
+  {
+    "key": "common_waiting_confirm",
+    "en": "Waiting for confirmation",
+    "zh": "等待确认",
+    "where": "ChatHeader.kt"
+  },
+  {
+    "key": "chat_running",
+    "en": "Running",
+    "zh": "执行中",
+    "where": "ChatHeader.kt"
+  },
+  {
+    "key": "chat_header_slot_failed",
+    "en": "Header plugin button \"%1$s\" could not be displayed",
+    "zh": "顶栏插件按钮「%1$s」没能显示",
+    "where": "ChatHeader.kt"
+  },
+  {
+    "key": "chat_plan_progress",
+    "en": "Plan %1$d/%2$d",
+    "zh": "计划 %1$d/%2$d",
+    "where": "ChatHeader.kt"
+  },
+  {
+    "key": "chat_compacting",
+    "en": "Compacting context…",
+    "zh": "正在压缩上下文…",
+    "where": "ChatMessageList.kt"
+  },
+  {
+    "key": "chat_perm_need_confirm",
+    "en": "The next command needs your confirmation",
+    "zh": "接下来的命令需要你的确认",
+    "where": "ChatMessageList.kt"
+  },
+  {
+    "key": "chat_owner_pill",
+    "en": "From %1$s",
+    "zh": "由 %1$s 发起",
+    "where": "ChatMessageList.kt"
+  },
+  {
+    "key": "chat_only_to",
+    "en": "Only sent back to @%1$s",
+    "zh": "只回传给 @%1$s",
+    "where": "ChatMessageList.kt"
+  },
+  {
+    "key": "chat_perm_other_inline",
+    "en": "Other (tap here to type below)",
+    "zh": "其他（点这里在下方自己输入）",
+    "where": "ChatMessageList.kt"
+  },
+  {
+    "key": "chat_perm_other",
+    "en": "Other (type it yourself)",
+    "zh": "其他（自己输入）",
+    "where": "ChatMessageList.kt"
+  },
+  {
+    "key": "chat_empty_hint_group",
+    "en": "@ an agent below to send a task; without an @ the last speaker answers.",
+    "zh": "在下面 @ 一位 Agent 发任务；不 @ 时由最后发言的那位接着答。",
+    "where": "ChatMessageList.kt"
+  },
+  {
+    "key": "chat_empty_hint_single",
+    "en": "Messages go to the local runtime; replies stream in here live.",
+    "zh": "消息会发给本地运行时，回复实时流式显示在这里。",
+    "where": "ChatMessageList.kt"
+  },
+  {
+    "key": "common_photo",
+    "en": "Photo",
+    "zh": "照片",
+    "where": "ChatScreen.kt"
+  },
+  {
+    "key": "chat_no_photo",
+    "en": "No photo taken",
+    "zh": "没有拍照",
+    "where": "ChatScreen.kt"
+  },
+  {
+    "key": "chat_attach_read_failed",
+    "en": "Failed to read %1$s",
+    "zh": "读取%1$s 失败",
+    "where": "ChatScreen.kt"
+  },
+  {
+    "key": "chat_camera_open_failed",
+    "en": "Cannot open camera: %1$s",
+    "zh": "打不开相机：%1$s",
+    "where": "ChatScreen.kt"
+  },
+  {
+    "key": "chat_camera_permission_hint",
+    "en": "Camera permission needed: Settings → Apps → DSH Mobile → Permissions → Camera",
+    "zh": "需要相机权限：系统设置 → 应用 → DSH Mobile → 权限 → 相机",
+    "where": "ChatScreen.kt"
+  },
+  {
+    "key": "chat_recall_usage",
+    "en": "Usage: /recall <word> or /recall R<n>",
+    "zh": "用法：/recall <词> 或 /recall R<序号>",
+    "where": "ChatScreen.kt"
+  },
+  {
+    "key": "chat_new_chat_hint",
+    "en": "To start a new chat, go back to the chat list and tap ＋ at the top right",
+    "zh": "新建会话请回到会话列表点右上角 ＋",
+    "where": "ChatScreen.kt"
+  },
+  {
+    "key": "chat_unknown_command",
+    "en": "Unknown command %1$s · quick commands can be edited in settings",
+    "zh": "未知指令 %1$s · 可在设置里修改快捷指令",
+    "where": "ChatScreen.kt"
+  },
+  {
+    "key": "common_me",
+    "en": "Me",
+    "zh": "我",
+    "where": "ChatScreen.kt"
+  },
+  {
+    "key": "common_assistant",
+    "en": "Assistant",
+    "zh": "助手",
+    "where": "ChatScreen.kt"
+  },
+  {
+    "key": "common_system",
+    "en": "System",
+    "zh": "系统",
+    "where": "ChatScreen.kt"
+  },
+  {
+    "key": "common_tool",
+    "en": "Tool",
+    "zh": "工具",
+    "where": "ChatScreen.kt"
+  },
+  {
+    "key": "chat_gallery_no_uri",
+    "en": "Gallery returned no file path",
+    "zh": "相册未返回文件地址",
+    "where": "ChatScreen.kt"
+  },
+  {
+    "key": "chat_export_saved",
+    "en": "Exported to gallery Pictures/DSH",
+    "zh": "已导出到相册 Pictures/DSH",
+    "where": "ChatScreen.kt"
+  },
+  {
+    "key": "chat_export_failed",
+    "en": "Export failed: %1$s",
+    "zh": "导出失败：%1$s",
+    "where": "ChatScreen.kt"
+  },
+  {
+    "key": "group_speaking",
+    "en": "Speaking",
+    "zh": "正在发言",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_spoke",
+    "en": "Spoke this round",
+    "zh": "本轮已发言",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_field_model",
+    "en": "Model",
+    "zh": "模型",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_unset",
+    "en": "Not set",
+    "zh": "未指定",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_field_role",
+    "en": "Role",
+    "zh": "角色",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_field_round",
+    "en": "This round",
+    "zh": "本轮",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_spoke_short",
+    "en": "Spoke",
+    "zh": "已发言",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_not_yet",
+    "en": "Not yet",
+    "zh": "还没轮到",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_round_usage",
+    "en": "Round usage",
+    "zh": "本轮用量",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_usage_tokens",
+    "en": "%1$s tokens · %2$d chars",
+    "zh": "%1$s tokens · %2$d 字",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_usage_chars",
+    "en": "%1$d chars",
+    "zh": "%1$d 字",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_pin_cancel",
+    "en": "Clear pick",
+    "zh": "取消指定",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_pin_set",
+    "en": "Pick as next",
+    "zh": "指定为下一位",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_replying",
+    "en": "Replying…",
+    "zh": "正在回复…",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_pick_next_title",
+    "en": "Pick the next speaker",
+    "zh": "指定下一位发言人",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_pick_next_hint",
+    "en": "Applies to the next send only: this message asks it to answer first, then the host schedules again.",
+    "zh": "只对下一次发送生效：这条消息点名它先答，之后回到主持人调度。",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_no_agents",
+    "en": "No agents in this room yet",
+    "zh": "群里还没有 Agent",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_next_badge",
+    "en": "Next",
+    "zh": "下一位",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_todo_count",
+    "en": "Todo %1$d",
+    "zh": "待办 %1$d",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_ledger",
+    "en": "Room ledger",
+    "zh": "房间账本",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_ledger_summary",
+    "en": "Open %1$d · Questions %2$d",
+    "zh": "未完成 %1$d · 问题 %2$d",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_ledger_open",
+    "en": "Open",
+    "zh": "未完成",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_ledger_empty",
+    "en": "Nothing open",
+    "zh": "没有未完成的事",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_ledger_reworked",
+    "en": "Sent back",
+    "zh": "已打回",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_ledger_questions",
+    "en": "Unresolved questions",
+    "zh": "未解问题",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_ledger_done",
+    "en": "%1$d done",
+    "zh": "已完成 %1$d 条",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_ledger_show_recent",
+    "en": "Recent 5",
+    "zh": "最近 5 条",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "group_ledger_rework_total",
+    "en": "Sent back %1$d times",
+    "zh": "累计打回 %1$d 次",
+    "where": "GroupUi.kt"
+  },
+  {
+    "key": "settings_err_download_limit",
+    "en": "The download limit must be a whole number of 1–4096 MB",
+    "zh": "单次下载上限须为 1–4096 MB 的整数",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_err_proxy_invalid",
+    "en": "Invalid proxy address. Example: http://127.0.0.1:7890 or socks5://127.0.0.1:1080",
+    "zh": "代理地址无效，示例：http://127.0.0.1:7890 或 socks5://127.0.0.1:1080",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_proxy_direct",
+    "en": "Switched to a direct connection",
+    "zh": "已切换为直连",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_proxy_saved",
+    "en": "Proxy saved: %1$s",
+    "zh": "代理已保存：%1$s",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_update_reading_env",
+    "en": "Reading environment status",
+    "zh": "读取环境状态",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_update_checking",
+    "en": "Checking…",
+    "zh": "检查中…",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_update_latest",
+    "en": "Already up to date (%1$s)",
+    "zh": "已经是最新版本（%1$s）",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_update_found",
+    "en": "New version found: %1$s",
+    "zh": "发现新版本 %1$s",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_update_check_failed",
+    "en": "Check failed: %1$s",
+    "zh": "检查失败：%1$s",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_update_downloading",
+    "en": "Downloading…",
+    "zh": "下载中…",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_update_downloaded",
+    "en": "Download complete, ready to install",
+    "zh": "下载完成，可以安装",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_update_digest_ok",
+    "en": "sha256 verified · %1$s",
+    "zh": "sha256 校验通过 · %1$s",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_update_digest_skip",
+    "en": "The manifest has no sha256; verification skipped",
+    "zh": "清单未提供 sha256，本次跳过校验",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_update_digest_fail",
+    "en": "sha256 verification failed",
+    "zh": "sha256 校验失败",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_update_verify_failed",
+    "en": "Download verification failed: the file was deleted, cannot install",
+    "zh": "下载校验失败：文件已删除，不能安装",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_update_download_failed",
+    "en": "Download failed: %1$s",
+    "zh": "下载失败：%1$s",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_reconnect_requested",
+    "en": "Reconnect requested",
+    "zh": "已请求重连",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_logs_cleared",
+    "en": "Logs cleared",
+    "zh": "日志已清理",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_saved_item",
+    "en": "Saved %1$s",
+    "zh": "已保存 %1$s",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_deleted",
+    "en": "Deleted",
+    "zh": "已删除",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_connection_switched",
+    "en": "Connection switched",
+    "zh": "已切换连接",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_linux_not_installed",
+    "en": "Not installed",
+    "zh": "未安装",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_linux_not_selfchecked",
+    "en": "Not self-checked yet",
+    "zh": "尚未自检",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "settings_linux_missing_manifest",
+    "en": "Linux artifact manifest missing: %1$s",
+    "zh": "缺少 Linux 制品清单：%1$s",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "agents_state_running",
+    "en": "Running",
+    "zh": "运行中",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "agents_state_failed",
+    "en": "Failed",
+    "zh": "失败",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "agents_saved_model",
+    "en": "Model saved: %1$s",
+    "zh": "已保存模型 %1$s",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "agents_saved_models",
+    "en": "Saved %1$d models",
+    "zh": "已保存 %1$d 个模型",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "agents_model_deleted",
+    "en": "Model deleted",
+    "zh": "已删除模型",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "agents_default_set",
+    "en": "Set as default model",
+    "zh": "已设为默认模型",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "agents_testing",
+    "en": "Testing · %1$s",
+    "zh": "测试中 · %1$s",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "agents_probe_ok",
+    "en": "OK · %1$s",
+    "zh": "成功 · %1$s",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "agents_probe_fail",
+    "en": "Failed · %1$s",
+    "zh": "失败 · %1$s",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "agents_probe_unknown",
+    "en": "Unknown error",
+    "zh": "未知错误",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "agents_probe_ms",
+    "en": "%1$dms",
+    "zh": "%1$dms",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "agents_probe_models",
+    "en": "models %1$s",
+    "zh": "模型 %1$s",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "agents_probe_context",
+    "en": "context %1$d",
+    "zh": "上下文 %1$d",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "agents_channels_reprobed",
+    "en": "Tool channels re-probed",
+    "zh": "已重新探测工具通道",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "agents_shizuku_requested",
+    "en": "Requested Shizuku permission; allow it in the dialog",
+    "zh": "已向 Shizuku 申请授权，请在弹窗中允许",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "agents_shizuku_not_running",
+    "en": "Shizuku is not running; start the Shizuku service first",
+    "zh": "Shizuku 未运行，请先启动 Shizuku 服务",
+    "where": "P2 state layer"
+  },
+  {
+    "key": "term_init_failed",
+    "en": "Terminal failed to start",
+    "zh": "终端初始化失败",
+    "where": "P2 state layer / terminal"
+  },
+  {
+    "key": "term_mode_simple",
+    "en": "Simple",
+    "zh": "简易",
+    "where": "P2 state layer / terminal"
+  },
+  {
+    "key": "term_starting",
+    "en": "Starting shell…",
+    "zh": "正在启动 shell…",
+    "where": "P2 state layer / terminal"
+  },
+  {
+    "key": "term_new",
+    "en": "New",
+    "zh": "新建",
+    "where": "P2 state layer / terminal"
+  },
+  {
+    "key": "term_shell_exited",
+    "en": "shell exited (%1$s) · tap here to start a new one",
+    "zh": "shell 已退出（%1$s）· 点这里新开一个",
+    "where": "P2 state layer / terminal"
+  },
+  {
+    "key": "term_clear",
+    "en": "Clear",
+    "zh": "清屏",
+    "where": "P2 state layer / terminal"
+  },
+  {
+    "key": "term_no_output",
+    "en": "(no output)",
+    "zh": "(无输出)",
+    "where": "P2 state layer / terminal"
+  },
+  {
+    "key": "term_exit_code",
+    "en": "(exit code %1$d)",
+    "zh": "(退出码 %1$d)",
+    "where": "P2 state layer / terminal"
+  },
+  {
+    "key": "term_running",
+    "en": "Running…",
+    "zh": "执行中…",
+    "where": "P2 state layer / terminal"
+  },
+  {
+    "key": "term_input_hint",
+    "en": "Type a command and press Enter",
+    "zh": "输入命令，回车执行",
+    "where": "P2 state layer / terminal"
+  },
+  {
+    "key": "term_execute",
+    "en": "Run",
+    "zh": "执行",
+    "where": "P2 state layer / terminal"
+  },
+  {
+    "key": "term_tab_title",
+    "en": "Terminal %1$s",
+    "zh": "终端 %1$s",
+    "where": "P2 state layer / terminal"
+  },
+  {
+    "key": "settings_linux_health_ok",
+    "en": "Node %1$s / kernel %2$s · healthy",
+    "zh": "Node %1$s / 内核 %2$s · 正常",
+    "where": "P2 state layer / linux controller"
+  },
+  {
+    "key": "settings_linux_health_fail",
+    "en": "Health check failed: %1$s",
+    "zh": "健康检查失败：%1$s",
+    "where": "P2 state layer / linux controller"
+  },
+  {
+    "key": "settings_linux_health_unset",
+    "en": "Node / kernel not installed or not self-checked",
+    "zh": "Node / 内核尚未安装或自检",
+    "where": "P2 state layer / linux controller"
+  },
+  {
+    "key": "settings_linux_health_failed_code",
+    "en": "Kernel health check failed: %1$d",
+    "zh": "内核健康检查失败：%1$d",
+    "where": "P2 state layer / linux controller"
+  },
+  {
+    "key": "settings_linux_install_first",
+    "en": "Install the Linux environment first",
+    "zh": "请先安装 Linux 环境",
+    "where": "P2 state layer / linux controller"
+  },
+  {
+    "key": "settings_linux_abi_unsupported",
+    "en": "The current ABI does not support the Linux environment",
+    "zh": "当前 ABI 不支持 Linux 环境",
+    "where": "P2 state layer / linux controller"
+  },
+  {
+    "key": "common_all",
+    "en": "All",
+    "zh": "全部",
+    "where": "feature/sessions/GroupLabels.kt"
+  },
+  {
+    "key": "agents_probe_timeout",
+    "en": "Timed out",
+    "zh": "连接超时",
+    "where": "feature/agents/AgentsScreen.kt"
+  },
+  {
+    "key": "agents_probe_empty_base_url",
+    "en": "Base URL is empty",
+    "zh": "Base URL 为空",
+    "where": "feature/agents/AgentsScreen.kt"
+  },
+  {
+    "key": "agents_probe_engine_offline",
+    "en": "Engine plugin, no network needed",
+    "zh": "引擎插件，免网络",
+    "where": "feature/agents/AgentsScreen.kt"
+  },
+  {
+    "key": "sessions_default_title",
+    "en": "New chat",
+    "zh": "新会话",
+    "where": "feature/sessions/SessionsViewModel.kt"
+  },
+  {
+    "key": "sessions_default_group_title",
+    "en": "New group",
+    "zh": "新群组",
+    "where": "feature/sessions/SessionsViewModel.kt"
   }
 ]

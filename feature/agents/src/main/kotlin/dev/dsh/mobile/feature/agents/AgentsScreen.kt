@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.dsh.mobile.core.data.settings.ModelProfile
+import dev.dsh.mobile.core.data.settings.ProbeFailure
 import dev.dsh.mobile.core.data.settings.ModelCatalog
 import dev.dsh.mobile.core.data.settings.ModelProvider
 import dev.dsh.mobile.core.data.settings.ModelProviders
@@ -85,6 +86,10 @@ import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.design.RunPill
 import dev.dsh.mobile.design.StatusCapsule
 import dev.dsh.mobile.design.qqFontBody
+import dev.dsh.mobile.design.UiText
+import dev.dsh.mobile.design.text
+import dev.dsh.mobile.design.resolve
+import androidx.compose.ui.platform.LocalContext
 import dev.dsh.mobile.toolbridge.ChannelStatus
 
 @Composable
@@ -100,6 +105,7 @@ fun AgentsScreen(
     var editing by remember { mutableStateOf<ModelProfile?>(null) }
     var adding by remember { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
+    val ctx = LocalContext.current
     // 删除模型前先弹确认框（M20）：API Key 会一起删，不可撤销，不能裸点 17dp 图标就删。
     var pendingDelete by remember { mutableStateOf<ModelProfile?>(null) }
     // 区块折叠状态：只记「展开」的区块 id，未列出的按默认收起。页面重建后保持。
@@ -110,8 +116,14 @@ fun AgentsScreen(
 
     LaunchedEffect(state.message) {
         state.message?.let {
-            toast = it
+            toast = it.resolve(ctx)
             viewModel.dismissMessage()
+        }
+    }
+    LaunchedEffect(state.probe) {
+        state.probe?.let {
+            toast = probeText(ctx, it)
+            viewModel.dismissProbe()
         }
     }
     LaunchedEffect(toast) {
@@ -326,7 +338,7 @@ fun AgentsScreen(
                         } else {
                             Column(Modifier.fillMaxWidth()) {
                                 state.all.forEachIndexed { i, s ->
-                                    AgentRow(AgentCard(s, stringResource(DesignR.string.agents_idle))) { onOpenSession(s.id) }
+                                    AgentRow(AgentCard(s, DesignR.string.agents_idle)) { onOpenSession(s.id) }
                                     if (i != state.all.lastIndex) QqCardDivider()
                                 }
                             }
@@ -613,7 +625,7 @@ private fun AgentRow(card: AgentCard, onClick: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        RunPill(card.label)
+        RunPill(stringResource(card.labelRes))
     }
 }
 
@@ -937,4 +949,32 @@ private fun DialogField(
                 .padding(horizontal = 10.dp, vertical = 9.dp),
         )
     }
+}
+
+/** 连接测试结论 → 文案。数据层只给 ProbeResult，中文都在这里取资源。 */
+private fun probeText(context: android.content.Context, notice: ProbeNotice): String {
+    val result = notice.result
+    val head = if (result.ok) {
+        val detail = if (result.engineOffline) {
+            context.getString(DesignR.string.agents_probe_engine_offline)
+        } else {
+            context.getString(DesignR.string.agents_probe_ms, result.elapsedMs)
+        }
+        context.getString(DesignR.string.agents_probe_ok, detail)
+    } else {
+        val why = when {
+            result.httpCode > 0 -> "HTTP " + result.httpCode
+            result.failure == ProbeFailure.EmptyBaseUrl -> context.getString(DesignR.string.agents_probe_empty_base_url)
+            result.failure == ProbeFailure.Timeout -> context.getString(DesignR.string.agents_probe_timeout)
+            result.error.isNotBlank() -> result.error
+            else -> context.getString(DesignR.string.agents_probe_unknown)
+        }
+        context.getString(DesignR.string.agents_probe_fail, why)
+    }
+    val withModels = if (result.ok && result.models.isNotEmpty()) {
+        head + " · " + context.getString(DesignR.string.agents_probe_models, result.models.joinToString(","))
+    } else head
+    return if (notice.window > 0) {
+        withModels + " · " + context.getString(DesignR.string.agents_probe_context, notice.window)
+    } else withModels
 }

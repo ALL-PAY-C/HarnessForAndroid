@@ -40,9 +40,10 @@ class PersonaSlotTest {
     @Test
     fun labelDropsEmbeddedState() {
         // 插件 label 里自带「：开（本会话）」，状态交给 Switch 表达，标题只留名字。
-        assertEquals("破甲注入", personaLabelOf("破甲注入：开（本会话）"))
-        assertEquals("破甲注入（本会话）", personaLabelOf("破甲注入（本会话）"))
-        assertEquals("破甲注入（本会话）", personaLabelOf(""))
+        val fallback = "破甲注入（本会话）"
+        assertEquals("破甲注入", personaLabelOf("破甲注入：开（本会话）", fallback))
+        assertEquals("破甲注入（本会话）", personaLabelOf("破甲注入（本会话）", fallback))
+        assertEquals("破甲注入（本会话）", personaLabelOf("", fallback))
     }
 
     @Test

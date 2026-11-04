@@ -1,6 +1,8 @@
 // 输入区：输入框、附件待发条、发送/停止按钮、工具面板与排队条。
 package dev.dsh.mobile.feature.chat
 
+import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.core.data.repo.SendQueue
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -108,17 +110,17 @@ internal fun QueueStrip(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.Schedule, null, tint = p.amber, modifier = Modifier.size(15.dp))
             Spacer(Modifier.width(6.dp))
-            val head = if (streaming) "已排队 " + items.size + " 条 · 等这一轮结束自动发"
-            else "待发送 " + items.size + " 条"
+            val head = if (streaming) stringResource(DesignR.string.chat_queued_head, items.size)
+            else stringResource(DesignR.string.chat_pending_head, items.size)
             Text(head, color = p.t2, fontSize = 12.sp, modifier = Modifier.weight(1f))
             Text(
-                if (expanded) "收起" else "展开",
+                if (expanded) stringResource(DesignR.string.common_collapse) else stringResource(DesignR.string.common_expand),
                 color = p.t3,
                 fontSize = 11.5.sp,
                 modifier = Modifier.clickable { expanded = !expanded }.padding(horizontal = 6.dp),
             )
             Text(
-                "清空",
+                stringResource(DesignR.string.chat_clear_action),
                 color = p.red,
                 fontSize = 11.5.sp,
                 modifier = Modifier.clickable { onClear() }.padding(horizontal = 6.dp),
@@ -139,7 +141,7 @@ internal fun QueueStrip(
                         Text((index + 1).toString(), color = p.t3, fontSize = 11.sp, modifier = Modifier.width(16.dp))
                         Column(Modifier.weight(1f)) {
                             Text(
-                                item.text.ifBlank { "（" + item.images.size + " 张图片）" },
+                                item.text.ifBlank { stringResource(DesignR.string.chat_images_count, item.images.size) },
                                 color = p.t1,
                                 fontSize = 12.5.sp,
                                 maxLines = 1,
@@ -148,7 +150,7 @@ internal fun QueueStrip(
                         }
                         if (index > 0) {
                             Text(
-                                "插队",
+                                stringResource(DesignR.string.chat_jump_queue),
                                 color = p.accent,
                                 fontSize = 11.5.sp,
                                 modifier = Modifier.clickable { onPromote(item.id) }
@@ -156,7 +158,7 @@ internal fun QueueStrip(
                             )
                         }
                         Text(
-                            "发",
+                            stringResource(DesignR.string.chat_send_short),
                             color = p.accent,
                             fontSize = 11.5.sp,
                             modifier = Modifier.clickable { onSendNow(item.id) }
@@ -229,7 +231,7 @@ private fun PlusToggleButton(active: Boolean, onClick: () -> Unit) {
         ) {
             Icon(
                 Icons.Filled.Add,
-                contentDescription = if (active) "收起工具面板" else "展开工具面板",
+                contentDescription = if (active) stringResource(DesignR.string.chat_tools_collapse) else stringResource(DesignR.string.chat_tools_expand),
                 tint = if (active) p.accent else p.t2,
                 modifier = Modifier.size(19.dp),
             )
@@ -363,7 +365,7 @@ internal fun Composer(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("${drafts.size} 张", color = p.t3, fontSize = 11.sp)
+                Text(stringResource(DesignR.string.chat_drafts_count, drafts.size), color = p.t3, fontSize = 11.sp)
                 drafts.forEach { path ->
                     Box {
                         // draft 存的是相对 filesDir 的路径，解码前还原成绝对路径。
@@ -383,7 +385,7 @@ internal fun Composer(
                             Box(
                                 Modifier.size(62.dp).clip(RoundedCornerShape(8.dp)).background(p.bg),
                                 contentAlignment = Alignment.Center,
-                            ) { Text("图", color = p.t3, fontSize = 12.sp) }
+                            ) { Text(stringResource(DesignR.string.chat_image_unit), color = p.t3, fontSize = 12.sp) }
                         }
                         Box(
                             Modifier
@@ -412,7 +414,7 @@ internal fun Composer(
         ) {
             Box(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 11.dp)) {
                 if (input.text.isBlank()) {
-                    Text("有什么可以帮你的？", color = p.t3, fontSize = 15.sp)
+                    Text(stringResource(DesignR.string.chat_empty_prompt), color = p.t3, fontSize = 15.sp)
                 }
                 BasicTextField(
                     value = input,
@@ -428,16 +430,16 @@ internal fun Composer(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // 常显：不受「+」与面板开关影响。
-                ToolButton("文件", Icons.Filled.AttachFile, onPickFile)
-                ToolButton("图片", Icons.Filled.Image, onPickImage)
-                ToolButton("拍照", Icons.Filled.PhotoCamera, onTakePhoto)
+                ToolButton(stringResource(DesignR.string.common_file), Icons.Filled.AttachFile, onPickFile)
+                ToolButton(stringResource(DesignR.string.common_image), Icons.Filled.Image, onPickImage)
+                ToolButton(stringResource(DesignR.string.common_take_photo), Icons.Filled.PhotoCamera, onTakePhoto)
                 Spacer(Modifier.weight(1f))
                 if (streaming && input.text.isNotBlank()) {
                     // 正在跑的时候有字：右下角仍然是「发送」，按设置里的三档策略处理
                     // （排队 / 插入 / 打断）。想明确指定时用这两个小按钮。
-                    ActionChip("排队", p.accent, onQueue)
+                    ActionChip(stringResource(DesignR.string.chat_mode_queue), p.accent, onQueue)
                     Spacer(Modifier.width(6.dp))
-                    ActionChip("插入", p.accent, onInsert)
+                    ActionChip(stringResource(DesignR.string.chat_mode_insert), p.accent, onInsert)
                     Spacer(Modifier.width(6.dp))
                 }
                 if (streaming && input.text.isBlank()) {
@@ -445,7 +447,7 @@ internal fun Composer(
                     SendStopButton(enabled = true, background = p.t1, onClick = onStop) {
                         Icon(
                             Icons.Filled.Stop,
-                            contentDescription = "停止",
+                            contentDescription = stringResource(DesignR.string.chat_stop),
                             tint = p.card,
                             modifier = Modifier.size(17.dp),
                         )
@@ -465,7 +467,7 @@ internal fun Composer(
                 ) {
                     Icon(
                         Icons.Filled.ArrowUpward,
-                        contentDescription = "发送",
+                        contentDescription = stringResource(DesignR.string.chat_send),
                         tint = if (canSend) Color.White else p.t3,
                         modifier = Modifier.size(18.dp),
                     )
@@ -485,17 +487,17 @@ internal fun Composer(
             ) {
                 // 三段都折叠成一行：先给目录，展开才出 chip。
                 if (quickCommands.isNotEmpty()) {
-                    PanelSection("快捷指令", quickOpen, { quickOpen = !quickOpen }) {
+                    PanelSection(stringResource(DesignR.string.chat_quick_commands), quickOpen, { quickOpen = !quickOpen }) {
                         ChipFlow(quickCommands) { onQuickCommand(it) }
                     }
                 }
                 if (templates.isNotEmpty()) {
-                    PanelSection("提示词模板", tplOpen, { tplOpen = !tplOpen }) {
+                    PanelSection(stringResource(DesignR.string.chat_prompt_templates), tplOpen, { tplOpen = !tplOpen }) {
                         ChipFlow(templates) { onTemplate(it) }
                     }
                 }
                 if (extras.isNotEmpty()) {
-                    PanelSection("插件", extraOpen, { extraOpen = !extraOpen }) {
+                    PanelSection(stringResource(DesignR.string.common_plugins), extraOpen, { extraOpen = !extraOpen }) {
                         ChipFlow(extras, onExtra)
                     }
                 }
@@ -525,16 +527,16 @@ internal fun Composer(
                             }
                         }
                         if (SlotEditState.enabled) {
-                            SlotPlusButton(label = "编辑" + SlotEditState.Slot.Composer.label) { picker = true }
+                            SlotPlusButton(label = stringResource(DesignR.string.common_edit) + SlotEditState.Slot.Composer.label) { picker = true }
                         }
                     }
                 }
 
                 if (picker) {
                     SlotPickerDialog(
-                        title = "添加到会话底部",
+                        title = stringResource(DesignR.string.chat_add_to_bottom),
                         items = slotCandidates,
-                        emptyHint = "没有可添加的插件组件，先去插件中心装插件",
+                        emptyHint = stringResource(DesignR.string.chat_no_slots_add),
                         onPick = { onSlotAdd(it); picker = false },
                         onDismiss = { picker = false },
                     )
@@ -574,7 +576,7 @@ private fun PanelSection(
             )
             Icon(
                 if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                contentDescription = if (expanded) "收起" else "展开",
+                contentDescription = if (expanded) stringResource(DesignR.string.common_collapse) else stringResource(DesignR.string.common_expand),
                 tint = p.t3,
                 modifier = Modifier.size(16.dp),
             )
@@ -665,7 +667,7 @@ private fun ComposerSlotRow(slots: List<SlotContribution>, onSlot: (SlotContribu
                         .padding(horizontal = 8.dp, vertical = 5.dp),
                 )
             }.isSuccess
-            if (!ok) failed = "插件按钮「" + slot.label + "」没能显示"
+            if (!ok) failed = stringResource(DesignR.string.chat_plugin_slot_failed, slot.label)
         }
         val hidden = slots.size - shown.size
         if (hidden > 0) {

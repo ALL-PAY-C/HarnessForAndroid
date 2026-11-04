@@ -1,6 +1,8 @@
 // 消息列表：气泡渲染、时间分隔、权限卡、选项气泡、系统回执与自动跟随滚动。
 package dev.dsh.mobile.feature.chat
 
+import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.R as DesignR
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -138,7 +140,6 @@ internal fun looksLikeHtmlDocument(text: String): Boolean {
 }
 
 /** /compact 等待期的占位文案（压缩要调模型，别让点击看起来没反应）。 */
-internal const val COMPACT_RUNNING_TEXT = "正在压缩上下文…"
 
 /**
  * 一条系统回执：居中、灰底小字。
@@ -180,7 +181,7 @@ private fun RecallNoteRow(report: RecallReport) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            if (hasRows) report.message + " · " + (if (open) "收起" else "展开") else report.message,
+            if (hasRows) report.message + " · " + (if (open) stringResource(DesignR.string.common_collapse) else stringResource(DesignR.string.common_expand)) else report.message,
             color = p.t2,
             fontSize = 11.sp,
             lineHeight = 15.sp,
@@ -270,7 +271,7 @@ private fun PermissionCard(
     ) {
         Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 8.dp)) {
             Text(
-                perm.title.ifBlank { "接下来的命令需要你的确认" },
+                perm.title.ifBlank { stringResource(DesignR.string.chat_perm_need_confirm) },
                 color = p.t1,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -281,9 +282,9 @@ private fun PermissionCard(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("等待确认", color = p.t3, fontSize = 11.5.sp)
-                if (!owner.isNullOrBlank()) Pill("由 " + owner + " 发起", p.accent)
-                if (!onlyTo.isNullOrBlank()) Pill("只回传给 @" + onlyTo, p.t3)
+                Text(stringResource(DesignR.string.common_waiting_confirm), color = p.t3, fontSize = 11.5.sp)
+                if (!owner.isNullOrBlank()) Pill(stringResource(DesignR.string.chat_owner_pill, owner), p.accent)
+                if (!onlyTo.isNullOrBlank()) Pill(stringResource(DesignR.string.chat_only_to, onlyTo), p.t3)
             }
         }
         // 每个选项一行：allow 走主色实心圆标，其余描边圆标；点一下即回传。
@@ -338,7 +339,7 @@ private fun PermissionCard(
                 Text("+", color = p.t2, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             }
             Spacer(Modifier.width(10.dp))
-            Text("其他（点这里在下方自己输入）", color = p.t3, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Text(stringResource(DesignR.string.chat_perm_other_inline), color = p.t3, fontSize = 13.sp, modifier = Modifier.weight(1f))
         }
     }
 }
@@ -364,7 +365,7 @@ private fun OptionBubbles(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (!onlyTo.isNullOrBlank()) {
-            Text("只回传给 @" + onlyTo, color = p.t3, fontSize = 10.5.sp)
+            Text(stringResource(DesignR.string.chat_only_to, onlyTo), color = p.t3, fontSize = 10.5.sp)
         }
         options.forEach { option ->
             val picked = selectedId == option.id
@@ -419,7 +420,7 @@ private fun OptionBubbles(
                 .padding(horizontal = 6.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("其他（自己输入）", color = p.accent, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text(stringResource(DesignR.string.chat_perm_other), color = p.accent, fontSize = 12.sp, fontWeight = FontWeight.Medium)
         }
     }
 }
@@ -456,8 +457,8 @@ internal fun ChatMessageList(
                 EmptyState(
                     icon = Icons.Filled.SmartToy,
                     iconSize = 34.dp,
-                    title = "有什么可以帮你的？",
-                    subtitle = if (state.isGroup) "在下面 @ 一位 Agent 发任务；不 @ 时由最后发言的那位接着答。" else "消息会发给本地运行时，回复实时流式显示在这里。",
+                    title = stringResource(DesignR.string.chat_empty_prompt),
+                    subtitle = if (state.isGroup) stringResource(DesignR.string.chat_empty_hint_group) else stringResource(DesignR.string.chat_empty_hint_single),
                 )
             }
         }
@@ -585,7 +586,7 @@ internal fun ChatMessageList(
             }
         }
         // /compact 进行中：一条占位，别让按钮点了以后毫无反应（压缩要调模型，可能秒级）。
-        if (compacting) item(key = "compact-running") { SystemNoteRow(COMPACT_RUNNING_TEXT) }
+        if (compacting) item(key = "compact-running") { SystemNoteRow(stringResource(DesignR.string.chat_compacting)) }
         // 系统回执（/compact 结果）：居中一条灰底小字，不占气泡位置、不带作者头像。
         items(systemNotes, key = { it.id }) { note -> SystemNoteRow(note.text) }
         // /recall 回执：同样居中，但可展开看 rowid 清单（正文不进 UI）。

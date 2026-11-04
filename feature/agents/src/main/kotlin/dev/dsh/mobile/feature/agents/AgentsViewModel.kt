@@ -1,5 +1,6 @@
 package dev.dsh.mobile.feature.agents
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.dsh.mobile.core.data.repo.ChatRepository
@@ -14,6 +15,8 @@ import dev.dsh.mobile.core.data.settings.SettingsStore
 import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.Session
 import dev.dsh.mobile.core.model.SessionStatus
+import dev.dsh.mobile.design.R as DesignR
+import dev.dsh.mobile.design.UiText
 import dev.dsh.mobile.toolbridge.ChannelStatus
 import dev.dsh.mobile.toolbridge.ShellBridge
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +28,13 @@ import kotlinx.coroutines.launch
 
 data class AgentCard(
     val session: Session,
-    val label: String,
+    @param:StringRes val labelRes: Int,
+)
+
+/** 一次连接测试的结论；文案在界面层按资源拼，模型层不带中文。 */
+data class ProbeNotice(
+    val result: ProbeResult,
+    val window: Int = 0,
 )
 
 data class AgentsUiState(
@@ -37,7 +46,8 @@ data class AgentsUiState(
     val models: List<ModelProfile> = emptyList(),
     val channels: List<ChannelStatus> = emptyList(),
     val activeChannel: String = "",
-    val message: String? = null,
+    val message: UiText? = null,
+    val probe: ProbeNotice? = null,
 )
 
 class AgentsViewModel(
@@ -53,7 +63,8 @@ class AgentsViewModel(
     private val engineModelIds: suspend () -> List<String> = { emptyList() },
 ) : ViewModel() {
 
-    private val message = MutableStateFlow<String?>(null)
+    private val message = MutableStateFlow<UiText?>(null)
+    private val probe = MutableStateFlow<ProbeNotice?>(null)
 
     init {
         // 只投递一次后台探测，绝不在这里同步跑：refresh() 内部把 available()/detail()
@@ -78,7 +89,7 @@ class AgentsViewModel(
 
     private val modelsAndChannels = combine(modelStore.models, shell.status) { m, c -> m to c }
 
-    val uiState: StateFlow<AgentsUiState> = combine(core, modelsAndChannels, message) { c, mc, msg ->
+    val uiState: StateFlow<AgentsUiState> = combine(core, modelsAndChannels, message, probe) { c, mc, msg, pr ->
         val active = c.sessions.filter {
             it.status == SessionStatus.Running ||
                 it.status == SessionStatus.WaitingPermission ||
@@ -88,11 +99,11 @@ class AgentsViewModel(
             running = active.map { s ->
                 AgentCard(
                     session = s,
-                    label = when (s.status) {
-                        SessionStatus.Running -> "运行中"
-                        SessionStatus.WaitingPermission -> "等待确认"
-                        SessionStatus.Failed -> "失败"
-                        else -> "空闲"
+                    labelRes = when (s.status) {
+                        SessionStatus.Running -> DesignR.string.agents_state_running
+                        SessionStatus.WaitingPermission -> DesignR.string.common_waiting_confirm
+                        SessionStatus.Failed -> DesignR.string.agents_state_failed
+                        else -> DesignR.string.agents_idle
                     },
                 )
             },
@@ -104,6 +115,7 @@ class AgentsViewModel(
             channels = mc.second,
             activeChannel = shell.active()?.id.orEmpty(),
             message = msg,
+            probe = pr,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AgentsUiState())
 
@@ -112,20 +124,20 @@ class AgentsViewModel(
         if (profiles.isEmpty()) return@launch
         profiles.forEach { modelStore.save(it) }
         message.value = if (profiles.size == 1) {
-            "已保存模型 ${profiles.first().name}"
+            UiText.Res(DesignR.string.agents_saved_model, listOf(profiles.first().name))
         } else {
-            "已保存 ${profiles.size} 个模型"
+            UiText.Res(DesignR.string.agents_saved_models, listOf(profiles.size))
         }
     }
 
     fun deleteModel(id: String) = viewModelScope.launch {
         modelStore.delete(id)
-        message.value = "已删除模型"
+        message.value = UiText.Res(DesignR.string.agents_model_deleted)
     }
 
     fun setDefaultModel(id: String) = viewModelScope.launch {
         modelStore.setDefault(id)
-        message.value = "已设为默认模型"
+        message.value = UiText.Res(DesignR.string.agents_default_set)
     }
 
     fun providers() = ModelProviders.all()
@@ -139,10 +151,10 @@ class AgentsViewModel(
 
     /**
      * 「测试连接」：GET /models 优先，失败退化成一条 1 token 的 chat 请求。
-     * 结果直接走 message -> Snackbar，格式化在 ModelProbe.formatResult（纯函数，有单测）。
+     * 结果走 probe -> Snackbar，文案在 AgentsScreen.probeText 里按资源拼（数据层不带中文）。
      */
     fun testModel(profile: ModelProfile) = viewModelScope.launch {
-        message.value = "测试中 · ${profile.name.ifBlank { profile.model }}"
+        message.value = UiText.Res(DesignR.string.agents_testing, listOf(profile.name.ifBlank { profile.model }))
         val result = try {
             ModelProbe.probe(profile.baseUrl, profile.apiKey, profile.model)
         } catch (t: Throwable) {
@@ -152,7 +164,8 @@ class AgentsViewModel(
                 error = t.message ?: t.javaClass.simpleName,
             )
         }
-        message.value = ModelProbe.formatResult(result)
+        message.value = null
+        probe.value = ProbeNotice(result)
         // 探测成功且用户没手填窗口时，顺手把端点 /models 里的真实上下文窗口存下来：
         // 内置表只是猜测（以前 DeepSeek 被猜成 64k），能读到真值就以真值为准。
         if (result.ok && profile.contextWindow <= 0 && profile.baseUrl.isNotBlank()) {
@@ -162,22 +175,30 @@ class AgentsViewModel(
             val window = windows[key] ?: windows[key.substringAfterLast('/')]
             if (window != null && window > 0) {
                 modelStore.save(profile.copy(contextWindow = window))
-                message.value = ModelProbe.formatResult(result) + " · 上下文 " + window
+                probe.value = ProbeNotice(result, window)
             }
         }
     }
 
     fun refreshChannels() {
         shell.refresh()
-        message.value = "已重新探测工具通道"
+        message.value = UiText.Res(DesignR.string.agents_channels_reprobed)
     }
 
     fun requestShizuku() {
         val ok = shell.shizuku?.requestPermission() == true
-        message.value = if (ok) "已向 Shizuku 申请授权，请在弹窗中允许" else "Shizuku 未运行，请先启动 Shizuku 服务"
+        message.value = if (ok) {
+            UiText.Res(DesignR.string.agents_shizuku_requested)
+        } else {
+            UiText.Res(DesignR.string.agents_shizuku_not_running)
+        }
     }
 
     fun dismissMessage() {
         message.value = null
+    }
+
+    fun dismissProbe() {
+        probe.value = null
     }
 }

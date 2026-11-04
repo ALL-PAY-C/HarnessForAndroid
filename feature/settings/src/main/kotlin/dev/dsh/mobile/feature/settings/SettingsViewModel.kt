@@ -1,6 +1,8 @@
 package dev.dsh.mobile.feature.settings
 
 import dev.dsh.mobile.core.common.ProxyEnv
+import dev.dsh.mobile.design.R as DesignR
+import dev.dsh.mobile.design.UiText
 import dev.dsh.mobile.core.common.UiLanguage
 import dev.dsh.mobile.core.common.device.CapabilityTier
 import dev.dsh.mobile.core.common.device.CapabilityTiers
@@ -53,18 +55,18 @@ data class SettingsUiState(
     val versions: List<String> = emptyList(),
     val storageBytes: Long = 0L,
     val busy: Boolean = false,
-    val message: String? = null,
+    val message: UiText? = null,
     // ---- 自更新 ----
     val appVersion: String = "",
     val updateSource: String = "",
     val updateInfo: UpdateInfo? = null,
-    val updateStatus: String? = null,
+    val updateStatus: UiText? = null,
     val updateProgress: Int = 0,
     val updateReady: Boolean = false,
     /** 「源：gh-proxy.com · 486ms」；检查还没跑或回退到本地副本时也非空（见 Updater.sourceLine）。 */
     val updateSourceLine: String? = null,
     /** sha256 结论那一行；未校验时为 null。 */
-    val updateDigest: String? = null,
+    val updateDigest: UiText? = null,
     /** true = 校验通过，false = 不通过（此时 updateReady 恒为 false）。 */
     val updateDigestOk: Boolean? = null,
 )
@@ -80,15 +82,15 @@ class SettingsViewModel(
 ) : ViewModel() {
 
     private val busy = MutableStateFlow(false)
-    private val message = MutableStateFlow<String?>(null)
+    private val message = MutableStateFlow<UiText?>(null)
     private val storage = MutableStateFlow(0L)
     private val updateSource = MutableStateFlow(updater.sourceUrl())
     private val updateInfo = MutableStateFlow<UpdateInfo?>(null)
-    private val updateStatus = MutableStateFlow<String?>(null)
+    private val updateStatus = MutableStateFlow<UiText?>(null)
     private val updateProgress = MutableStateFlow(0)
     private val updateReady = MutableStateFlow(false)
     private val updateSourceLine = MutableStateFlow<String?>(null)
-    private val updateDigest = MutableStateFlow<String?>(null)
+    private val updateDigest = MutableStateFlow<UiText?>(null)
     private val updateDigestOk = MutableStateFlow<Boolean?>(null)
     private var downloaded: File? = null
     private val updateTail = combine(updateReady, updateSourceLine, updateDigest, updateDigestOk) { r, l, d, ok ->
@@ -145,7 +147,7 @@ class SettingsViewModel(
     private data class UpdateSlice(
         val source: String,
         val info: UpdateInfo?,
-        val status: String?,
+        val status: UiText?,
         val progress: Int,
         val tail: UpdateTail,
     )
@@ -154,7 +156,7 @@ class SettingsViewModel(
     private data class UpdateTail(
         val ready: Boolean,
         val sourceLine: String?,
-        val digest: String?,
+        val digest: UiText?,
         val digestOk: Boolean?,
     )
 
@@ -170,7 +172,7 @@ class SettingsViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { !secretStore.get(WebSecretKeys.EXA).isNullOrBlank() }
                 .onSuccess { _exaConfigured.value = it }
-                .onFailure { message.value = it.message ?: it.toString() }
+                .onFailure { message.value = UiText.Raw(it.message ?: it.toString()) }
         }
     }
 
@@ -192,18 +194,26 @@ class SettingsViewModel(
     }
 
     fun setMaxDownloadMb(value: String) = launch {
-        val bytes = requireNotNull(downloadLimitBytes(value)) { "单次下载上限须为 1–4096 MB 的整数" }
+        val bytes = downloadLimitBytes(value)
+        if (bytes == null) {
+            message.value = UiText.Res(DesignR.string.settings_err_download_limit)
+            return@launch
+        }
         withContext(Dispatchers.IO) { settingsStore.setMaxDownloadBytes(bytes) }
     }
 
     fun setProxyUrl(raw: String) = launch {
         if (proxyInvalid(raw)) {
-            message.value = "代理地址无效，示例：http://127.0.0.1:7890 或 socks5://127.0.0.1:1080"
+            message.value = UiText.Res(DesignR.string.settings_err_proxy_invalid)
             return@launch
         }
         val value = ProxyEnv.normalize(raw)
         withContext(Dispatchers.IO) { settingsStore.setProxyUrl(value) }
-        message.value = if (value.isEmpty()) "已切换为直连" else "代理已保存：" + value
+        message.value = if (value.isEmpty()) {
+            UiText.Res(DesignR.string.settings_proxy_direct)
+        } else {
+            UiText.Res(DesignR.string.settings_proxy_saved, listOf(value))
+        }
     }
 
     fun bootstrapLinuxEnv() = linuxOperation { linuxActions.bootstrapEnvironment(it) }
@@ -219,20 +229,20 @@ class SettingsViewModel(
 
     private fun linuxOperation(action: suspend ((String) -> Unit) -> LinuxSettingsState) {
         if (_linuxState.value.busy) return
-        _linuxState.value = _linuxState.value.copy(busy = true, progress = "读取环境状态", error = null)
+        _linuxState.value = _linuxState.value.copy(busy = true, progress = UiText.Res(DesignR.string.settings_update_reading_env), error = null)
         viewModelScope.launch {
             try {
                 val result = withContext(Dispatchers.IO) {
-                    action { detail -> _linuxState.value = _linuxState.value.copy(progress = detail) }
+                    action { detail -> _linuxState.value = _linuxState.value.copy(progress = UiText.Raw(detail)) }
                 }
                 _linuxState.value = result
-                message.value = result.error ?: result.message
+                message.value = (result.error ?: result.message)?.let(UiText::Raw)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 val detail = error.message ?: error.toString()
                 _linuxState.value = _linuxState.value.copy(error = detail)
-                message.value = detail
+                message.value = UiText.Raw(detail)
             } finally {
                 _linuxState.value = _linuxState.value.copy(busy = false, progress = null)
             }
@@ -247,7 +257,7 @@ class SettingsViewModel(
 
     /** 检查清单；有新版本就记下来，等用户点下载。 */
     fun checkUpdate() = viewModelScope.launch {
-        updateStatus.value = "检查中…"
+        updateStatus.value = UiText.Res(DesignR.string.settings_update_checking)
         updateReady.value = false
         updateSourceLine.value = null
         updateDigest.value = null
@@ -259,18 +269,18 @@ class SettingsViewModel(
                 // 失败切换的可观测性：不管有没有新版，都告诉用户这轮实际用了哪个源、花了多久。
                 updateSourceLine.value = check.sourceLine()
                 updateStatus.value = if (info == null) {
-                    "已经是最新版本（${updater.installedVersion().second}）"
+                    UiText.Res(DesignR.string.settings_update_latest, listOf(updater.installedVersion().second))
                 } else {
-                    "发现新版本 ${info.versionName}"
+                    UiText.Res(DesignR.string.settings_update_found, listOf(info.versionName))
                 }
             }
-            .onFailure { updateStatus.value = "检查失败：${it.message}" }
+            .onFailure { updateStatus.value = UiText.Res(DesignR.string.settings_update_check_failed, listOf(it.message ?: "")) }
     }
 
     fun downloadUpdate() {
         val info = updateInfo.value ?: return
         viewModelScope.launch {
-            updateStatus.value = "下载中…"
+            updateStatus.value = UiText.Res(DesignR.string.settings_update_downloading)
             updateProgress.value = 0
             updateDigest.value = null
             updateDigestOk.value = null
@@ -278,14 +288,14 @@ class SettingsViewModel(
                 .onSuccess { report ->
                     downloaded = report.file
                     updateReady.value = true
-                    updateStatus.value = "下载完成，可以安装"
+                    updateStatus.value = UiText.Res(DesignR.string.settings_update_downloaded)
                     when (val sha = report.sha) {
                         is ShaStatus.Verified -> {
                             updateDigestOk.value = true
-                            updateDigest.value = "sha256 校验通过 · " + sha.sha256.take(12)
+                            updateDigest.value = UiText.Res(DesignR.string.settings_update_digest_ok, listOf(sha.sha256.take(12)))
                         }
                         ShaStatus.NotProvided -> {
-                            updateDigest.value = "清单未提供 sha256，本次跳过校验"
+                            updateDigest.value = UiText.Res(DesignR.string.settings_update_digest_skip)
                         }
                     }
                 }
@@ -295,10 +305,10 @@ class SettingsViewModel(
                     updateReady.value = false
                     if (err is ShaMismatchException) {
                         updateDigestOk.value = false
-                        updateDigest.value = err.message ?: "sha256 校验失败"
-                        updateStatus.value = "下载校验失败：文件已删除，不能安装"
+                        updateDigest.value = err.message?.let(UiText::Raw) ?: UiText.Res(DesignR.string.settings_update_digest_fail)
+                        updateStatus.value = UiText.Res(DesignR.string.settings_update_verify_failed)
                     } else {
-                        updateStatus.value = "下载失败：" + err.message
+                        updateStatus.value = UiText.Res(DesignR.string.settings_update_download_failed, listOf(err.message ?: ""))
                     }
                 }
         }
@@ -439,12 +449,12 @@ class SettingsViewModel(
         busy.value = true
         onReconnect()
         busy.value = false
-        message.value = "已请求重连"
+        message.value = UiText.Res(DesignR.string.settings_reconnect_requested)
     }
     fun clearLogs() = launch {
         runtime.clearLogs()
         refreshStorage()
-        message.value = "日志已清理"
+        message.value = UiText.Res(DesignR.string.settings_logs_cleared)
     }
 
     // ---- endpoints ----
@@ -461,17 +471,17 @@ class SettingsViewModel(
                 heartbeatMs = draft.heartbeatMs,
             ),
         )
-        message.value = "已保存 ${draft.name.ifBlank { draft.url }}"
+        message.value = UiText.Res(DesignR.string.settings_saved_item, listOf(draft.name.ifBlank { draft.url }))
     }
 
     fun deleteEndpoint(id: String) = launch {
         endpoints.delete(id)
-        message.value = "已删除"
+        message.value = UiText.Res(DesignR.string.settings_deleted)
     }
 
     fun activate(id: String) = launch {
         endpoints.setActive(id)
-        message.value = "已切换连接"
+        message.value = UiText.Res(DesignR.string.settings_connection_switched)
         onReconnect()
     }
 
@@ -480,7 +490,7 @@ class SettingsViewModel(
     private fun launch(block: suspend () -> Unit) {
         viewModelScope.launch {
             busy.value = true
-            runCatching { block() }.onFailure { message.value = it.message }
+            runCatching { block() }.onFailure { message.value = UiText.Raw(it.message ?: it.toString()) }
             busy.value = false
         }
     }

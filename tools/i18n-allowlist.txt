@@ -1,3 +1,25 @@
 # i18n allowlist: Chinese literals that stay in code, with the reason.
 # Format: path<TAB>literal<TAB>reason
 feature/sessions/src/main/kotlin/dev/dsh/mobile/feature/sessions/SessionsScreen.kt	模型	Failure reason text comes from the Node engine at runtime; matched with contains() to pick the "model missing" hint.
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/ChatMessageList.kt	取消	engine-supplied permission option labels matched verbatim (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/ChatMessageList.kt	拒绝	engine-supplied permission option labels matched verbatim (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/ChatMessageList.kt	不允许	engine-supplied permission option labels matched verbatim (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/ChatMessageList.kt	允许	engine-supplied permission option labels matched verbatim (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/ChatMessageList.kt	同意	engine-supplied permission option labels matched verbatim (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/ChatMessageList.kt	批准	engine-supplied permission option labels matched verbatim (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/ChatMessageList.kt	继续	engine-supplied permission option labels matched verbatim (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/ChatScreen.kt	/压缩	command alias in the engine protocol (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/ChatScreen.kt	/温层	command alias in the engine protocol (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/ChatScreen.kt	/回捞	command alias in the engine protocol (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/ChatScreen.kt	/回捞 	command alias in the engine protocol (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/GroupUi.kt	[群聊已散会]	engine-emitted conclusion prefix (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/GroupUi.kt	[群聊已停下]	engine-emitted conclusion prefix (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/GroupUi.kt	[群聊已升级]	engine-emitted conclusion prefix (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/GroupUi.kt	[主持人提问]	engine-emitted conclusion prefix (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/GroupUi.kt	[预算告急]	engine-emitted conclusion prefix (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/GroupUi.kt	主持人：	engine host message marker (data, not UI copy)
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/GroupUi.kt	自动机连续打回	engine notice marker (data, not UI copy)
+feature/sessions/src/main/kotlin/dev/dsh/mobile/feature/sessions/SessionsViewModel.kt	全部	sentinel group name; persisted identity + map key, display mapped by sentinelGroupRes()
+feature/sessions/src/main/kotlin/dev/dsh/mobile/feature/sessions/SessionsViewModel.kt	置顶	sentinel group name; persisted identity + map key, display mapped by sentinelGroupRes()
+feature/sessions/src/main/kotlin/dev/dsh/mobile/feature/sessions/SessionsViewModel.kt	归档	sentinel group name; persisted identity + map key, display mapped by sentinelGroupRes()
+feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/ChatSettingsScreen.kt	：	separator inside a stored preset label ("预设：x"); split, not display copy
