@@ -1,6 +1,8 @@
 package dev.dsh.mobile.feature.plugins
 
 import dev.dsh.mobile.core.common.RuntimeMirrors
+import dev.dsh.mobile.design.UiText
+import dev.dsh.mobile.design.R
 import dev.dsh.mobile.core.common.archive.ZipExtract
 import dev.dsh.mobile.core.common.download.DownloadCache
 import dev.dsh.mobile.core.common.download.Downloads
@@ -25,8 +27,8 @@ object SkillInstaller {
         data class ZipUrl(val url: String) : Source
     }
 
-    /** 给人看的失败原因（HTTP 码、缺 SKILL.md、路径非法…），UI 直接展示 message。 */
-    class SkillInstallException(message: String) : Exception(message)
+    /** 给人看的失败原因（HTTP 码、缺 SKILL.md、路径非法…），UI 直接展示 [text]。 */
+    class SkillInstallException(val text: UiText) : Exception(text.toString())
 
     /** 解压上限，默认值即生产值；测试用小值验证拒绝路径。 */
     data class Limits(
@@ -98,12 +100,16 @@ object SkillInstaller {
         } catch (e: ZipExtract.ZipExtractException) {
             throw SkillInstallException(
                 when (e) {
-                    is ZipExtract.ZipExtractException.IllegalEntry -> "压缩包里有非法路径：${e.entry}"
-                    is ZipExtract.ZipExtractException.TooManyEntries -> "压缩包条目太多（上限 ${e.limit} 个）"
-                    is ZipExtract.ZipExtractException.EntryTooLarge -> "单个文件太大：${e.entry}"
+                    is ZipExtract.ZipExtractException.IllegalEntry ->
+                        UiText.Res(R.string.skill_err_illegal_entry, listOf(e.entry))
+                    is ZipExtract.ZipExtractException.TooManyEntries ->
+                        UiText.Res(R.string.skill_err_too_many, listOf(e.limit))
+                    is ZipExtract.ZipExtractException.EntryTooLarge ->
+                        UiText.Res(R.string.skill_err_entry_too_large, listOf(e.entry))
                     is ZipExtract.ZipExtractException.TotalTooLarge ->
-                        "解压后总大小超过 ${e.limit / 1024 / 1024} MB"
-                    is ZipExtract.ZipExtractException.Corrupt -> "压缩包读不出来：${e.cause?.message ?: e.message}"
+                        UiText.Res(R.string.skill_err_total_too_large, listOf(e.limit / 1024 / 1024))
+                    is ZipExtract.ZipExtractException.Corrupt ->
+                        UiText.Res(R.string.skill_err_corrupt, listOf(e.cause?.message ?: e.message ?: ""))
                 },
             )
         }
@@ -140,8 +146,7 @@ object SkillInstaller {
         fetch: (String, File) -> Unit = { url, out -> httpDownload(cacheDir, url, out) },
     ): File {
         val source = parse(input) ?: throw SkillInstallException(
-            "链接看不懂：${input.take(80)}；支持 https://github.com/owner/repo、owner/repo、" +
-                "github.com/owner/repo/tree/分支，或 zip 直链",
+            UiText.Res(R.string.skill_err_bad_link, listOf(input.take(80))),
         )
         cacheDir.mkdirs()
         val stamp = System.currentTimeMillis()
@@ -159,14 +164,18 @@ object SkillInstaller {
             }
             if (last != null) {
                 if (last is SkillInstallException) throw last
-                throw SkillInstallException("下载失败：${last.message ?: last.toString()}")
+                throw SkillInstallException(
+                    UiText.Res(R.string.skill_err_download, listOf(last.message ?: last.toString())),
+                )
             }
-            if (!archive.isFile || archive.length() == 0L) throw SkillInstallException("下载到的包是空的")
+            if (!archive.isFile || archive.length() == 0L) {
+                throw SkillInstallException(UiText.Res(R.string.skill_err_empty_archive))
+            }
             stage.mkdirs()
             extract(archive, stage)
             val root = stageRoot(stage)
             if (!containsSkillManifest(root)) {
-                throw SkillInstallException("压缩包里没有 SKILL.md：技能仓库里要有 SKILL.md（根目录或子目录都行）")
+                throw SkillInstallException(UiText.Res(R.string.skill_err_no_manifest))
             }
             return root
         } catch (t: Throwable) {
@@ -185,12 +194,14 @@ object SkillInstaller {
                 target = out,
                 cache = DownloadCache(File(cacheDir, "dl-cache")),
                 maxBytes = MAX_DOWNLOAD_BYTES,
-                label = "技能包 " + url,
+                label = url,
                 connectTimeoutMs = CONNECT_TIMEOUT_MS,
                 readTimeoutMs = READ_TIMEOUT_MS,
             )
         } catch (e: Exception) {
-            throw SkillInstallException("下载失败：" + (e.message ?: e.toString()))
+            throw SkillInstallException(
+                UiText.Res(R.string.skill_err_download, listOf(e.message ?: e.toString())),
+            )
         }
     }
 }

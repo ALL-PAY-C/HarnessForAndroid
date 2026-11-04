@@ -1,6 +1,8 @@
 package dev.dsh.mobile.feature.plugins
 
 import org.json.JSONObject
+import dev.dsh.mobile.design.UiText
+import dev.dsh.mobile.design.R
 
 /**
  * 桌面端 DSH 左侧「技能」在 App 里的镜像数据。
@@ -68,16 +70,21 @@ internal fun bundledSkillSet(listing: Array<String>?): Set<String> =
     listing.orEmpty().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
 /** 移除确认框的正文；内置技能必须写明「下次启动会重新铺回」，否则用户以为删干净了。 */
-internal fun removeConfirmBody(name: String, bundled: Boolean): String =
-    if (bundled) {
-        "确认移除「$name」？它是随包内置技能，下次启动会重新铺回。"
-    } else {
-        "确认移除「$name」？它的目录与启用状态会一起删掉，删了要重装才能用。"
-    }
+internal fun removeConfirmBody(name: String, bundled: Boolean): UiText =
+    UiText.Res(
+        if (bundled) R.string.skill_remove_confirm_bundled else R.string.skill_remove_confirm,
+        listOf(name),
+    )
 
 /** 移除失败的 snackbar 文案；[reason] 是引擎原话，空则给兜底。 */
-internal fun removeFailureNotice(reason: String): String =
-    "移除失败：${reason.trim().ifBlank { "引擎拒绝了这次移除" }}"
+internal fun removeFailureNotice(reason: String): UiText {
+    val trimmed = reason.trim()
+    return if (trimmed.isEmpty()) {
+        UiText.Res(R.string.skill_remove_failed_fallback)
+    } else {
+        UiText.Res(R.string.skill_remove_failed, listOf(trimmed))
+    }
+}
 
 /** 移除成功的 snackbar 文案。 */
-internal fun removedNotice(name: String): String = "已移除 $name"
+internal fun removedNotice(name: String): UiText = UiText.Res(R.string.skill_removed, listOf(name))

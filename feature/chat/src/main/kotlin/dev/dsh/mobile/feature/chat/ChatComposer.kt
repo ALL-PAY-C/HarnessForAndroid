@@ -527,7 +527,10 @@ internal fun Composer(
                             }
                         }
                         if (SlotEditState.enabled) {
-                            SlotPlusButton(label = stringResource(DesignR.string.common_edit) + SlotEditState.Slot.Composer.label) { picker = true }
+                            SlotPlusButton(
+                                label = stringResource(DesignR.string.common_edit) +
+                                    stringResource(SlotEditState.Slot.Composer.labelRes),
+                            ) { picker = true }
                         }
                     }
                 }

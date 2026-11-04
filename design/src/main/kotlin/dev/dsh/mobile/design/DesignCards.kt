@@ -2,6 +2,7 @@
 package dev.dsh.mobile.design
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -109,7 +110,7 @@ fun SectionChevron(expanded: Boolean, tint: Color = LocalQq.current.t3) {
     val angle by animateFloatAsState(if (expanded) 0f else -90f, label = "chevron")
     Icon(
         ChevronDownGlyph,
-        contentDescription = if (expanded) "收起" else "展开",
+        contentDescription = if (expanded) stringResource(R.string.common_collapse) else stringResource(R.string.common_expand),
         tint = tint,
         modifier = Modifier.size(14.dp).rotate(angle),
     )

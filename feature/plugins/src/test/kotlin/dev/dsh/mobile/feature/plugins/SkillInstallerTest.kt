@@ -1,5 +1,7 @@
 package dev.dsh.mobile.feature.plugins
 
+import dev.dsh.mobile.design.R as DesignR
+import dev.dsh.mobile.design.UiText
 import java.io.File
 import java.io.IOException
 import java.util.zip.ZipEntry
@@ -19,6 +21,9 @@ import org.junit.Test
 class SkillInstallerTest {
 
     private fun tempDir(prefix: String): File = kotlin.io.path.createTempDirectory(prefix).toFile()
+
+    /** 断言到资源键而不是文案：改中英文案不该弄红这些用例。 */
+    private fun keyOf(text: UiText): Int = (text as UiText.Res).id
 
     /** name -> 内容；内容为 null 表示目录条目。 */
     private fun zip(dir: File, entries: List<Pair<String, ByteArray?>>, name: String = "sample.zip"): File {
@@ -134,7 +139,7 @@ class SkillInstallerTest {
             SkillInstaller.extract(archive, into)
             fail("路径穿越条目必须被拒")
         } catch (e: SkillInstaller.SkillInstallException) {
-            assertTrue("错误里应说明非法路径，实际 ${e.message}", (e.message ?: "").contains("非法路径"))
+            assertEquals(DesignR.string.skill_err_illegal_entry, keyOf(e.text))
         }
         assertFalse("越界文件不能落盘", File(work, "evil.txt").exists())
     }
@@ -149,7 +154,7 @@ class SkillInstallerTest {
             SkillInstaller.extract(archive, into)
             fail("绝对路径条目必须被拒")
         } catch (e: SkillInstaller.SkillInstallException) {
-            assertTrue("错误里应说明非法路径，实际 ${e.message}", (e.message ?: "").contains("非法路径"))
+            assertEquals(DesignR.string.skill_err_illegal_entry, keyOf(e.text))
         }
     }
 
@@ -163,7 +168,7 @@ class SkillInstallerTest {
             SkillInstaller.extract(archive, File(work, "stage"), SkillInstaller.Limits(maxEntries = 3))
             fail("条目数超限必须被拒")
         } catch (e: SkillInstaller.SkillInstallException) {
-            assertTrue("错误里应说明条目上限，实际 ${e.message}", (e.message ?: "").contains("条目太多"))
+            assertEquals(DesignR.string.skill_err_too_many, keyOf(e.text))
         }
     }
 
@@ -176,7 +181,7 @@ class SkillInstallerTest {
             SkillInstaller.extract(archive, File(work, "stage"), SkillInstaller.Limits(maxEntryBytes = 1024))
             fail("单文件超限必须被拒")
         } catch (e: SkillInstaller.SkillInstallException) {
-            assertTrue("错误里应说明文件上限，实际 ${e.message}", (e.message ?: "").contains("单个文件太大"))
+            assertEquals(DesignR.string.skill_err_entry_too_large, keyOf(e.text))
         }
     }
 
@@ -189,7 +194,7 @@ class SkillInstallerTest {
             SkillInstaller.extract(archive, File(work, "stage"), SkillInstaller.Limits(maxTotalBytes = 1024))
             fail("解压总大小超限必须被拒")
         } catch (e: SkillInstaller.SkillInstallException) {
-            assertTrue("错误里应说明总大小上限，实际 ${e.message}", (e.message ?: "").contains("总大小"))
+            assertEquals(DesignR.string.skill_err_total_too_large, keyOf(e.text))
         }
     }
 
@@ -251,7 +256,7 @@ class SkillInstallerTest {
             SkillInstaller.install(cache, "obra/superpowers", fetcherFrom(archive))
             fail("没有 SKILL.md 必须报错")
         } catch (e: SkillInstaller.SkillInstallException) {
-            assertTrue("错误里应提到 SKILL.md，实际 ${e.message}", (e.message ?: "").contains("SKILL.md"))
+            assertEquals(DesignR.string.skill_err_no_manifest, keyOf(e.text))
         }
     }
 

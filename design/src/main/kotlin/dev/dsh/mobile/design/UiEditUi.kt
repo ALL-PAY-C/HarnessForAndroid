@@ -1,6 +1,7 @@
 package dev.dsh.mobile.design
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -36,13 +37,13 @@ fun UiEditSlotPlusRow(
     val p = LocalQq.current
     SlotStrip(modifier = modifier.fillMaxWidth(), horizontal = true) {
         Text(
-            slot.label,
+            stringResource(slot.labelRes),
             color = p.t2,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.padding(end = 6.dp, top = 6.dp),
         )
-        SlotPlusButton(label = "编辑" + slot.label, onClick = onClick)
+        SlotPlusButton(label = stringResource(R.string.common_edit) + stringResource(slot.labelRes), onClick = onClick)
     }
 }
 
@@ -72,9 +73,9 @@ fun ExtrasUiEditCard(
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("拓展插件 UI", color = p.t1, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text(stringResource(R.string.design_ui_extend_title), color = p.t1, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 Text(
-                    "打开后各界面槽位旁出现「+」，可把插件组件摆上去；下面三档字号按倍率缩放正文、代码与终端",
+                    stringResource(R.string.design_ui_extend_hint),
                     color = p.t3,
                     fontSize = 11.5.sp,
                 )
@@ -83,9 +84,9 @@ fun ExtrasUiEditCard(
             Switch(checked = enabled, onCheckedChange = onEnabledChange)
         }
         Spacer(Modifier.height(6.dp))
-        FontRoleSlider("正文字号", UiLayoutPrefs.fontBody) { UiLayoutPrefs.setBodyFont(it) }
-        FontRoleSlider("代码字号", UiLayoutPrefs.fontCode) { UiLayoutPrefs.setCodeFont(it) }
-        FontRoleSlider("终端字号", UiLayoutPrefs.fontTerminal) { UiLayoutPrefs.setTerminalFont(it) }
+        FontRoleSlider(stringResource(R.string.design_ui_font_body), UiLayoutPrefs.fontBody) { UiLayoutPrefs.setBodyFont(it) }
+        FontRoleSlider(stringResource(R.string.design_ui_font_code), UiLayoutPrefs.fontCode) { UiLayoutPrefs.setCodeFont(it) }
+        FontRoleSlider(stringResource(R.string.design_ui_font_terminal), UiLayoutPrefs.fontTerminal) { UiLayoutPrefs.setTerminalFont(it) }
     }
 }
 

@@ -1,5 +1,6 @@
 package dev.dsh.mobile.app.notify
 
+import dev.dsh.mobile.design.R as DesignR
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -179,7 +180,7 @@ class OngoingCenter(
         if (signature == lastSignature) return
         lastSignature = signature
         runCatching { post(visible, s) }
-            .onFailure { AppLog.w("聚合通知失败：${it.message}") }
+            .onFailure { AppLog.w("aggregated notification failed: " + it.message) }
     }
 
     /**
@@ -224,8 +225,8 @@ class OngoingCenter(
                 runCatching {
                     notifierOf().notifyTurnComplete(
                         sessionId = sid,
-                        title = titles[sid].orEmpty().ifBlank { "会话已完成" },
-                        body = snippet.ifBlank { "本轮回复已完成" },
+                        title = titles[sid].orEmpty().ifBlank { context.getString(DesignR.string.notify_session_done_title) },
+                        body = snippet.ifBlank { context.getString(DesignR.string.notify_reply_done_body) },
                     )
                 }
             }
@@ -241,7 +242,7 @@ class OngoingCenter(
                     sessionId = sid,
                     requestId = perm.requestId,
                     agentName = perm.ownerAgentName.orEmpty(),
-                    title = perm.ownerAgentName?.takeIf { it.isNotBlank() }?.let { "$it 请求确认" } ?: "需要确认",
+                    title = perm.ownerAgentName?.takeIf { it.isNotBlank() }?.let { context.getString(DesignR.string.notify_permission_title, it) } ?: context.getString(DesignR.string.notify_permission_title_fallback),
                 )
             }
         }
@@ -280,7 +281,7 @@ class OngoingCenter(
 
     private fun doneTrace(sid: String, s: AppSettings, tail: String): SessionTrace = SessionTrace(
         sessionId = sid,
-        title = titles[sid].orEmpty().ifBlank { "会话" },
+        title = titles[sid].orEmpty().ifBlank { context.getString(DesignR.string.notify_session_fallback) },
         phase = SessionTrace.Phase.Done,
         // 完成那一行带上最后一句回复：通知栏里直接能读懂它答了什么，
         // 不用点进去。选项块已由 splitOptions 切掉，不会把 A/B 行当正文。
@@ -354,7 +355,7 @@ class OngoingCenter(
         }
         return SessionTrace(
             sessionId = sid,
-            title = titles[sid].orEmpty().ifBlank { "会话" },
+            title = titles[sid].orEmpty().ifBlank { context.getString(DesignR.string.notify_session_fallback) },
             phase = phase,
             thought = tailLines(rawThought, s.notifyThoughtLines),
             speaker = speakerPart?.name.orEmpty(),
@@ -371,10 +372,11 @@ class OngoingCenter(
         // 必须再走一次 startForeground 才会刷新内容。服务起来了就用它。
         val updater = foregroundUpdater
         if (updater != null) {
-            runCatching { updater(n) }.onFailure { AppLog.w("聚合通知更新失败：${it.message}") }
+            runCatching { updater(n) }
+                .onFailure { AppLog.w("aggregated notification update failed: " + it.message) }
         }
         runCatching { nm.notify(ID_ONGOING, n) }
-            .onFailure { AppLog.w("聚合通知失败：${it.message}") }
+            .onFailure { AppLog.w("aggregated notification failed: " + it.message) }
     }
 
     /** [dev.dsh.mobile.app.service.RuntimeService] 注入：用 startForeground 刷新自己那条通知。 */
@@ -400,7 +402,7 @@ class OngoingCenter(
                 val only = running.firstOrNull() ?: traces.first()
                 only.title
             }
-            else -> "${running.size} 个会话进行中"
+            else -> context.getString(DesignR.string.notify_running_summary, running.size)
         }
         val builder = Notification.Builder(context, CHANNEL_ONGOING)
             .setSmallIcon(android.R.drawable.stat_notify_sync)
@@ -427,7 +429,7 @@ class OngoingCenter(
         builder.setContentText(lines.first())
         val inbox = Notification.InboxStyle().setBigContentTitle(title)
         lines.forEach { inbox.addLine(it) }
-        if (ordered.size > 6) inbox.setSummaryText("还有 ${ordered.size - 6} 个…")
+        if (ordered.size > 6) inbox.setSummaryText(context.getString(DesignR.string.notify_more, ordered.size - 6))
         builder.setStyle(inbox)
 
         // 需要选择：把选项直接挂成通知按钮（最多 3 个，多的引导进应用）。
@@ -456,7 +458,7 @@ class OngoingCenter(
             builder.addAction(
                 Notification.Action.Builder(
                     null,
-                    "其他",
+                    context.getString(DesignR.string.notify_action_other),
                     openIntent(waiting.sessionId),
                 ).build(),
             )
@@ -490,19 +492,19 @@ class OngoingCenter(
     }
 
     private fun runtimeLine(): String = when (val r = runtime) {
-        is RuntimeState.Ready -> "运行时就绪 · ${r.transport}"
-        is RuntimeState.Starting -> "运行时启动中 ${r.detail}"
-        is RuntimeState.Reconnecting -> "重连中 #${r.attempt}"
-        is RuntimeState.Failed -> "连接失败：${r.reason}"
-        RuntimeState.NotConfigured -> "未配置运行时 · 到设置里选择内置运行时或连接地址"
+        is RuntimeState.Ready -> context.getString(DesignR.string.notify_runtime_ready, r.transport)
+        is RuntimeState.Starting -> context.getString(DesignR.string.notify_runtime_starting, r.detail)
+        is RuntimeState.Reconnecting -> context.getString(DesignR.string.notify_runtime_reconnecting, r.attempt)
+        is RuntimeState.Failed -> context.getString(DesignR.string.notify_runtime_failed, r.reason)
+        RuntimeState.NotConfigured -> context.getString(DesignR.string.notify_runtime_not_configured)
     }
 
     private fun formatLine(t: SessionTrace, s: AppSettings): String {
         val head = when (t.phase) {
-            SessionTrace.Phase.Waiting -> "⏸ 等你确认"
-            SessionTrace.Phase.Tool -> "⚙ 执行中"
-            SessionTrace.Phase.Done -> "✓ 完成"
-            SessionTrace.Phase.Thinking -> "… 思考中"
+            SessionTrace.Phase.Waiting -> context.getString(DesignR.string.notify_phase_waiting)
+            SessionTrace.Phase.Tool -> context.getString(DesignR.string.notify_phase_tool)
+            SessionTrace.Phase.Done -> context.getString(DesignR.string.notify_phase_done)
+            SessionTrace.Phase.Thinking -> context.getString(DesignR.string.notify_phase_thinking)
         }
         val who = if (t.speaker.isBlank() || t.speaker == t.title) "" else "${t.speaker} "
         val body = when {
@@ -542,8 +544,8 @@ class OngoingCenter(
         // 因此只在缺失时创建，重要性固定为 DEFAULT（无声音、无震动）。
         if (nm.getNotificationChannel(CHANNEL_ONGOING) != null) return
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_ONGOING, "进行中的会话", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "常驻展示正在思考的会话与思维链"
+            NotificationChannel(CHANNEL_ONGOING, context.getString(DesignR.string.notify_channel_name), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = context.getString(DesignR.string.notify_channel_desc)
                 setShowBadge(false)
                 enableVibration(false)
                 setSound(null, null)

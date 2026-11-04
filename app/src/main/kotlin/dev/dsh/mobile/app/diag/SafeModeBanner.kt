@@ -1,5 +1,7 @@
 package dev.dsh.mobile.app.diag
 
+import dev.dsh.mobile.design.R as DesignR
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
@@ -41,14 +43,14 @@ fun SafeModeBanner(reason: String, onOpenDiagnostics: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "安全模式",
+            text = stringResource(DesignR.string.diag_safe_mode_title),
             color = fg,
             fontSize = qqFontBody(13.sp),
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            text = reason.ifBlank { "上次启动连续失败" },
+            text = reason.ifBlank { stringResource(DesignR.string.diag_safe_mode_fallback) },
             color = fg.copy(alpha = 0.75f),
             fontSize = qqFontBody(12.sp),
             maxLines = 1,
@@ -57,7 +59,7 @@ fun SafeModeBanner(reason: String, onOpenDiagnostics: () -> Unit) {
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            text = "查看",
+            text = stringResource(DesignR.string.common_view),
             color = fg,
             fontSize = qqFontBody(12.5.sp),
             fontWeight = FontWeight.Medium,

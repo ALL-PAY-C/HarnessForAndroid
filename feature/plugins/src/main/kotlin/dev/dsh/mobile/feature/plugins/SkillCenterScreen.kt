@@ -1,6 +1,10 @@
 package dev.dsh.mobile.feature.plugins
 
 import androidx.compose.foundation.background
+import dev.dsh.mobile.design.R as DesignR
+import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.resolve
+import dev.dsh.mobile.design.text
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -87,8 +91,8 @@ fun rememberSkillCenterBarState(): SkillCenterBarState = remember { SkillCenterB
 @Composable
 fun SkillCenterBarActions(bar: SkillCenterBarState) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        IconBtn(Icons.Filled.Add, "安装技能") { bar.installOpen = true }
-        IconBtn(Icons.Filled.Refresh, "刷新") { bar.reload++ }
+        IconBtn(Icons.Filled.Add, stringResource(DesignR.string.skill_install_title)) { bar.installOpen = true }
+        IconBtn(Icons.Filled.Refresh, stringResource(DesignR.string.settings_refresh)) { bar.reload++ }
     }
 }
 
@@ -178,7 +182,12 @@ fun SkillCenterScreen(
                 val reason = (failure as? NodeEngineException)?.message
                     ?: failure?.message
                     ?: reply?.optJSONObject("error")?.optString("message").orEmpty()
-                snackbar.showSnackbar("切换失败：${reason.ifBlank { "引擎拒绝了这次改动" }}")
+                snackbar.showSnackbar(
+                    context.getString(
+                        DesignR.string.skill_toggle_failed,
+                        reason.ifBlank { context.getString(DesignR.string.skill_toggle_rejected) },
+                    ),
+                )
             }
         }
     }
@@ -194,7 +203,7 @@ fun SkillCenterScreen(
         if (installBusy) return
         val node = engine
         if (node == null) {
-            installError = "这个构建未内置 Node 运行时，装不了技能"
+            installError = context.getString(DesignR.string.skill_no_runtime)
             return
         }
         installBusy = true
@@ -209,7 +218,7 @@ fun SkillCenterScreen(
                 }
                 if (!reply.optBoolean("ok", true)) {
                     val reason = reply.optJSONObject("error")?.optString("message").orEmpty()
-                    error(reason.ifBlank { "技能管理器拒绝了这次安装" })
+                    error(reason.ifBlank { context.getString(DesignR.string.skill_install_rejected) })
                 }
             }.exceptionOrNull()
             runCatching { staged?.deleteRecursively() }
@@ -217,10 +226,13 @@ fun SkillCenterScreen(
             if (failure == null) {
                 bar.installOpen = false
                 installInput = ""
-                snackbar.showSnackbar("技能已安装")
+                snackbar.showSnackbar(context.getString(DesignR.string.skill_installed))
                 bar.reload++
             } else {
-                installError = (failure as? NodeEngineException)?.message ?: failure.message ?: failure.toString()
+                installError = (failure as? SkillInstaller.SkillInstallException)?.text?.resolve(context)
+                    ?: (failure as? NodeEngineException)?.message
+                    ?: failure.message
+                    ?: failure.toString()
             }
         }
     }
@@ -250,12 +262,12 @@ fun SkillCenterScreen(
                 val reason = (failure as? NodeEngineException)?.message
                     ?: failure?.message
                     ?: reply?.optJSONObject("error")?.optString("message").orEmpty()
-                snackbar.showSnackbar(removeFailureNotice(reason))
+                snackbar.showSnackbar(removeFailureNotice(reason).resolve(context))
                 return@launch
             }
             val refreshed = reply?.let { catalogState(it) }
             if (refreshed is SkillUiState.Ready) state = refreshed else bar.reload++
-            snackbar.showSnackbar(removedNotice(entry.name))
+            snackbar.showSnackbar(removedNotice(entry.name).resolve(context))
         }
     }
 
@@ -264,21 +276,21 @@ fun SkillCenterScreen(
             when (val s = state) {
                 is SkillUiState.Loading -> LoadingBody()
                 is SkillUiState.NoEngine -> EmptyState(
-                    title = "未内置 Node 运行时",
-                    subtitle = "这个构建里没有打包 libnode，技能列表读不到",
+                    title = stringResource(DesignR.string.skill_no_libnode_title),
+                    subtitle = stringResource(DesignR.string.skill_no_libnode_body),
                 )
                 is SkillUiState.Failed -> FailureBody(stage = s.stage, message = s.message) { bar.reload++ }
                 is SkillUiState.Ready -> if (s.entries.isEmpty()) {
                     EmptyState(
-                        title = "还没有安装任何技能",
-                        subtitle = "点右上角「+」，贴一个含 SKILL.md 的 GitHub 仓库或 zip 直链就能直接装",
+                        title = stringResource(DesignR.string.skill_empty_title),
+                        subtitle = stringResource(DesignR.string.skill_empty_body),
                     )
                 } else {
                     LazyColumn(
                         Modifier.fillMaxSize().padding(horizontal = QqSpace.m()),
                         contentPadding = PaddingValues(vertical = QqSpace.s()),
                     ) {
-                        item { SectionTitle("技能", s.entries.size) }
+                        item { SectionTitle(stringResource(DesignR.string.skill_section), s.entries.size) }
                         item {
                             SectionCard {
                                 s.entries.forEachIndexed { index, entry ->
@@ -335,7 +347,7 @@ private fun InstallSkillDialog(
     val p = LocalQq.current
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("安装技能", color = p.t1, fontWeight = FontWeight.SemiBold) },
+        title = { Text(stringResource(DesignR.string.skill_install_title), color = p.t1, fontWeight = FontWeight.SemiBold) },
         text = {
             Column {
                 OutlinedTextField(
@@ -343,13 +355,13 @@ private fun InstallSkillDialog(
                     onValueChange = onInputChange,
                     singleLine = true,
                     enabled = !busy,
-                    label = { Text("仓库 / 链接") },
+                    label = { Text(stringResource(DesignR.string.skill_repo_label)) },
                     placeholder = { Text("https://github.com/owner/repo") },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(QqSpace.s()))
                 Text(
-                    "支持含 SKILL.md 的 GitHub 仓库、owner/repo，或 zip 直链；装完即时生效。",
+                    stringResource(DesignR.string.skill_repo_hint),
                     color = p.t2,
                     fontSize = qqFontBody(12.5.sp),
                 )
@@ -368,13 +380,13 @@ private fun InstallSkillDialog(
                         modifier = Modifier.size(16.dp),
                     )
                 } else {
-                    Text("安装", color = p.accent, fontSize = qqFontBody(14.sp))
+                    Text(stringResource(DesignR.string.settings_install), color = p.accent, fontSize = qqFontBody(14.sp))
                 }
             }
         },
         dismissButton = {
             TextButton(enabled = !busy, onClick = onDismiss) {
-                Text("取消", color = p.t2, fontSize = qqFontBody(14.sp))
+                Text(stringResource(DesignR.string.common_cancel), color = p.t2, fontSize = qqFontBody(14.sp))
             }
         },
     )
@@ -396,8 +408,8 @@ private fun RemoveSkillDialog(
     val p = LocalQq.current
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("移除技能", color = p.t1, fontWeight = FontWeight.SemiBold) },
-        text = { Text(removeConfirmBody(name, bundled), color = p.t2, fontSize = qqFontBody(13.sp)) },
+        title = { Text(stringResource(DesignR.string.skill_remove_title), color = p.t1, fontWeight = FontWeight.SemiBold) },
+        text = { Text(removeConfirmBody(name, bundled).text(), color = p.t2, fontSize = qqFontBody(13.sp)) },
         confirmButton = {
             TextButton(enabled = !busy, onClick = onConfirm) {
                 if (busy) {
@@ -407,13 +419,13 @@ private fun RemoveSkillDialog(
                         modifier = Modifier.size(16.dp),
                     )
                 } else {
-                    Text("移除", color = p.red, fontSize = qqFontBody(14.sp))
+                    Text(stringResource(DesignR.string.common_remove), color = p.red, fontSize = qqFontBody(14.sp))
                 }
             }
         },
         dismissButton = {
             TextButton(enabled = !busy, onClick = onDismiss) {
-                Text("取消", color = p.t2, fontSize = qqFontBody(14.sp))
+                Text(stringResource(DesignR.string.common_cancel), color = p.t2, fontSize = qqFontBody(14.sp))
             }
         },
     )
@@ -546,7 +558,7 @@ internal suspend fun loadSkills(engine: NodeEngine?, pluginDirs: List<File>): Sk
         if (failure !is NodeEngineException || !rpcPathMissing(failure)) {
             return SkillUiState.Failed(
                 stage = (failure as? NodeEngineException)?.stage ?: "rpc",
-                message = failure?.message ?: failure?.toString() ?: "技能列表读取失败",
+                message = failure?.message ?: failure?.toString().orEmpty(),
             )
         }
         lastMissing = failure
@@ -559,7 +571,7 @@ internal suspend fun loadSkills(engine: NodeEngine?, pluginDirs: List<File>): Sk
     }
     return SkillUiState.Failed(
         stage = lastMissing?.stage ?: "rpc",
-        message = lastMissing?.message ?: "技能列表读取失败",
+        message = lastMissing?.message.orEmpty(),
     )
 }
 
@@ -568,7 +580,7 @@ private fun catalogState(reply: JSONObject): SkillUiState {
         val error = reply.optJSONObject("error")
         return SkillUiState.Failed(
             stage = error?.optString("stage").orEmpty().ifBlank { "rpc" },
-            message = error?.optString("message").orEmpty().ifBlank { "技能列表读取失败" },
+            message = error?.optString("message").orEmpty(),
         )
     }
     return SkillUiState.Ready(parseCatalog(catalogOf(reply)))
@@ -584,7 +596,7 @@ private fun LoadingBody() {
     ) {
         CircularProgressIndicator(color = p.accent, strokeWidth = 2.5.dp, modifier = Modifier.size(28.dp))
         Spacer(Modifier.height(14.dp))
-        Text("正在启动 Node 引擎…", color = p.t2, fontSize = qqFontBody(13.sp))
+        Text(stringResource(DesignR.string.skill_engine_starting), color = p.t2, fontSize = qqFontBody(13.sp))
     }
 }
 
@@ -594,14 +606,23 @@ private fun FailureBody(stage: String, message: String, onRetry: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(QqSpace.l())) {
         SectionCard {
             Column(Modifier.padding(horizontal = 14.dp, vertical = QqSpace.m())) {
-                Text("技能列表读取失败", color = p.red, fontSize = qqFontBody(14.sp), fontWeight = FontWeight.SemiBold)
+                Text(
+                    stringResource(DesignR.string.skill_list_failed),
+                    color = p.red,
+                    fontSize = qqFontBody(14.sp),
+                    fontWeight = FontWeight.SemiBold,
+                )
                 Spacer(Modifier.height(6.dp))
                 Text("stage: $stage", color = p.t3, fontSize = qqFontBody(11.5.sp))
                 Spacer(Modifier.height(2.dp))
-                Text(message, color = p.t2, fontSize = qqFontBody(12.5.sp))
+                Text(
+                    message.ifBlank { stringResource(DesignR.string.skill_list_failed) },
+                    color = p.t2,
+                    fontSize = qqFontBody(12.5.sp),
+                )
                 Spacer(Modifier.height(QqSpace.xs()))
                 TextButton(onClick = onRetry, contentPadding = PaddingValues(0.dp)) {
-                    Text("重试", color = p.accent, fontSize = qqFontBody(13.sp))
+                    Text(stringResource(DesignR.string.common_retry), color = p.accent, fontSize = qqFontBody(13.sp))
                 }
             }
         }
@@ -644,7 +665,7 @@ private fun SkillRow(
                 )
             }
         } else {
-            IconBtn(Icons.Filled.Delete, "移除 ${entry.name}") { onDelete() }
+            IconBtn(Icons.Filled.Delete, stringResource(DesignR.string.skill_remove_desc, entry.name)) { onDelete() }
         }
         Spacer(Modifier.width(6.dp))
         Switch(checked = entry.effectiveEnabled, onCheckedChange = onToggle, enabled = !busy)

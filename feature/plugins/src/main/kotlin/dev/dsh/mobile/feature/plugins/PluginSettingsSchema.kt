@@ -1,6 +1,7 @@
 package dev.dsh.mobile.feature.plugins
 
 import kotlin.math.roundToInt
+import dev.dsh.mobile.design.R
 import dev.dsh.mobile.pluginhost.ConfigSpec
 
 /**
@@ -94,7 +95,11 @@ internal val SettingItem.isReadOnly: Boolean
  * 2. 空 key 的行直接跳过（写回去也没有落点）；
  * 3. section 只在它第一次出现的位置插一行标题，不重排字段顺序 —— 插件作者写的顺序就是界面顺序。
  */
-fun settingsSchema(config: List<ConfigSpec>): SettingsSchema {
+fun settingsSchema(
+    config: List<ConfigSpec>,
+    /** 文案解析器：本文件刻意不碰 Context，分组兜底与降级提示都由调用方给已本地化的串。 */
+    copy: (Int, List<Any>) -> String = { id, _ -> "#" + id },
+): SettingsSchema {
     val items = mutableListOf<SettingItem>()
     val unsupported = mutableListOf<String>()
     var lastSection: String? = null
@@ -104,7 +109,7 @@ fun settingsSchema(config: List<ConfigSpec>): SettingsSchema {
         // 分组行：key 允许为空（它不存值），标题就是 label。老插件把分组写成
         // type=group 的独立行，新写法是用字段上的 section 属性，两条都要认。
         if (type == "group" || type == "section") {
-            val title = label.ifBlank { "分组" }
+            val title = label.ifBlank { copy(R.string.sessions_group_action, emptyList()) }
             if (title != lastSection) {
                 items += SettingItem.Section(title)
                 lastSection = title
@@ -145,7 +150,7 @@ fun settingsSchema(config: List<ConfigSpec>): SettingsSchema {
                 SettingItem.Info(
                     key = key,
                     label = label,
-                    hint = "不支持的设置类型 " + spec.type + "，已按说明行显示",
+                    hint = copy(R.string.plugins_schema_unsupported, listOf(spec.type)),
                 )
             }
         }

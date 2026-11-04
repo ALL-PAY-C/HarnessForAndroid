@@ -1,6 +1,8 @@
 package dev.dsh.mobile.feature.plugins
 
 import dev.dsh.mobile.pluginapi.SlotContribution
+import dev.dsh.mobile.design.UiText
+import dev.dsh.mobile.design.R
 
 /**
  * 插件中心列表的拼装逻辑。刻意放在独立文件、且不 import 任何 Compose 类型：
@@ -45,7 +47,7 @@ internal const val LOAD_ERROR_MAX_CHARS = 120
  * 真实的加载回执塞进 [loadError]（register() 抛的异常或 Node 引擎 plugins.load 的失败），
  * 不能拿「安装目录在不在」来推断状态 —— 那正是「装上了但报错」被显示成「已启用」的根源。
  */
-internal data class PluginRowStatus(val text: String, val failed: Boolean, val detail: String?)
+internal data class PluginRowStatus(val text: UiText, val failed: Boolean, val detail: String?)
 
 /** 失败优先于启用态：装上了但跑不起来，就不许显示「已启用」。 */
 internal fun pluginRowStatus(
@@ -54,9 +56,9 @@ internal fun pluginRowStatus(
     limit: Int = LOAD_ERROR_MAX_CHARS,
 ): PluginRowStatus {
     val error = loadError?.trim()?.takeIf { it.isNotEmpty() }
-    if (error == null) return PluginRowStatus(if (enabled) "已启用" else "已停用", false, null)
+    if (error == null) return PluginRowStatus(if (enabled) UiText.Res(R.string.plugins_row_enabled) else UiText.Res(R.string.plugins_row_disabled), false, null)
     val clipped = if (error.length <= limit) error else error.take(limit) + "…"
-    return PluginRowStatus("加载失败", true, clipped)
+    return PluginRowStatus(UiText.Res(R.string.plugins_row_load_failed), true, clipped)
 }
 
 /**

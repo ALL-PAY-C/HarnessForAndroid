@@ -1,5 +1,7 @@
 package dev.dsh.mobile.feature.settings
 
+import dev.dsh.mobile.design.R as DesignR
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,6 +53,9 @@ import dev.dsh.mobile.design.qqFontBody
 import dev.dsh.mobile.design.qqPageBottomInset
 import kotlinx.coroutines.launch
 
+/** 一次测试连接的结果：成功与否决定颜色，文案已本地化，不再靠前缀猜。 */
+private data class ProbeMsg(val ok: Boolean, val text: String)
+
 /**
  * 设置 → MCP 服务器（T9.10 P1）。
  *
@@ -66,7 +71,7 @@ fun McpServersScreen(onBack: () -> Unit) {
 
     var servers by remember { mutableStateOf(store.load()) }
     var editing by remember { mutableStateOf<McpServerRecord?>(null) }
-    var probes by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var probes by remember { mutableStateOf<Map<String, ProbeMsg>>(emptyMap()) }
     var probingId by remember { mutableStateOf<String?>(null) }
 
     fun runProbe(record: McpServerRecord) {
@@ -75,18 +80,21 @@ fun McpServersScreen(onBack: () -> Unit) {
         probes = probes - record.id
         scope.launch {
             val result = probeMcpServer(record)
-            probes = probes + (record.id to if (result.ok) {
-                "连接成功 · " + result.server + " · " + result.tools.size + " 个工具"
-            } else {
-                result.error ?: "连接失败"
-            })
+            probes = probes + (record.id to ProbeMsg(
+                ok = result.ok,
+                text = if (result.ok) {
+                    ctx.getString(DesignR.string.mcp_probe_ok, result.server, result.tools.size)
+                } else {
+                    result.error ?: ctx.getString(DesignR.string.mcp_probe_failed)
+                },
+            ))
             probingId = null
         }
     }
 
     Box(Modifier.fillMaxSize().background(p.bg)) {
         Column(Modifier.fillMaxSize()) {
-            QqScreenTopBar(title = "MCP 服务器", isBack = true, onNavigationClick = onBack)
+            QqScreenTopBar(title = stringResource(DesignR.string.mcp_title), isBack = true, onNavigationClick = onBack)
             Column(
                 Modifier
                     .fillMaxSize()
@@ -103,18 +111,16 @@ fun McpServersScreen(onBack: () -> Unit) {
             ) {
                 // T9.10-P4：两条链路的执行位置不同，权限语义也不同，先说清楚再让用户配。
                 Text(
-                    "本地运行时端点由本应用连接并执行工具，调用前按工具策略确认。" +
-                        "Loopback/Remote 端点下工具由引擎执行，不经过本应用的确认弹窗。" +
-                        "stdio 由引擎侧配置，本应用不下发。",
+                    stringResource(DesignR.string.mcp_hint),
                     color = p.t3,
                     fontSize = qqFontBody(11.5.sp),
                     modifier = Modifier.padding(horizontal = 4.dp),
                 )
 
-                SectionFrame(title = "已配置", icon = Icons.Filled.Widgets, tint = p.accent) {
+                SectionFrame(title = stringResource(DesignR.string.mcp_section_configured), icon = Icons.Filled.Widgets, tint = p.accent) {
                     if (servers.isEmpty()) {
                         Text(
-                            "还没有服务器。新增后这里会出现列表，启用开关控制它是否参与工具注入。",
+                            stringResource(DesignR.string.mcp_empty),
                             color = p.t3,
                             fontSize = qqFontBody(12.sp),
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -136,7 +142,7 @@ fun McpServersScreen(onBack: () -> Unit) {
                                             enabled = probingId == null,
                                         ) {
                                             Text(
-                                                if (probingId == server.id) "测试中" else "测试",
+                                                if (probingId == server.id) stringResource(DesignR.string.mcp_testing) else stringResource(DesignR.string.mcp_test),
                                                 fontSize = qqFontBody(12.sp),
                                             )
                                         }
@@ -147,10 +153,10 @@ fun McpServersScreen(onBack: () -> Unit) {
                                     }
                                 },
                             )
-                            probes[server.id]?.let { message ->
+                            probes[server.id]?.let { msg ->
                                 Text(
-                                    message,
-                                    color = if (message.startsWith("连接成功")) p.green else p.red,
+                                    msg.text,
+                                    color = if (msg.ok) p.green else p.red,
                                     fontSize = qqFontBody(11.5.sp),
                                     modifier = Modifier.padding(start = 56.dp, end = 14.dp, bottom = 8.dp),
                                 )
@@ -160,8 +166,8 @@ fun McpServersScreen(onBack: () -> Unit) {
                     }
                     QqRow(
                         icon = Icons.Filled.Add,
-                        title = "新增服务器",
-                        subtitle = "填 URL 与请求头",
+                        title = stringResource(DesignR.string.mcp_add_title),
+                        subtitle = stringResource(DesignR.string.mcp_add_sub),
                         tint = p.accent,
                         onClick = {
                             editing = McpServerRecord(
@@ -206,7 +212,7 @@ private fun McpEditor(
     onDelete: () -> Unit,
     onProbe: (McpServerRecord) -> Unit,
     probing: Boolean,
-    probeMessage: String?,
+    probeMessage: ProbeMsg?,
 ) {
     val p = LocalQq.current
     var name by remember(draft.id) { mutableStateOf(draft.name) }
@@ -221,16 +227,16 @@ private fun McpEditor(
     // 否则一进来就是两行红字。valid 仍按真实校验算，保存按钮的门槛不变。
     var touched by remember(draft.id) { mutableStateOf(false) }
     val rawNameError = serverNameError(name, others)
-    val rawUrlError = if (url.isBlank()) "URL 不能为空" else if (!url.startsWith("http")) "URL 需以 http:// 或 https:// 开头" else null
+    val rawUrlError = if (url.isBlank()) stringResource(DesignR.string.mcp_err_url_empty) else if (!url.startsWith("http")) stringResource(DesignR.string.mcp_err_url_scheme) else null
     val headers = parseHeaders(headersText)
     val timeoutMs = (timeoutText.toLongOrNull() ?: 0L) * 1000L
-    val rawTimeoutError = if (timeoutMs !in 1_000L..600_000L) "超时需在 1–600 秒之间" else null
+    val rawTimeoutError = if (timeoutMs !in 1_000L..600_000L) stringResource(DesignR.string.mcp_err_timeout) else null
     val valid = rawNameError == null && rawUrlError == null && rawTimeoutError == null
     val nameError = if (touched) rawNameError else null
     val urlError = if (touched) rawUrlError else null
     val timeoutError = if (touched) rawTimeoutError else null
 
-    SectionFrame(title = "编辑", icon = Icons.Filled.Widgets, tint = p.accent2) {
+    SectionFrame(title = stringResource(DesignR.string.common_edit), icon = Icons.Filled.Widgets, tint = p.accent2) {
         Column(
             Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(QqSpace.s()),
@@ -239,7 +245,7 @@ private fun McpEditor(
                 value = name,
                 onValueChange = { name = it },
                 singleLine = true,
-                label = { Text("名称（工具前缀 mcp__<名称>__）") },
+                label = { Text(stringResource(DesignR.string.mcp_field_name)) },
                 placeholder = { Text("files") },
                 isError = nameError != null,
                 modifier = Modifier.fillMaxWidth().then(blurred { touched = true }),
@@ -247,7 +253,7 @@ private fun McpEditor(
             if (nameError != null) {
                 Text(nameError, color = p.red, fontSize = qqFontBody(11.5.sp))
             } else if (name.isNotBlank()) {
-                Text("实际前缀：" + sanitizeServerName(name), color = p.t3, fontSize = qqFontBody(11.5.sp))
+                Text(stringResource(DesignR.string.mcp_actual_prefix, sanitizeServerName(name)), color = p.t3, fontSize = qqFontBody(11.5.sp))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(QqSpace.s())) {
                 MCP_TRANSPORTS.forEach { kind ->
@@ -262,7 +268,7 @@ private fun McpEditor(
                 value = url,
                 onValueChange = { url = it },
                 singleLine = true,
-                label = { Text("服务器 URL") },
+                label = { Text(stringResource(DesignR.string.mcp_field_url)) },
                 placeholder = { Text("https://example.com/mcp") },
                 isError = urlError != null,
                 modifier = Modifier.fillMaxWidth().then(blurred { touched = true }),
@@ -273,7 +279,7 @@ private fun McpEditor(
             OutlinedTextField(
                 value = headersText,
                 onValueChange = { headersText = it },
-                label = { Text("请求头（每行 Name: Value）") },
+                label = { Text(stringResource(DesignR.string.mcp_field_headers)) },
                 minLines = 2,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -281,7 +287,7 @@ private fun McpEditor(
                 value = timeoutText,
                 onValueChange = { timeoutText = it },
                 singleLine = true,
-                label = { Text("工具超时（秒，1–600）") },
+                label = { Text(stringResource(DesignR.string.mcp_field_timeout)) },
                 isError = timeoutError != null,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -304,21 +310,21 @@ private fun McpEditor(
                         touched = true
                         if (valid) onSave(snapshot())
                     },
-                ) { Text("保存") }
+                ) { Text(stringResource(DesignR.string.common_save)) }
                 TextButton(
                     onClick = {
                         touched = true
                         if (valid) onProbe(snapshot())
                     },
-                ) { Text(if (probing) "测试中…" else "测试连接") }
-                TextButton(onClick = onCancel) { Text("取消", color = p.t3) }
+                ) { Text(if (probing) stringResource(DesignR.string.mcp_testing_ellipsis) else stringResource(DesignR.string.mcp_test_connect)) }
+                TextButton(onClick = onCancel) { Text(stringResource(DesignR.string.common_cancel), color = p.t3) }
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onDelete) { Text("删除", color = p.red) }
+                TextButton(onClick = onDelete) { Text(stringResource(DesignR.string.common_delete), color = p.red) }
             }
-            probeMessage?.let { message ->
+            probeMessage?.let { msg ->
                 Text(
-                    message,
-                    color = if (message.startsWith("连接成功")) p.green else p.red,
+                    msg.text,
+                    color = if (msg.ok) p.green else p.red,
                     fontSize = qqFontBody(11.5.sp),
                 )
             }

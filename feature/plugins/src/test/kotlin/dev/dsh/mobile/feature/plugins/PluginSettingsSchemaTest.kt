@@ -64,7 +64,10 @@ class PluginSettingsSchemaTest {
 
     @Test
     fun unknownTypeBecomesInfoRowAndIsReported() {
-        val schema = settingsSchema(listOf(spec("weird", "colorPicker"), spec("ok", "text")))
+        val schema = settingsSchema(
+            listOf(spec("weird", "colorPicker"), spec("ok", "text")),
+            copy = { id, args -> id.toString() + ":" + args.joinToString() },
+        )
         val info = schema.items.filterIsInstance<SettingItem.Info>().single()
         assertEquals("weird", info.key)
         assertTrue("降级说明要写清是哪个类型", info.hint.contains("colorPicker"))

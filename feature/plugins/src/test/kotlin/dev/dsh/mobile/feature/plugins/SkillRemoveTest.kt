@@ -1,6 +1,8 @@
 package dev.dsh.mobile.feature.plugins
 
 import org.junit.Assert.assertEquals
+import dev.dsh.mobile.design.UiText
+import dev.dsh.mobile.design.R as DesignR
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -23,32 +25,30 @@ class SkillRemoveTest {
     @Test
     fun bundledConfirmBodyWarnsAboutReseeding() {
         val body = removeConfirmBody("code-review", bundled = true)
-        assertTrue(body.contains("code-review"))
-        assertTrue(body.contains("下次启动会重新铺回"))
+        assertEquals(UiText.Res(DesignR.string.skill_remove_confirm_bundled, listOf("code-review")), body)
     }
 
     @Test
     fun userSkillConfirmBodyHasNoReseedWarning() {
         val body = removeConfirmBody("my-own-skill", bundled = false)
-        assertTrue(body.contains("my-own-skill"))
-        assertFalse(body.contains("重新铺回"))
+        assertEquals(UiText.Res(DesignR.string.skill_remove_confirm, listOf("my-own-skill")), body)
     }
 
     @Test
     fun failureNoticeKeepsEngineWording() {
-        assertEquals("移除失败：未知技能: \"ghost\"", removeFailureNotice("未知技能: \"ghost\""))
-        assertEquals("移除失败：未知技能: \"ghost\"", removeFailureNotice("  未知技能: \"ghost\"  "))
+        assertEquals(UiText.Res(DesignR.string.skill_remove_failed, listOf("未知技能: \"ghost\"")), removeFailureNotice("未知技能: \"ghost\""))
+        assertEquals(UiText.Res(DesignR.string.skill_remove_failed, listOf("未知技能: \"ghost\"")), removeFailureNotice("  未知技能: \"ghost\"  "))
     }
 
     @Test
     fun failureNoticeFallsBackWhenEngineSaysNothing() {
-        assertEquals("移除失败：引擎拒绝了这次移除", removeFailureNotice(""))
-        assertEquals("移除失败：引擎拒绝了这次移除", removeFailureNotice("   \n "))
+        assertEquals(UiText.Res(DesignR.string.skill_remove_failed_fallback), removeFailureNotice(""))
+        assertEquals(UiText.Res(DesignR.string.skill_remove_failed_fallback), removeFailureNotice("   \n "))
     }
 
     @Test
     fun successNoticeNamesTheSkill() {
-        assertEquals("已移除 code-review", removedNotice("code-review"))
+        assertEquals(UiText.Res(DesignR.string.skill_removed, listOf("code-review")), removedNotice("code-review"))
     }
 
     @Test

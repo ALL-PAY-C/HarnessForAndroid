@@ -192,13 +192,16 @@ fun QqTabBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                SlotEditState.Slot.BottomBar.label,
+                stringResource(SlotEditState.Slot.BottomBar.labelRes),
                 color = p.t2,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(end = 6.dp),
             )
-            SlotPlusButton(label = stringResource(R.string.common_edit) + SlotEditState.Slot.BottomBar.label, onClick = onEditPlus)
+            SlotPlusButton(
+                label = stringResource(R.string.common_edit) + stringResource(SlotEditState.Slot.BottomBar.labelRes),
+                onClick = onEditPlus,
+            )
         }
     }
     Column(Modifier.fillMaxWidth().background(p.card).navigationBarsPadding()) {

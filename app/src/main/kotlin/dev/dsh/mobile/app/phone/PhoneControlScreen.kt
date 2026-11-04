@@ -1,5 +1,7 @@
 package dev.dsh.mobile.app.phone
 
+import dev.dsh.mobile.design.R as DesignR
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -95,7 +97,7 @@ fun PhoneControlScreen(phone: PhoneBridge) {
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             HeadCard(state = state, onRefresh = ::refresh)
-            SectionTitle("权限引导", PhonePermissionStep.entries.size)
+            SectionTitle(stringResource(DesignR.string.phone_section_permissions), PhonePermissionStep.entries.size)
             SectionCard {
                 PhonePermissionStep.entries.forEachIndexed { index, step ->
                     if (index > 0) QqCardDivider()
@@ -103,7 +105,7 @@ fun PhoneControlScreen(phone: PhoneBridge) {
                     QqRow(
                         icon = Icons.Filled.TouchApp,
                         title = step.title,
-                        subtitle = if (status == PhoneStepStatus.Granted) "已授权" else step.body,
+                        subtitle = if (status == PhoneStepStatus.Granted) stringResource(DesignR.string.settings_granted) else step.body,
                         tint = statusColor(p, status),
                         onClick = {
                             val intent = when (step) {
@@ -115,8 +117,8 @@ fun PhoneControlScreen(phone: PhoneBridge) {
                         trailing = {
                             Text(
                                 when (status) {
-                                    PhoneStepStatus.Granted -> "已授权"
-                                    PhoneStepStatus.Pending -> "待连接"
+                                    PhoneStepStatus.Granted -> stringResource(DesignR.string.settings_granted)
+                                    PhoneStepStatus.Pending -> stringResource(DesignR.string.phone_state_pending)
                                     PhoneStepStatus.Off -> step.actionLabel
                                 },
                                 color = statusColor(p, status),
@@ -128,7 +130,7 @@ fun PhoneControlScreen(phone: PhoneBridge) {
                 }
             }
             // T4.5：六类系统能力。给权限是「按需」的 —— 不点这一行就永远不弹窗。
-            SectionTitle("系统能力权限", DeviceCapability.entries.size)
+            SectionTitle(stringResource(DesignR.string.phone_section_capabilities), DeviceCapability.entries.size)
             SectionCard {
                 DeviceCapability.entries.forEachIndexed { index, capability ->
                     if (index > 0) QqCardDivider()
@@ -136,12 +138,12 @@ fun PhoneControlScreen(phone: PhoneBridge) {
                     QqRow(
                         icon = Icons.Filled.Lock,
                         title = capability.label,
-                        subtitle = if (granted) "已授权" else capability.hint + "（点一下申请）",
+                        subtitle = if (granted) stringResource(DesignR.string.settings_granted) else capability.hint + stringResource(DesignR.string.phone_tap_to_request),
                         tint = if (granted) p.green else p.t3,
                         onClick = { capabilities.requestMissing(capability) },
                         trailing = {
                             Text(
-                                if (granted) "已授权" else "未授权",
+                                if (granted) stringResource(DesignR.string.settings_granted) else stringResource(DesignR.string.settings_ungranted),
                                 color = if (granted) p.green else p.t3,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
@@ -150,7 +152,7 @@ fun PhoneControlScreen(phone: PhoneBridge) {
                     )
                 }
             }
-            SectionTitle("动作列表", PhoneAction.entries.size)
+            SectionTitle(stringResource(DesignR.string.phone_section_actions), PhoneAction.entries.size)
             SectionCard {
                 PhoneAction.entries.forEachIndexed { index, action ->
                     if (index > 0) QqCardDivider()
@@ -167,8 +169,8 @@ fun PhoneControlScreen(phone: PhoneBridge) {
             SectionCard {
                 QqRow(
                     icon = Icons.Filled.Refresh,
-                    title = if (busy) "读屏自检中…" else "读屏自检",
-                    subtitle = "执行一次 readscreen，验证服务真的能下发动作",
+                    title = if (busy) stringResource(DesignR.string.phone_selftest_running) else stringResource(DesignR.string.phone_selftest),
+                    subtitle = stringResource(DesignR.string.phone_selftest_hint),
                     tint = p.accent,
                     onClick = {
                         if (busy) return@QqRow
@@ -195,11 +197,11 @@ fun PhoneControlScreen(phone: PhoneBridge) {
                     )
                 }
             }
-            SectionTitle("最近动作", records.size)
+            SectionTitle(stringResource(DesignR.string.phone_section_recent), records.size)
             SectionCard {
                 if (records.isEmpty()) {
                     Text(
-                        "还没有动作记录。模型调用 phone 工具或点上面的「读屏自检」后会出现在这里。",
+                        stringResource(DesignR.string.phone_empty_recent),
                         color = p.t3,
                         fontSize = 11.5.sp,
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -217,7 +219,7 @@ fun PhoneControlScreen(phone: PhoneBridge) {
                 }
             }
             Text(
-                "全部动作在本机执行，不需要 root、不需要 ADB、不需要电脑。服务未开启时按钮只会把你送到系统设置页。",
+                stringResource(DesignR.string.phone_footer_local),
                 color = p.t3,
                 fontSize = 11.5.sp,
                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
@@ -247,13 +249,13 @@ private fun HeadCard(state: PhonePermissionState, onRefresh: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.weight(1f))
-            Text("刷新", color = p.accent, fontSize = 12.sp, modifier = Modifier.clickable(onClick = onRefresh))
+            Text(stringResource(DesignR.string.settings_refresh), color = p.accent, fontSize = 12.sp, modifier = Modifier.clickable(onClick = onRefresh))
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatusChip("无障碍服务", state.status(PhonePermissionStep.Accessibility))
-            StatusChip("服务连接", if (state.serviceBound) PhoneStepStatus.Granted else PhoneStepStatus.Off)
-            StatusChip("悬浮窗", state.status(PhonePermissionStep.Overlay))
+            StatusChip(stringResource(DesignR.string.phone_cap_accessibility), state.status(PhonePermissionStep.Accessibility))
+            StatusChip(stringResource(DesignR.string.phone_cap_service), if (state.serviceBound) PhoneStepStatus.Granted else PhoneStepStatus.Off)
+            StatusChip(stringResource(DesignR.string.phone_cap_overlay), state.status(PhonePermissionStep.Overlay))
         }
         if (!state.canControl) {
             Spacer(Modifier.height(8.dp))
@@ -293,9 +295,9 @@ private fun LastOutcome(record: PhoneActionRecord?) {
     }
     Text(
         when {
-            record == null -> "未执行"
-            record.ok -> "✓ 成功"
-            else -> "✗ 失败"
+            record == null -> stringResource(DesignR.string.phone_state_not_run)
+            record.ok -> stringResource(DesignR.string.phone_state_ok)
+            else -> stringResource(DesignR.string.phone_state_fail)
         },
         color = color,
         fontSize = 11.5.sp,

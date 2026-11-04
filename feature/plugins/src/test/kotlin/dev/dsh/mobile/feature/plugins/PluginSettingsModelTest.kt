@@ -1,6 +1,8 @@
 package dev.dsh.mobile.feature.plugins
 
 import dev.dsh.mobile.pluginapi.ConfigFieldType
+import dev.dsh.mobile.design.UiText
+import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.pluginapi.SlotContribution
 import dev.dsh.mobile.pluginapi.SlotId
 import dev.dsh.mobile.pluginhost.ConfigSpec
@@ -67,7 +69,7 @@ class PluginSettingsModelTest {
         ).single()
         assertTrue(entry.hasSettings)
         assertNull(entry.emptyText)
-        assertEquals("网关设置", entry.rowSubtitle)
+        assertEquals(UiText.Raw("网关设置"), entry.rowSubtitle)
         assertEquals(listOf("base"), entry.fields.map { it.key })
     }
 
@@ -77,7 +79,7 @@ class PluginSettingsModelTest {
             installed = listOf(manifest("x", config = listOf(ConfigSpec("a", "A"), ConfigSpec("b", "B")))),
             pages = emptyList(),
         ).single()
-        assertEquals("共 2 项设置", entry.rowSubtitle)
+        assertEquals(UiText.Res(DesignR.string.plugins_settings_count, listOf(2)), entry.rowSubtitle)
     }
 
     @Test
@@ -166,7 +168,7 @@ class PluginSettingsModelTest {
         assertEquals(mapOf("token" to "abc"), entry.extraValues)
         assertTrue("用户自己加的键也算有设置", entry.hasSettings)
         assertNull(entry.emptyText)
-        assertEquals("插件自带设置界面", entry.rowSubtitle)
+        assertEquals(UiText.Res(DesignR.string.plugins_has_own_ui), entry.rowSubtitle)
     }
 
     @Test

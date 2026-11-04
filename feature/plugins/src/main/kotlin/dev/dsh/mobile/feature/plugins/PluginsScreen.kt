@@ -1,6 +1,10 @@
 package dev.dsh.mobile.feature.plugins
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.platform.LocalContext
+import dev.dsh.mobile.design.R as DesignR
+import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.text
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
@@ -80,6 +84,7 @@ fun PluginsScreen(
     val tokens = rememberHostThemeTokens()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     // 待确认卸载的插件：点删除先弹二次确认，确认后才真正移除。
     var pending by remember { mutableStateOf<LoadedPlugin?>(null) }
     // 插件是外部装进来的：进页面、回到前台、重装 APK 之后都必须重扫一次。
@@ -91,7 +96,7 @@ fun PluginsScreen(
     // 顶部小字：说明「已移除」是持久的，重装即恢复。
     val hint: @Composable () -> Unit = {
         Text(
-            "被移除过的插件不会自动回来；重装同一个 APK 即恢复。",
+            stringResource(DesignR.string.plugins_removed_persist_hint),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
@@ -104,15 +109,19 @@ fun PluginsScreen(
                 item { hint() }
                 item {
                     GroupFrame(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
-                        GroupHeader(label = "已安装插件", count = 0, collapsible = false)
+                        GroupHeader(label = stringResource(DesignR.string.plugins_group_installed), count = 0, collapsible = false)
                         Column(
                             Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 26.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Text("没有插件", color = LocalQq.current.t1, style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                stringResource(DesignR.string.plugins_none),
+                                color = LocalQq.current.t1,
+                                style = MaterialTheme.typography.titleSmall,
+                            )
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                "① 系统里直接装插件 APK，装完回来自动认\n② 「插件市场 → 从文件安装」挑一个 APK",
+                                stringResource(DesignR.string.plugins_none_hint),
                                 color = LocalQq.current.t3,
                                 style = MaterialTheme.typography.labelSmall,
                                 textAlign = TextAlign.Center,
@@ -127,25 +136,35 @@ fun PluginsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                "重新扫描已安装插件",
+                                stringResource(DesignR.string.plugins_rescan),
                                 color = LocalQq.current.accent,
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.weight(1f),
                             )
-                            Text("↻ 重扫", color = LocalQq.current.accent, style = MaterialTheme.typography.labelSmall)
+                            Text(
+                                stringResource(DesignR.string.plugins_rescan_short),
+                                color = LocalQq.current.accent,
+                                style = MaterialTheme.typography.labelSmall,
+                            )
                         }
                     }
                 }
                 if (probes.isNotEmpty()) {
                     item {
                         GroupFrame(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
-                            GroupHeader(label = "加载诊断", count = probes.size, collapsible = false)
+                            GroupHeader(label = stringResource(DesignR.string.plugins_group_diag), count = probes.size, collapsible = false)
                             Column(Modifier.padding(vertical = 6.dp)) {
                                 probes.forEach { probe ->
                                     Text(
                                         (if (probe.ok) "✓ " else "✗ ") + probe.name +
-                                            "（" + (if (probe.source == "system") "系统安装" else "App 内导入") + "）" +
-                                            (probe.error?.let { "：$it" } ?: ""),
+                                            stringResource(
+                                                DesignR.string.plugins_diag_source,
+                                                stringResource(
+                                                    if (probe.source == "system") DesignR.string.plugins_source_system
+                                                    else DesignR.string.plugins_source_import,
+                                                ),
+                                            ) +
+                                            (probe.error?.let { stringResource(DesignR.string.plugins_diag_error, it) } ?: ""),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = if (probe.ok) MaterialTheme.colorScheme.primary
                                         else MaterialTheme.colorScheme.error,
@@ -172,11 +191,11 @@ fun PluginsScreen(
                 )
             }
             item {
-                AddRowCard("重新扫描已安装插件", onRescan)
+                AddRowCard(stringResource(DesignR.string.plugins_rescan), onRescan)
             }
             item {
                 Text(
-                    "插件在独立 try/catch 中加载与渲染：注册失败只禁用该插件，渲染异常显示降级卡片。HTML/JS 型插件通过“数据/API 适配 + 原生渲染器注册”兼容。",
+                    stringResource(DesignR.string.plugins_footer),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(16.dp),
@@ -197,9 +216,9 @@ fun PluginsScreen(
                 // 与其它一级页共用同一个顶栏骨架（左返回 / 标题居中 / 右侧槽位留空），
                 // 不再用 M3 TopAppBar 自成一套排版。
                 QqScreenTopBar(
-                    title = "插件",
+                    title = stringResource(DesignR.string.plugins_title),
                     isBack = true,
-                    navigationDescription = "返回",
+                    navigationDescription = stringResource(DesignR.string.common_back),
                     onNavigationClick = onBack,
                 )
             },
@@ -211,11 +230,10 @@ fun PluginsScreen(
     pending?.let { target ->
         AlertDialog(
             onDismissRequest = { pending = null },
-            title = { Text("移除插件？") },
+            title = { Text(stringResource(DesignR.string.plugins_remove_title)) },
             text = {
                 Text(
-                    "「" + target.manifest.name + "」将从 App 中移除，之后不再加载。" +
-                        "若插件是以 APK 形式装在系统里，请到系统设置里卸载那个 App。",
+                    stringResource(DesignR.string.plugins_remove_body, target.manifest.name),
                 )
             },
             confirmButton = {
@@ -224,17 +242,26 @@ fun PluginsScreen(
                         val name = target.manifest.name
                         pending = null
                         viewModel.uninstall(target.manifest.id)
-                            .onSuccess { scope.launch { snackbar.showSnackbar("已移除 " + name) } }
+                            .onSuccess {
+                                scope.launch {
+                                    snackbar.showSnackbar(context.getString(DesignR.string.plugins_removed, name))
+                                }
+                            }
                             .onFailure { t ->
                                 scope.launch {
-                                    snackbar.showSnackbar("移除失败：" + (t.message ?: t::class.java.simpleName))
+                                    snackbar.showSnackbar(
+                                        context.getString(
+                                            DesignR.string.plugins_remove_failed,
+                                            t.message ?: t::class.java.simpleName,
+                                        ),
+                                    )
                                 }
                             }
                     },
-                ) { Text("移除") }
+                ) { Text(stringResource(DesignR.string.common_remove)) }
             },
             dismissButton = {
-                TextButton(onClick = { pending = null }) { Text("取消") }
+                TextButton(onClick = { pending = null }) { Text(stringResource(DesignR.string.common_cancel)) }
             },
         )
     }
@@ -282,7 +309,7 @@ private fun PluginCard(
             onClick = { expanded = !expanded },
             trailing = {
                 Text(
-                    status.text,
+                    status.text.text(),
                     color = when {
                         status.failed -> MaterialTheme.colorScheme.error
                         plugin.enabled -> p.accent
@@ -306,7 +333,7 @@ private fun PluginCard(
                 ) {
                     Icon(
                         Icons.Filled.Delete,
-                        contentDescription = "卸载",
+                        contentDescription = stringResource(DesignR.string.plugins_uninstall_desc),
                         tint = p.t3,
                         modifier = Modifier.size(18.dp),
                     )
@@ -316,7 +343,10 @@ private fun PluginCard(
         if (status.failed) {
             // 常显（不用展开）：失败原因就是用户来这一页要看的唯一信息。
             Text(
-                "加载失败：" + (status.detail ?: "原因未知"),
+                stringResource(
+                    DesignR.string.plugins_load_failed,
+                    status.detail ?: stringResource(DesignR.string.plugins_reason_unknown),
+                ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.error,
                 maxLines = 2,
@@ -349,14 +379,18 @@ private fun PluginCard(
                 }
                 plugin.error?.let {
                     Spacer(Modifier.height(6.dp))
-                    Text("加载错误：" + it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                    Text(
+                        stringResource(DesignR.string.plugins_load_error, it),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
                 if (plugin.enabled) {
                     Spacer(Modifier.height(6.dp))
                     PluginBoundary(plugin.manifest.id) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                "槽位已注册：" + slots.size + " 项",
+                                stringResource(DesignR.string.plugins_slots_registered, slots.size),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = p.accent,
                             )
@@ -367,7 +401,9 @@ private fun PluginCard(
                                 if (pageAction is SlotAction.Page) {
                                     Column {
                                         PluginSlotItem(contribution = slot, tokens = tokens, onAction = onSlotAction)
-                                        TextButton(onClick = { onSlotAction(pageAction) }) { Text("打开页面") }
+                                        TextButton(onClick = { onSlotAction(pageAction) }) {
+                                            Text(stringResource(DesignR.string.plugins_open_page))
+                                        }
                                     }
                                 } else {
                                     PluginSlotItem(contribution = slot, tokens = tokens, onAction = onSlotAction)

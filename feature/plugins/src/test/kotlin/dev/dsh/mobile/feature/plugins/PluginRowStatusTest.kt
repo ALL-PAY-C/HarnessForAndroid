@@ -1,6 +1,8 @@
 package dev.dsh.mobile.feature.plugins
 
 import org.junit.Assert.assertEquals
+import dev.dsh.mobile.design.UiText
+import dev.dsh.mobile.design.R as DesignR
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -16,7 +18,7 @@ class PluginRowStatusTest {
     @Test
     fun enabledWithoutFailureShowsEnabled() {
         val row = pluginRowStatus(enabled = true, loadError = null)
-        assertEquals("已启用", row.text)
+        assertEquals(UiText.Res(DesignR.string.plugins_row_enabled), row.text)
         assertFalse(row.failed)
         assertNull(row.detail)
     }
@@ -24,14 +26,14 @@ class PluginRowStatusTest {
     @Test
     fun disabledWithoutFailureShowsDisabled() {
         val row = pluginRowStatus(enabled = false, loadError = "")
-        assertEquals("已停用", row.text)
+        assertEquals(UiText.Res(DesignR.string.plugins_row_disabled), row.text)
         assertFalse("空白错误不算失败", row.failed)
     }
 
     @Test
     fun loadErrorWinsOverEnabled() {
         val row = pluginRowStatus(enabled = true, loadError = " [load] Cannot find package '@deepseek-ai/dsh-credentials' ")
-        assertEquals("加载失败", row.text)
+        assertEquals(UiText.Res(DesignR.string.plugins_row_load_failed), row.text)
         assertTrue(row.failed)
         assertEquals("[load] Cannot find package '@deepseek-ai/dsh-credentials'", row.detail)
     }
@@ -39,7 +41,7 @@ class PluginRowStatusTest {
     @Test
     fun longErrorIsClippedWithEllipsis() {
         val row = pluginRowStatus(enabled = true, loadError = "x".repeat(500))
-        assertEquals("加载失败", row.text)
+        assertEquals(UiText.Res(DesignR.string.plugins_row_load_failed), row.text)
         assertEquals(LOAD_ERROR_MAX_CHARS + 1, row.detail!!.length)
         assertTrue(row.detail!!.endsWith("…"))
     }

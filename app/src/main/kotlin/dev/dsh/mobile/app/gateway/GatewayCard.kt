@@ -1,5 +1,7 @@
 package dev.dsh.mobile.app.gateway
 
+import dev.dsh.mobile.design.R as DesignR
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -73,9 +75,9 @@ fun GatewayCard(container: AppContainer) {
 
     val credentialMissing = authNames.isEmpty()
     val status = when (state) {
-        is GatewayManager.State.Running -> "运行中"
-        GatewayManager.State.Stopped -> "已停止"
-        else -> "未就绪"
+        is GatewayManager.State.Running -> stringResource(DesignR.string.agents_state_running)
+        GatewayManager.State.Stopped -> stringResource(DesignR.string.gateway_state_stopped)
+        else -> stringResource(DesignR.string.gateway_state_not_ready)
     }
     val key = gateway.apiKey
     val shownKey = if (revealed) key else "••••" + key.takeLast(4)
@@ -94,19 +96,19 @@ fun GatewayCard(container: AppContainer) {
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    "内置模型网关",
+                    stringResource(DesignR.string.gateway_title),
                     color = p.t1,
                     fontSize = qqFontBody(15.sp),
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
-                    if (credentialMissing) "$status · 凭据未导入" else status,
+                    if (credentialMissing) status + " · " + stringResource(DesignR.string.gateway_credentials_missing) else status,
                     color = if (credentialMissing) p.warn else p.t2,
                     fontSize = qqFontBody(12.sp),
                 )
             }
             Text(
-                if (expanded) "收起 ▴" else "展开 ▾",
+                if (expanded) stringResource(DesignR.string.common_collapse) + " ▴" else stringResource(DesignR.string.common_expand) + " ▾",
                 color = p.t3,
                 fontSize = qqFontBody(12.sp),
             )
@@ -120,7 +122,7 @@ fun GatewayCard(container: AppContainer) {
                     bottom = 11.dp,
                 ),
             ) {
-                GatewayChip("导入凭据", primary = true) { importing = true }
+                GatewayChip(stringResource(DesignR.string.gateway_import_credentials), primary = true) { importing = true }
             }
         }
 
@@ -138,19 +140,19 @@ fun GatewayCard(container: AppContainer) {
                 Text(
                     when (val s = state) {
                         is GatewayManager.State.Running ->
-                            "运行中 · ${GatewayManager.HOST}:${GatewayManager.PORT} · ${s.models} 个模型"
-                        is GatewayManager.State.Failed -> "启动失败：${s.message}"
+                            stringResource(DesignR.string.gateway_detail_running, GatewayManager.HOST + ":" + GatewayManager.PORT, s.models)
+                        is GatewayManager.State.Failed -> stringResource(DesignR.string.gateway_detail_failed, s.message)
                         GatewayManager.State.Starting ->
-                            "启动中…（超过 ${GatewayManager.START_TIMEOUT_MS / 1000}s 判失败）"
-                        GatewayManager.State.Stopped -> "未运行"
+                            stringResource(DesignR.string.gateway_detail_starting, GatewayManager.START_TIMEOUT_MS / 1000)
+                        GatewayManager.State.Stopped -> stringResource(DesignR.string.gateway_state_not_running)
                     },
                     color = p.t2,
                     fontSize = qqFontBody(12.sp),
                     lineHeight = 18.sp,
                 )
                 Text(
-                    if (credentialMissing) "凭据：未导入（没有凭据出不了模型）"
-                    else "凭据：${authNames.size} 份 · ${authNames.joinToString()}",
+                    if (credentialMissing) stringResource(DesignR.string.gateway_credentials_missing_hint)
+                    else stringResource(DesignR.string.gateway_credentials_count, authNames.size, authNames.joinToString()),
                     color = p.t2,
                     fontSize = qqFontBody(12.sp),
                     lineHeight = 18.sp,
@@ -170,7 +172,7 @@ fun GatewayCard(container: AppContainer) {
                     )
                 }
                 Text(
-                    if (revealed) "隐藏 Key" else "显示 Key",
+                    if (revealed) stringResource(DesignR.string.gateway_hide_key) else stringResource(DesignR.string.gateway_show_key),
                     color = p.accent,
                     fontSize = qqFontBody(13.sp),
                     modifier = Modifier
@@ -179,15 +181,15 @@ fun GatewayCard(container: AppContainer) {
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    GatewayChip("启动网关", primary = true) {
+                    GatewayChip(stringResource(DesignR.string.gateway_start), primary = true) {
                         GatewayService.start(ctx)
                         scope.launch { gateway.start() }
                     }
-                    GatewayChip("停止网关", primary = false) {
+                    GatewayChip(stringResource(DesignR.string.gateway_stop), primary = false) {
                         gateway.stop()
                         GatewayService.stop(ctx)
                     }
-                    GatewayChip("导入凭据", primary = false) { importing = true }
+                    GatewayChip(stringResource(DesignR.string.gateway_import_credentials), primary = false) { importing = true }
                 }
             }
         }
@@ -198,11 +200,11 @@ fun GatewayCard(container: AppContainer) {
         var err by remember { mutableStateOf<String?>(null) }
         AlertDialog(
             onDismissRequest = { importing = false },
-            title = { Text("导入网关凭据") },
+            title = { Text(stringResource(DesignR.string.gateway_import_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        "粘贴 OAuth JSON（含 refresh_token）。落盘到 ${gateway.authPath()}，重启网关生效。",
+                        stringResource(DesignR.string.gateway_import_hint, gateway.authPath()),
                         fontSize = 12.sp,
                     )
                     OutlinedTextField(
@@ -226,10 +228,10 @@ fun GatewayCard(container: AppContainer) {
                             GatewayService.start(ctx)
                             scope.launch { gateway.start() }
                         }
-                        .onFailure { err = it.message ?: "导入失败" }
-                }) { Text("导入并重启") }
+                        .onFailure { err = it.message ?: ctx.getString(DesignR.string.gateway_import_failed) }
+                }) { Text(stringResource(DesignR.string.gateway_import_and_restart)) }
             },
-            dismissButton = { TextButton(onClick = { importing = false }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { importing = false }) { Text(stringResource(DesignR.string.common_cancel)) } },
         )
     }
 }

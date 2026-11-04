@@ -1,6 +1,7 @@
 package dev.dsh.mobile.feature.plugins
 
 import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.text
 import dev.dsh.mobile.design.R as DesignR
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -268,7 +269,7 @@ fun PluginHubScreen(
                                 }
                                 pluginSettings.forEach { entry ->
                                     GroupChild(onClick = { openSettings = entry }) {
-                                        PluginChildText(entry.name, entry.rowSubtitle)
+                                        PluginChildText(entry.name, entry.rowSubtitle.text())
                                         SectionChevron(expanded = false)
                                     }
                                 }

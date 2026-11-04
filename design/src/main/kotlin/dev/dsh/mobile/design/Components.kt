@@ -2,6 +2,7 @@
 package dev.dsh.mobile.design
 
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -401,11 +402,11 @@ private fun CopyMessageButton(text: String) {
             .clip(RoundedCornerShape(6.dp))
             .clickable {
                 clipboard.setText(AnnotatedString(text))
-                Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.common_copied), Toast.LENGTH_SHORT).show()
             }
             .padding(horizontal = 6.dp, vertical = 2.dp),
     ) {
-        Text("复制", color = p.t3, fontSize = 11.sp)
+        Text(stringResource(R.string.common_copy), color = p.t3, fontSize = 11.sp)
     }
 }
 

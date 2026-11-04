@@ -1,6 +1,8 @@
 package dev.dsh.mobile.feature.plugins
 
 import androidx.compose.foundation.layout.Arrangement
+import dev.dsh.mobile.design.R as DesignR
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -55,9 +57,9 @@ fun BackupScheduleCard(backup: BackupManager?, onChanged: () -> Unit = {}) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("定时自动备份", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(DesignR.string.backup_schedule_title), style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "默认 05:00，可以加多个时间点；没运行就下次启动补做",
+                        stringResource(DesignR.string.backup_schedule_desc),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -93,7 +95,7 @@ fun BackupScheduleCard(backup: BackupManager?, onChanged: () -> Unit = {}) {
                 }
                 AssistChip(
                     onClick = { adding = true },
-                    label = { Text("+ 添加时间") },
+                    label = { Text(stringResource(DesignR.string.backup_schedule_add)) },
                 )
             }
         }
@@ -102,7 +104,7 @@ fun BackupScheduleCard(backup: BackupManager?, onChanged: () -> Unit = {}) {
     if (adding) {
         AlertDialog(
             onDismissRequest = { adding = false },
-            title = { Text("添加备份时间") },
+            title = { Text(stringResource(DesignR.string.backup_schedule_add_title)) },
             text = {
                 OutlinedTextField(
                     value = draft,
@@ -122,10 +124,10 @@ fun BackupScheduleCard(backup: BackupManager?, onChanged: () -> Unit = {}) {
                         onChanged()
                     }
                     adding = false
-                }) { Text("添加") }
+                }) { Text(stringResource(DesignR.string.backup_schedule_add_action)) }
             },
             dismissButton = {
-                TextButton(onClick = { adding = false }) { Text("取消") }
+                TextButton(onClick = { adding = false }) { Text(stringResource(DesignR.string.common_cancel)) }
             },
         )
     }

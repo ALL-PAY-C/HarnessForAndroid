@@ -1,6 +1,8 @@
 package dev.dsh.mobile.feature.plugins
 
 import dev.dsh.mobile.pluginapi.ConfigField
+import dev.dsh.mobile.design.UiText
+import dev.dsh.mobile.design.R
 import dev.dsh.mobile.pluginapi.ConfigFieldType
 import dev.dsh.mobile.pluginapi.SlotContribution
 import dev.dsh.mobile.core.common.AppLog
@@ -8,10 +10,10 @@ import dev.dsh.mobile.pluginhost.ConfigSpec
 import dev.dsh.mobile.pluginhost.PluginManifestFile
 
 /** 没有任何设置可操作时的统一文案（列表副标题与详情空态共用，避免两处说法不一致）。 */
-const val NO_SETTINGS_TEXT = "该插件没有设置项"
+val NO_SETTINGS_TEXT: UiText = UiText.Res(R.string.plugins_no_settings)
 
 /** 空态补充说明：告诉用户这不是 bug，而是插件自己没声明。 */
-const val NO_SETTINGS_HINT = "插件在 plugin.json（或 package.json 的 dsh.mobile.config）里声明字段后这里就是表单；没声明的也能在下面自己加键值，插件用 ctx.config.get 读到。"
+val NO_SETTINGS_HINT: UiText = UiText.Res(R.string.plugins_no_settings_hint)
 
 /**
  * 「插件设置」里的一行 = 一个插件的一项设置页。
@@ -67,16 +69,17 @@ data class PluginSettingsEntry(
      * 列表副标题。顺序即优先级：没设置项时先喊空态（用户抱怨的就是「点进去是介绍页」），
      * 有 description 就用插件自己的说明，否则用设置项数量兜底。
      */
-    val rowSubtitle: String
+    val rowSubtitle: UiText
         get() = when {
             !hasSettings -> NO_SETTINGS_TEXT
-            description.isNotBlank() -> description
-            fields.isNotEmpty() || actions.isNotEmpty() -> "共 " + (fields.size + actions.size) + " 项设置"
-            else -> "插件自带设置界面"
+            description.isNotBlank() -> UiText.Raw(description)
+            fields.isNotEmpty() || actions.isNotEmpty() ->
+                UiText.Res(R.string.plugins_settings_count, listOf(fields.size + actions.size))
+            else -> UiText.Res(R.string.plugins_has_own_ui)
         }
 
     /** 详情页空态文案；非 null 表示这页只能显示「没有设置项」。 */
-    val emptyText: String? get() = if (hasSettings) null else NO_SETTINGS_TEXT
+    val emptyText: UiText? get() = if (hasSettings) null else NO_SETTINGS_TEXT
 
     /**
      * 加载失败提示。JsBrokenPlugin 把失败阶段写进 subtitle（「加载失败：…」），
@@ -120,7 +123,7 @@ fun pluginSettingsEntries(
             schema = settingsSchema(manifest.config).also { parsed ->
                 // 未知类型不静默：日志 + 设置页说明行，两个地方都能看到。
                 if (parsed.unsupported.isNotEmpty()) {
-                    AppLog.w("插件 " + manifest.id + " 有 " + parsed.unsupported.size + " 个不支持的设置类型：" + parsed.unsupported.joinToString())
+                    AppLog.w("plugin " + manifest.id + " has " + parsed.unsupported.size + " unsupported setting types: " + parsed.unsupported.joinToString())
                 }
             },
         )

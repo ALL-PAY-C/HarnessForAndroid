@@ -1,6 +1,8 @@
 package dev.dsh.mobile.design.startup
 
 import android.net.Uri
+import dev.dsh.mobile.design.R
+import dev.dsh.mobile.design.UiText
 import android.widget.ImageView
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -60,8 +62,11 @@ interface StartupAnimation {
     /** 注册表里的唯一 id，spec 里 `builtin:` / `plugin:` 后面那一段就是它。 */
     val id: String
 
-    /** 设置页下拉里显示的名字。 */
-    val label: String
+    /** 设置页下拉里显示的名字（第三方样式自带；内置样式留空，用 [labelRes]）。 */
+    val label: String get() = ""
+
+    /** 内置样式的显示名资源；第三方样式留 0 表示用 [label]。 */
+    val labelRes: Int get() = 0
 
     /** 样式自带时长（ms），用户没填时长时用它。 */
     val defaultDurationMs: Int
@@ -136,11 +141,16 @@ object StartupAnimations {
     }
 
     /** 样式在设置页里的显示名；猜不到就用 id。 */
-    fun labelOf(spec: StartupSpec): String = when (spec) {
-        StartupSpec.Off -> "关闭"
-        is StartupSpec.Builtin -> of(spec.id)?.label ?: spec.id
-        is StartupSpec.Plugin -> of(spec.id)?.label ?: ("插件：" + spec.id)
-        is StartupSpec.Image -> "图片"
+    fun labelOf(spec: StartupSpec): UiText = when (spec) {
+        StartupSpec.Off -> UiText.Res(R.string.common_close)
+        is StartupSpec.Builtin -> nameOf(spec.id) ?: UiText.Raw(spec.id)
+        is StartupSpec.Plugin -> nameOf(spec.id) ?: UiText.Res(R.string.design_startup_plugin, listOf(spec.id))
+        is StartupSpec.Image -> UiText.Res(R.string.design_startup_image)
+    }
+
+    /** 已注册样式名：内置用资源，第三方用它自带的 label，都没有就退回 id。 */
+    private fun nameOf(id: String): UiText? = of(id)?.let { a ->
+        if (a.labelRes != 0) UiText.Res(a.labelRes) else UiText.Raw(a.label.ifBlank { id })
     }
 }
 
@@ -224,7 +234,7 @@ private fun ImageSpec(uri: String, progress: Float) {
 /** 淡入：H 标由小到大 + 淡入。 */
 private object FadeIn : StartupAnimation {
     override val id = "fade"
-    override val label = "淡入"
+    override val labelRes = R.string.design_startup_fade
     override val defaultDurationMs = 900
 
     @Composable
@@ -241,7 +251,7 @@ private object FadeIn : StartupAnimation {
 /** 画 H：横梁从左到右长出来，两根竖条先立好。 */
 private object DrawH : StartupAnimation {
     override val id = "draw-h"
-    override val label = "画 H"
+    override val labelRes = R.string.design_startup_draw_h
     override val defaultDurationMs = 1100
 
     @Composable
@@ -272,7 +282,7 @@ private object DrawH : StartupAnimation {
 /** 弹跳：H 标先落下来再回弹到原位。 */
 private object Bounce : StartupAnimation {
     override val id = "bounce"
-    override val label = "弹跳"
+    override val labelRes = R.string.design_startup_bounce
     override val defaultDurationMs = 1000
 
     @Composable

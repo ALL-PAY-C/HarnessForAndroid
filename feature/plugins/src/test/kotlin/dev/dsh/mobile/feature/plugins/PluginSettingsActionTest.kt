@@ -1,6 +1,8 @@
 package dev.dsh.mobile.feature.plugins
 
 import dev.dsh.mobile.pluginhost.ConfigSpec
+import dev.dsh.mobile.design.UiText
+import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.pluginhost.PluginManifestFile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -86,6 +88,6 @@ class PluginSettingsActionTest {
         ).single()
         assertTrue(entry.fields.isEmpty())
         assertTrue(entry.hasSettings)
-        assertEquals("共 1 项设置", entry.rowSubtitle)
+        assertEquals(UiText.Res(DesignR.string.plugins_settings_count, listOf(1)), entry.rowSubtitle)
     }
 }

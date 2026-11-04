@@ -2,6 +2,7 @@
 package dev.dsh.mobile.design
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -97,15 +98,15 @@ internal fun AttachmentImage(path: String, mine: Boolean) {
                     )
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(
-                            text = { Text("复制本地路径", fontSize = 13.sp) },
+                            text = { Text(stringResource(R.string.design_media_copy_path), fontSize = 13.sp) },
                             onClick = { menu = false; copyPath() },
                         )
                         DropdownMenuItem(
-                            text = { Text("打开方式", fontSize = 13.sp) },
+                            text = { Text(stringResource(R.string.design_media_open_with), fontSize = 13.sp) },
                             onClick = { menu = false; openWith(context, file) },
                         )
                         DropdownMenuItem(
-                            text = { Text("另存到相册", fontSize = 13.sp) },
+                            text = { Text(stringResource(R.string.design_media_save_gallery), fontSize = 13.sp) },
                             onClick = { menu = false; saveToGallery(context, file) },
                         )
                     }
@@ -118,7 +119,7 @@ internal fun AttachmentImage(path: String, mine: Boolean) {
                             .padding(horizontal = 10.dp, vertical = 8.dp),
                     ) {
                         Text(
-                            "图片已失效 · $path",
+                            stringResource(R.string.design_media_image_gone, path),
                             color = p.t3,
                             fontSize = 11.sp,
                             maxLines = 3,
@@ -135,7 +136,7 @@ internal fun AttachmentImage(path: String, mine: Boolean) {
                             .background(p.bg),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("加载中…", color = p.t3, fontSize = 12.sp)
+                        Text(stringResource(R.string.common_loading), color = p.t3, fontSize = 12.sp)
                     }
                 }
             }
@@ -230,7 +231,7 @@ private fun openWith(context: android.content.Context, file: File) {
             addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(
-            android.content.Intent.createChooser(view, "打开方式")
+            android.content.Intent.createChooser(view, context.getString(R.string.design_media_open_with))
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }

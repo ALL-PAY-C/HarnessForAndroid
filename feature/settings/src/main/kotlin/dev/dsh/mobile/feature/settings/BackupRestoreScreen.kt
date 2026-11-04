@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,6 +58,7 @@ import dev.dsh.mobile.core.data.backup.BackupSelection
 import dev.dsh.mobile.core.data.backup.RestoreEngine
 import dev.dsh.mobile.core.data.backup.isLegacyPackage
 import dev.dsh.mobile.design.LocalQq
+import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.design.QqCardDivider
 import dev.dsh.mobile.design.QqRow
 import dev.dsh.mobile.design.QqScreenTopBar
@@ -84,6 +86,9 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
     val p = LocalQq.current
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // 纯函数层的文案走同一个解析器：不把 Context 传进 BackupSummary。
+    val copy: CopyResolver = { id, args -> ctx.getString(id, *args.toTypedArray()) }
 
     // ---- 区块一：立即备份 ----
     var incSessions by remember { mutableStateOf(true) }
@@ -177,10 +182,10 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
             busy = false
             result.onSuccess { pair ->
                 val file = pair.first
-                exportNote = file.name + " · " + formatBytes(file.length()) + " · " + countsSummary(pair.second)
+                exportNote = file.name + " · " + formatBytes(file.length()) + " · " + countsSummary(pair.second, copy)
                 exportPass = ""
                 reload()
-            }.onFailure { e -> exportError = e.message ?: "备份失败" }
+            }.onFailure { e -> exportError = e.message ?: ctx.getString(DesignR.string.backup_err_export_failed) }
         }
     }
 
@@ -207,7 +212,7 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
             }.onFailure { e ->
                 // WrongPassphraseException 的 message 已经是「口令错误：…」，其余走引擎的中文文案。
                 target = null
-                restoreError = e.message ?: "恢复失败"
+                restoreError = e.message ?: ctx.getString(DesignR.string.backup_err_restore_failed)
             }
         }
     }
@@ -227,14 +232,14 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                     target = source
                     mode = if (source.legacy) RestoreEngine.Mode.Replace else RestoreEngine.Mode.Merge
                     restorePass = ""
-                }.onFailure { e -> pickError = e.message ?: "读不出这个备份包" }
+                }.onFailure { e -> pickError = e.message ?: ctx.getString(DesignR.string.backup_err_pick_failed) }
             }
         }
     }
 
     Box(Modifier.fillMaxSize().background(p.bg)) {
         Column(Modifier.fillMaxSize()) {
-            QqScreenTopBar(title = "备份与恢复", isBack = true, onNavigationClick = onBack)
+            QqScreenTopBar(title = stringResource(DesignR.string.backup_title), isBack = true, onNavigationClick = onBack)
             Column(
                 Modifier
                     .fillMaxSize()
@@ -250,34 +255,36 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                 verticalArrangement = Arrangement.spacedBy(SectionSpacing.cardGap),
             ) {
                 // ---------- 1. 立即备份 ----------
-                SectionFrame(title = "立即备份", icon = Icons.Filled.Backup, tint = p.accent) {
+                SectionFrame(title = stringResource(DesignR.string.backup_section_export), icon = Icons.Filled.Backup, tint = p.accent) {
                     Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                         Text(
-                            "备份包是标准 zip，落在应用私有目录 backups/ 里。含凭证的包必须设口令（至少 " +
-                                BackupSelection.MIN_PASSPHRASE_LENGTH + " 位），口令丢了包内凭证就解不回来。",
+                            stringResource(
+                                DesignR.string.backup_export_desc,
+                                BackupSelection.MIN_PASSPHRASE_LENGTH,
+                            ),
                             color = p.t3,
                             fontSize = qqFontBody(11.5.sp),
                         )
                         Text(
-                            "上次备份：" + if (lastBackupAt > 0L) TimeFmt.absolute(lastBackupAt) else "从未备份",
+                            stringResource(DesignR.string.backup_last_backup, if (lastBackupAt > 0L) TimeFmt.absolute(lastBackupAt) else stringResource(DesignR.string.backup_never_backed_up)),
                             color = p.t3,
                             fontSize = qqFontBody(11.sp),
                         )
                     }
                     QqCardDivider()
-                    CheckRow("会话与消息", "全部会话与消息；不勾只留表结构", incSessions) { incSessions = it }
+                    CheckRow(stringResource(DesignR.string.backup_section_db), stringResource(DesignR.string.backup_check_db_desc), incSessions) { incSessions = it }
                     QqCardDivider()
-                    CheckRow("设置", "界面 / 会话 / 通知 / 群组 / 模板（设备路径键恢复时保留本机值）", incSettings) {
+                    CheckRow(stringResource(DesignR.string.backup_section_settings), stringResource(DesignR.string.backup_check_settings_desc), incSettings) {
                         incSettings = it
                     }
                     QqCardDivider()
-                    CheckRow("插件", "已安装插件的目录与配置（不含 apk 与旧版本缓存）", incPlugins) { incPlugins = it }
+                    CheckRow(stringResource(DesignR.string.backup_section_plugins), stringResource(DesignR.string.backup_check_plugins_desc), incPlugins) { incPlugins = it }
                     QqCardDivider()
-                    CheckRow("附件文件", "聊天附件（库里存的是相对路径，必须一起带走）", incAttachments) {
+                    CheckRow(stringResource(DesignR.string.backup_section_attachments), stringResource(DesignR.string.backup_check_attachments_desc), incAttachments) {
                         incAttachments = it
                     }
                     QqCardDivider()
-                    CheckRow("凭证", "端点 token / 模型 apiKey / MCP 请求头 / 插件凭证，口令加密", incSecrets) {
+                    CheckRow(stringResource(DesignR.string.backup_section_secrets), stringResource(DesignR.string.backup_check_secrets_desc), incSecrets) {
                         incSecrets = it
                         if (!it) exportPass = ""
                     }
@@ -287,7 +294,7 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                                 value = exportPass,
                                 onValueChange = { exportPass = it },
                                 label = {
-                                    Text("导出凭证的口令（至少 " + BackupSelection.MIN_PASSPHRASE_LENGTH + " 位）")
+                                    Text(stringResource(DesignR.string.backup_export_pass_label, BackupSelection.MIN_PASSPHRASE_LENGTH))
                                 },
                                 singleLine = true,
                                 visualTransformation = PasswordVisualTransformation(),
@@ -303,23 +310,23 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                         TextButton(
                             onClick = { startExport() },
                             enabled = !busy && (!incSecrets || exportPass.length >= BackupSelection.MIN_PASSPHRASE_LENGTH),
-                        ) { Text(if (busy) "处理中…" else "创建备份") }
+                        ) { Text(if (busy) stringResource(DesignR.string.backup_busy) else stringResource(DesignR.string.backup_create)) }
                         Spacer(Modifier.width(8.dp))
                         if (busy) {
                             CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(8.dp))
-                            Text("正在写入备份包，先别退出", color = p.t3, fontSize = qqFontBody(11.5.sp))
+                            Text(stringResource(DesignR.string.backup_writing), color = p.t3, fontSize = qqFontBody(11.5.sp))
                         }
                     }
-                    exportNote?.let { InfoLine("备份完成：" + it, p.green) }
+                    exportNote?.let { InfoLine(stringResource(DesignR.string.backup_export_done, it), p.green) }
                     exportError?.let { InfoLine(it, p.red) }
                 }
 
                 // ---------- 2. 已有备份 ----------
-                SectionFrame(title = "已有备份", icon = Icons.Filled.Restore, tint = p.accent2) {
+                SectionFrame(title = stringResource(DesignR.string.backup_section_existing), icon = Icons.Filled.Restore, tint = p.accent2) {
                     if (entries.isEmpty()) {
                         Text(
-                            "还没有备份。上面勾好内容点「创建备份」，文件就会出现在这里。",
+                            stringResource(DesignR.string.backup_empty_hint),
                             color = p.t3,
                             fontSize = qqFontBody(12.sp),
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -334,8 +341,8 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                                 subtitle = listOfNotNull(
                                     TimeFmt.absolute(entry.createdAt).takeIf { it.isNotBlank() },
                                     formatBytes(entry.file.length()),
-                                    manifests[entry.file.name]?.let { sectionsSummary(it) },
-                                    if (entry.file.name in legacyNames) "旧格式包 · 仅整机还原（无分节校验）" else null,
+                                    manifests[entry.file.name]?.let { sectionsSummary(it, copy) },
+                                    if (entry.file.name in legacyNames) stringResource(DesignR.string.backup_legacy_tag) else null,
                                 ).joinToString(" · "),
                                 tint = p.accent2,
                             )
@@ -363,12 +370,12 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                                                 restorePass = ""
                                             }
 
-                                            else -> pickError = "这个备份包已损坏：既没有 manifest.json，也不是旧格式结构"
+                                            else -> pickError = ctx.getString(DesignR.string.backup_err_broken)
                                         }
                                     },
-                                ) { Text("恢复") }
+                                ) { Text(stringResource(DesignR.string.backup_action_restore)) }
                                 TextButton(enabled = !busy, onClick = { pendingDelete = entry }) {
-                                    Text("删除", color = p.red)
+                                    Text(stringResource(DesignR.string.common_delete), color = p.red)
                                 }
                             }
                         }
@@ -376,11 +383,11 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                 }
 
                 // ---------- 3. 从文件恢复 ----------
-                SectionFrame(title = "从文件恢复", icon = Icons.Filled.Folder, tint = p.accent) {
+                SectionFrame(title = stringResource(DesignR.string.backup_section_from_file), icon = Icons.Filled.Folder, tint = p.accent) {
                     QqRow(
                         icon = Icons.Filled.Folder,
-                        title = "选择备份包",
-                        subtitle = "系统文件选择器 · .hfabak / .zip",
+                        title = stringResource(DesignR.string.backup_pick_title),
+                        subtitle = stringResource(DesignR.string.backup_pick_subtitle),
                         tint = p.accent,
                         onClick = { if (!busy) openDoc.launch(arrayOf("application/zip", "*/*")) },
                     )
@@ -391,22 +398,25 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                             val m = source.manifest
                             if (m == null) {
                                 Text(
-                                    "旧格式包 · 仅整机还原（无分节校验）",
+                                    stringResource(DesignR.string.backup_legacy_tag),
                                     color = p.warn,
                                     fontSize = qqFontBody(11.5.sp),
                                 )
                                 Text(
                                     formatBytes(source.file.length()) +
-                                        " · 包内没有 manifest.json，按旧版结构整机覆盖设置 / 数据库 / 插件",
+                                        " · " + stringResource(DesignR.string.backup_legacy_no_manifest_desc),
                                     color = p.t3,
                                     fontSize = qqFontBody(11.sp),
                                 )
                             } else {
-                                Text(countsSummary(m), color = p.t3, fontSize = qqFontBody(11.5.sp))
+                                Text(countsSummary(m, copy), color = p.t3, fontSize = qqFontBody(11.5.sp))
                                 Text(
-                                    "包含：" + sectionsSummary(m) +
-                                        " · 产包版本 " + m.appVersionName +
-                                        " · 库版本 " + m.dbVersion,
+                                    stringResource(
+                                        DesignR.string.backup_includes,
+                                        sectionsSummary(m, copy),
+                                        m.appVersionName,
+                                        m.dbVersion,
+                                    ),
                                     color = p.t3,
                                     fontSize = qqFontBody(11.sp),
                                 )
@@ -421,7 +431,7 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                                     mode = if (source.legacy) RestoreEngine.Mode.Replace else RestoreEngine.Mode.Merge
                                     restorePass = ""
                                 },
-                            ) { Text("开始恢复") }
+                            ) { Text(stringResource(DesignR.string.backup_start_restore)) }
                         }
                     }
                     pickError?.let {
@@ -432,19 +442,19 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
 
                 // ---------- 结果 ----------
                 report?.let { r ->
-                    SectionFrame(title = "恢复完成", icon = Icons.Filled.Restore, tint = p.green) {
+                    SectionFrame(title = stringResource(DesignR.string.backup_section_done), icon = Icons.Filled.Restore, tint = p.green) {
                         Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                            Text(reportSummary(r), color = p.t1, fontSize = qqFontBody(12.5.sp))
+                            Text(reportSummary(r, copy), color = p.t1, fontSize = qqFontBody(12.5.sp))
                             r.preRestore?.let { snapshot ->
                                 Text(
-                                    "已自动创建恢复前快照：" + snapshot.name,
+                                    stringResource(DesignR.string.backup_snapshot_created, snapshot.name),
                                     color = p.t3,
                                     fontSize = qqFontBody(11.5.sp),
                                 )
                             }
                             r.warnings.forEach { Text(it, color = p.warn, fontSize = qqFontBody(11.sp)) }
                             Text(
-                                "重启 App 生效：设置与插件在下次启动时重新加载。",
+                                stringResource(DesignR.string.backup_restart_hint),
                                 color = p.t3,
                                 fontSize = qqFontBody(11.sp),
                             )
@@ -454,13 +464,13 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                             // 而 DataStore 的实例是文件级委托单例，没有作废重读的 API
                             // （详见 AppContainer.softRestart 的注释）。
                             TextButton(onClick = { restartApp(ctx, RestartReason.BackupRestore) }) {
-                                Text("立即重启")
+                                Text(stringResource(DesignR.string.backup_restart_now))
                             }
                         }
                     }
                 }
                 restoreError?.let {
-                    SectionFrame(title = "恢复失败", icon = Icons.Filled.Lock, tint = p.red) {
+                    SectionFrame(title = stringResource(DesignR.string.backup_err_restore_failed), icon = Icons.Filled.Lock, tint = p.red) {
                         InfoLine(it, p.red)
                     }
                 }
@@ -472,8 +482,8 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
     pendingDelete?.let { entry ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("删除这个备份") },
-            text = { Text(entry.file.name + " · " + formatBytes(entry.file.length()) + "，删掉找不回来。") },
+            title = { Text(stringResource(DesignR.string.backup_delete_title)) },
+            text = { Text(stringResource(DesignR.string.backup_delete_body, entry.file.name, formatBytes(entry.file.length()))) },
             confirmButton = {
                 TextButton(onClick = {
                     pendingDelete = null
@@ -481,9 +491,9 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                         withContext(Dispatchers.IO) { manager.delete(entry.file) }
                         reload()
                     }
-                }) { Text("删除", color = p.red) }
+                }) { Text(stringResource(DesignR.string.common_delete), color = p.red) }
             },
-            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text(stringResource(DesignR.string.common_cancel)) } },
         )
     }
 
@@ -494,44 +504,44 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
         val legacyOnly = source.legacy
         AlertDialog(
             onDismissRequest = { if (!busy) target = null },
-            title = { Text(if (legacyOnly) "整机还原旧格式包" else "恢复备份") },
+            title = { Text(stringResource(if (legacyOnly) DesignR.string.backup_confirm_title_legacy else DesignR.string.backup_confirm_title)) },
             text = {
                 Column {
                     Text(source.displayName, color = p.t1, fontSize = qqFontBody(13.sp))
                     if (m != null) {
-                        Text(countsSummary(m), color = p.t3, fontSize = qqFontBody(11.5.sp))
+                        Text(countsSummary(m, copy), color = p.t3, fontSize = qqFontBody(11.5.sp))
                     }
                     Spacer(Modifier.height(6.dp))
                     if (legacyOnly) {
                         // 旧包文案必须说清代价：没有分节可选，整机覆盖。
                         Text(
-                            "旧格式包不含 manifest 校验，无法选择恢复内容，会整机覆盖设置 / 数据库 / 插件。",
+                            stringResource(DesignR.string.backup_legacy_warn),
                             color = p.warn,
                             fontSize = qqFontBody(11.5.sp),
                         )
                         Text(
-                            "旧包没有分节信息，也不会自动拍恢复前快照。",
+                            stringResource(DesignR.string.backup_legacy_no_snapshot),
                             color = p.t3,
                             fontSize = qqFontBody(11.sp),
                         )
                     } else {
                         ModeRow(
                             selected = mode == RestoreEngine.Mode.Merge,
-                            title = "合并（推荐）",
-                            subtitle = "同 id 覆盖、新 id 新增；同名不同 id 的会话加「（导入）」后缀",
+                            title = stringResource(DesignR.string.backup_mode_merge_title),
+                            subtitle = stringResource(DesignR.string.backup_mode_merge_desc),
                         ) { mode = RestoreEngine.Mode.Merge }
                         ModeRow(
                             selected = mode == RestoreEngine.Mode.Replace,
-                            title = "整机还原",
-                            subtitle = "先清空会话 / 消息 / 设置 / 插件再整包落地，会自动先拍一个恢复前快照",
+                            title = stringResource(DesignR.string.backup_mode_replace_title),
+                            subtitle = stringResource(DesignR.string.backup_mode_replace_desc),
                         ) { mode = RestoreEngine.Mode.Replace }
                         if (needsPass) {
                             Spacer(Modifier.height(4.dp))
-                            Text("这个包含凭证，必须输入导出时的口令", color = p.warn, fontSize = qqFontBody(11.5.sp))
+                            Text(stringResource(DesignR.string.backup_needs_pass), color = p.warn, fontSize = qqFontBody(11.5.sp))
                             OutlinedTextField(
                                 value = restorePass,
                                 onValueChange = { restorePass = it },
-                                label = { Text("口令") },
+                                label = { Text(stringResource(DesignR.string.backup_pass_label)) },
                                 singleLine = true,
                                 visualTransformation = PasswordVisualTransformation(),
                                 modifier = Modifier.fillMaxWidth(),
@@ -550,9 +560,9 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                             if (needsPass) restorePass else "",
                         )
                     },
-                ) { Text(if (busy) "恢复中…" else "开始") }
+                ) { Text(if (busy) stringResource(DesignR.string.backup_restoring) else stringResource(DesignR.string.backup_action_start)) }
             },
-            dismissButton = { TextButton(enabled = !busy, onClick = { target = null }) { Text("取消") } },
+            dismissButton = { TextButton(enabled = !busy, onClick = { target = null }) { Text(stringResource(DesignR.string.common_cancel)) } },
         )
     }
 }
@@ -592,14 +602,14 @@ private fun readPicked(ctx: Context, manager: BackupManager, uri: Uri, previous:
     previous?.delete()
     val local = File(ctx.cacheDir, IMPORT_FILE_PREFIX + System.currentTimeMillis() + ".hfabak")
     try {
-        val input = ctx.contentResolver.openInputStream(uri) ?: throw IllegalStateException("打不开这个文件")
+        val input = ctx.contentResolver.openInputStream(uri) ?: throw IllegalStateException(ctx.getString(DesignR.string.backup_err_open_failed))
         input.use { source -> local.outputStream().use { sink -> source.copyTo(sink) } }
         val preview = manager.previewPackage(local)
         return when (classifyBackup(preview.isFailure, isLegacyPackage(local))) {
             BackupKind.Current -> PickedBackup(local, displayName, preview.getOrThrow(), false)
             BackupKind.Legacy -> PickedBackup(local, displayName, null, true)
             BackupKind.Broken ->
-                throw preview.exceptionOrNull() ?: IllegalStateException("读不出这个备份包")
+                throw preview.exceptionOrNull() ?: IllegalStateException(ctx.getString(DesignR.string.backup_err_pick_failed))
         }
     } catch (e: Throwable) {
         local.delete()

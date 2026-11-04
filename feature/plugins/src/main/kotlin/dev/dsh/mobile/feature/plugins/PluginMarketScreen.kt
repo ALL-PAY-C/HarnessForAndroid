@@ -1,6 +1,8 @@
 package dev.dsh.mobile.feature.plugins
 
 import androidx.compose.foundation.background
+import dev.dsh.mobile.design.R as DesignR
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -108,6 +110,7 @@ fun PluginMarketScreen(
     var query by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf<String?>(null) }
     var notice by remember { mutableStateOf<String?>(null) }
+    var noticeFailed by remember { mutableStateOf(false) }
     var snapshots by remember { mutableStateOf<List<BackupManager.Entry>>(emptyList()) }
     val context = LocalContext.current
     val p = LocalQq.current
@@ -121,9 +124,9 @@ fun PluginMarketScreen(
                 val result = runCatching {
                     val bytes = withContext(Dispatchers.IO) {
                         context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                            ?: error("读不到所选文件")
+                            ?: error(context.getString(DesignR.string.market_err_read_file))
                     }
-                    require(bytes.isNotEmpty()) { "文件是空的" }
+                    require(bytes.isNotEmpty()) { context.getString(DesignR.string.market_err_empty_file) }
                     val pick = File(context.cacheDir, "plugin-pick-" + System.currentTimeMillis() + ".zip")
                     withContext(Dispatchers.IO) {
                         // zip / npm tarball（gzip）原样落盘；裸清单就地包成单文件 zip。
@@ -140,18 +143,21 @@ fun PluginMarketScreen(
                     val store = externalStore
                     if (store != null) {
                         val entry = store.installPackage(pick).getOrElse { pick.delete(); throw it }
-                        val kind = if (entry.dirPath.isNotBlank()) "数据插件" else "APK 插件"
-                        entry.name + " " + entry.version + "（" + kind + "）"
+                        val kind = context.getString(
+                            if (entry.dirPath.isNotBlank()) DesignR.string.market_kind_data else DesignR.string.market_kind_apk,
+                        )
+                        context.getString(DesignR.string.market_done_wrapped, entry.name, entry.version, kind)
                     } else {
-                        val target = installer ?: error("安装器未就绪")
+                        val target = installer ?: error(context.getString(DesignR.string.plugins_err_installer_not_ready))
                         val manifest = target.installArchive(pick).getOrElse { pick.delete(); throw it }
-                        manifest.name + " " + manifest.version + "（数据插件）"
+                        context.getString(DesignR.string.market_done_data, manifest.name, manifest.version)
                     }
                 }
                 busy = null
+                noticeFailed = result.isFailure
                 notice = result.fold(
-                    onSuccess = { "已安装 $it，已热加载" },
-                    onFailure = { e -> "安装失败：" + (e.message ?: e::class.java.simpleName) },
+                    onSuccess = { context.getString(DesignR.string.market_installed_hot, it) },
+                    onFailure = { e -> context.getString(DesignR.string.market_install_failed, e.message ?: e::class.java.simpleName) },
                 )
                 if (result.isSuccess) {
                     snapshots = backup?.list().orEmpty()
@@ -252,21 +258,21 @@ fun PluginMarketScreen(
                 value = query,
                 onValueChange = { query = it },
                 singleLine = true,
-                placeholder = { Text("搜索插件名 / 描述 / npm 包") },
+                placeholder = { Text(stringResource(DesignR.string.market_search_hint)) },
                 modifier = Modifier.weight(1f),
             )
             IconButton(onClick = { bodyOpen = !bodyOpen }) {
                 Icon(
                     if (bodyOpen) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                    contentDescription = if (bodyOpen) "收起" else "展开",
+                    contentDescription = stringResource(if (bodyOpen) DesignR.string.common_collapse else DesignR.string.common_expand),
                 )
             }
         }
         if (bodyOpen) {
             Text(
                 when {
-                    snapshot.plugins.isEmpty() && loading -> "拉取中…"
-                    loading -> countsText(snapshot) + " · 补源中…"
+                    snapshot.plugins.isEmpty() && loading -> stringResource(DesignR.string.market_loading_fetch)
+                    loading -> countsText(snapshot) + " · " + stringResource(DesignR.string.market_loading_more)
                     else -> countsText(snapshot)
                 },
                 style = MaterialTheme.typography.labelSmall,
@@ -283,12 +289,12 @@ fun PluginMarketScreen(
             var sortMenu by remember { mutableStateOf(false) }
             Box {
                 TextButton(onClick = { sortMenu = true }) {
-                    Text("排序：" + sort.label, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(DesignR.string.market_sort_prefix, stringResource(sort.labelRes)), fontWeight = FontWeight.SemiBold)
                 }
                 DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
                     MarketSort.entries.forEach { option ->
                         DropdownMenuItem(
-                            text = { Text(option.label) },
+                            text = { Text(stringResource(option.labelRes)) },
                             onClick = { sort = option; sortMenu = false },
                         )
                     }
@@ -296,7 +302,7 @@ fun PluginMarketScreen(
             }
             Spacer(Modifier.weight(1f))
             TextButton(onClick = { ascending = !ascending }) {
-                Text(if (ascending) "升序 ↑" else "降序 ↓")
+                Text(stringResource(if (ascending) DesignR.string.market_sort_asc else DesignR.string.market_sort_desc))
             }
         }
         LazyColumn(Modifier.weight(1f)) {
@@ -316,7 +322,7 @@ fun PluginMarketScreen(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = { refresh() }, enabled = !loading) { Text("重试") }
+                    TextButton(onClick = { refresh() }, enabled = !loading) { Text(stringResource(DesignR.string.common_retry)) }
                 }
                 Hairline(Modifier.padding(horizontal = 16.dp))
             }
@@ -325,19 +331,19 @@ fun PluginMarketScreen(
             item(key = "github-import") {
                 AlertDialog(
                     onDismissRequest = { if (busy == null) gitHubOpen = false },
-                    title = { Text("从 GitHub 导入插件") },
+                    title = { Text(stringResource(DesignR.string.market_github_title)) },
                     text = {
                         Column {
                             OutlinedTextField(
                                 value = repoInput,
                                 onValueChange = { repoInput = it },
                                 singleLine = true,
-                                label = { Text("仓库链接") },
+                                label = { Text(stringResource(DesignR.string.market_github_repo_label)) },
                                 placeholder = { Text("https://github.com/owner/repo") },
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             Text(
-                                "仓库里有 plugin.json、package.json 或现成的 .zip 插件包即可（旧的 .apk 插件包也收）；先试 main，再试 master。",
+                                stringResource(DesignR.string.market_github_hint),
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.padding(top = 8.dp),
                             )
@@ -351,16 +357,21 @@ fun PluginMarketScreen(
                                 gitHubOpen = false
                                 busy = GITHUB_BUSY
                                 notice = null
+                                noticeFailed = false
                                 scope.launch {
                                     val result = withContext(Dispatchers.IO) {
                                         runCatching {
-                                            GitHubPlugins.install(installer, externalStore, context.cacheDir, input)
+                                            GitHubPlugins.install(installer, externalStore, context.cacheDir, input) { id, args ->
+                                                context.getString(id, *args.toTypedArray())
+                                            }
                                         }
                                     }
                                     busy = null
+                                    noticeFailed = result.isFailure
+                                    noticeFailed = result.isFailure
                                     notice = result.fold(
-                                        onSuccess = { "已安装 $it，已热加载" },
-                                        onFailure = { "导入失败：${it.message}" },
+                                        onSuccess = { context.getString(DesignR.string.market_installed_hot, it) },
+                                        onFailure = { context.getString(DesignR.string.market_import_failed, it.message ?: it::class.java.simpleName) },
                                     )
                                     if (result.isSuccess) {
                                         snapshots = backup?.list().orEmpty()
@@ -368,10 +379,10 @@ fun PluginMarketScreen(
                                     }
                                 }
                             },
-                        ) { Text("拉取安装") }
+                        ) { Text(stringResource(DesignR.string.market_github_install)) }
                     },
                     dismissButton = {
-                        TextButton(onClick = { gitHubOpen = false }) { Text("取消") }
+                        TextButton(onClick = { gitHubOpen = false }) { Text(stringResource(DesignR.string.common_cancel)) }
                     },
                 )
             }
@@ -384,7 +395,7 @@ fun PluginMarketScreen(
                     Text(
                         text,
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (text.contains("失败")) MaterialTheme.colorScheme.error
+                        color = if (noticeFailed) MaterialTheme.colorScheme.error
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                     )
@@ -425,34 +436,40 @@ fun PluginMarketScreen(
                                     add("npm" to {
                                         target.installNpm(entry.npm).map { done ->
                                             // 装上几个依赖是用户排查「装上了为什么加载不起来」的第一手线索。
-                                            done.manifest.name + "（npm 包" +
-                                                (if (done.deps.installed > 0) "，依赖 " + done.deps.installed + " 个" else "") + "）"
+                                            val deps = if (done.deps.installed > 0) {
+                                                context.getString(DesignR.string.market_npm_deps, done.deps.installed)
+                                            } else {
+                                                ""
+                                            }
+                                            context.getString(DesignR.string.market_npm_done, done.manifest.name, deps)
                                         }
                                     })
                                 }
                                 if (directArchive && target != null) {
-                                    add("直链" to { target.installUrl(url).map { it.name + "（数据插件）" } })
+                                    add(context.getString(DesignR.string.market_source_direct) to { target.installUrl(url).map { context.getString(DesignR.string.market_done_name_data, it.name) } })
                                 }
                                 if (repoLink != null) {
                                     add("GitHub" to {
                                         runCatching {
-                                            GitHubPlugins.install(installer, externalStore, context.cacheDir, repoLink)
+                                            GitHubPlugins.install(installer, externalStore, context.cacheDir, repoLink) { id, args ->
+                                                context.getString(id, *args.toTypedArray())
+                                            }
                                         }
                                     })
                                 }
                                 if (url.isNotBlank() && target != null && !directArchive) {
-                                    add("直链" to { target.installUrl(url).map { it.name + "（数据插件）" } })
+                                    add(context.getString(DesignR.string.market_source_direct) to { target.installUrl(url).map { context.getString(DesignR.string.market_done_name_data, it.name) } })
                                 }
                             }
                             val failures = ArrayList<String>()
                             var result: Result<String> = Result.failure(
                                 IllegalStateException(
                                     buildString {
-                                        append("这个条目没有登记任何可安装的来源")
+                                        append(context.getString(DesignR.string.market_no_source))
                                         if (entry.installHint.isNotBlank()) {
-                                            append("；作者给的安装命令是 ").append(entry.installHint)
+                                            append(context.getString(DesignR.string.market_hint_command, entry.installHint))
                                         } else {
-                                            append("；点「GitHub 详情」去项目主页看看它怎么装")
+                                            append(context.getString(DesignR.string.market_hint_detail))
                                         }
                                     },
                                 ),
@@ -463,15 +480,20 @@ fun PluginMarketScreen(
                                     result = attempt
                                     break
                                 }
-                                failures += tag + "：" + (attempt.exceptionOrNull()?.message ?: "失败")
+                                failures += context.getString(
+                                    DesignR.string.market_fail_line,
+                                    tag,
+                                    attempt.exceptionOrNull()?.message ?: context.getString(DesignR.string.market_failed_word),
+                                )
                             }
                             if (result.isFailure && failures.isNotEmpty()) {
                                 result = Result.failure(IllegalStateException(failures.joinToString("\n")))
                             }
                             busy = null
+                            noticeFailed = result.isFailure
                             notice = result.fold(
-                                onSuccess = { "已安装 $it，已热加载" },
-                                onFailure = { e -> "安装失败：" + (e.message ?: e::class.java.simpleName) },
+                                onSuccess = { context.getString(DesignR.string.market_installed_hot, it) },
+                                onFailure = { e -> context.getString(DesignR.string.market_install_failed, e.message ?: e::class.java.simpleName) },
                             )
                             if (result.isSuccess) {
                                 snapshots = backup?.list().orEmpty()
@@ -485,19 +507,18 @@ fun PluginMarketScreen(
         }
         item {
             CollapsibleSection(
-                title = "备份与回档",
+                title = stringResource(DesignR.string.market_backup_title),
                 icon = Icons.Filled.Restore,
                 tint = MaterialTheme.colorScheme.primary,
                 expanded = backupOpen,
                 onToggle = { backupOpen = !backupOpen },
                 count = snapshots.size,
-                subtitle = "装插件前自动备份，可回档",
+                subtitle = stringResource(DesignR.string.market_backup_subtitle),
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
             ) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
                     Text(
-                        "装插件前自动备份一次；连续安装只备份一次，回档就回到这批插件都还没装的那一刻。" +
-                            "定时备份默认 05:00，没赶上会在下次启动时补做。",
+                        stringResource(DesignR.string.market_backup_desc),
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Spacer(Modifier.height(8.dp))
@@ -507,13 +528,16 @@ fun PluginMarketScreen(
                             scope.launch {
                                 val file = withContext(Dispatchers.IO) { manager.snapshot("manual") }
                                 snapshots = manager.list()
-                                notice = if (file != null) "已备份 ${file.name}" else "备份失败"
+                                notice = if (file != null) context.getString(DesignR.string.market_backup_done, file.name)
+                                    else context.getString(DesignR.string.market_backup_failed)
+                                noticeFailed = file == null
                             }
-                        }) { Text("立即备份") }
+                        }) { Text(stringResource(DesignR.string.market_backup_now)) }
                         TextButton(onClick = {
                             backup?.closeBatch()
-                            notice = "已结束本批安装，下次安装会重新备份"
-                        }) { Text("结束本批") }
+                            notice = context.getString(DesignR.string.market_backup_batch_closed)
+                            noticeFailed = false
+                        }) { Text(stringResource(DesignR.string.market_backup_close_batch)) }
                     }
                 }
                 BackupScheduleCard(backup) { snapshots = backup?.list().orEmpty() }
@@ -534,17 +558,21 @@ fun PluginMarketScreen(
                             val manager = backup ?: return@TextButton
                             scope.launch {
                                 val ok = withContext(Dispatchers.IO) { manager.restore(entry.file).isSuccess }
-                                notice = if (ok) "已回档，重启 App 生效" else "回档失败"
+                                notice = if (ok) context.getString(DesignR.string.market_backup_restored)
+                                    else context.getString(DesignR.string.market_backup_restore_failed)
+                                noticeFailed = !ok
                             }
-                        }) { Text("回档") }
+                        }) { Text(stringResource(DesignR.string.market_backup_restore)) }
                         TextButton(onClick = {
                             val manager = backup ?: return@TextButton
                             scope.launch {
                                 val ok = withContext(Dispatchers.IO) { manager.delete(entry.file) }
                                 snapshots = manager.list()
-                                notice = if (ok) "已删除这个存档" else "删除失败"
+                                notice = if (ok) context.getString(DesignR.string.market_backup_deleted)
+                                    else context.getString(DesignR.string.market_backup_delete_failed)
+                                noticeFailed = !ok
                             }
-                        }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                        }) { Text(stringResource(DesignR.string.common_delete), color = MaterialTheme.colorScheme.error) }
                     }
                 }
             }
@@ -552,7 +580,7 @@ fun PluginMarketScreen(
         // 源与备份都是折叠卡，和 Agent 页同一套 CollapsibleSection；默认收起，展开状态跨旋屏保留。
         item {
             CollapsibleSection(
-                title = "插件源",
+                title = stringResource(DesignR.string.market_sources_title),
                 icon = Icons.Filled.Cloud,
                 tint = MaterialTheme.colorScheme.primary,
                 expanded = srcOpen,
@@ -573,8 +601,11 @@ fun PluginMarketScreen(
                             Text(
                                 buildString {
                                     append(status.name)
-                                    append(if (status.ok) " · " + status.count + " 条" else " · 失败")
-                                    status.error?.let { append("（" + it.take(60) + "）") }
+                                    append(
+                                        if (status.ok) stringResource(DesignR.string.market_source_count, status.count)
+                                        else stringResource(DesignR.string.market_source_failed),
+                                    )
+                                    status.error?.let { append(stringResource(DesignR.string.market_source_error, it.take(60))) }
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -583,8 +614,8 @@ fun PluginMarketScreen(
                     }
                     if (snapshot.sources.isEmpty()) {
                         Text(
-                            if (load.fromCache) "还没刷新，当前展示上次成功索引的缓存。"
-                            else "离线或全部源不可达，当前展示内置目录。",
+                            if (load.fromCache) stringResource(DesignR.string.market_cache_stale)
+                            else stringResource(DesignR.string.market_offline_builtin),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -592,12 +623,13 @@ fun PluginMarketScreen(
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            if (loading) "正在补源…" else "共 " + snapshot.plugins.size + " 个可装插件",
+                            if (loading) stringResource(DesignR.string.market_refreshing)
+                            else stringResource(DesignR.string.market_total, snapshot.plugins.size),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.weight(1f),
                         )
-                        TextButton(onClick = { refresh() }, enabled = !loading) { Text("重新拉取") }
+                        TextButton(onClick = { refresh() }, enabled = !loading) { Text(stringResource(DesignR.string.market_refresh_again)) }
                     }
                 }
             }
@@ -612,12 +644,16 @@ fun PluginMarketScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             MarketActionButton(
-                label = if (busy == PICK_BUSY) "安装中…" else "文件安装",
+                label = stringResource(
+                    if (busy == PICK_BUSY) DesignR.string.market_busy_installing else DesignR.string.market_install_from_file,
+                ),
                 enabled = (installer != null || externalStore != null) && busy == null,
                 modifier = Modifier.weight(1f),
             ) { filePicker.launch(arrayOf("*/*")) }
             MarketActionButton(
-                label = if (busy == GITHUB_BUSY) "拉取中…" else "链接安装",
+                label = stringResource(
+                    if (busy == GITHUB_BUSY) DesignR.string.market_loading_fetch else DesignR.string.market_install_from_link,
+                ),
                 enabled = busy == null,
                 modifier = Modifier.weight(1f),
             ) { gitHubOpen = true }
@@ -626,8 +662,9 @@ fun PluginMarketScreen(
 }
 
 /** 「N 个源 · M 个插件」——标题行右边那行小字。 */
+@Composable
 private fun countsText(snapshot: MarketSnapshot): String =
-    snapshot.sources.size.toString() + " 个源 · " + snapshot.plugins.size + " 个插件"
+    stringResource(DesignR.string.market_counts, snapshot.sources.size, snapshot.plugins.size)
 
 /** 条目之间的 1dp 分隔线：整页连续列表靠它分段，不再靠一张张卡片。 */
 @Composable
@@ -675,9 +712,9 @@ private fun MarketRow(
     // 让用户一眼看出这条会走哪条安装链路：npm 包能直接装，只登记了仓库的要去项目主页。
     val via = when {
         entry.npm.isNotBlank() -> "npm:" + entry.npm
-        entry.packageUrl.isNotBlank() -> "直链归档"
-        entry.repo.isNotBlank() -> "GitHub 仓库"
-        else -> "仅命令"
+        entry.packageUrl.isNotBlank() -> stringResource(DesignR.string.market_via_archive)
+        entry.repo.isNotBlank() -> stringResource(DesignR.string.market_via_repo)
+        else -> stringResource(DesignR.string.market_via_command)
     }
     Column(modifier.fillMaxWidth()) {
         // 收起时只有一行：名字 + 「版本 · 来源 · 简介」，右端箭头点开看详情。
@@ -694,7 +731,7 @@ private fun MarketRow(
                     buildString {
                         append(listOf(entry.version, via).filter { it.isNotBlank() }.joinToString(" · "))
                         if (entry.description.isNotBlank()) {
-                            if (isNotEmpty()) append("　")
+                            if (isNotEmpty()) append(stringResource(DesignR.string.market_join_sep))
                             append(entry.description)
                         }
                     },
@@ -715,7 +752,7 @@ private fun MarketRow(
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val stats = buildList {
-                        if (entry.downloads > 0) add(entry.downloads.toString() + " 次下载")
+                        if (entry.downloads > 0) add(stringResource(DesignR.string.market_downloads, entry.downloads))
                         if (entry.stars > 0) add("★ " + entry.stars)
                     }.joinToString(" · ")
                     if (stats.isNotBlank()) {
@@ -724,11 +761,13 @@ private fun MarketRow(
                     Spacer(Modifier.weight(1f))
                     val detail = entry.repo.ifBlank { entry.homepage }
                     if (detail.isNotBlank()) {
-                        TextButton(onClick = { openUrl(context, detail) }) { Text("GitHub 详情") }
+                        TextButton(onClick = { openUrl(context, detail) }) { Text(stringResource(DesignR.string.market_github_detail)) }
                     }
                     if (entry.npm.isNotBlank() || entry.packageUrl.isNotBlank() || entry.repo.isNotBlank()) {
                         MarketActionButton(
-                            label = if (busy) "下载中…" else "安装插件",
+                            label = stringResource(
+                                if (busy) DesignR.string.market_busy_downloading else DesignR.string.market_install_action,
+                            ),
                             enabled = !busy,
                             modifier = Modifier.width(112.dp),
                             onClick = onInstall,
@@ -736,7 +775,7 @@ private fun MarketRow(
                     } else {
                         // 真正没有任何下载地址的条目（多为 DSH 主机侧插件）才退化成命令。
                         TextButton(onClick = { clipboard.setText(AnnotatedString(entry.installHint)) }) {
-                            Text("复制命令")
+                            Text(stringResource(DesignR.string.market_copy_command))
                         }
                     }
                 }
@@ -747,10 +786,10 @@ private fun MarketRow(
 }
 
 
-private enum class MarketSort(val label: String) {
-    Downloads("下载量"),
-    Stars("星标"),
-    Name("名称"),
+private enum class MarketSort(val labelRes: Int) {
+    Downloads(DesignR.string.market_sort_downloads),
+    Stars(DesignR.string.market_sort_stars),
+    Name(DesignR.string.market_sort_name),
 }
 
 private fun sortEntries(list: List<MarketEntry>, sort: MarketSort, ascending: Boolean): List<MarketEntry> {

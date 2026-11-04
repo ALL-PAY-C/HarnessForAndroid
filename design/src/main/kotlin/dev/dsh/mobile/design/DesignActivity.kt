@@ -49,6 +49,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 
 /**
@@ -100,7 +101,11 @@ fun ActivitySummary(
     // 折叠行只说「在干什么 / 干完了、用了多久 / 动了几个工具」。
     // 不再塞「1.2k 字」这种计数：字数对用户没有决策价值，还占掉一行里最显眼的位置。
     val steps = tools.size + if (chars > 0) 1 else 0
-    val head = if (live) "正在思考…" else "思考过程 · $steps 步"
+    val head = if (live) {
+        stringResource(R.string.design_activity_thinking_live)
+    } else {
+        stringResource(R.string.design_activity_thought_steps, steps)
+    }
     Column(modifier.fillMaxWidth()) {
         Row(
             Modifier
@@ -123,7 +128,11 @@ fun ActivitySummary(
             Spacer(Modifier.width(4.dp))
             Icon(
                 if (open) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                contentDescription = if (open) "收起思考" else "展开思考",
+                contentDescription = if (open) {
+                    stringResource(R.string.design_activity_thought_collapse)
+                } else {
+                    stringResource(R.string.design_activity_thought_expand)
+                },
                 tint = p.t3.copy(alpha = 0.7f),
                 modifier = Modifier.size(14.dp),
             )
@@ -133,7 +142,8 @@ fun ActivitySummary(
                 // 工具动作先折成一句话，像 DSH 那样「› 执行了命令，已写入文件」。
                 // 每个工具仍然可以单独点开看入参/响应，只是默认不再把整块 JSON 摊开占屏。
                 if (tools.isNotEmpty()) {
-                    val phrase = tools.map { toolPhrase(it) }.distinct().joinToString("，")
+                    val sep = stringResource(R.string.design_activity_phrase_sep)
+                    val phrase = tools.map { toolPhrase(it).text() }.distinct().joinToString(sep)
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -153,7 +163,11 @@ fun ActivitySummary(
                             modifier = Modifier.weight(1f),
                         )
                         Text(
-                            if (toolsOpen) "收起" else tools.size.toString() + " 项",
+                            if (toolsOpen) {
+                                stringResource(R.string.common_collapse)
+                            } else {
+                                stringResource(R.string.design_activity_tool_count, tools.size)
+                            },
                             color = p.t3,
                             fontSize = 11.sp,
                             modifier = Modifier.padding(start = 6.dp),
@@ -195,11 +209,13 @@ fun ActivitySummary(
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Spacer(Modifier.weight(1f))
-                        CopyChip("复制思考") { clipboard.setText(AnnotatedString(thought)) }
+                        CopyChip(stringResource(R.string.design_activity_copy_thought)) {
+                            clipboard.setText(AnnotatedString(thought))
+                        }
                     }
                 } else if (!live && tools.isEmpty()) {
                     Text(
-                        "这一轮没有返回推理内容。换用带 reasoning 的模型（如 deepseek-reasoner）就能在这里看到完整思维链。",
+                        stringResource(R.string.design_activity_no_reasoning),
                         color = p.t3,
                         fontSize = 12.sp,
                         lineHeight = 18.sp,
@@ -232,17 +248,17 @@ private fun ThoughtScroll(text: String, live: Boolean, modifier: Modifier = Modi
 }
 
 /** 把一个工具调用压成一句人话，拼进「› 执行了命令，写入了文件」那一行。 */
-internal fun toolPhrase(tool: ToolCall): String {
+internal fun toolPhrase(tool: ToolCall): UiText {
     val k = (tool.kind + " " + tool.title).lowercase()
     return when {
-        "shell" in k || "bash" in k || "exec" in k || "terminal" in k -> "执行了命令"
-        "write" in k || "edit" in k || "patch" in k || "create" in k -> "写入了文件"
-        "read" in k || "cat" in k || "view" in k -> "读取了文件"
-        "grep" in k || "search" in k || "find" in k || "glob" in k -> "搜索了内容"
-        "fetch" in k || "http" in k || "web" in k || "download" in k -> "访问了网络"
-        "delete" in k || "remove" in k || "rm" in k -> "删除了内容"
-        tool.title.isNotBlank() -> tool.title
-        else -> "调用了工具"
+        "shell" in k || "bash" in k || "exec" in k || "terminal" in k -> UiText.Res(R.string.design_tool_phrase_shell)
+        "write" in k || "edit" in k || "patch" in k || "create" in k -> UiText.Res(R.string.design_tool_phrase_write)
+        "read" in k || "cat" in k || "view" in k -> UiText.Res(R.string.design_tool_phrase_read)
+        "grep" in k || "search" in k || "find" in k || "glob" in k -> UiText.Res(R.string.design_tool_phrase_search)
+        "fetch" in k || "http" in k || "web" in k || "download" in k -> UiText.Res(R.string.design_tool_phrase_fetch)
+        "delete" in k || "remove" in k || "rm" in k -> UiText.Res(R.string.design_tool_phrase_delete)
+        tool.title.isNotBlank() -> UiText.Raw(tool.title)
+        else -> UiText.Res(R.string.design_tool_phrase_other)
     }
 }
 
@@ -321,7 +337,7 @@ private fun ToolCallCard(tool: ToolCall) {
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                tool.title.ifBlank { tool.args }.ifBlank { "工具调用" },
+                tool.title.ifBlank { tool.args }.ifBlank { stringResource(R.string.design_tool_call_fallback) },
                 color = if (tool.status == ToolCall.ToolStatus.Failed) p.red else p.t2,
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
@@ -333,7 +349,7 @@ private fun ToolCallCard(tool: ToolCall) {
             Text(
                 buildList {
                     if (tool.elapsedMs > 0L) add(shortDuration(tool.elapsedMs))
-                    if (tool.attempts > 1) add("重试 ${tool.attempts - 1}")
+                    if (tool.attempts > 1) add(stringResource(R.string.design_tool_retry, tool.attempts - 1))
                 }.joinToString(" · "),
                 color = p.t3,
                 fontSize = 10.sp,
@@ -348,11 +364,11 @@ private fun ToolCallCard(tool: ToolCall) {
         }
         if (open) {
             Column(Modifier.fillMaxWidth().padding(start = 13.dp, bottom = 4.dp)) {
-                JsonBlock("入参", tool.args)
-                JsonBlock("请求", tool.requestJson)
-                JsonBlock("响应", tool.responseJson)
+                JsonBlock(stringResource(R.string.design_json_args), tool.args)
+                JsonBlock(stringResource(R.string.design_json_request), tool.requestJson)
+                JsonBlock(stringResource(R.string.design_json_response), tool.responseJson)
                 if (tool.detail.isNotBlank() && tool.status == ToolCall.ToolStatus.Failed) {
-                    JsonBlock("错误", tool.detail)
+                    JsonBlock(stringResource(R.string.design_json_error), tool.detail)
                 }
             }
         }
@@ -375,7 +391,7 @@ private fun JsonBlock(label: String, value: String) {
             )
             if (value.isNotBlank()) {
                 Text(
-                    "复制",
+                    stringResource(R.string.common_copy),
                     color = p.accent,
                     fontSize = 10.sp,
                     modifier = Modifier

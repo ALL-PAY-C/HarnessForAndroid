@@ -4473,5 +4473,2651 @@
     "en": "New group",
     "zh": "新群组",
     "where": "feature/sessions/SessionsViewModel.kt"
+  },
+  {
+    "key": "common_copied",
+    "en": "Copied",
+    "zh": "已复制",
+    "where": "design"
+  },
+  {
+    "key": "common_loading",
+    "en": "Loading…",
+    "zh": "加载中…",
+    "where": "design"
+  },
+  {
+    "key": "common_preview",
+    "en": "Preview",
+    "zh": "预览",
+    "where": "design"
+  },
+  {
+    "key": "design_activity_thinking_live",
+    "en": "Thinking…",
+    "zh": "正在思考…",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_activity_thought_steps",
+    "en": "Thinking process · %1$d steps",
+    "zh": "思考过程 · %1$d 步",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_activity_thought_collapse",
+    "en": "Collapse thinking",
+    "zh": "收起思考",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_activity_thought_expand",
+    "en": "Expand thinking",
+    "zh": "展开思考",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_activity_phrase_sep",
+    "en": ", ",
+    "zh": "，",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_activity_tool_count",
+    "en": "%1$d items",
+    "zh": "%1$d 项",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_activity_copy_thought",
+    "en": "Copy reasoning",
+    "zh": "复制思考",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_activity_no_reasoning",
+    "en": "This turn returned no reasoning. Switch to a model with reasoning (such as deepseek-reasoner) to see the full chain of thought here.",
+    "zh": "这一轮没有返回推理内容。换用带 reasoning 的模型（如 deepseek-reasoner）就能在这里看到完整思维链。",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_tool_phrase_shell",
+    "en": "ran a command",
+    "zh": "执行了命令",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_tool_phrase_write",
+    "en": "wrote a file",
+    "zh": "写入了文件",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_tool_phrase_read",
+    "en": "read a file",
+    "zh": "读取了文件",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_tool_phrase_search",
+    "en": "searched content",
+    "zh": "搜索了内容",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_tool_phrase_fetch",
+    "en": "accessed the network",
+    "zh": "访问了网络",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_tool_phrase_delete",
+    "en": "deleted content",
+    "zh": "删除了内容",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_tool_phrase_other",
+    "en": "called a tool",
+    "zh": "调用了工具",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_tool_call_fallback",
+    "en": "Tool call",
+    "zh": "工具调用",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_tool_retry",
+    "en": "retry %1$d",
+    "zh": "重试 %1$d",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_json_args",
+    "en": "Arguments",
+    "zh": "入参",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_json_request",
+    "en": "Request",
+    "zh": "请求",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_json_response",
+    "en": "Response",
+    "zh": "响应",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_json_error",
+    "en": "Error",
+    "zh": "错误",
+    "where": "DesignActivity.kt"
+  },
+  {
+    "key": "design_identity_field_name",
+    "en": "Card name",
+    "zh": "卡名",
+    "where": "IdentityCardUi.kt"
+  },
+  {
+    "key": "design_identity_field_identity",
+    "en": "Who you are (one line)",
+    "zh": "你是谁（一句话身份）",
+    "where": "IdentityCardUi.kt"
+  },
+  {
+    "key": "design_identity_field_duties",
+    "en": "Duties (one per line)",
+    "zh": "职责（一行一条）",
+    "where": "IdentityCardUi.kt"
+  },
+  {
+    "key": "design_identity_field_boundaries",
+    "en": "Boundaries (one per line, highest priority)",
+    "zh": "禁区（一行一条，优先级最高）",
+    "where": "IdentityCardUi.kt"
+  },
+  {
+    "key": "design_identity_field_rules",
+    "en": "Rules (one per line)",
+    "zh": "准则（一行一条）",
+    "where": "IdentityCardUi.kt"
+  },
+  {
+    "key": "design_identity_field_tone",
+    "en": "Tone",
+    "zh": "口吻",
+    "where": "IdentityCardUi.kt"
+  },
+  {
+    "key": "design_identity_field_examples",
+    "en": "Examples (one per line)",
+    "zh": "示例（一行一条）",
+    "where": "IdentityCardUi.kt"
+  },
+  {
+    "key": "design_identity_field_freeform",
+    "en": "Free-form notes",
+    "zh": "自由补充",
+    "where": "IdentityCardUi.kt"
+  },
+  {
+    "key": "design_identity_empty_preview",
+    "en": "(Empty card: nothing is injected after saving)",
+    "zh": "（空卡：保存后不注入任何内容）",
+    "where": "IdentityCardUi.kt"
+  },
+  {
+    "key": "design_identity_adopt",
+    "en": "Convert to identity card",
+    "zh": "转为身份卡",
+    "where": "IdentityCardUi.kt"
+  },
+  {
+    "key": "design_identity_saving",
+    "en": "Saving…",
+    "zh": "保存中…",
+    "where": "IdentityCardUi.kt"
+  },
+  {
+    "key": "design_identity_clear_hint",
+    "en": "Clearing only wipes this card; persona text already in sessions stays put and reappears as a read-only card.",
+    "zh": "清空只清这张卡；会话里已有的旧人设文本保持不动，会重新作为只读卡出现。",
+    "where": "IdentityCardUi.kt"
+  },
+  {
+    "key": "design_slot_session_list",
+    "en": "Session list item",
+    "zh": "会话列表项",
+    "where": "SlotEditUi.kt"
+  },
+  {
+    "key": "design_slot_chat_top_bar",
+    "en": "Chat top bar",
+    "zh": "会话顶栏",
+    "where": "SlotEditUi.kt"
+  },
+  {
+    "key": "design_slot_composer",
+    "en": "Composer",
+    "zh": "输入框区",
+    "where": "SlotEditUi.kt"
+  },
+  {
+    "key": "design_slot_bottom_bar",
+    "en": "Bottom tab bar",
+    "zh": "底部 tab 栏",
+    "where": "SlotEditUi.kt"
+  },
+  {
+    "key": "design_slot_drawer_group",
+    "en": "Drawer group",
+    "zh": "抽屉分组",
+    "where": "SlotEditUi.kt"
+  },
+  {
+    "key": "design_media_copy_path",
+    "en": "Copy local path",
+    "zh": "复制本地路径",
+    "where": "DesignMedia.kt"
+  },
+  {
+    "key": "design_media_open_with",
+    "en": "Open with",
+    "zh": "打开方式",
+    "where": "DesignMedia.kt"
+  },
+  {
+    "key": "design_media_save_gallery",
+    "en": "Save to gallery",
+    "zh": "另存到相册",
+    "where": "DesignMedia.kt"
+  },
+  {
+    "key": "design_media_image_gone",
+    "en": "Image unavailable · %1$s",
+    "zh": "图片已失效 · %1$s",
+    "where": "DesignMedia.kt"
+  },
+  {
+    "key": "design_startup_plugin",
+    "en": "Plugin: %1$s",
+    "zh": "插件：%1$s",
+    "where": "StartupAnimation.kt"
+  },
+  {
+    "key": "design_startup_image",
+    "en": "Image",
+    "zh": "图片",
+    "where": "StartupAnimation.kt"
+  },
+  {
+    "key": "design_startup_fade",
+    "en": "Fade in",
+    "zh": "淡入",
+    "where": "StartupAnimation.kt"
+  },
+  {
+    "key": "design_startup_draw_h",
+    "en": "Draw H",
+    "zh": "画 H",
+    "where": "StartupAnimation.kt"
+  },
+  {
+    "key": "design_startup_bounce",
+    "en": "Bounce",
+    "zh": "弹跳",
+    "where": "StartupAnimation.kt"
+  },
+  {
+    "key": "design_ui_extend_title",
+    "en": "Plugin UI extensions",
+    "zh": "拓展插件 UI",
+    "where": "UiEditUi.kt"
+  },
+  {
+    "key": "design_ui_extend_hint",
+    "en": "When on, a \"+\" appears beside each slot so plugin components can be placed there; the three font scales below resize body, code and terminal text.",
+    "zh": "打开后各界面槽位旁出现「+」，可把插件组件摆上去；下面三档字号按倍率缩放正文、代码与终端",
+    "where": "UiEditUi.kt"
+  },
+  {
+    "key": "design_ui_font_body",
+    "en": "Body size",
+    "zh": "正文字号",
+    "where": "UiEditUi.kt"
+  },
+  {
+    "key": "design_ui_font_code",
+    "en": "Code size",
+    "zh": "代码字号",
+    "where": "UiEditUi.kt"
+  },
+  {
+    "key": "design_ui_font_terminal",
+    "en": "Terminal size",
+    "zh": "终端字号",
+    "where": "UiEditUi.kt"
+  },
+  {
+    "key": "common_view",
+    "en": "View",
+    "zh": "查看",
+    "where": "SafeModeBanner.kt"
+  },
+  {
+    "key": "diag_safe_mode_title",
+    "en": "Safe mode",
+    "zh": "安全模式",
+    "where": "SafeModeBanner.kt"
+  },
+  {
+    "key": "diag_safe_mode_fallback",
+    "en": "Last start failed repeatedly",
+    "zh": "上次启动连续失败",
+    "where": "SafeModeBanner.kt"
+  },
+  {
+    "key": "gateway_title",
+    "en": "Built-in model gateway",
+    "zh": "内置模型网关",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_state_stopped",
+    "en": "Stopped",
+    "zh": "已停止",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_state_not_ready",
+    "en": "Not ready",
+    "zh": "未就绪",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_credentials_missing",
+    "en": "credentials not imported",
+    "zh": "凭据未导入",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_import_credentials",
+    "en": "Import credentials",
+    "zh": "导入凭据",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_detail_running",
+    "en": "Running · %1$s · %2$d models",
+    "zh": "运行中 · %1$s · %2$d 个模型",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_detail_failed",
+    "en": "Start failed: %1$s",
+    "zh": "启动失败：%1$s",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_detail_starting",
+    "en": "Starting… (fails after %1$d s)",
+    "zh": "启动中…（超过 %1$d 秒判失败）",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_state_not_running",
+    "en": "Not running",
+    "zh": "未运行",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_credentials_missing_hint",
+    "en": "Credentials: not imported (no credentials, no models)",
+    "zh": "凭据：未导入（没有凭据出不了模型）",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_credentials_count",
+    "en": "Credentials: %1$d · %2$s",
+    "zh": "凭据：%1$d 份 · %2$s",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_hide_key",
+    "en": "Hide key",
+    "zh": "隐藏 Key",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_show_key",
+    "en": "Show key",
+    "zh": "显示 Key",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_start",
+    "en": "Start gateway",
+    "zh": "启动网关",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_stop",
+    "en": "Stop gateway",
+    "zh": "停止网关",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_import_title",
+    "en": "Import gateway credentials",
+    "zh": "导入网关凭据",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_import_hint",
+    "en": "Paste the OAuth JSON (with refresh_token). It is written to %1$s and takes effect after the gateway restarts.",
+    "zh": "粘贴 OAuth JSON（含 refresh_token）。落盘到 %1$s，重启网关生效。",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_import_failed",
+    "en": "Import failed",
+    "zh": "导入失败",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "gateway_import_and_restart",
+    "en": "Import and restart",
+    "zh": "导入并重启",
+    "where": "GatewayCard.kt"
+  },
+  {
+    "key": "notify_session_done_title",
+    "en": "Session finished",
+    "zh": "会话已完成",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_reply_done_body",
+    "en": "This round's reply is complete",
+    "zh": "本轮回复已完成",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_permission_title",
+    "en": "%1$s needs your confirmation",
+    "zh": "%1$s 请求确认",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_permission_title_fallback",
+    "en": "Confirmation needed",
+    "zh": "需要确认",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_session_fallback",
+    "en": "Session",
+    "zh": "会话",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_running_summary",
+    "en": "%1$d sessions running",
+    "zh": "%1$d 个会话进行中",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_more",
+    "en": "%1$d more…",
+    "zh": "还有 %1$d 个…",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_action_other",
+    "en": "Other",
+    "zh": "其他",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_runtime_ready",
+    "en": "Runtime ready · %1$s",
+    "zh": "运行时就绪 · %1$s",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_runtime_starting",
+    "en": "Runtime starting %1$s",
+    "zh": "运行时启动中 %1$s",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_runtime_reconnecting",
+    "en": "Reconnecting #%1$d",
+    "zh": "重连中 #%1$d",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_runtime_failed",
+    "en": "Connection failed: %1$s",
+    "zh": "连接失败：%1$s",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_runtime_not_configured",
+    "en": "Runtime not configured · pick the built-in runtime or a connection address in settings",
+    "zh": "未配置运行时 · 到设置里选择内置运行时或连接地址",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_phase_waiting",
+    "en": "⏸ Waiting for you",
+    "zh": "⏸ 等你确认",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_phase_tool",
+    "en": "⚙ Running",
+    "zh": "⚙ 执行中",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_phase_done",
+    "en": "✓ Done",
+    "zh": "✓ 完成",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_phase_thinking",
+    "en": "… Thinking",
+    "zh": "… 思考中",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_channel_name",
+    "en": "Ongoing sessions",
+    "zh": "进行中的会话",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "notify_channel_desc",
+    "en": "Keeps running sessions and their thinking in the shade",
+    "zh": "常驻展示正在思考的会话与思维链",
+    "where": "OngoingCenter.kt"
+  },
+  {
+    "key": "phone_section_permissions",
+    "en": "Permission setup",
+    "zh": "权限引导",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_state_pending",
+    "en": "Not connected",
+    "zh": "待连接",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_section_capabilities",
+    "en": "System capabilities",
+    "zh": "系统能力权限",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_tap_to_request",
+    "en": " (tap to request)",
+    "zh": "（点一下申请）",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_section_actions",
+    "en": "Actions",
+    "zh": "动作列表",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_selftest_running",
+    "en": "Checking screen reader…",
+    "zh": "读屏自检中…",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_selftest",
+    "en": "Screen reader self-test",
+    "zh": "读屏自检",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_selftest_hint",
+    "en": "Runs readscreen once to verify the service can actually dispatch actions",
+    "zh": "执行一次 readscreen，验证服务真的能下发动作",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_section_recent",
+    "en": "Recent actions",
+    "zh": "最近动作",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_empty_recent",
+    "en": "No actions yet. They show up here once the model calls the phone tool or you tap the self-test above.",
+    "zh": "还没有动作记录。模型调用 phone 工具或点上面的「读屏自检」后会出现在这里。",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_footer_local",
+    "en": "Every action runs on this device: no root, no ADB, no computer. While the service is off the buttons only take you to system settings.",
+    "zh": "全部动作在本机执行，不需要 root、不需要 ADB、不需要电脑。服务未开启时按钮只会把你送到系统设置页。",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_cap_accessibility",
+    "en": "Accessibility service",
+    "zh": "无障碍服务",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_cap_service",
+    "en": "Service connection",
+    "zh": "服务连接",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_cap_overlay",
+    "en": "Overlay",
+    "zh": "悬浮窗",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_state_not_run",
+    "en": "Not run",
+    "zh": "未执行",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_state_ok",
+    "en": "✓ OK",
+    "zh": "✓ 成功",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_state_fail",
+    "en": "✗ Failed",
+    "zh": "✗ 失败",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "linux_op_inspect",
+    "en": "Environment status / kernel health",
+    "zh": "环境状态 / 内核健康",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_op_install_env",
+    "en": "Install / repair Linux",
+    "zh": "安装 / 修复 Linux",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_op_repair_runtime",
+    "en": "Repair runtime",
+    "zh": "修复运行时",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_op_reinstall_runtime",
+    "en": "Reinstall runtime",
+    "zh": "重装运行时",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_op_install_kernel",
+    "en": "Install / repair DSH kernel",
+    "zh": "安装 / 修复 DSH 内核",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_op_selfcheck",
+    "en": "Linux self-check",
+    "zh": "Linux 自检",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_op_cleanup",
+    "en": "Clean inactive versions",
+    "zh": "清理非激活版本",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_op_bootstrap",
+    "en": "Fill in environment dependencies",
+    "zh": "补齐环境依赖",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_log_start",
+    "en": "%1$s started",
+    "zh": "%1$s 开始",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_log_cancelled",
+    "en": "%1$s cancelled",
+    "zh": "%1$s 已取消",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_log_failed_prefix",
+    "en": "%1$s failed: ",
+    "zh": "%1$s 失败：",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_log_done",
+    "en": "Done",
+    "zh": "完成",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_check_failed",
+    "en": "failed · ",
+    "zh": "失败 · ",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_exit_code",
+    "en": "%1$s exit code %2$d",
+    "zh": "%1$s 退出码 %2$d",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_msg_repair_done",
+    "en": "Runtime repaired; fixed execute permission on %1$d item(s)",
+    "zh": "运行时修复完成，已补齐 %1$d 项执行权限",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_msg_repair_failed",
+    "en": "Health check failed after repair: %1$s",
+    "zh": "运行时修复后健康检查失败：%1$s",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_msg_reinstall_done",
+    "en": "Linux runtime reinstalled",
+    "zh": "Linux 运行时重装完成",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_msg_reinstall_failed",
+    "en": "Check failed after reinstall: %1$s",
+    "zh": "Linux 运行时重装后检查失败：%1$s",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_msg_cleanup_done",
+    "en": "Removed %1$d inactive version(s), freed %2$d bytes",
+    "zh": "已清理 %1$d 个非激活版本，释放 %2$d 字节",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_msg_logs_cleared",
+    "en": "Diagnostics log cleared",
+    "zh": "诊断日志已清空",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_progress_remove_runtime",
+    "en": "Removing the current Linux runtime",
+    "zh": "删除当前 Linux 运行时",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_progress_manifest",
+    "en": "Reading Linux artifact manifest",
+    "zh": "读取 Linux 制品清单",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_progress_download",
+    "en": "Downloading, verifying and unpacking rootfs",
+    "zh": "下载、校验并解包 rootfs",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_progress_tools",
+    "en": "Provisioning Linux tools (the first run may take minutes)",
+    "zh": "预置 Linux 工具（首次可能需要数分钟）",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_progress_selfcheck",
+    "en": "Running Linux self-check",
+    "zh": "运行 Linux 自检",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_progress_kernel_manifest",
+    "en": "Reading DSH kernel manifest",
+    "zh": "读取 DSH 内核清单",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_progress_kernel_install",
+    "en": "Verifying and installing the DSH kernel and Node",
+    "zh": "校验并安装 DSH 内核与 Node",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_progress_node_verify",
+    "en": "Verifying Node and kernel versions",
+    "zh": "验证 Node 与内核版本",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_err_proot_channel",
+    "en": "rootfs is installed but registering the proot channel failed",
+    "zh": "rootfs 已安装，但 proot 通道注册失败",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_err_tools",
+    "en": "Provisioning Linux tools failed",
+    "zh": "Linux 工具预置失败",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_err_selfcheck_empty",
+    "en": "Linux self-check returned no checks",
+    "zh": "Linux 自检未返回检查项",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_err_kernel_manifest",
+    "en": "DSH kernel manifest is missing required fields",
+    "zh": "DSH 内核清单缺失必填字段",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "linux_err_need_env",
+    "en": "Install the Linux environment first",
+    "zh": "请先安装 Linux 环境",
+    "where": "LinuxSettingsController.kt"
+  },
+  {
+    "key": "diag_title",
+    "en": "Diagnostics",
+    "zh": "诊断",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_safe_on_prefix",
+    "en": "On · ",
+    "zh": "已开启 · ",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_safe_reason_unknown",
+    "en": "Reason unknown",
+    "zh": "原因未知",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_safe_off",
+    "en": "Off",
+    "zh": "未开启",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_safe_active_title",
+    "en": "Safe mode is on",
+    "zh": "安全模式已开启",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_safe_inactive_title",
+    "en": "Safe mode is off",
+    "zh": "安全模式未开启",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_safe_active_hint",
+    "en": "Plugins, auto-connect and accessibility extensions are narrowed by safe mode; the state is sticky and can only be left here",
+    "zh": "插件 / 自动连接 / 无障碍扩展已按安全模式收敛；状态粘性，只能从这里退出",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_safe_inactive_hint",
+    "en": "Consecutive start failures haven't reached the threshold",
+    "zh": "连续启动失败未达阈值",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_safe_flags_title",
+    "en": "Switches narrowed this time",
+    "zh": "本次收敛的开关",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_flag_plugins_name",
+    "en": "Plugins",
+    "zh": "插件",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_flag_plugins",
+    "en": "Plugins disabled",
+    "zh": "插件已禁用",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_flag_engine_name",
+    "en": "Auto engine",
+    "zh": "自动引擎",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_flag_engine",
+    "en": "Auto-connect disabled (manual start still works)",
+    "zh": "自动连接已禁用（仍可手动启动）",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_flag_accessibility_name",
+    "en": "Accessibility",
+    "zh": "无障碍",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_flag_accessibility",
+    "en": "Accessibility extensions disabled",
+    "zh": "无障碍扩展已禁用",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_none",
+    "en": "None",
+    "zh": "无",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_rollback_title",
+    "en": "Last config rollback",
+    "zh": "最近一次配置回滚",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_safe_exit",
+    "en": "Exit safe mode and restart",
+    "zh": "退出安全模式并重启",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_safe_exit_busy",
+    "en": "Running…",
+    "zh": "执行中…",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_safe_exit_hint",
+    "en": "Clears the safe-mode flag, then rebuilds plugins and engines in-process",
+    "zh": "清掉安全模式标志后在进程内重建插件与引擎",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_toast_safe_exited",
+    "en": "Left safe mode, rebuilding",
+    "zh": "已退出安全模式，正在重建",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_crashes_title",
+    "en": "Crash reports",
+    "zh": "崩溃记录",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_crashes_hint",
+    "en": "Files are deleted after a successful upload, so everything listed here is still pending",
+    "zh": "上传成功后文件会被删除，所以列在这里的都是尚未上传的",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_crashes_empty",
+    "en": "No crash files pending",
+    "zh": "没有待处理的崩溃文件",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_crashes_dir_unavailable",
+    "en": "Crash directory unavailable",
+    "zh": "崩溃目录不可用",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_crashes_dir_empty",
+    "en": "Crash directory is empty",
+    "zh": "崩溃目录为空",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_not_uploaded",
+    "en": "Not uploaded",
+    "zh": "未上传",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_maintenance",
+    "en": "Maintenance",
+    "zh": "维护动作",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_upload_on_prefix",
+    "en": "Upload on · ",
+    "zh": "上传已开启 · ",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_endpoint_empty",
+    "en": "No endpoint",
+    "zh": "端点为空",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_upload_off_hint",
+    "en": "Upload off (you can turn it on below; nothing goes online while it stays off)",
+    "zh": "上传未开启（下面可以打开；关闭时全程不联网）",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_restore_title",
+    "en": "Restore the previous config (pre-rollback)",
+    "zh": "恢复上次配置（pre-rollback）",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_restore_hint",
+    "en": "Writes the settings saved before the rollback back in; fully effective after a restart",
+    "zh": "把回滚前存下的那份设置写回去，重启后完全生效",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_toast_no_restore",
+    "en": "No pre-rollback copy to restore",
+    "zh": "没有可恢复的回滚前副本",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_toast_restored",
+    "en": "Restored %1$d settings; fully effective after a restart",
+    "zh": "已恢复 %1$d 项设置，重启后完全生效",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_toast_restore_failed",
+    "en": "Restore failed: %1$s",
+    "zh": "恢复失败：%1$s",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_upload_title",
+    "en": "Upload crash reports",
+    "zh": "上传崩溃报告",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_upload_on_hint",
+    "en": "On · tap to turn off",
+    "zh": "已开启 · 点一下关闭",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_upload_off_toggle",
+    "en": "Off · tap to turn on (fill in the endpoint first)",
+    "zh": "已关闭 · 点一下打开（需要先填端点）",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_toast_upload_off",
+    "en": "Upload turned off",
+    "zh": "已关闭上传",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_toast_upload_on",
+    "en": "Upload turned on",
+    "zh": "已开启上传",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_endpoint_title",
+    "en": "Upload endpoint",
+    "zh": "上传端点",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_endpoint_unset",
+    "en": "Not set · POST a JSON here",
+    "zh": "未设置 · POST 一个 JSON 到这里",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_upload_now",
+    "en": "Upload pending files now",
+    "zh": "立即上传未上传文件",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_upload_now_hint",
+    "en": "One POST, 10s timeout, no retries; the file is deleted only on 2xx",
+    "zh": "单次 POST，10s 超时，不重试；2xx 才删文件",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_upload_failed_keep",
+    "en": "Upload failed, file kept",
+    "zh": "上传失败，文件保留",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_uploaded_count",
+    "en": "Uploaded %1$d",
+    "zh": "已上传 %1$d 条",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_paths_hint",
+    "en": "Crash files: files/crash · Config snapshots: files/lkg (ring of 3 + pre-rollback audit copy)",
+    "zh": "崩溃文件目录：files/crash · 配置快照目录：files/lkg（环形 3 份 + pre-rollback 审计副本）",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_endpoint_dialog_title",
+    "en": "Crash upload endpoint",
+    "zh": "崩溃上传端点",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_endpoint_dialog_hint",
+    "en": "POST one JSON; only 2xx counts as success. Leave it empty to disable.",
+    "zh": "POST 一个 JSON，2xx 才算成功；留空等于不启用。",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_toast_endpoint_saved",
+    "en": "Saved and upload turned on",
+    "zh": "已保存并开启上传",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "diag_toast_endpoint_cleared",
+    "en": "Endpoint cleared",
+    "zh": "已清空端点",
+    "where": "DiagnosticsScreen.kt"
+  },
+  {
+    "key": "mcp_title",
+    "en": "MCP servers",
+    "zh": "MCP 服务器",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_hint",
+    "en": "Local-runtime endpoints are called by this app, which confirms per tool policy. With Loopback/Remote endpoints the engine runs the tools and this app's confirmation dialog is skipped. stdio is configured on the engine side and is not dispatched from here.",
+    "zh": "本地运行时端点由本应用连接并执行工具，调用前按工具策略确认。Loopback/Remote 端点下工具由引擎执行，不经过本应用的确认弹窗。stdio 由引擎侧配置，本应用不下发。",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_section_configured",
+    "en": "Configured",
+    "zh": "已配置",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_empty",
+    "en": "No servers yet. Once you add one the list shows up here, and its switch controls whether it takes part in tool injection.",
+    "zh": "还没有服务器。新增后这里会出现列表，启用开关控制它是否参与工具注入。",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_probe_ok",
+    "en": "Connected · %1$s · %2$d tools",
+    "zh": "连接成功 · %1$s · %2$d 个工具",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_probe_failed",
+    "en": "Connection failed",
+    "zh": "连接失败",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_testing",
+    "en": "Testing",
+    "zh": "测试中",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_testing_ellipsis",
+    "en": "Testing…",
+    "zh": "测试中…",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_test",
+    "en": "Test",
+    "zh": "测试",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_test_connect",
+    "en": "Test connection",
+    "zh": "测试连接",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_add_title",
+    "en": "Add server",
+    "zh": "新增服务器",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_add_sub",
+    "en": "Fill in the URL and request headers",
+    "zh": "填 URL 与请求头",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_err_url_empty",
+    "en": "URL cannot be empty",
+    "zh": "URL 不能为空",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_err_url_scheme",
+    "en": "URL must start with http:// or https://",
+    "zh": "URL 需以 http:// 或 https:// 开头",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_err_timeout",
+    "en": "Timeout must be between 1 and 600 seconds",
+    "zh": "超时需在 1–600 秒之间",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_field_name",
+    "en": "Name (tool prefix mcp__<name>__)",
+    "zh": "名称（工具前缀 mcp__<名称>__）",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_actual_prefix",
+    "en": "Actual prefix: %1$s",
+    "zh": "实际前缀：%1$s",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_field_url",
+    "en": "Server URL",
+    "zh": "服务器 URL",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_field_headers",
+    "en": "Headers (one Name: Value per line)",
+    "zh": "请求头（每行 Name: Value）",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "mcp_field_timeout",
+    "en": "Tool timeout (seconds, 1–600)",
+    "zh": "工具超时（秒，1–600）",
+    "where": "McpServersScreen.kt"
+  },
+  {
+    "key": "backup_section_db",
+    "en": "Chats & messages",
+    "zh": "会话与消息",
+    "where": "BackupSummary.kt"
+  },
+  {
+    "key": "backup_section_settings",
+    "en": "Settings",
+    "zh": "设置",
+    "where": "BackupSummary.kt"
+  },
+  {
+    "key": "backup_section_plugins",
+    "en": "Plugins",
+    "zh": "插件",
+    "where": "BackupSummary.kt"
+  },
+  {
+    "key": "backup_section_secrets",
+    "en": "Credentials",
+    "zh": "凭证",
+    "where": "BackupSummary.kt"
+  },
+  {
+    "key": "backup_section_attachments",
+    "en": "Attachment files",
+    "zh": "附件文件",
+    "where": "BackupSummary.kt"
+  },
+  {
+    "key": "backup_section_workspace",
+    "en": "Workspace",
+    "zh": "工作区",
+    "where": "BackupSummary.kt"
+  },
+  {
+    "key": "backup_counts_sessions",
+    "en": "%1$d chats",
+    "zh": "会话 %1$d",
+    "where": "BackupSummary.kt"
+  },
+  {
+    "key": "backup_counts_messages",
+    "en": "%1$d messages",
+    "zh": "消息 %1$d",
+    "where": "BackupSummary.kt"
+  },
+  {
+    "key": "backup_counts_plugins",
+    "en": "%1$d plugins",
+    "zh": "插件 %1$d 个",
+    "where": "BackupSummary.kt"
+  },
+  {
+    "key": "backup_counts_attachments",
+    "en": "%1$d attachments",
+    "zh": "附件 %1$d 个",
+    "where": "BackupSummary.kt"
+  },
+  {
+    "key": "backup_counts_files",
+    "en": "%1$d files",
+    "zh": "文件 %1$d 个",
+    "where": "BackupSummary.kt"
+  },
+  {
+    "key": "backup_has_secrets",
+    "en": "Includes credentials (passphrase required)",
+    "zh": "含凭证（需要口令）",
+    "where": "BackupSummary.kt"
+  },
+  {
+    "key": "backup_no_secrets",
+    "en": "No credentials",
+    "zh": "不含凭证",
+    "where": "BackupSummary.kt"
+  },
+  {
+    "key": "backup_sections_empty",
+    "en": "Empty package (no usable sections)",
+    "zh": "空包（没有可用分节）",
+    "where": "BackupSummary.kt"
+  },
+  {
+    "key": "backup_mode_replace",
+    "en": "Full restore",
+    "zh": "整机还原",
+    "where": "BackupSummary.kt"
+  },
+  {
+    "key": "backup_mode_merge",
+    "en": "Merge import",
+    "zh": "合并导入",
+    "where": "BackupSummary.kt"
+  },
+  {
+    "key": "backup_err_export_failed",
+    "en": "Backup failed",
+    "zh": "备份失败",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_err_restore_failed",
+    "en": "Restore failed",
+    "zh": "恢复失败",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_err_pick_failed",
+    "en": "Cannot read this backup package",
+    "zh": "读不出这个备份包",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_title",
+    "en": "Backup & restore",
+    "zh": "备份与恢复",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_section_export",
+    "en": "Back up now",
+    "zh": "立即备份",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_export_desc",
+    "en": "The package is a standard zip stored in the app-private backups/ folder. Packages that include credentials require a passphrase (at least %1$d characters); lose the passphrase and the credentials cannot be decrypted.",
+    "zh": "备份包是标准 zip，落在应用私有目录 backups/ 里。含凭证的包必须设口令（至少 %1$d 位），口令丢了包内凭证就解不回来。",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_last_backup",
+    "en": "Last backup: %1$s",
+    "zh": "上次备份：%1$s",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_never_backed_up",
+    "en": "Never backed up",
+    "zh": "从未备份",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_check_db_desc",
+    "en": "All chats and messages; uncheck to keep the table structure only",
+    "zh": "全部会话与消息；不勾只留表结构",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_check_settings_desc",
+    "en": "UI / chats / notifications / groups / templates (device-path keys keep local values on restore)",
+    "zh": "界面 / 会话 / 通知 / 群组 / 模板（设备路径键恢复时保留本机值）",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_check_plugins_desc",
+    "en": "Installed plugin folders and config (no apk or old version caches)",
+    "zh": "已安装插件的目录与配置（不含 apk 与旧版本缓存）",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_check_attachments_desc",
+    "en": "Chat attachments (the database stores relative paths, so they must come along)",
+    "zh": "聊天附件（库里存的是相对路径，必须一起带走）",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_check_secrets_desc",
+    "en": "Endpoint tokens / model apiKeys / MCP headers / plugin credentials, encrypted with the passphrase",
+    "zh": "端点 token / 模型 apiKey / MCP 请求头 / 插件凭证，口令加密",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_export_pass_label",
+    "en": "Passphrase for exported credentials (at least %1$d characters)",
+    "zh": "导出凭证的口令（至少 %1$d 位）",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_busy",
+    "en": "Working…",
+    "zh": "处理中…",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_create",
+    "en": "Create backup",
+    "zh": "创建备份",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_writing",
+    "en": "Writing the backup package, keep the app open",
+    "zh": "正在写入备份包，先别退出",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_export_done",
+    "en": "Backup complete: %1$s",
+    "zh": "备份完成：%1$s",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_section_existing",
+    "en": "Existing backups",
+    "zh": "已有备份",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_empty_hint",
+    "en": "No backups yet. Check the sections above and tap Create backup — the file will show up here.",
+    "zh": "还没有备份。上面勾好内容点「创建备份」，文件就会出现在这里。",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_legacy_tag",
+    "en": "Legacy package · full restore only (no section validation)",
+    "zh": "旧格式包 · 仅整机还原（无分节校验）",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_err_broken",
+    "en": "This package is corrupt: it has no manifest.json and is not a legacy layout",
+    "zh": "这个备份包已损坏：既没有 manifest.json，也不是旧格式结构",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_action_restore",
+    "en": "Restore",
+    "zh": "恢复",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_section_from_file",
+    "en": "Restore from file",
+    "zh": "从文件恢复",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_pick_title",
+    "en": "Choose backup package",
+    "zh": "选择备份包",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_pick_subtitle",
+    "en": "System file picker · .hfabak / .zip",
+    "zh": "系统文件选择器 · .hfabak / .zip",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_legacy_no_manifest_desc",
+    "en": "No manifest.json inside; restores the legacy layout over settings / database / plugins",
+    "zh": "包内没有 manifest.json，按旧版结构整机覆盖设置 / 数据库 / 插件",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_includes",
+    "en": "Contains: %1$s · package version %2$s · db version %3$d",
+    "zh": "包含：%1$s · 产包版本 %2$s · 库版本 %3$d",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_start_restore",
+    "en": "Start restore",
+    "zh": "开始恢复",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_section_done",
+    "en": "Restore complete",
+    "zh": "恢复完成",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_snapshot_created",
+    "en": "Pre-restore snapshot created automatically: %1$s",
+    "zh": "已自动创建恢复前快照：%1$s",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_restart_hint",
+    "en": "Restart the app to apply: settings and plugins reload on next launch.",
+    "zh": "重启 App 生效：设置与插件在下次启动时重新加载。",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_restart_now",
+    "en": "Restart now",
+    "zh": "立即重启",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_delete_title",
+    "en": "Delete this backup",
+    "zh": "删除这个备份",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_delete_body",
+    "en": "%1$s · %2$s — this cannot be undone.",
+    "zh": "%1$s · %2$s，删掉找不回来。",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_confirm_title_legacy",
+    "en": "Full-restore legacy package",
+    "zh": "整机还原旧格式包",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_confirm_title",
+    "en": "Restore backup",
+    "zh": "恢复备份",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_legacy_warn",
+    "en": "Legacy packages have no manifest checksum and no section selection; they overwrite settings / database / plugins wholesale.",
+    "zh": "旧格式包不含 manifest 校验，无法选择恢复内容，会整机覆盖设置 / 数据库 / 插件。",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_legacy_no_snapshot",
+    "en": "Legacy packages carry no section info and no pre-restore snapshot is taken.",
+    "zh": "旧包没有分节信息，也不会自动拍恢复前快照。",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_mode_merge_title",
+    "en": "Merge (recommended)",
+    "zh": "合并（推荐）",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_mode_merge_desc",
+    "en": "Same id overwrites, new id appends; same-name different-id chats get an “(imported)” suffix",
+    "zh": "同 id 覆盖、新 id 新增；同名不同 id 的会话加「（导入）」后缀",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_mode_replace_title",
+    "en": "Full restore",
+    "zh": "整机还原",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_mode_replace_desc",
+    "en": "Clears chats / messages / settings / plugins first, then unpacks everything; takes a pre-restore snapshot automatically",
+    "zh": "先清空会话 / 消息 / 设置 / 插件再整包落地，会自动先拍一个恢复前快照",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_needs_pass",
+    "en": "This package contains credentials; enter the passphrase used when exporting",
+    "zh": "这个包含凭证，必须输入导出时的口令",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_pass_label",
+    "en": "Passphrase",
+    "zh": "口令",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_restoring",
+    "en": "Restoring…",
+    "zh": "恢复中…",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_action_start",
+    "en": "Start",
+    "zh": "开始",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "backup_err_open_failed",
+    "en": "Cannot open this file",
+    "zh": "打不开这个文件",
+    "where": "BackupRestoreScreen.kt"
+  },
+  {
+    "key": "plugins_no_settings",
+    "en": "This plugin has no settings",
+    "zh": "该插件没有设置项",
+    "where": "PluginSettingsModel.kt"
+  },
+  {
+    "key": "plugins_no_settings_hint",
+    "en": "Declare fields in the plugin's plugin.json (or dsh.mobile.config in package.json) and they become a form here. Plugins without declarations can still add key/value pairs below — read them with ctx.config.get.",
+    "zh": "插件在 plugin.json（或 package.json 的 dsh.mobile.config）里声明字段后这里就是表单；没声明的也能在下面自己加键值，插件用 ctx.config.get 读到。",
+    "where": "PluginSettingsModel.kt"
+  },
+  {
+    "key": "plugins_settings_count",
+    "en": "%1$d settings",
+    "zh": "共 %1$d 项设置",
+    "where": "PluginSettingsModel.kt"
+  },
+  {
+    "key": "plugins_has_own_ui",
+    "en": "Plugin provides its own settings UI",
+    "zh": "插件自带设置界面",
+    "where": "PluginSettingsModel.kt"
+  },
+  {
+    "key": "plugins_row_enabled",
+    "en": "Enabled",
+    "zh": "已启用",
+    "where": "PluginHubRows.kt"
+  },
+  {
+    "key": "plugins_row_disabled",
+    "en": "Disabled",
+    "zh": "已停用",
+    "where": "PluginHubRows.kt"
+  },
+  {
+    "key": "plugins_row_load_failed",
+    "en": "Load failed",
+    "zh": "加载失败",
+    "where": "PluginHubRows.kt"
+  },
+  {
+    "key": "plugins_schema_unsupported",
+    "en": "Unsupported setting type %1$s — shown as a hint row",
+    "zh": "不支持的设置类型 %1$s，已按说明行显示",
+    "where": "PluginSettingsSchema.kt"
+  },
+  {
+    "key": "skill_remove_confirm_bundled",
+    "en": "Remove “%1$s”? It ships with the app and is restored on next launch.",
+    "zh": "确认移除「%1$s」？它是随包内置技能，下次启动会重新铺回。",
+    "where": "SkillCatalog.kt"
+  },
+  {
+    "key": "skill_remove_confirm",
+    "en": "Remove “%1$s”? Its folder and enabled state are deleted; reinstall it to use it again.",
+    "zh": "确认移除「%1$s」？它的目录与启用状态会一起删掉，删了要重装才能用。",
+    "where": "SkillCatalog.kt"
+  },
+  {
+    "key": "skill_remove_failed",
+    "en": "Remove failed: %1$s",
+    "zh": "移除失败：%1$s",
+    "where": "SkillCatalog.kt"
+  },
+  {
+    "key": "skill_remove_failed_fallback",
+    "en": "Remove failed: the engine rejected this removal",
+    "zh": "移除失败：引擎拒绝了这次移除",
+    "where": "SkillCatalog.kt"
+  },
+  {
+    "key": "skill_removed",
+    "en": "Removed %1$s",
+    "zh": "已移除 %1$s",
+    "where": "SkillCatalog.kt"
+  },
+  {
+    "key": "backup_schedule_title",
+    "en": "Scheduled backups",
+    "zh": "定时自动备份",
+    "where": "BackupScheduleCard.kt"
+  },
+  {
+    "key": "backup_schedule_desc",
+    "en": "Defaults to 05:00; add more times as needed. Missed runs happen on next launch.",
+    "zh": "默认 05:00，可以加多个时间点；没运行就下次启动补做",
+    "where": "BackupScheduleCard.kt"
+  },
+  {
+    "key": "backup_schedule_add",
+    "en": "+ Add time",
+    "zh": "＋ 添加时间",
+    "where": "BackupScheduleCard.kt"
+  },
+  {
+    "key": "backup_schedule_add_title",
+    "en": "Add backup time",
+    "zh": "添加备份时间",
+    "where": "BackupScheduleCard.kt"
+  },
+  {
+    "key": "backup_schedule_add_action",
+    "en": "Add",
+    "zh": "添加",
+    "where": "BackupScheduleCard.kt"
+  },
+  {
+    "key": "market_err_read_file",
+    "en": "Could not read the selected file",
+    "zh": "读不到所选文件",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_err_empty_file",
+    "en": "The file is empty",
+    "zh": "文件是空的",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_kind_data",
+    "en": "data plugin",
+    "zh": "数据插件",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_kind_apk",
+    "en": "APK plugin",
+    "zh": "APK 插件",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_done_wrapped",
+    "en": "%1$s %2$s (%3$s)",
+    "zh": "%1$s %2$s（%3$s）",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_done_data",
+    "en": "%1$s %2$s (data plugin)",
+    "zh": "%1$s %2$s（数据插件）",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_done_name_data",
+    "en": "%1$s (data plugin)",
+    "zh": "%1$s（数据插件）",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_installed_hot",
+    "en": "Installed %1$s, hot-reloaded",
+    "zh": "已安装 %1$s，已热加载",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_install_failed",
+    "en": "Install failed: %1$s",
+    "zh": "安装失败：%1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_search_hint",
+    "en": "Search name / description / npm package",
+    "zh": "搜索插件名 / 描述 / npm 包",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_loading_fetch",
+    "en": "Fetching…",
+    "zh": "拉取中…",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_loading_more",
+    "en": "loading more sources…",
+    "zh": "补源中…",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_sort_prefix",
+    "en": "Sort: %1$s",
+    "zh": "排序：%1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_sort_asc",
+    "en": "Ascending ↑",
+    "zh": "升序 ↑",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_sort_desc",
+    "en": "Descending ↓",
+    "zh": "降序 ↓",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_github_title",
+    "en": "Import plugin from GitHub",
+    "zh": "从 GitHub 导入插件",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_github_repo_label",
+    "en": "Repository link",
+    "zh": "仓库链接",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_github_hint",
+    "en": "The repo needs a plugin.json, a package.json or a ready-made .zip plugin bundle (old .apk bundles work too); main is tried first, then master.",
+    "zh": "仓库里有 plugin.json、package.json 或现成的 .zip 插件包即可（旧的 .apk 插件包也收）；先试 main，再试 master。",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_import_failed",
+    "en": "Import failed: %1$s",
+    "zh": "导入失败：%1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_github_install",
+    "en": "Fetch and install",
+    "zh": "拉取安装",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_npm_done",
+    "en": "%1$s (npm package%2$s)",
+    "zh": "%1$s（npm 包%2$s）",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_npm_deps",
+    "en": ", %1$d dependencies",
+    "zh": "，依赖 %1$d 个",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_source_direct",
+    "en": "direct link",
+    "zh": "直链",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_no_source",
+    "en": "This entry has no installable source registered",
+    "zh": "这个条目没有登记任何可安装的来源",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_hint_command",
+    "en": "; the author's install command is %1$s",
+    "zh": "；作者给的安装命令是 %1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_hint_detail",
+    "en": "; open \"GitHub details\" to see how the project is installed",
+    "zh": "；点「GitHub 详情」去项目主页看看它怎么装",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_fail_line",
+    "en": "%1$s: %2$s",
+    "zh": "%1$s：%2$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_failed_word",
+    "en": "failed",
+    "zh": "失败",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_backup_title",
+    "en": "Backup and rollback",
+    "zh": "备份与回档",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_backup_subtitle",
+    "en": "Auto-backup before installing plugins, rollback available",
+    "zh": "装插件前自动备份，可回档",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_backup_desc",
+    "en": "A backup is taken once before installing plugins; consecutive installs share one, so rolling back returns to the moment none of this batch was installed. Scheduled backup defaults to 05:00 and is caught up on the next launch if missed.",
+    "zh": "装插件前自动备份一次；连续安装只备份一次，回档就回到这批插件都还没装的那一刻。定时备份默认 05:00，没赶上会在下次启动时补做。",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_backup_done",
+    "en": "Backed up %1$s",
+    "zh": "已备份 %1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_backup_failed",
+    "en": "Backup failed",
+    "zh": "备份失败",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_backup_now",
+    "en": "Back up now",
+    "zh": "立即备份",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_backup_batch_closed",
+    "en": "This install batch is closed; the next install backs up again",
+    "zh": "已结束本批安装，下次安装会重新备份",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_backup_close_batch",
+    "en": "End batch",
+    "zh": "结束本批",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_backup_restored",
+    "en": "Rolled back, restart the app to apply",
+    "zh": "已回档，重启 App 生效",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_backup_restore_failed",
+    "en": "Rollback failed",
+    "zh": "回档失败",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_backup_restore",
+    "en": "Roll back",
+    "zh": "回档",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_backup_deleted",
+    "en": "Snapshot deleted",
+    "zh": "已删除这个存档",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_backup_delete_failed",
+    "en": "Delete failed",
+    "zh": "删除失败",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_sources_title",
+    "en": "Plugin sources",
+    "zh": "插件源",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_source_count",
+    "en": " · %1$d entries",
+    "zh": " · %1$d 条",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_source_failed",
+    "en": " · failed",
+    "zh": " · 失败",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_source_error",
+    "en": " (%1$s)",
+    "zh": "（%1$s）",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_cache_stale",
+    "en": "Not refreshed yet; showing the cache of the last successful index.",
+    "zh": "还没刷新，当前展示上次成功索引的缓存。",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_offline_builtin",
+    "en": "Offline or all sources unreachable; showing the built-in catalogue.",
+    "zh": "离线或全部源不可达，当前展示内置目录。",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_refreshing",
+    "en": "Loading more sources…",
+    "zh": "正在补源…",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_total",
+    "en": "%1$d installable plugins",
+    "zh": "共 %1$d 个可装插件",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_refresh_again",
+    "en": "Fetch again",
+    "zh": "重新拉取",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_busy_installing",
+    "en": "Installing…",
+    "zh": "安装中…",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_install_from_file",
+    "en": "Install from file",
+    "zh": "文件安装",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_install_from_link",
+    "en": "Install from link",
+    "zh": "链接安装",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_counts",
+    "en": "%1$d sources · %2$d plugins",
+    "zh": "%1$d 个源 · %2$d 个插件",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_via_archive",
+    "en": "direct archive",
+    "zh": "直链归档",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_via_repo",
+    "en": "GitHub repository",
+    "zh": "GitHub 仓库",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_via_command",
+    "en": "command only",
+    "zh": "仅命令",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_join_sep",
+    "en": " · ",
+    "zh": " · ",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_downloads",
+    "en": "%1$d downloads",
+    "zh": "%1$d 次下载",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_github_detail",
+    "en": "GitHub details",
+    "zh": "GitHub 详情",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_busy_downloading",
+    "en": "Downloading…",
+    "zh": "下载中…",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_install_action",
+    "en": "Install plugin",
+    "zh": "安装插件",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_copy_command",
+    "en": "Copy command",
+    "zh": "复制命令",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_sort_downloads",
+    "en": "Downloads",
+    "zh": "下载量",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_sort_stars",
+    "en": "Stars",
+    "zh": "星标",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "market_sort_name",
+    "en": "Name",
+    "zh": "名称",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_err_installer_not_ready",
+    "en": "Installer is not ready",
+    "zh": "安装器未就绪",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_err_link_unreadable",
+    "en": "Cannot parse the link: %1$s\nSupports https://github.com/owner/repo, owner/repo, github.com/owner/repo/tree/branch, or a direct .zip URL",
+    "zh": "链接看不懂：%1$s\n支持 https://github.com/owner/repo、owner/repo、github.com/owner/repo/tree/分支，或直接的 .zip 包地址",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_err_repo_fetch",
+    "en": "Cannot fetch repository %1$s: %2$s",
+    "zh": "拉不到仓库 %1$s：%2$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_err_branch_missing",
+    "en": "neither main nor master exists",
+    "zh": "main / master 都不存在",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_done_js",
+    "en": "%1$s (JS plugin)",
+    "zh": "%1$s（JS 插件）",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_done_zip",
+    "en": "%1$s %2$s (zip plugin bundle)",
+    "zh": "%1$s %2$s（zip 插件包）",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_done_apk",
+    "en": "%1$s %2$s (APK plugin)",
+    "zh": "%1$s %2$s（APK 插件）",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_err_no_manifest",
+    "en": "The repository has no plugin.json, package.json, .zip or .apk; cannot tell what kind of plugin it is",
+    "zh": "仓库里没有 plugin.json、package.json、.zip 或 .apk，认不出这是插件仓库",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_err_loader_not_ready",
+    "en": "Plugin loader is not ready",
+    "zh": "插件加载器未就绪",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_download_label",
+    "en": "plugin package %1$s",
+    "zh": "插件包 %1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_err_unreadable_zip",
+    "en": "Cannot read the package: %1$s",
+    "zh": "包读不出来：%1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_err_illegal_entry",
+    "en": "The archive contains an illegal path: %1$s",
+    "zh": "压缩包里有非法路径：%1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_err_too_many",
+    "en": "Too many archive entries (limit %1$d)",
+    "zh": "压缩包条目太多（上限 %1$d 个）",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_err_entry_too_large",
+    "en": "A single file is too large: %1$s",
+    "zh": "单个文件太大：%1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_err_total_too_large",
+    "en": "Unpacked size exceeds %1$d MB",
+    "zh": "解压后总大小超过 %1$d MB",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_err_corrupt",
+    "en": "Cannot read the archive: %1$s",
+    "zh": "压缩包读不出来：%1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_err_bad_link",
+    "en": "Cannot parse the link: %1$s; supports https://github.com/owner/repo, owner/repo, github.com/owner/repo/tree/branch, or a direct zip URL",
+    "zh": "链接看不懂：%1$s；支持 https://github.com/owner/repo、owner/repo、github.com/owner/repo/tree/分支，或 zip 直链",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_err_download",
+    "en": "Download failed: %1$s",
+    "zh": "下载失败：%1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_err_empty_archive",
+    "en": "The downloaded package is empty",
+    "zh": "下载到的包是空的",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_err_no_manifest",
+    "en": "The archive has no SKILL.md: a skill repository needs SKILL.md (root or any subdirectory)",
+    "zh": "压缩包里没有 SKILL.md：技能仓库里要有 SKILL.md（根目录或子目录都行）",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_install_title",
+    "en": "Install skill",
+    "zh": "安装技能",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_toggle_failed",
+    "en": "Toggle failed: %1$s",
+    "zh": "切换失败：%1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_toggle_rejected",
+    "en": "The engine rejected this change",
+    "zh": "引擎拒绝了这次改动",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_no_runtime",
+    "en": "This build has no bundled Node runtime, so skills cannot be installed",
+    "zh": "这个构建未内置 Node 运行时，装不了技能",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_install_rejected",
+    "en": "The skill manager rejected this install",
+    "zh": "技能管理器拒绝了这次安装",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_installed",
+    "en": "Skill installed",
+    "zh": "技能已安装",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_no_libnode_title",
+    "en": "No bundled Node runtime",
+    "zh": "未内置 Node 运行时",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_no_libnode_body",
+    "en": "This build does not bundle libnode, so the skill list is unavailable",
+    "zh": "这个构建里没有打包 libnode，技能列表读不到",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_empty_title",
+    "en": "No skills installed yet",
+    "zh": "还没有安装任何技能",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_empty_body",
+    "en": "Tap + at the top right and paste a GitHub repo or a direct zip link containing SKILL.md",
+    "zh": "点右上角「+」，贴一个含 SKILL.md 的 GitHub 仓库或 zip 直链就能直接装",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_section",
+    "en": "Skills",
+    "zh": "技能",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_repo_label",
+    "en": "Repo / link",
+    "zh": "仓库 / 链接",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_repo_hint",
+    "en": "Accepts a GitHub repo containing SKILL.md, owner/repo, or a direct zip link; takes effect immediately",
+    "zh": "支持含 SKILL.md 的 GitHub 仓库、owner/repo，或 zip 直链；装完即时生效。",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_remove_title",
+    "en": "Remove skill",
+    "zh": "移除技能",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_remove_desc",
+    "en": "Remove %1$s",
+    "zh": "移除 %1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_list_failed",
+    "en": "Failed to load the skill list",
+    "zh": "技能列表读取失败",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "skill_engine_starting",
+    "en": "Starting the Node engine…",
+    "zh": "正在启动 Node 引擎…",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_removed_persist_hint",
+    "en": "Removed plugins do not come back automatically; reinstalling the same APK restores them.",
+    "zh": "被移除过的插件不会自动回来；重装同一个 APK 即恢复。",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_group_installed",
+    "en": "Installed plugins",
+    "zh": "已安装插件",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_none",
+    "en": "No plugins",
+    "zh": "没有插件",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_none_hint",
+    "en": "① Install a plugin APK on the system; it is picked up on return\n② Use “Plugin market → Install from file” to pick an APK",
+    "zh": "① 系统里直接装插件 APK，装完回来自动认\n② 「插件市场 → 从文件安装」挑一个 APK",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_rescan",
+    "en": "Rescan installed plugins",
+    "zh": "重新扫描已安装插件",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_rescan_short",
+    "en": "↻ Rescan",
+    "zh": "↻ 重扫",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_group_diag",
+    "en": "Load diagnostics",
+    "zh": "加载诊断",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_source_system",
+    "en": "system install",
+    "zh": "系统安装",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_source_import",
+    "en": "imported in app",
+    "zh": "App 内导入",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_diag_source",
+    "en": "（%1$s）",
+    "zh": "（%1$s）",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_diag_error",
+    "en": "：%1$s",
+    "zh": "：%1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_footer",
+    "en": "Plugins load and render inside their own try/catch: a failed registration only disables that plugin, and a render crash shows a fallback card. HTML/JS plugins work through “data/API adapter + native renderer registration”.",
+    "zh": "插件在独立 try/catch 中加载与渲染：注册失败只禁用该插件，渲染异常显示降级卡片。HTML/JS 型插件通过“数据/API 适配 + 原生渲染器注册”兼容。",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_title",
+    "en": "Plugins",
+    "zh": "插件",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_remove_title",
+    "en": "Remove plugin?",
+    "zh": "移除插件？",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_remove_body",
+    "en": "“%1$s” will be removed from the app and no longer loaded. If the plugin is installed system-wide as an APK, uninstall that app in system settings.",
+    "zh": "「%1$s」将从 App 中移除，之后不再加载。若插件是以 APK 形式装在系统里的，请到系统设置里卸载那个 App。",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_removed",
+    "en": "Removed %1$s",
+    "zh": "已移除 %1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_remove_failed",
+    "en": "Remove failed: %1$s",
+    "zh": "移除失败：%1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_uninstall_desc",
+    "en": "Uninstall",
+    "zh": "卸载",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_load_failed",
+    "en": "Load failed: %1$s",
+    "zh": "加载失败：%1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_reason_unknown",
+    "en": "unknown reason",
+    "zh": "原因未知",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_load_error",
+    "en": "Load error: %1$s",
+    "zh": "加载错误：%1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_slots_registered",
+    "en": "Slots registered: %1$d",
+    "zh": "槽位已注册：%1$d 项",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_open_page",
+    "en": "Open page",
+    "zh": "打开页面",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_set_ui_broken",
+    "en": "The plugin code failed to load; only the declarative part remains below. Check the plugin directory or reinstall the plugin.",
+    "zh": "插件代码没能加载，下面只剩声明式部分。检查插件目录或重新安装该插件。",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_set_group",
+    "en": "Settings",
+    "zh": "设置项",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_set_reset_missing",
+    "en": "Settings entry to reset not found: %1$s",
+    "zh": "找不到要重置的设置项：%1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_set_reset_done",
+    "en": "Reset to default",
+    "zh": "已重置为默认",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_set_row_failed",
+    "en": "This row could not be rendered: %1$s",
+    "zh": "这一项没能画出来：%1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_set_row_failed_hint",
+    "en": "The host does not recognize the declared type, or the data is broken; other settings are unaffected",
+    "zh": "插件声明的类型宿主认不出或数据坏了，其余设置不受影响",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_set_ui_section",
+    "en": "Plugin UI",
+    "zh": "插件界面",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_set_open_browser",
+    "en": "Open in browser",
+    "zh": "在浏览器打开",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_set_reset_hint_on",
+    "en": "Writes back the default: %1$s",
+    "zh": "写回默认值：%1$s",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_set_reset_hint_off",
+    "en": "%1$s not found, cannot reset",
+    "zh": "找不到 %1$s，无法重置",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_set_not_set",
+    "en": "Not set",
+    "zh": "未设置",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_set_custom_group",
+    "en": "Custom config",
+    "zh": "自定义配置",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_set_key_hint",
+    "en": "Key, e.g. apiKey",
+    "zh": "键名，例如 apiKey",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_set_value_hint",
+    "en": "Value",
+    "zh": "值",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_set_add",
+    "en": "Add entry",
+    "zh": "添加配置项",
+    "where": "feature/plugins"
   }
 ]

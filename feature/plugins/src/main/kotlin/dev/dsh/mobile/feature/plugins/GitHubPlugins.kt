@@ -1,6 +1,7 @@
 package dev.dsh.mobile.feature.plugins
 
 import dev.dsh.mobile.core.common.RuntimeMirrors
+import dev.dsh.mobile.design.R
 import dev.dsh.mobile.core.common.archive.ZipExtract
 import dev.dsh.mobile.core.common.download.DownloadCache
 import dev.dsh.mobile.core.common.download.Downloads
@@ -80,10 +81,10 @@ object GitHubPlugins {
         externalStore: ExternalPluginStore?,
         cacheDir: File,
         input: String,
+        copy: (Int, List<Any>) -> String,
     ): String {
         val repo = parse(input) ?: guess(input) ?: error(
-            "链接看不懂：" + input.take(80) + "\n支持 https://github.com/owner/repo、owner/repo、" +
-                "github.com/owner/repo/tree/分支，或直接的 .zip 包地址",
+            copy(R.string.plugins_err_link_unreadable, listOf(input.take(80))),
         )
         val stamp = System.currentTimeMillis()
         val archive = File(cacheDir, "gh-$stamp.zip")
@@ -102,22 +103,27 @@ object GitHubPlugins {
         }
         if (branch.isEmpty()) {
             archive.delete()
-            error("拉不到仓库 " + repo.owner + "/" + repo.name + "：" + (last?.message ?: "main / master 都不存在"))
+            error(
+                copy(
+                    R.string.plugins_err_repo_fetch,
+                    listOf(repo.owner + "/" + repo.name, last?.message ?: copy(R.string.plugins_err_branch_missing, emptyList())),
+                ),
+            )
         }
         try {
-            val entries = scan(archive)
+            val entries = scan(archive, copy)
             val manifest = entries
                 .filter { it == "plugin.json" || it.endsWith("/plugin.json") }
                 .minByOrNull { it.count { ch -> ch == '/' } }
             if (manifest != null) {
-                val target = installer ?: error("安装器未就绪")
+                val target = installer ?: error(copy(R.string.plugins_err_installer_not_ready, emptyList()))
                 val staged = File(cacheDir, "gh-stage-$stamp.zip")
                 val prefix = manifest.removeSuffix("plugin.json")
                 repackage(archive, prefix, staged)
                 val installed = target.installZip(staged).getOrElse { staged.delete(); throw it }
-                return installed.name + "（数据插件）"
+                return copy(R.string.market_done_data, listOf(installed.name, installed.version))
             }
-            val target = installer ?: error("安装器未就绪")
+            val target = installer ?: error(copy(R.string.plugins_err_installer_not_ready, emptyList()))
             val pkgJson = entries
                 .filter { it == "package.json" || it.endsWith("/package.json") }
                 .minByOrNull { it.count { ch -> ch == '/' } }
@@ -125,7 +131,7 @@ object GitHubPlugins {
                 val staged = File(cacheDir, "gh-stage-$stamp.zip")
                 repackage(archive, pkgJson.removeSuffix("package.json"), staged)
                 val installed = target.installZip(staged).getOrElse { staged.delete(); throw it }
-                return installed.name + "（JS 插件）"
+                return installed.name + copy(R.string.plugins_done_js, emptyList())
             }
             // 仓库里直接放的 zip 插件包：正常分发格式，raw 下载后原样解包。
             val zipEntry = entries
@@ -136,19 +142,19 @@ object GitHubPlugins {
                 val raw = "https://raw.githubusercontent.com/" + repo.owner + "/" + repo.name + "/" + branch + "/" + zipEntry
                 download(raw, file, cacheDir)
                 val installed = target.installArchive(file).getOrElse { file.delete(); throw it }
-                return installed.name + " " + installed.version + "（zip 插件包）"
+                return installed.name + " " + installed.version + copy(R.string.plugins_done_zip, emptyList())
             }
             // 老分发格式兜底：仓库里只有 .apk 整包。仍按内容分流，装得上就不算变砖。
             val apk = entries
                 .filter { it.endsWith(".apk", ignoreCase = true) }
                 .minByOrNull { it.count { ch -> ch == '/' } }
-                ?: error("仓库里没有 plugin.json、package.json、.zip 或 .apk，认不出这是插件仓库")
-            val store = externalStore ?: error("插件加载器未就绪")
+                ?: error(copy(R.string.plugins_err_no_manifest, emptyList()))
+            val store = externalStore ?: error(copy(R.string.plugins_err_loader_not_ready, emptyList()))
             val file = File(cacheDir, "gh-$stamp.apk")
             val raw = "https://raw.githubusercontent.com/" + repo.owner + "/" + repo.name + "/" + branch + "/" + apk
             download(raw, file, cacheDir)
             val entry = store.installPackage(file).getOrElse { file.delete(); throw it }
-            return entry.name + " " + entry.version + "（APK 插件）"
+            return entry.name + " " + entry.version + copy(R.string.plugins_done_apk, emptyList())
         } finally {
             archive.delete()
         }
@@ -161,15 +167,15 @@ object GitHubPlugins {
             target = out,
             cache = DownloadCache(File(cacheDir, "dl-cache")),
             maxBytes = MAX_BYTES,
-            label = "插件包 " + url,
+            label = url,
             connectTimeoutMs = 15_000,
             readTimeoutMs = 60_000,
         )
     }
 
-    private fun scan(zip: File): List<String> = runCatching {
+    private fun scan(zip: File, copy: (Int, List<Any>) -> String): List<String> = runCatching {
         ZipExtract.names(zip, ZipExtract.Options.pathOnly(MAX_ENTRIES))
-    }.getOrElse { error("包读不出来：" + it.message) }
+    }.getOrElse { error(copy(R.string.plugins_err_unreadable_zip, listOf(it.message ?: it::class.java.simpleName))) }
 
     /** 把 prefix 目录下的文件提到 zip 根，喂给只认「根 plugin.json」的安装器。 */
     private fun repackage(src: File, prefix: String, out: File) {

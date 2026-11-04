@@ -1,5 +1,6 @@
 package dev.dsh.mobile.feature.settings
 
+import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.core.data.backup.BackupManifest
 import dev.dsh.mobile.core.data.backup.BackupSections
 import dev.dsh.mobile.core.data.backup.Counts
@@ -19,6 +20,9 @@ import java.util.zip.ZipOutputStream
 /** 备份页文案纯函数的单测：这些字符串直接上屏，错一个字就是用户看不懂状态。 */
 class BackupSummaryTest {
 
+    /** 假资源：把 id 与参数原样拼出来，断言只验接线，不锁具体文案。 */
+    private val copy: CopyResolver = { id, args -> "res:" + id + ":" + args.joinToString(",") }
+
     private fun manifest(
         sections: List<SectionInfo> = listOf(SectionInfo(BackupSections.DB, true, 1, 10L)),
         counts: Counts = Counts(sessions = 2, messages = 30),
@@ -36,17 +40,17 @@ class BackupSummaryTest {
 
     @Test
     fun sectionLabel_coversEveryKnownSection() {
-        assertEquals("会话与消息", sectionLabel(BackupSections.DB))
-        assertEquals("设置", sectionLabel(BackupSections.SETTINGS))
-        assertEquals("插件", sectionLabel(BackupSections.PLUGINS))
-        assertEquals("凭证", sectionLabel(BackupSections.SECRETS))
-        assertEquals("附件文件", sectionLabel(BackupSections.ATTACHMENTS))
-        assertEquals("工作区", sectionLabel(BackupSections.WORKSPACE))
+        assertEquals(copy(DesignR.string.backup_section_db, emptyList()), sectionLabel(BackupSections.DB, copy))
+        assertEquals(copy(DesignR.string.backup_section_settings, emptyList()), sectionLabel(BackupSections.SETTINGS, copy))
+        assertEquals(copy(DesignR.string.backup_section_plugins, emptyList()), sectionLabel(BackupSections.PLUGINS, copy))
+        assertEquals(copy(DesignR.string.backup_section_secrets, emptyList()), sectionLabel(BackupSections.SECRETS, copy))
+        assertEquals(copy(DesignR.string.backup_section_attachments, emptyList()), sectionLabel(BackupSections.ATTACHMENTS, copy))
+        assertEquals(copy(DesignR.string.backup_section_workspace, emptyList()), sectionLabel(BackupSections.WORKSPACE, copy))
     }
 
     @Test
     fun sectionLabel_fallsBackToRawId() {
-        assertEquals("future", sectionLabel("future"))
+        assertEquals("future", sectionLabel("future", copy))
     }
 
     @Test
@@ -68,22 +72,22 @@ class BackupSummaryTest {
     @Test
     fun countsSummary_mentionsSecretsAndSkipsZeroCounts() {
         val plain = manifest(counts = Counts(sessions = 3, messages = 12))
-        assertEquals("会话 3 · 消息 12 · 不含凭证", countsSummary(plain))
+        assertEquals(copy(DesignR.string.backup_counts_sessions, listOf(3)) + " · " + copy(DesignR.string.backup_counts_messages, listOf(12)) + " · " + copy(DesignR.string.backup_no_secrets, emptyList()), countsSummary(plain, copy))
 
         val rich = manifest(
             counts = Counts(sessions = 3, messages = 12, plugins = 2, attachments = 5),
             secrets = SecretsInfo(saltB64 = "c2FsdA==", ivB64 = "aXY="),
         )
-        assertEquals("会话 3 · 消息 12 · 插件 2 个 · 附件 5 个 · 含凭证（需要口令）", countsSummary(rich))
+        assertEquals(copy(DesignR.string.backup_counts_sessions, listOf(3)) + " · " + copy(DesignR.string.backup_counts_messages, listOf(12)) + " · " + copy(DesignR.string.backup_counts_plugins, listOf(2)) + " · " + copy(DesignR.string.backup_counts_attachments, listOf(5)) + " · " + copy(DesignR.string.backup_has_secrets, emptyList()), countsSummary(rich, copy))
     }
 
     @Test
     fun sectionsSummary_readsAsSlashListOrEmpty() {
         assertEquals(
-            "会话与消息 / 设置",
-            sectionsSummary(manifest(sections = listOf(SectionInfo(BackupSections.DB), SectionInfo(BackupSections.SETTINGS)))),
+            copy(DesignR.string.backup_section_db, emptyList()) + " / " + copy(DesignR.string.backup_section_settings, emptyList()),
+            sectionsSummary(manifest(sections = listOf(SectionInfo(BackupSections.DB), SectionInfo(BackupSections.SETTINGS))), copy),
         )
-        assertEquals("空包（没有可用分节）", sectionsSummary(manifest(sections = emptyList())))
+        assertEquals(copy(DesignR.string.backup_sections_empty, emptyList()), sectionsSummary(manifest(sections = emptyList()), copy))
     }
 
     @Test
@@ -106,7 +110,7 @@ class BackupSummaryTest {
             files = 0,
             warnings = emptyList(),
         )
-        assertEquals("合并导入 · 会话 1 · 消息 8", reportSummary(merge))
+        assertEquals(copy(DesignR.string.backup_mode_merge, emptyList()) + " · " + copy(DesignR.string.backup_counts_sessions, listOf(1)) + " · " + copy(DesignR.string.backup_counts_messages, listOf(8)), reportSummary(merge, copy))
 
         val replace = RestoreEngine.Report(
             mode = RestoreEngine.Mode.Replace,
@@ -116,7 +120,7 @@ class BackupSummaryTest {
             files = 9,
             warnings = listOf("w"),
         )
-        assertEquals("整机还原 · 会话 4 · 消息 40 · 插件 2 个 · 文件 9 个", reportSummary(replace))
+        assertEquals(copy(DesignR.string.backup_mode_replace, emptyList()) + " · " + copy(DesignR.string.backup_counts_sessions, listOf(4)) + " · " + copy(DesignR.string.backup_counts_messages, listOf(40)) + " · " + copy(DesignR.string.backup_counts_plugins, listOf(2)) + " · " + copy(DesignR.string.backup_counts_files, listOf(9)), reportSummary(replace, copy))
     }
 
     @Test

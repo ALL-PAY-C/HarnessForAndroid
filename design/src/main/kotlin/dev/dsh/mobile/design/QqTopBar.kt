@@ -1,6 +1,7 @@
 package dev.dsh.mobile.design
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -45,7 +46,7 @@ fun QqScreenTopBar(
     val icon = navigationIcon ?: if (isBack) Icons.AutoMirrored.Filled.ArrowBack else Icons.Filled.Menu
     QqTopBar(
         leading = {
-            IconBtn(icon, navigationDescription ?: if (isBack) "返回" else "菜单", onNavigationClick)
+            IconBtn(icon, navigationDescription ?: if (isBack) stringResource(R.string.common_back) else stringResource(R.string.common_menu), onNavigationClick)
         },
         trailing = actions,
     ) {

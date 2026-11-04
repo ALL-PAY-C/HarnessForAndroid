@@ -1,6 +1,7 @@
 package dev.dsh.mobile.design
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -96,7 +97,7 @@ fun CollapsibleSection(
             }
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                if (expanded) "收起" else "展开",
+                if (expanded) stringResource(R.string.common_collapse) else stringResource(R.string.common_expand),
                 tint = p.t3,
                 modifier = Modifier.size(20.dp).rotate(arrow),
             )

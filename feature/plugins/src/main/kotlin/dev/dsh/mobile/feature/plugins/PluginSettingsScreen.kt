@@ -1,6 +1,9 @@
 package dev.dsh.mobile.feature.plugins
 
 import androidx.compose.foundation.background
+import dev.dsh.mobile.design.R as DesignR
+import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.text
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -87,7 +90,7 @@ internal fun PluginSettingsDetail(
                     Text(failure, color = p.accent2, fontSize = MaterialTheme.typography.bodyMedium.fontSize, fontWeight = FontWeight.Medium)
                     Spacer(Modifier.height(3.dp))
                     Text(
-                        "插件代码没能加载，下面只剩声明式部分。检查插件目录或重新安装该插件。",
+                        stringResource(DesignR.string.plugins_set_ui_broken),
                         color = p.t3,
                         fontSize = MaterialTheme.typography.bodySmall.fontSize,
                     )
@@ -100,7 +103,7 @@ internal fun PluginSettingsDetail(
         if (!entry.schema.isEmpty) {
             GroupFrame {
                 GroupHeader(
-                    label = "设置项",
+                    label = stringResource(DesignR.string.plugins_set_group),
                     count = entry.schema.items.count { it !is SettingItem.Section },
                     collapsible = false,
                 )
@@ -117,7 +120,7 @@ internal fun PluginSettingsDetail(
                                     if (fallback == null) {
                                         Toast.makeText(
                                             context,
-                                            "找不到要重置的设置项：" + action.target,
+                                            context.getString(DesignR.string.plugins_set_reset_missing, action.target),
                                             Toast.LENGTH_SHORT,
                                         ).show()
                                     } else {
@@ -125,15 +128,19 @@ internal fun PluginSettingsDetail(
                                         overrides = overrides + (action.target to fallback)
                                         resetTick++
                                         onSave(action.target, fallback)
-                                        Toast.makeText(context, "已重置为默认", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(DesignR.string.plugins_set_reset_done),
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
                                     }
                                 },
                             )
                         }
                         if (rendered.isFailure) {
                             InlineNote(
-                                "这一项没能画出来：" + item.key,
-                                "插件声明的类型宿主认不出或数据坏了，其余设置不受影响",
+                                stringResource(DesignR.string.plugins_set_row_failed, item.key),
+                                stringResource(DesignR.string.plugins_set_row_failed_hint),
                             )
                         }
                     }
@@ -145,7 +152,7 @@ internal fun PluginSettingsDetail(
 
         if (page != null && entry.hasPage) {
             Text(
-                "插件界面",
+                stringResource(DesignR.string.plugins_set_ui_section),
                 color = p.t3,
                 fontSize = MaterialTheme.typography.bodySmall.fontSize,
                 modifier = Modifier.padding(start = 4.dp),
@@ -162,7 +169,7 @@ internal fun PluginSettingsDetail(
             GroupFrame {
                 GroupChild(onClick = { onOpenUrl(url) }) {
                     Text(
-                        "在浏览器打开",
+                        stringResource(DesignR.string.plugins_set_open_browser),
                         color = p.t1,
                         fontSize = MaterialTheme.typography.bodyLarge.fontSize,
                         modifier = Modifier.weight(1f),
@@ -175,9 +182,9 @@ internal fun PluginSettingsDetail(
         entry.emptyText?.let { empty ->
             GroupFrame {
                 Column(Modifier.padding(horizontal = 13.dp, vertical = 14.dp)) {
-                    Text(empty, color = p.t2, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
+                    Text(empty.text(), color = p.t2, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
                     Spacer(Modifier.height(4.dp))
-                    Text(NO_SETTINGS_HINT, color = p.t3, fontSize = MaterialTheme.typography.bodySmall.fontSize)
+                    Text(NO_SETTINGS_HINT.text(), color = p.t3, fontSize = MaterialTheme.typography.bodySmall.fontSize)
                 }
             }
         }
@@ -231,7 +238,10 @@ private fun ActionRow(action: ConfigAction, onReset: () -> Unit) {
                 fontSize = MaterialTheme.typography.bodyLarge.fontSize,
             )
             Text(
-                if (enabled) "写回默认值：" + action.target else "找不到 " + action.target + "，无法重置",
+                stringResource(
+                    if (enabled) DesignR.string.plugins_set_reset_hint_on else DesignR.string.plugins_set_reset_hint_off,
+                    action.target,
+                ),
                 color = p.t3,
                 fontSize = MaterialTheme.typography.bodySmall.fontSize,
             )
@@ -294,7 +304,7 @@ private fun ValueBox(field: ConfigField, initial: String, resetKey: Int, onSave:
     ) {
         if (text.isEmpty()) {
             Text(
-                field.default.ifBlank { "未设置" },
+                field.default.ifBlank { stringResource(DesignR.string.plugins_set_not_set) },
                 color = p.t3,
                 fontSize = MaterialTheme.typography.bodyMedium.fontSize,
             )
@@ -346,7 +356,7 @@ private fun SelectBox(field: ConfigField, current: String, resetKey: Int, onSave
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                shown.ifBlank { "未设置" },
+                shown.ifBlank { stringResource(DesignR.string.plugins_set_not_set) },
                 color = p.t1,
                 fontSize = MaterialTheme.typography.bodyMedium.fontSize,
                 modifier = Modifier.weight(1f),
@@ -383,7 +393,7 @@ private fun ExtraConfigSection(entry: PluginSettingsEntry, onSave: (key: String,
     // 详情页拿到的是打开时的快照，存储写回不会重建这一页；本地存一份，改完立刻看得见。
     var saved by remember(entry.pluginId) { mutableStateOf(entry.extraValues) }
     GroupFrame {
-        GroupHeader(label = "自定义配置", count = saved.size, collapsible = false)
+        GroupHeader(label = stringResource(DesignR.string.plugins_set_custom_group), count = saved.size, collapsible = false)
         Column(Modifier.padding(vertical = 4.dp)) {
             saved.forEach { (key, value) ->
                 ConfigFieldRow(ConfigField(key = key, label = key), value, 0) { text ->
@@ -393,9 +403,9 @@ private fun ExtraConfigSection(entry: PluginSettingsEntry, onSave: (key: String,
             }
             if (adding) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 9.dp)) {
-                    SimpleInput("键名，例如 apiKey", draftKey) { draftKey = it }
+                    SimpleInput(stringResource(DesignR.string.plugins_set_key_hint), draftKey) { draftKey = it }
                     Spacer(Modifier.height(6.dp))
-                    SimpleInput("值", draftValue) { draftValue = it }
+                    SimpleInput(stringResource(DesignR.string.plugins_set_value_hint), draftValue) { draftValue = it }
                     Spacer(Modifier.height(9.dp))
                     // 两个按钮各占一半宽度：贴在文本上的 clickable 命中区只有字形大小，
                     // 手指点在字缝里就什么都不会发生。
@@ -416,7 +426,11 @@ private fun ExtraConfigSection(entry: PluginSettingsEntry, onSave: (key: String,
                                 .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text("取消", color = p.t3, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
+                            Text(
+                                stringResource(DesignR.string.common_cancel),
+                                color = p.t3,
+                                fontSize = MaterialTheme.typography.bodyMedium.fontSize,
+                            )
                         }
                         Box(
                             Modifier
@@ -434,7 +448,7 @@ private fun ExtraConfigSection(entry: PluginSettingsEntry, onSave: (key: String,
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                "保存",
+                                stringResource(DesignR.string.common_save),
                                 color = if (draftKey.isBlank()) p.t3 else p.accent,
                                 fontSize = MaterialTheme.typography.bodyMedium.fontSize,
                                 fontWeight = FontWeight.Medium,
@@ -444,7 +458,12 @@ private fun ExtraConfigSection(entry: PluginSettingsEntry, onSave: (key: String,
                 }
             } else {
                 GroupChild(onClick = { adding = true }) {
-                    Text("添加配置项", color = p.t1, fontSize = MaterialTheme.typography.bodyLarge.fontSize, modifier = Modifier.weight(1f))
+                    Text(
+                        stringResource(DesignR.string.plugins_set_add),
+                        color = p.t1,
+                        fontSize = MaterialTheme.typography.bodyLarge.fontSize,
+                        modifier = Modifier.weight(1f),
+                    )
                     Text("+", color = p.t3, fontSize = MaterialTheme.typography.bodyLarge.fontSize)
                 }
             }

@@ -478,7 +478,9 @@ class LocalEngineTransport(
     override suspend fun newSession(cwd: String): Session {
         val s = Session(
             id = UUID.randomUUID().toString(),
-            title = "新会话",
+            // 标题留空：调用方按当前语言传入（getString(sessions_default_title)），
+            // 仓库层 title 用 remote?.title?.ifBlank { title } 兜底，这里写死文案会盖掉它。
+            title = "",
             cwd = cwd,
             createdAt = System.currentTimeMillis(),
             updatedAt = System.currentTimeMillis(),
@@ -488,7 +490,7 @@ class LocalEngineTransport(
     }
 
     override suspend fun resumeSession(sessionId: String): Session =
-        sessions[sessionId] ?: Session(id = sessionId, title = "会话", cwd = "")
+        sessions[sessionId] ?: Session(id = sessionId, title = "", cwd = "")
 
     override suspend fun closeSession(sessionId: String) {
         jobs.remove(sessionId)?.cancel()

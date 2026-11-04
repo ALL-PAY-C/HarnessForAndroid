@@ -1,6 +1,7 @@
 package dev.dsh.mobile.design
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,9 +41,9 @@ fun QqIdentityCardEditor(
     onAdopt: () -> Unit = {},
     /** 卡下方的一行说明（内置预设/角色卡的存储位置），null 不渲染。 */
     hint: String? = null,
-    /** 清空按钮文案：预设卡是「清空」，角色卡是「恢复默认」。 */
-    clearLabel: String = "清空",
-    clearHint: String = "清空只清这张卡；会话里已有的旧人设文本保持不动，会重新作为只读卡出现。",
+    /** 清空按钮文案：预设卡是「清空」，角色卡是「恢复默认」；null 用默认文案。 */
+    clearLabel: String? = null,
+    clearHint: String? = null,
 ) {
     val p = LocalQq.current
     // 换预设 / 换角色时整块重建：remember 的 key 是 initial，展开另一张卡不会串内容。
@@ -66,23 +67,25 @@ fun QqIdentityCardEditor(
         freeform = freeform.trim(),
     )
     val preview = current.render()
+    val clearText = clearLabel ?: stringResource(R.string.common_clear)
+    val clearHintText = clearHint ?: stringResource(R.string.design_identity_clear_hint)
 
     Column(
         Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        QqCardField("卡名", name, { name = it }, singleLine = true)
-        QqCardField("你是谁（一句话身份）", identity, { identity = it })
-        QqCardField("职责（一行一条）", duties, { duties = it })
-        QqCardField("禁区（一行一条，优先级最高）", boundaries, { boundaries = it })
-        QqCardField("准则（一行一条）", rules, { rules = it })
-        QqCardField("口吻", tone, { tone = it }, singleLine = true)
-        QqCardField("示例（一行一条）", examples, { examples = it })
-        QqCardField("自由补充", freeform, { freeform = it })
+        QqCardField(stringResource(R.string.design_identity_field_name), name, { name = it }, singleLine = true)
+        QqCardField(stringResource(R.string.design_identity_field_identity), identity, { identity = it })
+        QqCardField(stringResource(R.string.design_identity_field_duties), duties, { duties = it })
+        QqCardField(stringResource(R.string.design_identity_field_boundaries), boundaries, { boundaries = it })
+        QqCardField(stringResource(R.string.design_identity_field_rules), rules, { rules = it })
+        QqCardField(stringResource(R.string.design_identity_field_tone), tone, { tone = it }, singleLine = true)
+        QqCardField(stringResource(R.string.design_identity_field_examples), examples, { examples = it })
+        QqCardField(stringResource(R.string.design_identity_field_freeform), freeform, { freeform = it })
 
-        Text("预览", color = p.t3, fontSize = 11.sp)
+        Text(stringResource(R.string.common_preview), color = p.t3, fontSize = 11.sp)
         Text(
-            preview.ifBlank { "（空卡：保存后不注入任何内容）" },
+            preview.ifBlank { stringResource(R.string.design_identity_empty_preview) },
             color = p.t2,
             fontSize = 11.5.sp,
             modifier = Modifier
@@ -94,14 +97,14 @@ fun QqIdentityCardEditor(
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             if (legacyPersona.isNotBlank() && current.freeform.isBlank() && initial.freeform.isBlank()) {
-                TextButton(enabled = !busy, onClick = onAdopt) { Text("转为身份卡", fontSize = 12.sp) }
+                TextButton(enabled = !busy, onClick = onAdopt) { Text(stringResource(R.string.design_identity_adopt), fontSize = 12.sp) }
             }
-            TextButton(enabled = !busy, onClick = { onSave(null) }) { Text(clearLabel, color = p.red, fontSize = 12.sp) }
+            TextButton(enabled = !busy, onClick = { onSave(null) }) { Text(clearText, color = p.red, fontSize = 12.sp) }
             TextButton(enabled = !busy && current.hasContent(), onClick = { onSave(current) }) {
-                Text(if (busy) "保存中…" else "保存", fontSize = 12.sp)
+                Text(stringResource(if (busy) R.string.design_identity_saving else R.string.common_save), fontSize = 12.sp)
             }
         }
-        Text(clearHint, color = p.t3, fontSize = 10.sp)
+        Text(clearHintText, color = p.t3, fontSize = 10.sp)
         hint?.let { Text(it, color = p.t3, fontSize = 10.sp) }
     }
 }

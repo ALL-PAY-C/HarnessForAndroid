@@ -1,5 +1,6 @@
 package dev.dsh.mobile.feature.settings
 
+import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.core.data.backup.BackupManifest
 import dev.dsh.mobile.core.data.backup.BackupSections
 import dev.dsh.mobile.core.data.backup.RestoreEngine
@@ -12,15 +13,21 @@ import java.util.Locale
  * （feature/settings 没有 Robolectric，界面只能手测，文案不能也只靠手测）。
  */
 
+/** 资源 id → 当前语言的文案：界面传 context.getString，单测传假实现。 */
+internal typealias CopyResolver = (Int, List<Any>) -> String
+
 /** 分节 id → 用户看得懂的名字。 */
-internal fun sectionLabel(id: String): String = when (id) {
-    BackupSections.DB -> "会话与消息"
-    BackupSections.SETTINGS -> "设置"
-    BackupSections.PLUGINS -> "插件"
-    BackupSections.SECRETS -> "凭证"
-    BackupSections.ATTACHMENTS -> "附件文件"
-    BackupSections.WORKSPACE -> "工作区"
-    else -> id
+internal fun sectionLabel(id: String, copy: CopyResolver): String {
+    val res = when (id) {
+        BackupSections.DB -> DesignR.string.backup_section_db
+        BackupSections.SETTINGS -> DesignR.string.backup_section_settings
+        BackupSections.PLUGINS -> DesignR.string.backup_section_plugins
+        BackupSections.SECRETS -> DesignR.string.backup_section_secrets
+        BackupSections.ATTACHMENTS -> DesignR.string.backup_section_attachments
+        BackupSections.WORKSPACE -> DesignR.string.backup_section_workspace
+        else -> null
+    }
+    return res?.let { copy(it, emptyList()) } ?: id
 }
 
 /** 包内实际写入的分节，顺序固定与 [BackupSections.ALL] 一致，不受 manifest 里数组顺序影响。 */
@@ -28,18 +35,18 @@ internal fun includedSections(m: BackupManifest): List<String> =
     BackupSections.ALL.filter { id -> m.sections.any { it.id == id && it.included } }
 
 /** 「会话 12 · 消息 340 · 插件 3 个 · 含凭证（需要口令）」——选中文件后立即展示的那一行。 */
-internal fun countsSummary(m: BackupManifest): String = buildList {
-    add("会话 " + m.counts.sessions)
-    add("消息 " + m.counts.messages)
-    if (m.counts.plugins > 0) add("插件 " + m.counts.plugins + " 个")
-    if (m.counts.attachments > 0) add("附件 " + m.counts.attachments + " 个")
-    add(if (m.secrets != null) "含凭证（需要口令）" else "不含凭证")
+internal fun countsSummary(m: BackupManifest, copy: CopyResolver): String = buildList {
+    add(copy(DesignR.string.backup_counts_sessions, listOf(m.counts.sessions)))
+    add(copy(DesignR.string.backup_counts_messages, listOf(m.counts.messages)))
+    if (m.counts.plugins > 0) add(copy(DesignR.string.backup_counts_plugins, listOf(m.counts.plugins)))
+    if (m.counts.attachments > 0) add(copy(DesignR.string.backup_counts_attachments, listOf(m.counts.attachments)))
+    add(copy(if (m.secrets != null) DesignR.string.backup_has_secrets else DesignR.string.backup_no_secrets, emptyList()))
 }.joinToString(" · ")
 
 /** 已有备份一行的副标题：包含哪些节。 */
-internal fun sectionsSummary(m: BackupManifest): String {
-    val names = includedSections(m).map { sectionLabel(it) }
-    return if (names.isEmpty()) "空包（没有可用分节）" else names.joinToString(" / ")
+internal fun sectionsSummary(m: BackupManifest, copy: CopyResolver): String {
+    val names = includedSections(m).map { sectionLabel(it, copy) }
+    return if (names.isEmpty()) copy(DesignR.string.backup_sections_empty, emptyList()) else names.joinToString(" / ")
 }
 
 /** 1024 进制、一位小数：896 B / 12.3 KB / 1.4 MB。负数按 0 显示。 */
@@ -83,10 +90,10 @@ internal fun isStaleImport(name: String, lastModified: Long, now: Long): Boolean
     name.startsWith(IMPORT_FILE_PREFIX) && now - lastModified > IMPORT_TTL_MILLIS
 
 /** 恢复成功后的结果摘要（成功页第一行）。 */
-internal fun reportSummary(r: RestoreEngine.Report): String = buildList {
-    add(if (r.mode == RestoreEngine.Mode.Replace) "整机还原" else "合并导入")
-    add("会话 " + r.sessions)
-    add("消息 " + r.messages)
-    if (r.plugins > 0) add("插件 " + r.plugins + " 个")
-    if (r.files > 0) add("文件 " + r.files + " 个")
+internal fun reportSummary(r: RestoreEngine.Report, copy: CopyResolver): String = buildList {
+    add(copy(if (r.mode == RestoreEngine.Mode.Replace) DesignR.string.backup_mode_replace else DesignR.string.backup_mode_merge, emptyList()))
+    add(copy(DesignR.string.backup_counts_sessions, listOf(r.sessions)))
+    add(copy(DesignR.string.backup_counts_messages, listOf(r.messages)))
+    if (r.plugins > 0) add(copy(DesignR.string.backup_counts_plugins, listOf(r.plugins)))
+    if (r.files > 0) add(copy(DesignR.string.backup_counts_files, listOf(r.files)))
 }.joinToString(" · ")

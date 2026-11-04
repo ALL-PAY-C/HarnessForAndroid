@@ -23,3 +23,5 @@ feature/sessions/src/main/kotlin/dev/dsh/mobile/feature/sessions/SessionsViewMod
 feature/sessions/src/main/kotlin/dev/dsh/mobile/feature/sessions/SessionsViewModel.kt	置顶	sentinel group name; persisted identity + map key, display mapped by sentinelGroupRes()
 feature/sessions/src/main/kotlin/dev/dsh/mobile/feature/sessions/SessionsViewModel.kt	归档	sentinel group name; persisted identity + map key, display mapped by sentinelGroupRes()
 feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/ChatSettingsScreen.kt	：	separator inside a stored preset label ("预设：x"); split, not display copy
+feature/plugins/src/main/kotlin/dev/dsh/mobile/feature/plugins/PluginSettingsModel.kt	加载失败	prefix of a page subtitle produced by plugin-host JsBrokenPlugin (out of P3 scope); matched with startsWith(), data not copy
+feature/plugins/src/main/kotlin/dev/dsh/mobile/feature/plugins/SkillCenterScreen.kt	未注册 RPC 路径	error text produced by bin.js / cordis-lite at runtime; matched with contains(), data not copy

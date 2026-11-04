@@ -1,6 +1,8 @@
 package dev.dsh.mobile.design
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -49,12 +51,12 @@ import androidx.compose.ui.window.Dialog
  */
 object SlotEditState {
     /** 界面上可编辑的位置。顺序即界面里展示的顺序。 */
-    enum class Slot(val label: String) {
-        SessionList("会话列表项"),
-        ChatTopBar("会话顶栏"),
-        Composer("输入框区"),
-        BottomBar("底部 tab 栏"),
-        DrawerGroup("抽屉分组"),
+    enum class Slot(@StringRes val labelRes: Int) {
+        SessionList(R.string.design_slot_session_list),
+        ChatTopBar(R.string.design_slot_chat_top_bar),
+        Composer(R.string.design_slot_composer),
+        BottomBar(R.string.design_slot_bottom_bar),
+        DrawerGroup(R.string.design_slot_drawer_group),
     }
 
     /** 默认关闭：装完即用的界面不该一上手就能被改。 */
@@ -118,7 +120,7 @@ fun SlotRemoveBadge(onClick: () -> Unit, modifier: Modifier = Modifier) {
         ) {
             Icon(
                 Icons.Filled.Remove,
-                "移除",
+                stringResource(R.string.common_remove),
                 tint = Color.White,
                 modifier = Modifier.size(14.dp),
             )
@@ -198,7 +200,7 @@ fun SlotPickerDialog(
             }
             Spacer(Modifier.height(10.dp))
             Text(
-                "取消",
+                stringResource(R.string.common_cancel),
                 color = p.accent,
                 fontSize = 13.sp,
                 modifier = Modifier
