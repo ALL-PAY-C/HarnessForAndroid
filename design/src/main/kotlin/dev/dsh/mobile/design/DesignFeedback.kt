@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -38,11 +39,11 @@ import dev.dsh.mobile.core.model.SessionStatus
 fun StatusCapsule(state: RuntimeState, onClick: () -> Unit = {}) {
     val p = LocalQq.current
     val (label, color) = when (state) {
-        is RuntimeState.Ready -> "就绪" to p.green
-        is RuntimeState.Starting -> "启动中" to p.amber
-        is RuntimeState.Reconnecting -> "重连 ${state.attempt}" to p.amber
-        is RuntimeState.Failed -> "离线" to p.red
-        RuntimeState.NotConfigured -> "未配置" to p.t3
+        is RuntimeState.Ready -> stringResource(R.string.status_ready) to p.green
+        is RuntimeState.Starting -> stringResource(R.string.status_starting) to p.amber
+        is RuntimeState.Reconnecting -> stringResource(R.string.status_reconnecting, state.attempt) to p.amber
+        is RuntimeState.Failed -> stringResource(R.string.status_offline) to p.red
+        RuntimeState.NotConfigured -> stringResource(R.string.status_unconfigured) to p.t3
     }
     Row(
         Modifier

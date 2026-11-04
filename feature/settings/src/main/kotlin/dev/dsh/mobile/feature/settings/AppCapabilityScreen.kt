@@ -1,5 +1,7 @@
 package dev.dsh.mobile.feature.settings
 
+import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.R as DesignR
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -60,7 +62,7 @@ fun AppCapabilityScreen(
     Box(Modifier.fillMaxSize().background(p.bg)) {
         Column(Modifier.fillMaxSize()) {
             QqScreenTopBar(
-                title = "手机能力授权",
+                title = stringResource(DesignR.string.settings_capability_title),
                 isBack = true,
                 onNavigationClick = onBack,
             )
@@ -77,7 +79,11 @@ fun AppCapabilityScreen(
                         ),
                     ),
             ) {
-                SectionFrame(title = "六类系统能力", icon = Icons.Filled.Lock, tint = p.accent2) {
+                SectionFrame(
+                    title = stringResource(DesignR.string.settings_capability_section),
+                    icon = Icons.Filled.Lock,
+                    tint = p.accent2,
+                ) {
                     DeviceCapability.entries.forEachIndexed { index, capability ->
                         if (index > 0) QqCardDivider()
                         CapabilityRow(
@@ -90,10 +96,7 @@ fun AppCapabilityScreen(
                     }
                 }
                 Spacer(Modifier.height(SectionSpacing.cardGap))
-                HintLine(
-                    "常驻允许 = 以后不再问；本会话 = 本次运行内确认一次后不再问；每次询问 = 每次调用都要点允许。" +
-                        "系统权限没给时动作返回 E_PERMISSION_DENIED（带 needsPermission），不会抛异常，也不会静默失败。",
-                )
+                HintLine(stringResource(DesignR.string.settings_capability_hint))
             }
         }
     }
@@ -116,7 +119,7 @@ private fun CapabilityRow(
             }
             if (!granted) {
                 Text(
-                    "去授权",
+                    stringResource(DesignR.string.settings_capability_grant),
                     color = Color.White,
                     fontSize = qqFontBody(12.sp),
                     modifier = Modifier
@@ -128,7 +131,9 @@ private fun CapabilityRow(
                 Spacer(Modifier.width(8.dp))
             }
             Text(
-                if (granted) "已授权" else "未授权",
+                stringResource(
+                    if (granted) DesignR.string.settings_capability_granted else DesignR.string.settings_capability_ungranted,
+                ),
                 color = if (granted) p.green else p.t3,
                 fontSize = qqFontBody(12.sp),
             )

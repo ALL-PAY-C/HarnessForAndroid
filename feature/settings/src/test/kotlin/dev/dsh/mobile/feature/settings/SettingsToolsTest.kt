@@ -28,20 +28,19 @@ class SettingsToolsTest {
         assertEquals("缺少 Linux 制品清单：x86_64", missingLinuxManifest("x86_64"))
     }
     @Test fun blankProxyMeansDirect() {
-        assertNull(proxyError(""))
-        assertNull(proxyError("   "))
-        assertEquals("直连", proxyLabel(""))
+        assertFalse(proxyInvalid(""))
+        assertFalse(proxyInvalid("   "))
+        assertNull(proxyLabel(""))
     }
     @Test fun validProxyUrlsAreAccepted() {
         listOf("http://127.0.0.1:7890", "https://proxy.local:8443", "socks5://10.0.0.2:1080", "127.0.0.1:7890").forEach {
-            assertNull("应接受：" + it, proxyError(it))
+            assertFalse("应接受：" + it, proxyInvalid(it))
         }
         assertEquals("http://127.0.0.1:7890", proxyLabel(" http://127.0.0.1:7890 "))
     }
-    @Test fun brokenProxyUrlsAreRejectedWithHint() {
+    @Test fun brokenProxyUrlsAreRejected() {
         listOf("http://", "http://bad host:1", "ftp://127.0.0.1:21", "//").forEach {
-            assertNotNull("应拒绝：" + it, proxyError(it))
+            assertTrue("应拒绝：" + it, proxyInvalid(it))
         }
-        assertTrue(proxyError("http://")!!.contains("127.0.0.1:7890"))
     }
 }

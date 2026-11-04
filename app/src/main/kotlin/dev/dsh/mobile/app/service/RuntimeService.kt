@@ -189,5 +189,57 @@ class RuntimeService : Service() {
                 .build()
             runCatching { nm.notify(OngoingCenter.ID_ONGOING, n) }
         }
+
+        /**
+         * 硬重启前的最后一条出口。进程马上要被杀，没人能替用户点界面，
+         * 所以挂一条高优先级、可点击、可清除的通知（不是常驻通知，用户随时能划掉）。
+         *
+         * 为什么必须有这条：killProcess 之后 AMS 会把任务移除（app died, no saved state），
+         * 粘性服务把进程拉回来时 Activity 不会自己回到前台，BAL 也不允许后台启动 Activity。
+         * 没有通知，用户面前只剩一个空桌面——正是这次要修的那个现象。
+         */
+        fun postRelaunchNotice(context: Context, text: String) {
+            val nm = context.getSystemService(NotificationManager::class.java) ?: return
+            // 单独一个渠道：IMPORTANCE_HIGH 才会抬头提示，也不会把常驻通知那个 LOW 渠道一起抬起来。
+            if (nm.getNotificationChannel(CHANNEL_RELAUNCH) == null) {
+                nm.createNotificationChannel(
+                    android.app.NotificationChannel(
+                        CHANNEL_RELAUNCH,
+                        "重启提示",
+                        NotificationManager.IMPORTANCE_HIGH,
+                    ).apply {
+                        setShowBadge(false)
+                        // 不响铃不震动：这是一条「你回来了」的提示，不是告警。
+                        setSound(null, null)
+                        enableVibration(false)
+                    },
+                )
+            }
+            val pi = PendingIntent.getActivity(
+                context,
+                RELAUNCH_REQUEST_CODE,
+                // SINGLE_TOP|CLEAR_TOP：进程还活着时点它回栈顶，进程已死时就是一次冷启动。
+                Intent(context, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            val n = Notification.Builder(context, CHANNEL_RELAUNCH)
+                .setContentTitle("恢复完成，点此回到应用")
+                .setContentText(text)
+                .setSmallIcon(android.R.drawable.stat_notify_sync)
+                .setContentIntent(pi)
+                // 可清除：这条提示的寿命只到用户回到 App 为止，不留垃圾、不常驻。
+                .setAutoCancel(true)
+                .setOngoing(false)
+                .setOnlyAlertOnce(true)
+                .build()
+            runCatching { nm.notify(ID_RELAUNCH, n) }
+                .onFailure { AppLog.w("postRelaunchNotice 失败：${it.message}") }
+        }
+
+        /** 重启提示走独立 ID，别和常驻通知抢同一个槽位。 */
+        private const val ID_RELAUNCH = 4712
+        private const val CHANNEL_RELAUNCH = "dsh.relaunch"
+        private const val RELAUNCH_REQUEST_CODE = 4713
     }
 }

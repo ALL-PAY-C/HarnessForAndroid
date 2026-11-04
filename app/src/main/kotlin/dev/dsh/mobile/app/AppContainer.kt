@@ -5,6 +5,7 @@ import dev.dsh.mobile.app.diag.AppBootGuard
 import dev.dsh.mobile.app.diag.CrashReporter
 import dev.dsh.mobile.app.gateway.GatewayManager
 import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.common.RestartReason
 import dev.dsh.mobile.core.common.ProxyEnv
 import dev.dsh.mobile.core.common.AppScope
 import dev.dsh.mobile.core.common.DshResult
@@ -483,6 +484,8 @@ class AppContainer(
             configBridge = pluginConfigBridge,
             personaBridge = sessionPersonaBridge,
             onPluginCrash = { id, failure -> crashReporter.recordCaught(CrashKind.PLUGIN, "plugin", id + ": " + failure) },
+            // 崩溃循环进安全模式后只放行内置插件：判定来自启动守卫，与插件自己数的失败取或。
+            extraSafeMode = { bootGuard.safeModeController.isActive() },
             onUninstall = { id ->
             pluginInstaller.uninstall(id).getOrThrow()
             externalPlugins.remove(id)
@@ -546,6 +549,56 @@ class AppContainer(
                 }
             }
         }
+    }
+
+    /**
+     * 进程内软重启：不杀进程，把「只在启动时读一次磁盘」的可变状态按当前磁盘重建一遍。
+     *
+     * 为什么主路径不再杀进程：Android 14+ 的 BAL 硬化会拦掉 AlarmManager PendingIntent 的启动
+     * （实测 BAL_BLOCK，callingUidProcState: FOREGROUND_SERVICE），而 killProcess 之后 AMS 已经把任务
+     * 移除（Force removing ActivityRecord ... app died, no saved state），粘性服务把进程拉回来也不会
+     * 把 Activity 带回前台。杀进程这条路在当前系统上根本回不来，只能做进程内重建。
+     *
+     * 为什么不重建 AppContainer 本身，逐条：
+     *  · scope 是 AppScope 的进程级单例（AppContainer.kt:111），新容器会多出一整套后台循环
+     *    （models 自动重连、gateway 自启、备份补跑），旧容器的循环还活着，两套一起写同一份磁盘；
+     *  · PluginHostHolder.instance 是进程级槽位，换实例会让已经上屏的插件 UI 指向死宿主；
+     *  · db / settings 都是按文件单例（DataModule），再建一份只是多一条连接，读不到「更干净」的数据。
+     * 真正需要重建的只有三样：插件注册表、引擎连接、界面（界面由 RestartController 调 recreate）。
+     *
+     * @return true = 已在进程内重建完；false = 这条场景必须换进程，调用方走硬重启。
+     */
+    fun softRestart(reason: RestartReason): Boolean {
+        AppLog.i("SOFT_RESTART begin reason=" + reason.label)
+        if (reason == RestartReason.BackupRestore) {
+            // 恢复改写的是 files/datastore/*.preferences_pb 原始文件（RestoreEngine.restoreSettings 直接
+            // writeBytes，绕过 DataStore API），而 DataStore 实例是 SettingsStore.kt:215 的
+            // "private val Context.settingsStore by preferencesDataStore(...)" 文件级委托：
+            // 一个进程只有一个，没有「作废重读」的公开 API，core/data 又是只读边界。
+            // 继续用旧实例 = 界面还是恢复前的值，而且下一次 edit() 会把整份旧缓存写回文件，
+            // 把刚恢复的设置覆盖掉。所以恢复场景只能换进程。
+            AppLog.w("SOFT_RESTART rejected: DataStore 缓存无法作废 reason=" + reason.label)
+            return false
+        }
+        // 1) 标志位：调用方（SafeModeController.exit）在进来之前已经同步写完 BootGuardStore，
+        //    这里不再写第二份，免得出现「标志清了但账本还写着安全模式」。
+        // 2) 插件：安全模式期间被拦掉的插件要按磁盘重新注册。PluginHost.load 对已存在 id 是 no-op，
+        //    reloadPlugins 走 force=true，并 keepOnly 收掉幽灵行。
+        runCatching { reloadPlugins() }
+            .onFailure { AppLog.e("SOFT_RESTART reloadPlugins failed", it) }
+        // 3) 引擎：安全模式下 connectActive 压根没跑过。force=true 让「同端点且已 Ready」的短路放行，
+        //    正常退出时也能真重连一次。
+        if (!bootGuard.safeModeController.flags().disableAutoEngine) {
+            runCatching { connectActive(force = true) }
+                .onFailure { AppLog.e("SOFT_RESTART connectActive failed", it) }
+        } else {
+            AppLog.i("SOFT_RESTART engine skipped: disableAutoEngine")
+        }
+        // 4) 常驻通知：RuntimeService 的 collector 还活着，但文案可能停在安全模式那一版。
+        runCatching { ongoingCenter.refresh() }
+            .onFailure { AppLog.w("SOFT_RESTART ongoingCenter refresh failed", it) }
+        AppLog.i("SOFT_RESTART done reason=" + reason.label)
+        return true
     }
 
     private val _transport = MutableStateFlow<DshTransport?>(null)

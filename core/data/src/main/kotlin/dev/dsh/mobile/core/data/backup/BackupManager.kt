@@ -7,6 +7,35 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.zip.ZipFile
+
+
+/**
+ * 旧格式包判定：包内没有 manifest.json，且带历史版本的三前缀条目（shared_prefs/ db/ plugins/）。
+ *
+ * 只读 zip 中央目录，不解压 —— 2 GiB 的包也只花一次目录解析。历史版本的 [BackupManager]
+ * 就是用这三个前缀拍的存档，升级后用户手里一定有这种包；[BackupManager.restorePackage]
+ * 的 legacy 分支能恢复它们，但只有覆盖语义（没有分节、没有合并）。
+ *
+ * 读不出 zip（真损坏）返回 false：调用方据此报错，不能把坏包当旧格式放过。
+ */
+fun isLegacyPackage(file: File): Boolean = runCatching {
+    ZipFile(file).use { zip ->
+        var hasManifest = false
+        var hasLegacyEntry = false
+        val it = zip.entries()
+        while (it.hasMoreElements()) {
+            val entry = it.nextElement()
+            if (entry.isDirectory) continue
+            val name = entry.name.removePrefix("./").removePrefix("/")
+            if (name == BackupWriter.MANIFEST_ENTRY) hasManifest = true
+            if (name.startsWith("shared_prefs/") || name.startsWith("db/") || name.startsWith("plugins/")) {
+                hasLegacyEntry = true
+            }
+        }
+        !hasManifest && hasLegacyEntry
+    }
+}.getOrDefault(false)
 
 
 /**
@@ -172,6 +201,33 @@ class BackupManager(private val context: Context) {
         // 让下次快照重新迁移，避免把明文 token 再次打进 zip。
         EndpointTokenMigration.reset()
     }
+
+    /**
+     * 手动导出（设置 → 备份与恢复 → 创建备份）：按 [selection] 在应用私有 backups 目录产一个标准包。
+     *
+     * 与 [snapshot] 的区别只有一个：勾选范围由用户给，而不是固定的四节。
+     * 文件名走 [backupFileName]，带版本名，用户在不同版本拍的包之间能区分。
+     */
+    fun export(selection: BackupSelection): Result<Pair<File, BackupManifest>> = runCatching {
+        EndpointTokenMigration.ensureMigrated(context)
+        val out = File(
+            dir,
+            backupFileName(
+                nowMillis = System.currentTimeMillis(),
+                appVersionName = AppInfo.of(context).versionName,
+            ),
+        )
+        val manifest = writer().write(out, selection)
+        prefs.edit()
+            .putLong(KEY_LAST, System.currentTimeMillis())
+            .putString("reason.${out.name}", if (selection.secrets) "manual:secrets" else "manual")
+            .apply()
+        trim()
+        out to manifest
+    }
+
+    /** 只读包内 manifest（不动磁盘）：给「已有备份」列表与 SAF 选中后的预览用。 */
+    fun previewPackage(file: File): Result<BackupManifest> = runCatching { engine().preview(file) }
 
     /** 手动删掉一个存档（界面上要能删，否则只能等它自己滚出去）。 */
     fun delete(file: File): Boolean = runCatching { file.exists() && file.delete() }.getOrDefault(false)

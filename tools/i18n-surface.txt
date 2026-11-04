@@ -1,0 +1,15 @@
+# i18n gate surface: files whose user-visible strings must come from resources.
+# P1 (done) — every line below is at 0 literals; i18n-lint stays green on them.
+design/src/main/kotlin/dev/dsh/mobile/design/DesignFeedback.kt
+design/src/main/kotlin/dev/dsh/mobile/design/DesignRows.kt
+feature/sessions/src/main/kotlin/dev/dsh/mobile/feature/sessions/SessionsScreen.kt
+feature/agents/src/main/kotlin/dev/dsh/mobile/feature/agents/AgentsScreen.kt
+feature/settings/src/main/kotlin/dev/dsh/mobile/feature/settings/AppearanceSection.kt
+feature/settings/src/main/kotlin/dev/dsh/mobile/feature/settings/SettingsScreen.kt
+app/src/main/kotlin/dev/dsh/mobile/app/nav/AppNav.kt
+app/src/main/kotlin/dev/dsh/mobile/app/nav/AppDrawer.kt
+feature/settings/src/main/kotlin/dev/dsh/mobile/feature/settings/AppAppearanceScreen.kt
+feature/plugins/src/main/kotlin/dev/dsh/mobile/feature/plugins/PluginHubScreen.kt
+feature/settings/src/main/kotlin/dev/dsh/mobile/feature/settings/AppCapabilityScreen.kt
+feature/settings/src/main/kotlin/dev/dsh/mobile/feature/settings/AppGatewayScreen.kt
+feature/settings/src/main/kotlin/dev/dsh/mobile/feature/settings/ExtrasScreen.kt

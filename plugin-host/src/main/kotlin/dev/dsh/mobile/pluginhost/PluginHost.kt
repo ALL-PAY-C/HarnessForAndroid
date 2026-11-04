@@ -120,6 +120,11 @@ class PluginHost(
     private val personaBridge: SessionPersonaBridge? = null,
     /** 插件注册/常驻服务失败的落盘回调（T9.12）；默认 null，老调用方不用改。 */
     private val onPluginCrash: ((String, String) -> Unit)? = null,
+    /**
+     * 进程级安全模式（T9.12 步骤3）：启动守卫判定崩溃循环后由 app 层注入。
+     * 与 [PluginStore.safeMode]（插件自己数的连续失败）取或，两套来源共用同一条放行规则。
+     */
+    private val extraSafeMode: () -> Boolean = { false },
 ) {
 
     private val registry = PluginRegistry()
@@ -147,7 +152,7 @@ class PluginHost(
     val slots: PluginRegistry get() = registry
 
     /** True when repeated boot failures turned third-party plugins off. */
-    val safeMode: Boolean get() = store?.safeMode == true
+    val safeMode: Boolean get() = store?.safeMode == true || extraSafeMode()
 
     fun clearSafeMode() {
         store?.clearSafeMode()

@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -34,12 +35,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.dsh.mobile.core.common.UiLanguage
+import dev.dsh.mobile.core.common.UiLocale
 import dev.dsh.mobile.core.model.BackMaterial
 import java.io.File
 import java.io.InputStream
@@ -377,6 +383,19 @@ private fun effectiveBlur(tokens: ThemeTokens, hasWallpaper: Boolean): Dp {
     return maxOf(materialPaint(tokens.backMaterial, tokens.glassAlpha, true).blur, tokens.glassBlur)
 }
 
+/**
+ * 界面语言（T9.11 §2.2 第二段）：MainActivity 从 AppSettings 提供，DshTheme 据此覆盖
+ * LocalContext / LocalConfiguration / LocalLayoutDirection。
+ *
+ * 为什么靠 CompositionLocal 覆盖而不是 activity.recreate()：重建会走 Configuration change，
+ * ViewModel、rememberSaveable、滚动位置、输入框草稿全丢；覆盖后 stringResource 立即取到新资源，
+ * 变更只是一次重组。
+ *
+ * 升级注意：compose-ui 1.7.x 的 stringResource 读 LocalContext.current.resources，覆盖 LocalContext 足够；
+ * 1.8+ 改成读 LocalResources，届时必须在这里一并覆盖，否则全站静默停在旧语言。
+ */
+val LocalUiLanguage = staticCompositionLocalOf { UiLanguage.System }
+
 @Composable
 fun DshTheme(
     tokens: ThemeTokens,
@@ -398,7 +417,14 @@ fun DshTheme(
         code = UiLayoutPrefs.fontCode,
         terminal = UiLayoutPrefs.fontTerminal,
     )
+    // 语言覆盖放在最外层：里面所有 Composable（含 design 自己的组件）拿到的 LocalContext 都是目标语言。
+    val language = LocalUiLanguage.current
+    val baseContext = LocalContext.current
+    val localized = remember(language, baseContext) { UiLocale.wrap(baseContext, language) }
     CompositionLocalProvider(
+        LocalContext provides localized,
+        LocalConfiguration provides localized.resources.configuration,
+        LocalLayoutDirection provides if (localized.resources.configuration.layoutDirection == android.view.View.LAYOUT_DIRECTION_RTL) LayoutDirection.Rtl else LayoutDirection.Ltr,
         LocalThemeTokens provides tokens.copy(dark = dark, accent = accent, accent2 = accent2),
         LocalFontRoles provides fontRoles,
         LocalQq provides palette,

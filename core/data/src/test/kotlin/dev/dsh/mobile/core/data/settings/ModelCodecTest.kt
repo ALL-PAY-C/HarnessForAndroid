@@ -58,7 +58,8 @@ class ModelCodecTest {
         )
         val back = ModelCodec.decode(ModelCodec.encode(listOf(profile))).single()
         assertEquals(profile, back)
-        assertEquals("中", back.reasoningLabel)
+        // 文案归 UI 层（design 资源），数据层只保证取值不变。
+        assertEquals("medium", back.reasoningEffort)
     }
 
     @Test
@@ -103,13 +104,9 @@ class ModelCodecTest {
     }
 
     @Test
-    fun reasoningSanitizerAndLabels() {
+    fun reasoningSanitizer() {
         assertEquals("low", sanitizeReasoningEffort(" LOW "))
         assertEquals("high", sanitizeReasoningEffort("bogus"))
         assertEquals("off", sanitizeReasoningEffort("off"))
-        assertEquals("关", reasoningLabelOf("off"))
-        assertEquals("低", reasoningLabelOf("low"))
-        assertEquals("中", reasoningLabelOf("medium"))
-        assertEquals("高", reasoningLabelOf("high"))
     }
 }

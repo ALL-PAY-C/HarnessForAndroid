@@ -1,5 +1,8 @@
 package dev.dsh.mobile.feature.sessions
 
+import androidx.compose.ui.platform.LocalContext
+import dev.dsh.mobile.design.R as DesignR
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -126,6 +129,8 @@ fun SessionsScreen(
     // 编辑态开着且点了右下角「+」：候选列表弹窗。
     var pickingSlot by remember { mutableStateOf(false) }
     val hostTokens = rememberHostThemeTokens()
+    // 回调（onClick / 协程）里不能调 stringResource，这些格子统一走 ctx.getString。
+    val ctx = LocalContext.current
     fun toast(msg: String) { scope.launch { snackbar.showSnackbar(msg) } }
     val visibleIds = state.groups.flatMap { it.second }.map { it.id }
 
@@ -160,13 +165,13 @@ fun SessionsScreen(
                     horizontalArrangement = Arrangement.spacedBy(QqSpace.s()),
                 ) {
                     Text(
-                        "已选 ${state.selected.size} 项",
+                        stringResource(DesignR.string.sessions_selected_count, state.selected.size),
                         color = p.accent,
                         fontSize = qqFontBody(13.5.sp),
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        "全选",
+                        stringResource(DesignR.string.common_select_all),
                         color = p.accent,
                         fontSize = qqFontBody(12.5.sp),
                         modifier = Modifier
@@ -175,7 +180,7 @@ fun SessionsScreen(
                             .padding(horizontal = 7.dp, vertical = 3.dp),
                     )
                     Text(
-                        "退出",
+                        stringResource(DesignR.string.common_exit),
                         color = p.t3,
                         fontSize = qqFontBody(12.5.sp),
                         modifier = Modifier
@@ -189,9 +194,9 @@ fun SessionsScreen(
             null
         }
         QqScreenTopBar(
-            title = if (state.selectionMode) null else "会话",
+            title = if (state.selectionMode) null else stringResource(DesignR.string.sessions_title),
             navigationIcon = Icons.Filled.Menu,
-            navigationDescription = "侧边栏",
+            navigationDescription = stringResource(DesignR.string.common_sidebar),
             onNavigationClick = onOpenDrawer,
             actions = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -203,9 +208,15 @@ fun SessionsScreen(
                         TokenPill(usage)
                         Spacer(Modifier.width(2.dp))
                     }
-                    IconBtn(Icons.Filled.CreateNewFolder, "新建文件夹") { creatingFolder = "" }
+                    IconBtn(
+                        Icons.Filled.CreateNewFolder,
+                        stringResource(DesignR.string.sessions_new_folder),
+                    ) { creatingFolder = "" }
                     Spacer(Modifier.width(2.dp))
-                    IconBtn(Icons.Filled.Add, "新建会话") { creating = true }
+                    IconBtn(
+                        Icons.Filled.Add,
+                        stringResource(DesignR.string.sessions_new_chat),
+                    ) { creating = true }
                 }
             },
             center = selectionCenter,
@@ -229,7 +240,10 @@ fun SessionsScreen(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = QqSpace.m(), vertical = 10.dp),
                     )
                 }
-                IconBtn(Icons.Filled.Close, "关闭搜索") { searching = false; viewModel.setQuery("") }
+                IconBtn(
+                    Icons.Filled.Close,
+                    stringResource(DesignR.string.common_close_search),
+                ) { searching = false; viewModel.setQuery("") }
             }
         }
 
@@ -239,25 +253,28 @@ fun SessionsScreen(
             // 内容区只剩纯背景，就是「退出会话后偶发整页空白」。
             if (!state.loaded) {
                 EmptyState(
-                    title = "正在读取会话",
-                    subtitle = "稍等片刻，本地会话列表马上就好",
+                    title = stringResource(DesignR.string.sessions_loading),
+                    subtitle = stringResource(DesignR.string.sessions_loading_hint),
                 )
             } else if (state.groups.all { it.second.isEmpty() } && state.folders.isEmpty()) {
                 EmptyState(
-                    title = "还没有会话",
+                    title = stringResource(DesignR.string.sessions_empty_title),
                     subtitle = when (val rt = state.runtime) {
-                        is RuntimeState.Ready -> "点右上角 + 新建，或在设置里同步历史会话"
+                        is RuntimeState.Ready -> stringResource(DesignR.string.sessions_empty_ready_hint)
                         is RuntimeState.Failed ->
-                            if (rt.reason.contains("模型")) "先在 Agent 页添加一个模型，再点右上角 + 开始对话"
-                            else "连接失败：" + rt.reason
-                        else -> "先在 Agent 页添加模型（填 API Key），再回到这里点 + 新建对话"
+                            if (rt.reason.contains("模型") || rt.reason.contains("model", ignoreCase = true)) {
+                                stringResource(DesignR.string.sessions_empty_no_model)
+                            } else {
+                                stringResource(DesignR.string.sessions_empty_failed, rt.reason)
+                            }
+                        else -> stringResource(DesignR.string.sessions_empty_no_key)
                     },
                 )
             } else if (contentRows.isEmpty()) {
                 // 所有分组都被祖先折叠吞掉：列表会渲染 0 行，这里给一条能自己走出去的空态。
                 EmptyState(
-                    title = "没有可显示的会话",
-                    subtitle = "分组都收起了：点上方文件夹条展开，或到设置里同步历史会话",
+                    title = stringResource(DesignR.string.sessions_all_collapsed_title),
+                    subtitle = stringResource(DesignR.string.sessions_all_collapsed_hint),
                 )
             } else {
                 LazyColumn(
@@ -442,15 +459,33 @@ fun SessionsScreen(
                                                     // 删除 / 重命名 / 撤回 (unarchive back to its own group).
                                                     val actions = if (session.archived) {
                                                         listOf(
-                                                            SwipeAction("删除", p.red) { viewModel.delete(session.id) },
-                                                            SwipeAction("重命名", p.accent) { renaming = session },
-                                                            SwipeAction("撤回", p.green) { viewModel.archive(session.id, false) },
+                                                            SwipeAction(
+                                                                stringResource(DesignR.string.common_delete),
+                                                                p.red,
+                                                            ) { viewModel.delete(session.id) },
+                                                            SwipeAction(
+                                                                stringResource(DesignR.string.common_rename),
+                                                                p.accent,
+                                                            ) { renaming = session },
+                                                            SwipeAction(
+                                                                stringResource(DesignR.string.sessions_unarchive),
+                                                                p.green,
+                                                            ) { viewModel.archive(session.id, false) },
                                                         )
                                                     } else {
                                                         listOf(
-                                                            SwipeAction("归档", p.amber) { viewModel.archive(session.id, true) },
-                                                            SwipeAction("重命名", p.accent) { renaming = session },
-                                                            SwipeAction("分组", p.green) { grouping = session },
+                                                            SwipeAction(
+                                                                stringResource(DesignR.string.sessions_archive),
+                                                                p.amber,
+                                                            ) { viewModel.archive(session.id, true) },
+                                                            SwipeAction(
+                                                                stringResource(DesignR.string.common_rename),
+                                                                p.accent,
+                                                            ) { renaming = session },
+                                                            SwipeAction(
+                                                                stringResource(DesignR.string.sessions_group_action),
+                                                                p.green,
+                                                            ) { grouping = session },
                                                         )
                                                     }
                                                     SwipeableRow(actions = actions, content = { boxed { row() } })
@@ -467,7 +502,7 @@ fun SessionsScreen(
                         item(key = "slot-placed") {
                             Column(Modifier.fillMaxWidth()) {
                                 Text(
-                                    "插件",
+                                    stringResource(DesignR.string.plugins_page_title),
                                     color = p.t2,
                                     fontSize = qqFontBody(12.5.sp),
                                     fontWeight = FontWeight.SemiBold,
@@ -494,9 +529,9 @@ fun SessionsScreen(
 
         if (pickingSlot) {
             SlotPickerDialog(
-                title = "添加到会话列表",
+                title = stringResource(DesignR.string.sessions_slot_add_title),
                 items = slotCandidates,
-                emptyHint = "没有可添加的插件组件：先到插件页装一个带会话列表槽位的插件",
+                emptyHint = stringResource(DesignR.string.sessions_slot_picker_empty),
                 onPick = { pickingSlot = false; onSlotAdd(it) },
                 onDismiss = { pickingSlot = false },
             )
@@ -505,19 +540,21 @@ fun SessionsScreen(
         if (state.selectionMode) {
             Box(Modifier.fillMaxWidth().height(1.dp).background(p.line))
             Row(Modifier.fillMaxWidth().background(p.card).padding(horizontal = 6.dp, vertical = 6.dp)) {
-                MultiAction("置顶") {
+                MultiAction(stringResource(DesignR.string.sessions_pin)) {
                     val n = state.selected.size
                     viewModel.pinSelected(true)
-                    toast("已置顶 $n 项")
+                    toast(ctx.getString(DesignR.string.sessions_pinned_toast, n))
                 }
-                MultiAction("归档") {
+                MultiAction(stringResource(DesignR.string.sessions_archive)) {
                     val n = state.selected.size
                     viewModel.archiveSelected()
-                    toast("已归档 $n 项")
+                    toast(ctx.getString(DesignR.string.sessions_archived_toast, n))
                 }
-                MultiAction("移动") { movingSelected = true }
-                MultiAction("删除", danger = true) { confirmingDelete = true }
-                MultiAction("取消") { viewModel.clearSelection() }
+                MultiAction(stringResource(DesignR.string.sessions_move_action)) { movingSelected = true }
+                MultiAction(stringResource(DesignR.string.common_delete), danger = true) {
+                    confirmingDelete = true
+                }
+                MultiAction(stringResource(DesignR.string.common_cancel)) { viewModel.clearSelection() }
             }
         }
         SnackbarHost(snackbar)
@@ -526,27 +563,33 @@ fun SessionsScreen(
     if (confirmingDelete) {
         AlertDialog(
             onDismissRequest = { confirmingDelete = false },
-            title = { Text("删除会话") },
-            text = { Text("删除已选的 ${state.selected.size} 项会话？消息记录会一并删除，无法恢复。") },
+            title = { Text(stringResource(DesignR.string.sessions_delete_title)) },
+            text = {
+                Text(
+                    stringResource(DesignR.string.sessions_delete_confirm, state.selected.size),
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     val n = state.selected.size
                     confirmingDelete = false
                     viewModel.deleteSelected()
-                    toast("已删除 $n 项")
-                }) { Text("删除", color = p.red) }
+                    toast(ctx.getString(DesignR.string.sessions_deleted_toast, n))
+                }) { Text(stringResource(DesignR.string.common_delete), color = p.red) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmingDelete = false }) { Text("取消") }
+                TextButton(onClick = { confirmingDelete = false }) {
+                    Text(stringResource(DesignR.string.common_cancel))
+                }
             },
         )
     }
 
     renaming?.let { session ->
         InputDialog(
-            title = "重命名会话",
+            title = stringResource(DesignR.string.sessions_rename_title),
             initial = session.title,
-            confirmLabel = "保存",
+            confirmLabel = stringResource(DesignR.string.common_save),
             onDismiss = { renaming = null },
         ) { value ->
             if (value.isNotBlank()) viewModel.rename(session.id, value.trim())
@@ -581,13 +624,13 @@ fun SessionsScreen(
         GroupDialog(
             current = "",
             known = state.knownGroups,
-            title = "移动 ${state.selected.size} 项到分组",
+            title = stringResource(DesignR.string.sessions_move_selected_title, state.selected.size),
             onDismiss = { movingSelected = false },
         ) { group ->
             val n = state.selected.size
             viewModel.moveSelectedTo(group)
             movingSelected = false
-            toast("已移动 $n 项到「$group」")
+            toast(ctx.getString(DesignR.string.sessions_moved_toast, n, group))
         }
     }
 
@@ -596,8 +639,23 @@ fun SessionsScreen(
         val count = folderSessionCount(state.sessionCountByFolder, path)
         AlertDialog(
             onDismissRequest = { if (!deletingFolder) pendingDeleteGroup = null },
-            title = { Text("删除文件夹「" + folderPathFromGroup(name).substringAfterLast('/') + "」") },
-            text = { Text("文件夹及子文件夹内 ${count} 个会话会移入「${SessionsUiState.ARCHIVE_GROUP}」，会话本身不删除。") },
+            title = {
+                Text(
+                    stringResource(
+                        DesignR.string.sessions_delete_folder_title,
+                        folderPathFromGroup(name).substringAfterLast('/'),
+                    ),
+                )
+            },
+            text = {
+                Text(
+                    stringResource(
+                        DesignR.string.sessions_delete_folder_body,
+                        count,
+                        SessionsUiState.ARCHIVE_GROUP,
+                    ),
+                )
+            },
             confirmButton = {
                 TextButton(enabled = !deletingFolder, onClick = {
                     deletingFolder = true
@@ -606,15 +664,28 @@ fun SessionsScreen(
                         result.fold(
                             onSuccess = {
                                 pendingDeleteGroup = null
-                                toast("已删除文件夹")
+                                toast(ctx.getString(DesignR.string.sessions_folder_deleted_toast))
                             },
-                            onFailure = { toast("删除失败，部分会话可能已归档，请重试") },
+                            onFailure = {
+                                toast(ctx.getString(DesignR.string.sessions_folder_delete_failed))
+                            },
                         )
                     }
-                }) { Text(if (deletingFolder) "删除中…" else "删除", color = p.red) }
+                }) {
+                    Text(
+                        if (deletingFolder) {
+                            stringResource(DesignR.string.sessions_deleting)
+                        } else {
+                            stringResource(DesignR.string.common_delete)
+                        },
+                        color = p.red,
+                    )
+                }
             },
             dismissButton = {
-                TextButton(enabled = !deletingFolder, onClick = { pendingDeleteGroup = null }) { Text("取消") }
+                TextButton(enabled = !deletingFolder, onClick = { pendingDeleteGroup = null }) {
+                    Text(stringResource(DesignR.string.common_cancel))
+                }
             },
         )
     }
@@ -626,25 +697,34 @@ fun SessionsScreen(
             title = { Text(bare.substringAfterLast('/')) },
             text = {
                 Column {
-                    FolderAction("新建子文件夹") { folderMenu = null; creatingFolder = bare }
-                    FolderAction("重命名") { folderMenu = null; renamingFolder = bare }
-                    FolderAction("删除（组内会话进归档）", danger = true) {
+                    FolderAction(stringResource(DesignR.string.sessions_new_subfolder)) {
+                        folderMenu = null
+                        creatingFolder = bare
+                    }
+                    FolderAction(stringResource(DesignR.string.common_rename)) {
+                        folderMenu = null
+                        renamingFolder = bare
+                    }
+                    FolderAction(
+                        stringResource(DesignR.string.sessions_delete_group_action),
+                        danger = true,
+                    ) {
                         folderMenu = null
                         pendingDeleteGroup = path
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { folderMenu = null }) { Text("取消") }
+                TextButton(onClick = { folderMenu = null }) { Text(stringResource(DesignR.string.common_cancel)) }
             },
         )
     }
 
     renamingFolder?.let { path ->
         InputDialog(
-            title = "重命名文件夹",
+            title = stringResource(DesignR.string.sessions_rename_folder_title),
             initial = path.substringAfterLast('/'),
-            confirmLabel = "保存",
+            confirmLabel = stringResource(DesignR.string.common_save),
             onDismiss = { renamingFolder = null },
         ) { value ->
             if (value.isNotBlank()) viewModel.renameFolder(path, value.trim())
@@ -654,14 +734,18 @@ fun SessionsScreen(
 
     creatingFolder?.let { parent ->
         InputDialog(
-            title = if (parent.isBlank()) "新建文件夹" else "在「" + parent.substringAfterLast('/') + "」里新建",
+            title = if (parent.isBlank()) {
+                stringResource(DesignR.string.sessions_new_folder)
+            } else {
+                stringResource(DesignR.string.sessions_create_in_folder_title, parent.substringAfterLast('/'))
+            },
             initial = "",
-            confirmLabel = "创建",
+            confirmLabel = stringResource(DesignR.string.sessions_create_action),
             onDismiss = { creatingFolder = null },
         ) { value ->
             if (value.isNotBlank()) {
                 viewModel.createFolder(value, parent)
-                toast("已创建文件夹「" + value.trim() + "」")
+                toast(ctx.getString(DesignR.string.sessions_folder_created_toast, value.trim()))
             }
             creatingFolder = null
         }
@@ -712,7 +796,7 @@ private fun androidx.compose.foundation.layout.RowScope.MultiAction(
 internal fun InputDialog(
     title: String,
     initial: String = "",
-    confirmLabel: String = "确定",
+    confirmLabel: String = stringResource(DesignR.string.common_ok),
     hint: String = "",
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
@@ -744,7 +828,7 @@ internal fun InputDialog(
             }
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                DialogButton("取消", p.t2, onDismiss)
+                DialogButton(stringResource(DesignR.string.common_cancel), p.t2, onDismiss)
                 Spacer(Modifier.width(QqSpace.s()))
                 DialogButton(confirmLabel, p.accent) { onConfirm(value) }
             }
@@ -769,7 +853,7 @@ private fun DialogButton(label: String, color: Color, onClick: () -> Unit) {
 private fun GroupDialog(
     current: String,
     known: List<String>,
-    title: String = "移动到分组",
+    title: String = stringResource(DesignR.string.sessions_move_to_group),
     onDismiss: () -> Unit,
     onPick: (String) -> Unit,
 ) {
@@ -797,7 +881,13 @@ private fun GroupDialog(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(name, color = p.t1, fontSize = qqFontBody(14.sp), modifier = Modifier.weight(1f))
-                        if (name == current) Text("当前", color = p.accent, fontSize = qqFontBody(11.5.sp))
+                        if (name == current) {
+                            Text(
+                                stringResource(DesignR.string.sessions_current),
+                                color = p.accent,
+                                fontSize = qqFontBody(11.5.sp),
+                            )
+                        }
                     }
                 }
             }
@@ -812,7 +902,7 @@ private fun GroupDialog(
                 )
                 if (newName.isBlank()) {
                     Text(
-                        "新建分组…",
+                        stringResource(DesignR.string.sessions_new_group_hint),
                         color = p.t3,
                         fontSize = qqFontBody(14.sp),
                         modifier = Modifier.padding(horizontal = QqSpace.m(), vertical = 11.dp),
@@ -821,9 +911,11 @@ private fun GroupDialog(
             }
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                DialogButton("取消", p.t2, onDismiss)
+                DialogButton(stringResource(DesignR.string.common_cancel), p.t2, onDismiss)
                 Spacer(Modifier.width(QqSpace.s()))
-                DialogButton("确定", p.accent) { if (newName.isNotBlank()) onPick(newName.trim()) }
+                DialogButton(stringResource(DesignR.string.common_ok), p.accent) {
+                    if (newName.isNotBlank()) onPick(newName.trim())
+                }
             }
         }
     }
@@ -868,7 +960,12 @@ private fun NewChatSheet(
                 .background(p.card)
                 .padding(QqSpace.l()),
         ) {
-            Text("新建聊天", color = p.t1, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(DesignR.string.sessions_new_chat_title),
+                color = p.t1,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
             Spacer(Modifier.height(QqSpace.m()))
 
             Box(Modifier.fillMaxWidth().clip(QqShape.field()).background(p.bg)) {
@@ -881,7 +978,11 @@ private fun NewChatSheet(
                 )
                 if (name.isBlank()) {
                     Text(
-                        if (isGroup) "群聊名称" else "会话名称（可留空）",
+                        if (isGroup) {
+                            stringResource(DesignR.string.sessions_group_name_hint)
+                        } else {
+                            stringResource(DesignR.string.sessions_chat_name_hint)
+                        },
                         color = p.t3,
                         fontSize = 15.sp,
                         modifier = Modifier.padding(horizontal = QqSpace.m(), vertical = 11.dp),
@@ -900,7 +1001,7 @@ private fun NewChatSheet(
                 )
                 if (workspace.isBlank()) {
                     Text(
-                        "工作区路径（留空用默认目录，产物落在这里）",
+                        stringResource(DesignR.string.sessions_workspace_hint),
                         color = p.t3,
                         fontSize = qqFontBody(13.sp),
                         modifier = Modifier.padding(horizontal = QqSpace.m(), vertical = 10.dp),
@@ -912,7 +1013,11 @@ private fun NewChatSheet(
             Row(
                 Modifier.fillMaxWidth().clip(QqShape.field()).background(p.bg).padding(3.dp),
             ) {
-                listOf(false to "普通会话", true to "群聊").forEach { (value, label) ->
+                val kindLabels = listOf(
+                    false to stringResource(DesignR.string.sessions_kind_single),
+                    true to stringResource(DesignR.string.sessions_kind_group),
+                )
+                kindLabels.forEach { (value, label) ->
                     val active = isGroup == value
                     Box(
                         Modifier
@@ -935,7 +1040,11 @@ private fun NewChatSheet(
 
             Spacer(Modifier.height(QqSpace.m()))
             Text(
-                if (isGroup) "选择 Agent（可重复拉同一个）" else "选择一个 Agent",
+                if (isGroup) {
+                    stringResource(DesignR.string.sessions_pick_agent_group)
+                } else {
+                    stringResource(DesignR.string.sessions_pick_agent_single)
+                },
                 color = p.t2,
                 fontSize = qqFontBody(12.sp),
                 fontWeight = FontWeight.SemiBold,
@@ -943,7 +1052,11 @@ private fun NewChatSheet(
             Spacer(Modifier.height(6.dp))
 
             if (models.isEmpty()) {
-                Text("还没有接入 Agent，先到 Agent 页添加 API Key", color = p.t3, fontSize = qqFontBody(12.5.sp))
+                Text(
+                    stringResource(DesignR.string.sessions_no_agent),
+                    color = p.t3,
+                    fontSize = qqFontBody(12.5.sp),
+                )
             } else {
                 Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState())) {
                     models.forEach { profile ->
@@ -993,26 +1106,40 @@ private fun NewChatSheet(
             if (isGroup && memberIds.isNotEmpty()) {
                 Spacer(Modifier.height(QqSpace.s()))
                 Text(
-                    "已选 ${memberIds.size} 位：" + numberedLabels().joinToString("、"),
+                    stringResource(
+                        DesignR.string.sessions_selected_members,
+                        memberIds.size,
+                        numberedLabels().joinToString(stringResource(DesignR.string.common_list_separator)),
+                    ),
                     color = p.t3,
                     fontSize = qqFontBody(11.5.sp),
                 )
             }
 
             Spacer(Modifier.height(14.dp))
-            Text("选择分组", color = p.t2, fontSize = qqFontBody(12.sp), fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(DesignR.string.sessions_pick_group),
+                color = p.t2,
+                fontSize = qqFontBody(12.sp),
+                fontWeight = FontWeight.SemiBold,
+            )
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                listOf("最近") .plus(known.filter { it != "最近" }).take(3).forEach { g ->
-                    val active = group == g || (group.isBlank() && g == "最近")
+                val recentLabel = stringResource(DesignR.string.common_recent)
+                listOf(Session.DEFAULT_GROUP)
+                    .plus(known.filter { it != Session.DEFAULT_GROUP })
+                    .take(3)
+                    .forEach { g ->
+                    val isRecent = g == Session.DEFAULT_GROUP
+                    val active = group == g || (group.isBlank() && isRecent)
                     Text(
-                        g,
+                        if (isRecent) recentLabel else g,
                         color = if (active) Color.White else p.t2,
                         fontSize = qqFontBody(12.sp),
                         modifier = Modifier
                             .clip(QqShape.chip())
                             .background(if (active) p.accent else p.bg)
-                            .clickable { group = if (g == "最近") "" else g }
+                            .clickable { group = if (isRecent) "" else g }
                             .padding(horizontal = 11.dp, vertical = 6.dp),
                     )
                 }
@@ -1027,17 +1154,27 @@ private fun NewChatSheet(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = QqSpace.m(), vertical = 10.dp),
                 )
                 if (group.isBlank()) {
-                    Text("新分组名（留空=最近）", color = p.t3, fontSize = qqFontBody(14.sp),
-                        modifier = Modifier.padding(horizontal = QqSpace.m(), vertical = 10.dp))
+                    Text(
+                        stringResource(DesignR.string.sessions_new_group_name_hint),
+                        color = p.t3, fontSize = qqFontBody(14.sp),
+                        modifier = Modifier.padding(horizontal = QqSpace.m(), vertical = 10.dp),
+                    )
                 }
             }
 
             Spacer(Modifier.height(QqSpace.l()))
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                DialogButton("取消", p.t2, onDismiss)
+                DialogButton(stringResource(DesignR.string.common_cancel), p.t2, onDismiss)
                 Spacer(Modifier.width(QqSpace.s()))
                 val ready = if (isGroup) memberIds.isNotEmpty() else singleAgent != null
-                DialogButton(if (ready) "创建" else "请选择 Agent", if (ready) p.accent else p.t3) {
+                DialogButton(
+                    if (ready) {
+                        stringResource(DesignR.string.sessions_create_action)
+                    } else {
+                        stringResource(DesignR.string.sessions_need_agent)
+                    },
+                    if (ready) p.accent else p.t3,
+                ) {
                     if (!ready) return@DialogButton
                     if (isGroup) {
                         val counters = mutableMapOf<String, Int>()

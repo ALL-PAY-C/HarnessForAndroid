@@ -9,6 +9,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -17,9 +19,11 @@ import dev.dsh.mobile.app.nav.AppNav
 import dev.dsh.mobile.app.notify.NotificationCenter
 import dev.dsh.mobile.app.service.RuntimeService
 import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.common.UiLocale
 import dev.dsh.mobile.core.data.settings.AppSettings
 import dev.dsh.mobile.core.data.settings.ThemeMode
 import dev.dsh.mobile.design.DshTheme
+import dev.dsh.mobile.design.LocalUiLanguage
 import dev.dsh.mobile.design.startup.StartupAnimationGate
 import dev.dsh.mobile.design.ThemeTokens
 import kotlinx.coroutines.Dispatchers
@@ -101,6 +105,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings by container.settings.settings
                 .collectAsStateWithLifecycle(initialValue = AppSettings.DEFAULT)
+            // 语言：DataStore 是唯一事实来源，启动镜像（prefs）与它不一致时补写——
+            // 清过数据、或从没有 ui_language 的旧版本升级上来时都会走到这里。
+            LaunchedEffect(settings.uiLanguage) {
+                UiLocale.mirror(applicationContext, settings.uiLanguage)
+            }
 
             val dark = when (settings.themeMode) {
                 ThemeMode.System -> isSystemInDarkTheme()
@@ -128,13 +137,17 @@ class MainActivity : ComponentActivity() {
                 glassAlpha = settings.glassAlpha,
                 glassBlur = settings.glassBlurDp.dp,
             )
-            DshTheme(tokens = tokens, dark = dark) {
-                // 启动动画：spec 为空（默认）时 StartupAnimationGate 直接铺 content，不叠加任何节点。
-                StartupAnimationGate(
-                    spec = settings.startupAnimation,
-                    durationMs = settings.startupAnimationMs,
-                ) {
-                    AppNav(container = container)
+            // 语言只在这里提供一次：DshTheme 覆盖 LocalContext → 全站 stringResource 换语言，
+            // 而 settings 变更是重组不是生命周期事件，ViewModel 与页面状态都不重建（T9.11 §2.3）。
+            CompositionLocalProvider(LocalUiLanguage provides settings.uiLanguage) {
+                DshTheme(tokens = tokens, dark = dark) {
+                    // 启动动画：spec 为空（默认）时 StartupAnimationGate 直接铺 content，不叠加任何节点。
+                    StartupAnimationGate(
+                        spec = settings.startupAnimation,
+                        durationMs = settings.startupAnimationMs,
+                    ) {
+                        AppNav(container = container)
+                    }
                 }
             }
         }

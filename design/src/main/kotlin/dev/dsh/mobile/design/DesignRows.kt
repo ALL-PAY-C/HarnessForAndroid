@@ -1,6 +1,8 @@
 // 行式组件：会话行、设置行、标签栏与滑动操作行。
 package dev.dsh.mobile.design
 
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
@@ -104,7 +106,7 @@ fun ConvRow(
                     SessionStatusDot(session.status, size = 7.dp)
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        session.title.ifBlank { "未命名会话" },
+                        session.title.ifBlank { stringResource(R.string.common_untitled_session) },
                         color = p.t1,
                         fontSize = qqFontBody(15.5.sp),
                         fontWeight = FontWeight.SemiBold,
@@ -116,12 +118,12 @@ fun ConvRow(
                             Modifier.clip(RoundedCornerShape(6.dp)).background(p.accent.copy(alpha = 0.12f))
                                 .padding(horizontal = 5.dp, vertical = 1.dp),
                         ) {
-                            Text("群 ${session.memberCount}", color = p.accent, fontSize = qqFontBody(9.5.sp), fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.design_group_members, session.memberCount), color = p.accent, fontSize = qqFontBody(9.5.sp), fontWeight = FontWeight.SemiBold)
                         }
                     }
                     if (session.pinned) {
                         Spacer(Modifier.width(5.dp))
-                        Text("置顶", color = p.t3, fontSize = qqFontBody(10.sp))
+                        Text(stringResource(R.string.common_pinned), color = p.t3, fontSize = qqFontBody(10.sp))
                     }
                     Spacer(Modifier.weight(1f))
                     if (timeText.isNotBlank()) {
@@ -131,7 +133,8 @@ fun ConvRow(
                 Spacer(Modifier.height(3.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        session.preview.ifBlank { "开始对话…" },
+                        session.preview.ifBlank { stringResource(R.string.sessions_start_chat) },
+
                         color = p.t2,
                         fontSize = qqFontBody(13.sp),
                         maxLines = 1,
@@ -159,7 +162,15 @@ fun SessionRow(
 }
 
 /** Bottom tab bar: icon + label, accent when active. */
-data class TabSpec(val label: String, val icon: ImageVector)
+data class TabSpec(
+    val label: String?,
+    val icon: ImageVector,
+    @StringRes val labelRes: Int? = null,
+) {
+    /** 底部栏文字：内置 tab 走资源，插件 tab 只有运行期来的纯文本。 */
+    @Composable
+    fun title(): String = labelRes?.let { stringResource(it) } ?: label.orEmpty()
+}
 
 @Composable
 fun QqTabBar(
@@ -187,7 +198,7 @@ fun QqTabBar(
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(end = 6.dp),
             )
-            SlotPlusButton(label = "编辑" + SlotEditState.Slot.BottomBar.label, onClick = onEditPlus)
+            SlotPlusButton(label = stringResource(R.string.common_edit) + SlotEditState.Slot.BottomBar.label, onClick = onEditPlus)
         }
     }
     Column(Modifier.fillMaxWidth().background(p.card).navigationBarsPadding()) {
@@ -208,13 +219,13 @@ private fun androidx.compose.foundation.layout.RowScope.TabItem(tab: TabSpec, ac
     ) {
         Icon(
             tab.icon,
-            tab.label,
+            tab.title(),
             tint = if (active) p.accent else p.t3,
             modifier = Modifier.size(23.dp),
         )
         Spacer(Modifier.height(3.dp))
         Text(
-            tab.label,
+            tab.title(),
             color = if (active) p.accent else p.t3,
             fontSize = 11.sp,
             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,

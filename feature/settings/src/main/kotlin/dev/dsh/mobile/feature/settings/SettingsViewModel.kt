@@ -1,6 +1,7 @@
 package dev.dsh.mobile.feature.settings
 
 import dev.dsh.mobile.core.common.ProxyEnv
+import dev.dsh.mobile.core.common.UiLanguage
 import dev.dsh.mobile.core.common.device.CapabilityTier
 import dev.dsh.mobile.core.common.device.CapabilityTiers
 import dev.dsh.mobile.core.common.device.DeviceCapability
@@ -196,9 +197,8 @@ class SettingsViewModel(
     }
 
     fun setProxyUrl(raw: String) = launch {
-        val invalid = proxyError(raw)
-        if (invalid != null) {
-            message.value = invalid
+        if (proxyInvalid(raw)) {
+            message.value = "代理地址无效，示例：http://127.0.0.1:7890 或 socks5://127.0.0.1:1080"
             return@launch
         }
         val value = ProxyEnv.normalize(raw)
@@ -316,6 +316,8 @@ class SettingsViewModel(
 
     // ---- theme & appearance ----
     fun setThemeMode(m: ThemeMode) = launch { settingsStore.setThemeMode(m) }
+
+    fun setUiLanguage(language: UiLanguage) = launch { settingsStore.setUiLanguage(language) }
     fun setAccent(c: Long) = launch { settingsStore.setAccent(c) }
     fun setBubbleMine(c: Long) = launch { settingsStore.setBubbleMine(c) }
     fun setBubbleOther(c: Long) = launch { settingsStore.setBubbleOther(c) }

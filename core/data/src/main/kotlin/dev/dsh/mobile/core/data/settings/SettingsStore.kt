@@ -13,6 +13,8 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.dsh.mobile.core.common.ProxyEnv
+import dev.dsh.mobile.core.common.UiLanguage
+import dev.dsh.mobile.core.common.UiLocale
 import dev.dsh.mobile.core.data.preset.AgentPresets
 import dev.dsh.mobile.core.model.BackMaterial
 import kotlinx.coroutines.flow.Flow
@@ -38,6 +40,8 @@ data class AppSettings(
      */
     val sessionPresetSwitches: Map<String, String> = emptyMap(),
     val themeMode: ThemeMode = ThemeMode.System,
+    /** 界面语言三态（T9.11 §2.1）：System 跟随系统首选语言。 */
+    val uiLanguage: UiLanguage = UiLanguage.System,
     val accent: Long = 0xFF3B7CFF,
     val bubbleMine: Long = 0xFF3B7CFF,
     val bubbleOther: Long = 0xFFF1F2F5,
@@ -227,6 +231,7 @@ class SettingsStore(private val context: Context) {
     internal object K {
         val defaultPresetId = stringPreferencesKey("default_preset_id")
         val themeMode = stringPreferencesKey("theme_mode")
+        val uiLanguage = stringPreferencesKey("ui_language")
         val accent = longPreferencesKey("accent")
         val bubbleMine = longPreferencesKey("bubble_mine")
         val bubbleOther = longPreferencesKey("bubble_other")
@@ -320,6 +325,8 @@ class SettingsStore(private val context: Context) {
             sessionPresetIds = parseSessionMap(p[K.sessionPresetIds]),
             sessionPresetSwitches = parseSessionMap(p[K.sessionPresetSwitches]),
             themeMode = runCatching { ThemeMode.valueOf(p[K.themeMode] ?: d.themeMode.name) }.getOrDefault(d.themeMode),
+            uiLanguage = runCatching { UiLanguage.valueOf(p[K.uiLanguage] ?: d.uiLanguage.name) }
+                .getOrDefault(d.uiLanguage),
             accent = p[K.accent] ?: d.accent,
             bubbleMine = p[K.bubbleMine] ?: d.bubbleMine,
             bubbleOther = p[K.bubbleOther] ?: d.bubbleOther,
@@ -395,6 +402,16 @@ class SettingsStore(private val context: Context) {
     }
 
     suspend fun setThemeMode(mode: ThemeMode) = edit { it[K.themeMode] = mode.name }
+
+    /**
+     * 写语言：DataStore 是唯一事实来源，同时同步写 SharedPreferences 镜像。
+     * 镜像存在的唯一理由是 Application.attachBaseContext 必须同步拿到语言（T9.11 §2.1），
+     * 不加镜像的话冷启动第一帧会先画中文再跳英文。
+     */
+    suspend fun setUiLanguage(language: UiLanguage) {
+        edit { it[K.uiLanguage] = language.name }
+        UiLocale.mirror(context, language)
+    }
     suspend fun setAccent(color: Long) = edit { it[K.accent] = color }
     suspend fun setBubbleMine(color: Long) = edit { it[K.bubbleMine] = color }
     suspend fun setBubbleOther(color: Long) = edit { it[K.bubbleOther] = color }

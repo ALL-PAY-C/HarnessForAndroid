@@ -1,0 +1,3151 @@
+[
+  {
+    "key": "common_confirm",
+    "en": "OK",
+    "zh": "确定"
+  },
+  {
+    "key": "common_cancel",
+    "en": "Cancel",
+    "zh": "取消"
+  },
+  {
+    "key": "common_save",
+    "en": "Save",
+    "zh": "保存"
+  },
+  {
+    "key": "common_close",
+    "en": "Close",
+    "zh": "关闭"
+  },
+  {
+    "key": "common_delete",
+    "en": "Delete",
+    "zh": "删除"
+  },
+  {
+    "key": "common_done",
+    "en": "Done",
+    "zh": "完成"
+  },
+  {
+    "key": "common_back",
+    "en": "Back",
+    "zh": "返回"
+  },
+  {
+    "key": "common_retry",
+    "en": "Retry",
+    "zh": "重试"
+  },
+  {
+    "key": "app_language_title",
+    "en": "Language",
+    "zh": "界面语言"
+  },
+  {
+    "key": "app_language_system",
+    "en": "Follow system",
+    "zh": "跟随系统"
+  },
+  {
+    "key": "app_language_zh",
+    "en": "Chinese (Simplified)",
+    "zh": "简体中文"
+  },
+  {
+    "key": "app_language_en",
+    "en": "English",
+    "zh": "English"
+  },
+  {
+    "key": "app_language_hint",
+    "en": "Takes effect immediately: screens, dialogs and notifications switch together, without restarting the page.",
+    "zh": "立即生效：页面、对话框、通知同步切换，不重进页面。"
+  },
+  {
+    "key": "settings_gateway_title",
+    "en": "Built-in Model Gateway",
+    "zh": "内置模型网关",
+    "where": "AppGatewayScreen.kt"
+  },
+  {
+    "key": "settings_extras_title",
+    "en": "Extras",
+    "zh": "拓展",
+    "where": "ExtrasScreen.kt"
+  },
+  {
+    "key": "settings_appearance_title",
+    "en": "Appearance",
+    "zh": "外观",
+    "where": "AppAppearanceScreen.kt"
+  },
+  {
+    "key": "settings_appearance_reset",
+    "en": "Reset appearance",
+    "zh": "恢复默认外观",
+    "where": "AppAppearanceScreen.kt"
+  },
+  {
+    "key": "settings_appearance_reset_sub",
+    "en": "Reset icons, wallpaper, colors and spacing",
+    "zh": "重置图标、壁纸、颜色与间距",
+    "where": "AppAppearanceScreen.kt"
+  },
+  {
+    "key": "plugins_page_title",
+    "en": "Plugins",
+    "zh": "插件",
+    "where": "PluginHubScreen.kt"
+  },
+  {
+    "key": "plugins_empty",
+    "en": "No plugin pages yet",
+    "zh": "还没有插件提供页面",
+    "where": "PluginHubScreen.kt"
+  },
+  {
+    "key": "plugins_section_slots",
+    "en": "Plugin widgets",
+    "zh": "插件组件",
+    "where": "PluginHubScreen.kt"
+  },
+  {
+    "key": "plugins_section_settings",
+    "en": "Plugin settings",
+    "zh": "插件设置",
+    "where": "PluginHubScreen.kt"
+  },
+  {
+    "key": "plugins_edit_label",
+    "en": "Edit plugin page",
+    "zh": "编辑插件页",
+    "where": "PluginHubScreen.kt"
+  },
+  {
+    "key": "plugins_picker_title",
+    "en": "Add to plugin page",
+    "zh": "添加到插件页",
+    "where": "PluginHubScreen.kt"
+  },
+  {
+    "key": "plugins_picker_empty",
+    "en": "No plugin widgets to add. Install a plugin with a PluginPage slot first.",
+    "zh": "没有可添加的插件组件：先到插件页装一个带 PluginPage 槽位的插件",
+    "where": "PluginHubScreen.kt"
+  },
+  {
+    "key": "settings_capability_title",
+    "en": "Device permissions",
+    "zh": "手机能力授权",
+    "where": "AppCapabilityScreen.kt"
+  },
+  {
+    "key": "settings_capability_section",
+    "en": "Six system capabilities",
+    "zh": "六类系统能力",
+    "where": "AppCapabilityScreen.kt"
+  },
+  {
+    "key": "settings_capability_hint",
+    "en": "Always = never ask again; This session = ask once per run; Every time = ask on each call. When the system permission is not granted, the action returns E_PERMISSION_DENIED (with needsPermission) instead of throwing or failing silently.",
+    "zh": "常驻允许 = 以后不再问；本会话 = 本次运行内确认一次后不再问；每次询问 = 每次调用都要点允许。系统权限没给时动作返回 E_PERMISSION_DENIED（带 needsPermission），不会抛异常，也不会静默失败。",
+    "where": "AppCapabilityScreen.kt"
+  },
+  {
+    "key": "settings_capability_grant",
+    "en": "Grant",
+    "zh": "去授权",
+    "where": "AppCapabilityScreen.kt"
+  },
+  {
+    "key": "settings_capability_granted",
+    "en": "Granted",
+    "zh": "已授权",
+    "where": "AppCapabilityScreen.kt"
+  },
+  {
+    "key": "settings_capability_ungranted",
+    "en": "Not granted",
+    "zh": "未授权",
+    "where": "AppCapabilityScreen.kt"
+  },
+  {
+    "key": "nav_tab_sessions",
+    "en": "Chats",
+    "zh": "会话",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_tab_plugins",
+    "en": "Plugins",
+    "zh": "插件",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_tab_settings",
+    "en": "Settings",
+    "zh": "设置",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_drawer_skills",
+    "en": "Skill Center",
+    "zh": "技能中心",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_drawer_skills_none",
+    "en": "No skill plugin installed",
+    "zh": "未装技能插件",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_drawer_skills_count",
+    "en": "%1$d skill plugins",
+    "zh": "%1$d 个技能插件",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_drawer_phone",
+    "en": "Phone control",
+    "zh": "手机控制",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_drawer_phone_on",
+    "en": "Accessibility is on",
+    "zh": "无障碍已开启",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_drawer_phone_off",
+    "en": "Root-free control · Not authorized",
+    "zh": "免 root 操控 · 待授权",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_drawer_presets",
+    "en": "Agent presets",
+    "zh": "Agent 预设",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_drawer_presets_default",
+    "en": "Default: %1$s",
+    "zh": "默认：%1$s",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_safe_mode_boot_failed",
+    "en": "The last launches kept failing",
+    "zh": "上次启动连续失败",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_plugin_market_label",
+    "en": "Install plugins",
+    "zh": "插件安装",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_plugin_market_sub",
+    "en": "Search, install, back up and roll back",
+    "zh": "检索安装、备份与回档",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_plugin_manage_label",
+    "en": "Manage plugins",
+    "zh": "插件管理",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_plugin_manage_sub",
+    "en": "Enable, disable and protect saves",
+    "zh": "启用停用、存档保护",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_plugin_page_title",
+    "en": "Plugin page",
+    "zh": "插件页面",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_plugin_page_missing",
+    "en": "Plugin page not found: %1$s",
+    "zh": "插件页面不存在：%1$s",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_slot_no_session",
+    "en": "No open chat, so the plugin action \"%1$s\" has nowhere to go",
+    "zh": "没有打开的会话，插件动作「%1$s」无处发送",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_slot_config_failed",
+    "en": "Could not change plugin config: %1$s",
+    "zh": "插件配置没改成：%1$s",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_persona_updated",
+    "en": "Persona updated for this chat; it applies from the next message",
+    "zh": "本会话人设已更新，下一条消息起生效",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_persona_was_empty",
+    "en": "This chat had no persona to clear",
+    "zh": "本会话本来就没设人设",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_persona_no_session",
+    "en": "Persona not applied: open a chat first",
+    "zh": "没写成人设：先打开一个会话再点",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_link_failed",
+    "en": "Cannot open link: %1$s",
+    "zh": "打不开链接：%1$s",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_slot_page_missing",
+    "en": "The plugin points to a page that does not exist: %1$s",
+    "zh": "插件指向的页面不存在：%1$s",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_custom_html_ready",
+    "en": "HTML rendering ready: html code blocks in messages open in a WebView",
+    "zh": "HTML 渲染已就绪：消息里的 html 代码块会走 WebView",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_custom_html_missing",
+    "en": "No HTML renderer registered; code blocks stay as source",
+    "zh": "HTML 渲染插件没注册，代码块仍是源码视图",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_custom_diagram_ready",
+    "en": "Diagram rendering ready: mermaid / dot / echarts / svg blocks are drawn",
+    "zh": "图形渲染已就绪：mermaid / dot / echarts / svg 等代码块会画成图",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_custom_diagram_missing",
+    "en": "No diagram renderer registered; code blocks stay as source",
+    "zh": "图形渲染插件没注册，代码块仍是源码视图",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_custom_handled",
+    "en": "Handled by the plugin: %1$s",
+    "zh": "由插件处理：%1$s",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_http_empty",
+    "en": "HTTP %1$d (empty response)",
+    "zh": "HTTP %1$d（空响应）",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_http_failed",
+    "en": "Request failed: %1$s",
+    "zh": "请求失败：%1$s",
+    "where": "AppNav.kt"
+  },
+  {
+    "key": "nav_drawer_runtime_ready",
+    "en": "Runtime ready",
+    "zh": "运行时就绪",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_drawer_runtime_starting",
+    "en": "Runtime starting",
+    "zh": "运行时启动中",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_drawer_runtime_reconnecting",
+    "en": "Reconnecting",
+    "zh": "重连中",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_drawer_runtime_failed",
+    "en": "Runtime error",
+    "zh": "运行时异常",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_drawer_runtime_unconfigured",
+    "en": "Runtime not configured",
+    "zh": "未配置运行时",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_search_placeholder",
+    "en": "Search chats / messages",
+    "zh": "搜索会话 / 聊天记录",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_search_clear",
+    "en": "Clear",
+    "zh": "清除",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_drawer_section_common",
+    "en": "Pinned",
+    "zh": "常用",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_drawer_section_recent",
+    "en": "Recent chats",
+    "zh": "最近会话",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_drawer_no_sessions",
+    "en": "No chats yet",
+    "zh": "还没有会话",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_drawer_picker_title",
+    "en": "Add to drawer",
+    "zh": "添加到抽屉",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_drawer_picker_empty",
+    "en": "No plugin widgets to add. Install a plugin with a Drawer slot first.",
+    "zh": "没有可添加的插件组件：先到插件页装一个带抽屉槽位的插件",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_search_searching",
+    "en": "Searching…",
+    "zh": "搜索中…",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "common_no_result",
+    "en": "No results",
+    "zh": "没有找到相关内容",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_search_empty_hint",
+    "en": "Try another keyword: chat title or message text",
+    "zh": "换个关键词：会话标题或消息正文",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_search_section_sessions",
+    "en": "Chats",
+    "zh": "会话",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_search_section_messages",
+    "en": "Messages",
+    "zh": "聊天记录",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "common_untitled_session",
+    "en": "Untitled chat",
+    "zh": "未命名会话",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "common_pinned",
+    "en": "Pinned",
+    "zh": "置顶",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "common_no_messages",
+    "en": "No messages yet",
+    "zh": "还没有消息",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_drawer_runtime_footer",
+    "en": "Local Node runtime · Works offline",
+    "zh": "本地 Node 运行时 · 无需联网",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_role_user",
+    "en": "Me",
+    "zh": "我",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_role_assistant",
+    "en": "Assistant",
+    "zh": "助手",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_role_system",
+    "en": "System",
+    "zh": "系统",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_role_message",
+    "en": "Message",
+    "zh": "消息",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_time_just_now",
+    "en": "Just now",
+    "zh": "刚刚",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_time_minutes",
+    "en": "%1$d min ago",
+    "zh": "%1$d 分钟前",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_time_hours",
+    "en": "%1$d h ago",
+    "zh": "%1$d 小时前",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_time_yesterday",
+    "en": "Yesterday",
+    "zh": "昨天",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_search_title",
+    "en": "Search history",
+    "zh": "搜索历史记录",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_search_page_empty_title",
+    "en": "Search chats and messages",
+    "zh": "搜索会话与聊天记录",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "nav_search_page_empty_hint",
+    "en": "Type part of a chat title or message text",
+    "zh": "输入会话标题或消息正文里的片段",
+    "where": "AppDrawer.kt"
+  },
+  {
+    "key": "sessions_selected_count",
+    "en": "%1$d selected",
+    "zh": "已选 %1$d 项",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "common_select_all",
+    "en": "Select all",
+    "zh": "全选",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "common_exit",
+    "en": "Exit",
+    "zh": "退出",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_title",
+    "en": "Chats",
+    "zh": "会话",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "common_sidebar",
+    "en": "Sidebar",
+    "zh": "侧边栏",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_new_folder",
+    "en": "New folder",
+    "zh": "新建文件夹",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_new_chat",
+    "en": "New chat",
+    "zh": "新建会话",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "common_close_search",
+    "en": "Close search",
+    "zh": "关闭搜索",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_loading",
+    "en": "Loading chats",
+    "zh": "正在读取会话",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_loading_hint",
+    "en": "The local chat list will be ready in a moment",
+    "zh": "稍等片刻，本地会话列表马上就好",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_empty_title",
+    "en": "No chats yet",
+    "zh": "还没有会话",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_empty_ready_hint",
+    "en": "Tap + to start one, or sync history in Settings",
+    "zh": "点右上角 + 新建，或在设置里同步历史会话",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_empty_no_model",
+    "en": "Add a model on the Agents page first, then tap + to start chatting",
+    "zh": "先在 Agent 页添加一个模型，再点右上角 + 开始对话",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_empty_failed",
+    "en": "Connection failed: %1$s",
+    "zh": "连接失败：%1$s",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_empty_no_key",
+    "en": "Add a model (with its API key) on the Agents page, then come back and tap +",
+    "zh": "先在 Agent 页添加模型（填 API Key），再回到这里点 + 新建对话",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_all_collapsed_title",
+    "en": "Nothing to show",
+    "zh": "没有可显示的会话",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_all_collapsed_hint",
+    "en": "All groups are collapsed — expand a folder chip above, or sync history in Settings",
+    "zh": "分组都收起了：点上方文件夹条展开，或到设置里同步历史会话",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_unarchive",
+    "en": "Restore",
+    "zh": "撤回",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_archive",
+    "en": "Archive",
+    "zh": "归档",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_group_action",
+    "en": "Group",
+    "zh": "分组",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_slot_add_title",
+    "en": "Add to chat list",
+    "zh": "添加到会话列表",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_slot_picker_empty",
+    "en": "No plugin widgets to add — install a plugin with a chat-list slot first",
+    "zh": "没有可添加的插件组件：先到插件页装一个带会话列表槽位的插件",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_pin",
+    "en": "Pin",
+    "zh": "置顶",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_pinned_toast",
+    "en": "Pinned %1$d",
+    "zh": "已置顶 %1$d 项",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_archived_toast",
+    "en": "Archived %1$d",
+    "zh": "已归档 %1$d 项",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_move_action",
+    "en": "Move",
+    "zh": "移动",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_delete_title",
+    "en": "Delete chats",
+    "zh": "删除会话",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_delete_confirm",
+    "en": "Delete %1$d selected chats? Their messages go with them and cannot be recovered.",
+    "zh": "删除已选的 %1$d 项会话？消息记录会一并删除，无法恢复。",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_deleted_toast",
+    "en": "Deleted %1$d",
+    "zh": "已删除 %1$d 项",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_rename_title",
+    "en": "Rename chat",
+    "zh": "重命名会话",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_move_selected_title",
+    "en": "Move %1$d items to a group",
+    "zh": "移动 %1$d 项到分组",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_moved_toast",
+    "en": "Moved %1$d to \"%2$s\"",
+    "zh": "已移动 %1$d 项到「%2$s」",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_delete_folder_title",
+    "en": "Delete folder \"%1$s\"",
+    "zh": "删除文件夹「%1$s」",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_delete_folder_body",
+    "en": "%1$d chats in this folder and its subfolders move to \"%2$s\"; the chats themselves are kept.",
+    "zh": "文件夹及子文件夹内 %1$d 个会话会移入「%2$s」，会话本身不删除。",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_folder_deleted_toast",
+    "en": "Folder deleted",
+    "zh": "已删除文件夹",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_folder_delete_failed",
+    "en": "Delete failed — some chats may already be archived, try again",
+    "zh": "删除失败，部分会话可能已归档，请重试",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_deleting",
+    "en": "Deleting…",
+    "zh": "删除中…",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_new_subfolder",
+    "en": "New subfolder",
+    "zh": "新建子文件夹",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_delete_group_action",
+    "en": "Delete (chats go to archive)",
+    "zh": "删除（组内会话进归档）",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_rename_folder_title",
+    "en": "Rename folder",
+    "zh": "重命名文件夹",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_create_in_folder_title",
+    "en": "New inside \"%1$s\"",
+    "zh": "在「%1$s」里新建",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_create_action",
+    "en": "Create",
+    "zh": "创建",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_folder_created_toast",
+    "en": "Created folder \"%1$s\"",
+    "zh": "已创建文件夹「%1$s」",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "common_ok",
+    "en": "OK",
+    "zh": "确定",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_move_to_group",
+    "en": "Move to group",
+    "zh": "移动到分组",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_current",
+    "en": "Current",
+    "zh": "当前",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_new_group_hint",
+    "en": "New group…",
+    "zh": "新建分组…",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_new_chat_title",
+    "en": "New chat",
+    "zh": "新建聊天",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_group_name_hint",
+    "en": "Group name",
+    "zh": "群聊名称",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_chat_name_hint",
+    "en": "Chat name (optional)",
+    "zh": "会话名称（可留空）",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_workspace_hint",
+    "en": "Workspace path (blank = default dir; outputs land here)",
+    "zh": "工作区路径（留空用默认目录，产物落在这里）",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_kind_single",
+    "en": "Single chat",
+    "zh": "普通会话",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_kind_group",
+    "en": "Group chat",
+    "zh": "群聊",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_pick_agent_group",
+    "en": "Pick agents (the same one may be added twice)",
+    "zh": "选择 Agent（可重复拉同一个）",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_pick_agent_single",
+    "en": "Pick an agent",
+    "zh": "选择一个 Agent",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_no_agent",
+    "en": "No agents connected yet — add an API key on the Agents page",
+    "zh": "还没有接入 Agent，先到 Agent 页添加 API Key",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_selected_members",
+    "en": "%1$d selected: %2$s",
+    "zh": "已选 %1$d 位：%2$s",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "common_list_separator",
+    "en": ", ",
+    "zh": "、",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_pick_group",
+    "en": "Pick a group",
+    "zh": "选择分组",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "common_recent",
+    "en": "Recent",
+    "zh": "最近",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_new_group_name_hint",
+    "en": "New group name (blank = Recent)",
+    "zh": "新分组名（留空=最近）",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "sessions_need_agent",
+    "en": "Pick an agent first",
+    "zh": "请选择 Agent",
+    "where": "SessionsScreen.kt"
+  },
+  {
+    "key": "common_rename",
+    "en": "Rename",
+    "zh": "重命名",
+    "where": "common"
+  },
+  {
+    "key": "common_menu",
+    "en": "Menu",
+    "zh": "菜单",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_section_runtime",
+    "en": "Runtime",
+    "zh": "运行环境",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_runtime_local_ready",
+    "en": "Running locally · %1$s",
+    "zh": "本地运行中 · %1$s",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_runtime_ready_detail",
+    "en": "ready",
+    "zh": "就绪",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_runtime_starting",
+    "en": "Starting · %1$s",
+    "zh": "启动中 · %1$s",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_runtime_reconnecting",
+    "en": "Reconnecting · attempt %1$d",
+    "zh": "重连中 · 第 %1$d 次",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_runtime_failed",
+    "en": "Error · %1$s",
+    "zh": "异常 · %1$s",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_runtime_not_started",
+    "en": "Not started",
+    "zh": "未启动",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_runtime_running",
+    "en": "Running · %1$s",
+    "zh": "运行中 · %1$s",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_reconnect",
+    "en": "Reconnect",
+    "zh": "重连",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_connect",
+    "en": "Connect",
+    "zh": "连接",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_section_models",
+    "en": "Models",
+    "zh": "模型接入",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_section_models_sub",
+    "en": "API keys and the default model",
+    "zh": "API Key 与默认模型",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_no_models",
+    "en": "No models connected yet",
+    "zh": "还没有接入模型",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_no_models_hint",
+    "en": "One API key is enough to put an agent to work (DeepSeek / OpenAI-compatible / any relay)",
+    "zh": "填一个 API Key 就能让 Agent 干活（DeepSeek / OpenAI 兼容 / 第三方中转都可以）",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_add_model",
+    "en": "Add model",
+    "zh": "添加模型",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_add_model_sub",
+    "en": "API key / base URL / model name",
+    "zh": "API Key / Base URL / 模型名",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_section_tools",
+    "en": "Phone tools",
+    "zh": "手机工具",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_section_tools_sub",
+    "en": "Channels and permission state",
+    "zh": "通道与授权状态",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_section_running",
+    "en": "Running",
+    "zh": "运行中",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_section_running_sub",
+    "en": "Agents executing right now",
+    "zh": "正在执行的 Agent",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_section_commands",
+    "en": "Commands",
+    "zh": "可用指令",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_section_all",
+    "en": "All chats",
+    "zh": "全部会话",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_section_all_sub",
+    "en": "Every past chat",
+    "zh": "全部历史会话",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_empty_all_title",
+    "en": "No agent chats yet",
+    "zh": "还没有 Agent 会话",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_empty_all_hint",
+    "en": "Go back to Chats and tap + to create one",
+    "zh": "回到会话页点右上角 + 新建一个",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_idle",
+    "en": "Idle",
+    "zh": "空闲",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_delete_model_title",
+    "en": "Delete model",
+    "zh": "删除模型",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_delete_model_body",
+    "en": "Delete \"%1$s\"? Its API key goes too and cannot be recovered.",
+    "zh": "删除「%1$s」？API Key 会一起删除，无法恢复。",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_engine_no_models",
+    "en": "The engine plugin reported no models — check that it is installed and was started on the Plugins page, or type a model name directly",
+    "zh": "引擎插件没有上报模型：确认插件已安装并在插件页启动过，或直接手填模型名",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_context_m",
+    "en": "%1$dM context",
+    "zh": "%1$dM 上下文",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_context_k",
+    "en": "%1$dK context",
+    "zh": "%1$dK 上下文",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_context",
+    "en": "%1$d context",
+    "zh": "%1$d 上下文",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_badge_default",
+    "en": "Default",
+    "zh": "默认",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_reasoning_badge",
+    "en": "Thinking %1$s",
+    "zh": "思考%1$s",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_reasoning_off",
+    "en": "Off",
+    "zh": "关",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_reasoning_low",
+    "en": "Low",
+    "zh": "低",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_reasoning_medium",
+    "en": "Medium",
+    "zh": "中",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_reasoning_high",
+    "en": "High",
+    "zh": "高",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_test",
+    "en": "Test",
+    "zh": "测试",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_set_default",
+    "en": "Set as default",
+    "zh": "设为默认",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_badge_current",
+    "en": "Current",
+    "zh": "当前",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_authorize",
+    "en": "Authorize",
+    "zh": "授权",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_available",
+    "en": "Available",
+    "zh": "可用",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_reprobe",
+    "en": "Re-probe",
+    "zh": "重新探测",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_no_output",
+    "en": "No output",
+    "zh": "无输出",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_dialog_edit",
+    "en": "Edit model",
+    "zh": "编辑模型",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_field_name",
+    "en": "Name",
+    "zh": "名称",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_field_model_name",
+    "en": "Model name",
+    "zh": "模型名",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_fetching",
+    "en": "Fetching…",
+    "zh": "拉取中…",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_fetch_models",
+    "en": "Fetch model list",
+    "zh": "拉取模型列表",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_available_count",
+    "en": "%1$d available · pick several",
+    "zh": "共 %1$d 个 · 可多选",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_picked_count",
+    "en": "%1$d picked",
+    "zh": "已选 %1$d 个",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_fetch_failed",
+    "en": "Fetch failed: %1$s",
+    "zh": "拉取失败：%1$s",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_field_context_window",
+    "en": "Context window tokens (blank = auto-detect)",
+    "zh": "上下文窗口 tokens（留空自动判断）",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_field_reasoning",
+    "en": "Reasoning effort",
+    "zh": "思考强度",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_field_max_output",
+    "en": "Max output tokens (blank = omit)",
+    "zh": "最大输出 tokens（留空 = 不发送）",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_field_temperature",
+    "en": "Temperature (0-2, decimals ok, blank = omit)",
+    "zh": "温度（0-2，可小数，留空 = 不发送）",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_field_top_p",
+    "en": "Top P (0-1, decimals ok, blank = omit)",
+    "zh": "Top P（0-1，可小数，留空 = 不发送）",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_supports_tools",
+    "en": "Tool calling",
+    "zh": "支持工具调用",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_supports_tools_hint",
+    "en": "When off, requests carry no tools",
+    "zh": "关闭后请求里不带 tools",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "status_ready",
+    "en": "Ready",
+    "zh": "就绪",
+    "where": "DesignFeedback.kt"
+  },
+  {
+    "key": "status_starting",
+    "en": "Starting",
+    "zh": "启动中",
+    "where": "DesignFeedback.kt"
+  },
+  {
+    "key": "status_reconnecting",
+    "en": "Reconnect %1$d",
+    "zh": "重连 %1$d",
+    "where": "DesignFeedback.kt"
+  },
+  {
+    "key": "status_offline",
+    "en": "Offline",
+    "zh": "离线",
+    "where": "DesignFeedback.kt"
+  },
+  {
+    "key": "status_unconfigured",
+    "en": "Not configured",
+    "zh": "未配置",
+    "where": "DesignFeedback.kt"
+  },
+  {
+    "key": "appearance_group_icon",
+    "en": "Icon",
+    "zh": "图标",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_icon_current_custom",
+    "en": "Current: custom image",
+    "zh": "当前：自定义图片",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_icon_current_builtin",
+    "en": "Current: built-in icon",
+    "zh": "当前：内置图标",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_icon_style",
+    "en": "Icon style",
+    "zh": "图标样式",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_icon_default",
+    "en": "Default",
+    "zh": "默认",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_icon_custom",
+    "en": "Image",
+    "zh": "图片",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_icon_pick",
+    "en": "Choose icon image…",
+    "zh": "选择图标图片…",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_icon_replace",
+    "en": "Replace icon image…",
+    "zh": "更换图标图片…",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_icon_clear",
+    "en": "Remove custom icon",
+    "zh": "清除自定义图标",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_icon_hint",
+    "en": "Picked through the system file picker (image/*) and copied into the app's private directory, so no SAF grant is needed later. Non-square images are scaled uniformly, never cropped.",
+    "zh": "图片从系统文件选择器取（image/*），会复制一份到应用私有目录（不再依赖 SAF 授权），非正方形图按等比缩放不裁切。",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_group_theme",
+    "en": "Theme",
+    "zh": "主题",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_theme_mode",
+    "en": "Light / dark",
+    "zh": "深浅",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_theme_system",
+    "en": "Follow system",
+    "zh": "跟随系统",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_theme_light",
+    "en": "Light",
+    "zh": "浅色",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_theme_dark",
+    "en": "Dark",
+    "zh": "深色",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_bg_pick",
+    "en": "Choose background image…",
+    "zh": "自定义背景图片…",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_bg_replace",
+    "en": "Replace background image…",
+    "zh": "更换背景图片…",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_bg_clear",
+    "en": "Remove background image",
+    "zh": "清除背景图片",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_bg_dim",
+    "en": "Background dimming",
+    "zh": "背景压暗",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_bg_hint_none",
+    "en": "Without a background image the theme's flat colors are used.",
+    "zh": "未设置背景图时按主题走纯色。",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_bg_hint_set",
+    "en": "The image fills the screen (centerCrop); dimming keeps text readable over bright wallpapers. With material set to None the wallpaper is not drawn.",
+    "zh": "背景图铺满全屏（centerCrop），压暗用来救亮色壁纸上的正文可读性；材质选「无」时壁纸不绘制。",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_border_width",
+    "en": "Border width",
+    "zh": "边框宽度",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_accent_hue",
+    "en": "Hue",
+    "zh": "色调",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_hue_follow",
+    "en": "Follow accent",
+    "zh": "跟随主色",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_hue_reset",
+    "en": "Reset hue to accent",
+    "zh": "色调改回跟随主色",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_group_splash",
+    "en": "Launch animation",
+    "zh": "启动动画",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_splash_style",
+    "en": "Style",
+    "zh": "样式",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_splash_off",
+    "en": "Off",
+    "zh": "关闭",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_splash_fade",
+    "en": "Fade",
+    "zh": "淡入",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_splash_draw_h",
+    "en": "Draw H",
+    "zh": "画 H",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_splash_bounce",
+    "en": "Bounce",
+    "zh": "弹跳",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_splash_dur_default",
+    "en": "Default length",
+    "zh": "默认时长",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_splash_dur_fast",
+    "en": "Fast",
+    "zh": "快",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_splash_dur_normal",
+    "en": "Normal",
+    "zh": "标准",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_splash_dur_slow",
+    "en": "Slow",
+    "zh": "慢",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_splash_replace",
+    "en": "Replace animation image…",
+    "zh": "更换动画图片…",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_splash_pick",
+    "en": "Choose animation image / GIF…",
+    "zh": "选择动画图片 / GIF…",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_splash_custom_spec",
+    "en": "Custom spec",
+    "zh": "自定义 spec",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_splash_apply_spec",
+    "en": "Apply custom spec",
+    "zh": "应用自定义 spec",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_splash_off_action",
+    "en": "Turn off launch animation",
+    "zh": "关闭启动动画",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_splash_hint",
+    "en": "Off by default. Spec syntax: builtin:fade / builtin:draw-h / builtin:bounce / image:<uri> / plugin:<id>. A plugin that registers a style of the same name shows up here; an unknown style is skipped. Tap the screen to skip.",
+    "zh": "默认关闭。spec 写法：builtin:fade / builtin:draw-h / builtin:bounce / image:<uri> / plugin:<id>；插件注册同名样式即可出现在这里，宿主认不出就退回不播。点屏幕可跳过。",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_group_material",
+    "en": "Panel material",
+    "zh": "面板材质",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_strength",
+    "en": "Strength",
+    "zh": "强度",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_blur_radius",
+    "en": "Blur radius",
+    "zh": "雾化半径",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_blur_none",
+    "en": "No blur without a material",
+    "zh": "无材质时不雾化",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_blur_unsupported",
+    "en": "Not supported on this device",
+    "zh": "本机不支持",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_blur_hint",
+    "en": "Blur (RenderEffect) needs Android 12+. Liquid and Acrylic already blur by default, so the slider can only add on top.",
+    "zh": "雾化（RenderEffect）只在 Android 12+ 生效；液态 / 亚克力自带模糊下限，滑块只能往上加。",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_blur_legacy",
+    "en": "This system is below Android 12: no blur, translucency only.",
+    "zh": "当前系统低于 Android 12：不做雾化，只保留半透明降级。",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_group_detail",
+    "en": "Details",
+    "zh": "细节",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_corner_radius",
+    "en": "Corner radius",
+    "zh": "圆角",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_font_scale",
+    "en": "Font size",
+    "zh": "字号",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_density",
+    "en": "List density",
+    "zh": "列表密度",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_compact_bubbles",
+    "en": "Compact bubbles",
+    "zh": "紧凑气泡",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_compact_bubbles_hint",
+    "en": "Tighter bubble padding",
+    "zh": "减小气泡内边距",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_detail_hint",
+    "en": "Corner radius, font size, density and compact bubbles share the same keys as Restore default appearance.",
+    "zh": "圆角 / 字号 / 密度 / 紧凑气泡与「恢复默认外观」共用同一组键。",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_material_none",
+    "en": "None",
+    "zh": "无",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_material_matte",
+    "en": "Matte",
+    "zh": "磨砂",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_material_liquid",
+    "en": "Liquid",
+    "zh": "液态",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_material_acrylic",
+    "en": "Acrylic",
+    "zh": "亚克力",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_material_none_hint",
+    "en": "Fully opaque pages; the wallpaper is not drawn.",
+    "zh": "页面完全实底，壁纸不参与绘制。",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_material_matte_hint",
+    "en": "Translucent panels with background blur; strength adjusts panel opacity.",
+    "zh": "半透明面板 + 背景雾化；强度调面板不透明度。",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_material_liquid_hint",
+    "en": "More transparent panels with top highlights and edge refraction; the wallpaper gets a light blur.",
+    "zh": "更透的面板 + 顶部高光与边缘折射，壁纸带一层轻微模糊。",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "appearance_material_acrylic_hint",
+    "en": "High opacity with fine noise, heavy frost; strength is fixed, the blur slider still applies.",
+    "zh": "高不透明度 + 细噪点，重磨砂；强度固定，雾化滑块仍可用。",
+    "where": "AppearanceSection.kt"
+  },
+  {
+    "key": "settings_reinstall_runtime",
+    "en": "Reinstall runtime",
+    "zh": "重装运行时",
+    "where": "settings"
+  },
+  {
+    "key": "settings_reinstall_runtime_body",
+    "en": "This deletes the current Linux runtime and downloads it again. Installed plugins and skills are unaffected.",
+    "zh": "会删除当前 Linux 运行时并重新下载覆盖，已安装的插件与技能不受影响",
+    "where": "settings"
+  },
+  {
+    "key": "settings_reinstall_runtime_confirm",
+    "en": "Reinstall",
+    "zh": "确认重装",
+    "where": "settings"
+  },
+  {
+    "key": "settings_section_basic",
+    "en": "App & updates",
+    "zh": "应用与更新",
+    "where": "settings"
+  },
+  {
+    "key": "settings_check_update",
+    "en": "Check for updates",
+    "zh": "检查更新",
+    "where": "settings"
+  },
+  {
+    "key": "settings_update_source",
+    "en": "Update source",
+    "zh": "更新源",
+    "where": "settings"
+  },
+  {
+    "key": "settings_update_source_builtin",
+    "en": "Built-in · GitHub (mirrors, tap to customize)",
+    "zh": "内置 · GitHub（多镜像，点这里可自定义）",
+    "where": "settings"
+  },
+  {
+    "key": "settings_download",
+    "en": "Download",
+    "zh": "下载",
+    "where": "settings"
+  },
+  {
+    "key": "settings_install",
+    "en": "Install",
+    "zh": "安装",
+    "where": "settings"
+  },
+  {
+    "key": "settings_extras_sub",
+    "en": "Plugin UI settings",
+    "zh": "拓展插件 UI 配置",
+    "where": "settings"
+  },
+  {
+    "key": "settings_mcp",
+    "en": "MCP servers",
+    "zh": "MCP 服务器",
+    "where": "settings"
+  },
+  {
+    "key": "settings_mcp_sub",
+    "en": "External tool servers (HTTP / SSE)",
+    "zh": "外部工具服务器（HTTP / SSE）",
+    "where": "settings"
+  },
+  {
+    "key": "settings_backup",
+    "en": "Backup & restore",
+    "zh": "备份与恢复",
+    "where": "settings"
+  },
+  {
+    "key": "settings_backup_sub",
+    "en": "Backups / restore from file / full device",
+    "zh": "备份包 / 从文件恢复 / 整机还原",
+    "where": "settings"
+  },
+  {
+    "key": "settings_diagnostics",
+    "en": "Diagnostics & crash reports",
+    "zh": "诊断与崩溃报告",
+    "where": "settings"
+  },
+  {
+    "key": "settings_diagnostics_sub",
+    "en": "Crash log / safe mode / settings rollback",
+    "zh": "崩溃记录 / 安全模式 / 设置回滚",
+    "where": "settings"
+  },
+  {
+    "key": "settings_workspace",
+    "en": "Workspace",
+    "zh": "工作区",
+    "where": "settings"
+  },
+  {
+    "key": "settings_app_private_dir",
+    "en": "App private dir",
+    "zh": "应用私有目录",
+    "where": "settings"
+  },
+  {
+    "key": "settings_default_workspace",
+    "en": "Default workspace",
+    "zh": "默认工作区",
+    "where": "settings"
+  },
+  {
+    "key": "common_select",
+    "en": "Choose",
+    "zh": "选择",
+    "where": "settings"
+  },
+  {
+    "key": "common_clear",
+    "en": "Clear",
+    "zh": "清除",
+    "where": "settings"
+  },
+  {
+    "key": "settings_workspace_unset",
+    "en": "Not set · using app private dir",
+    "zh": "未设置 · 使用应用私有目录",
+    "where": "settings"
+  },
+  {
+    "key": "settings_workspace_granted",
+    "en": "System dir access granted; the runtime still uses the absolute path above",
+    "zh": "已授权系统目录访问；运行时读写仍按上面的绝对路径",
+    "where": "settings"
+  },
+  {
+    "key": "settings_full_file_access",
+    "en": "All files access",
+    "zh": "全文件访问",
+    "where": "settings"
+  },
+  {
+    "key": "settings_readme",
+    "en": "Documentation",
+    "zh": "说明文档",
+    "where": "settings"
+  },
+  {
+    "key": "settings_appearance_sub",
+    "en": "Icon / wallpaper / material / details",
+    "zh": "图标 / 壁纸 / 材质 / 细节",
+    "where": "settings"
+  },
+  {
+    "key": "settings_phone_caps",
+    "en": "Phone permissions",
+    "zh": "手机能力授权",
+    "where": "settings"
+  },
+  {
+    "key": "settings_phone_caps_sub",
+    "en": "Camera / mic / contacts / SMS / dial / location",
+    "zh": "相机 / 麦克风 / 联系人 / 短信 / 拨号 / 定位",
+    "where": "settings"
+  },
+  {
+    "key": "settings_section_chat",
+    "en": "Chats",
+    "zh": "会话",
+    "where": "settings"
+  },
+  {
+    "key": "settings_chat_sub",
+    "en": "Sending / display / groups / templates",
+    "zh": "发送 / 显示 / 群组 / 模板",
+    "where": "settings"
+  },
+  {
+    "key": "settings_send_display",
+    "en": "Sending & display",
+    "zh": "发送与显示",
+    "where": "settings"
+  },
+  {
+    "key": "settings_send_display_sub",
+    "en": "Send / scroll / thinking",
+    "zh": "发消息 / 滚动 / 思考",
+    "where": "settings"
+  },
+  {
+    "key": "settings_send_mode",
+    "en": "Sending while running",
+    "zh": "运行中发消息",
+    "where": "settings"
+  },
+  {
+    "key": "settings_send_queue",
+    "en": "Queue",
+    "zh": "排队",
+    "where": "settings"
+  },
+  {
+    "key": "settings_send_insert",
+    "en": "Insert",
+    "zh": "插入",
+    "where": "settings"
+  },
+  {
+    "key": "settings_send_steer",
+    "en": "Interrupt",
+    "zh": "打断",
+    "where": "settings"
+  },
+  {
+    "key": "settings_send_mode_hint",
+    "en": "Queue = send after the current turn; Insert = don't interrupt, attach to the next request; Interrupt = stop the current reply now.",
+    "zh": "排队＝等这轮跑完再发；插入＝不打断，下一轮请求带上；打断＝立刻中止当前回复。",
+    "where": "settings"
+  },
+  {
+    "key": "settings_group_sessions",
+    "en": "Group sessions",
+    "zh": "会话分组",
+    "where": "settings"
+  },
+  {
+    "key": "settings_group_sessions_hint",
+    "en": "Collapse the chat list by project",
+    "zh": "按项目折叠会话列表",
+    "where": "settings"
+  },
+  {
+    "key": "settings_auto_scroll",
+    "en": "Auto-scroll to bottom",
+    "zh": "自动滚到底",
+    "where": "settings"
+  },
+  {
+    "key": "settings_auto_scroll_hint",
+    "en": "Stick to the bottom when new content arrives",
+    "zh": "新内容到达时贴着底部",
+    "where": "settings"
+  },
+  {
+    "key": "settings_show_duration",
+    "en": "Show duration",
+    "zh": "显示耗时",
+    "where": "settings"
+  },
+  {
+    "key": "settings_show_duration_hint",
+    "en": "Show turn duration at the bubble's bottom right",
+    "zh": "气泡右下角显示本轮用时",
+    "where": "settings"
+  },
+  {
+    "key": "settings_colorize_authors",
+    "en": "Color authors",
+    "zh": "作者着色",
+    "where": "settings"
+  },
+  {
+    "key": "settings_colorize_authors_hint",
+    "en": "Distinct colors per agent in group chats",
+    "zh": "群聊里不同 Agent 用不同颜色",
+    "where": "settings"
+  },
+  {
+    "key": "settings_show_thoughts",
+    "en": "Show thinking",
+    "zh": "显示思考过程",
+    "where": "settings"
+  },
+  {
+    "key": "settings_show_thoughts_hint",
+    "en": "The agent's reasoning snippets",
+    "zh": "Agent 的 reasoning 片段",
+    "where": "settings"
+  },
+  {
+    "key": "settings_thoughts_expanded",
+    "en": "Expand thinking by default",
+    "zh": "思考默认展开",
+    "where": "settings"
+  },
+  {
+    "key": "settings_thoughts_expanded_hint",
+    "en": "New chats open with thinking expanded",
+    "zh": "新会话默认展开思考过程",
+    "where": "settings"
+  },
+  {
+    "key": "settings_render_special",
+    "en": "Render special formats by default",
+    "zh": "默认渲染特殊格式",
+    "where": "settings"
+  },
+  {
+    "key": "settings_render_special_hint",
+    "en": "HTML / LaTeX / Markdown / code blocks; new chats start with this",
+    "zh": "HTML / LaTeX / Markdown / 代码块；新会话按此初始化",
+    "where": "settings"
+  },
+  {
+    "key": "settings_context_tools",
+    "en": "Context & tools",
+    "zh": "上下文与工具",
+    "where": "settings"
+  },
+  {
+    "key": "settings_context_tools_sub",
+    "en": "Status / usage / limits",
+    "zh": "状态 / 用量 / 上限",
+    "where": "settings"
+  },
+  {
+    "key": "settings_show_agent_status",
+    "en": "Show agent status",
+    "zh": "显示 Agent 状态",
+    "where": "settings"
+  },
+  {
+    "key": "settings_show_agent_status_hint",
+    "en": "Running / awaiting-confirmation markers",
+    "zh": "运行中/等待确认标记",
+    "where": "settings"
+  },
+  {
+    "key": "settings_show_token_usage",
+    "en": "Show token usage",
+    "zh": "显示 token 用量",
+    "where": "settings"
+  },
+  {
+    "key": "settings_show_token_usage_hint",
+    "en": "Usage capsule in the title bar",
+    "zh": "标题栏用量胶囊",
+    "where": "settings"
+  },
+  {
+    "key": "settings_auto_approve",
+    "en": "Auto-approve tools",
+    "zh": "自动确认工具",
+    "where": "settings"
+  },
+  {
+    "key": "settings_auto_approve_hint",
+    "en": "Skip the confirmation dialog before running",
+    "zh": "跳过执行前的确认弹窗",
+    "where": "settings"
+  },
+  {
+    "key": "settings_max_output_hint",
+    "en": "0 = unlimited. Reasoning models without a cap can write tens of thousands of characters of thinking; a group turn can take over ten minutes.",
+    "zh": "0 = 不限制。推理模型不设上限会写出几万字思维链，群组一轮能跑十几分钟。",
+    "where": "settings"
+  },
+  {
+    "key": "settings_group_orchestration",
+    "en": "Group orchestration",
+    "zh": "群组编排",
+    "where": "settings"
+  },
+  {
+    "key": "settings_group_orchestration_sub",
+    "en": "Parallelism / roles / context budget",
+    "zh": "并行度 / 分工 / 上下文预算",
+    "where": "settings"
+  },
+  {
+    "key": "settings_group_multi_hint",
+    "en": "The same agent can join a group several times; each instance gets its own context and runs independently.",
+    "zh": "同一 Agent 可以被拉进群多次，每个实例独立上下文、独立执行。",
+    "where": "settings"
+  },
+  {
+    "key": "settings_group_strategy",
+    "en": "Default strategy",
+    "zh": "默认编排",
+    "where": "settings"
+  },
+  {
+    "key": "settings_auto",
+    "en": "Auto",
+    "zh": "自动",
+    "where": "settings"
+  },
+  {
+    "key": "settings_parallel",
+    "en": "Parallel",
+    "zh": "并行",
+    "where": "settings"
+  },
+  {
+    "key": "settings_chain",
+    "en": "Chain",
+    "zh": "串行",
+    "where": "settings"
+  },
+  {
+    "key": "settings_automaton",
+    "en": "Review",
+    "zh": "验收",
+    "where": "settings"
+  },
+  {
+    "key": "settings_group_strategy_hint",
+    "en": "Auto = pick by member count; Parallel = all at once; Chain = one after another; Review = executor and reviewer alternate.",
+    "zh": "自动＝按成员数挑；并行＝同时开工；串行＝依次接力；验收＝执行者与验收者交替。",
+    "where": "settings"
+  },
+  {
+    "key": "settings_room_dispatch",
+    "en": "Room scheduling",
+    "zh": "房间调度",
+    "where": "settings"
+  },
+  {
+    "key": "settings_room_round_robin",
+    "en": "Round robin",
+    "zh": "轮转",
+    "where": "settings"
+  },
+  {
+    "key": "settings_room_moderated",
+    "en": "Moderated",
+    "zh": "主持",
+    "where": "settings"
+  },
+  {
+    "key": "settings_room_dispatch_hint",
+    "en": "Round robin = everyone speaks once, then turn-taking by priority; Moderated = a moderator model picks the next speaker step by step (one extra lightweight request per step).",
+    "zh": "轮转＝首轮全员发言后按优先序接力；主持＝由主持人模型逐步决定下一个发言者（每步多一次轻量请求）。",
+    "where": "settings"
+  },
+  {
+    "key": "settings_subagent_depth",
+    "en": "Subagent depth",
+    "zh": "子代理嵌套",
+    "where": "settings"
+  },
+  {
+    "key": "settings_depth_one",
+    "en": "One level",
+    "zh": "一层",
+    "where": "settings"
+  },
+  {
+    "key": "settings_depth_two",
+    "en": "Two levels",
+    "zh": "两层",
+    "where": "settings"
+  },
+  {
+    "key": "settings_depth_three",
+    "en": "Three levels",
+    "zh": "三层",
+    "where": "settings"
+  },
+  {
+    "key": "settings_depth_hint",
+    "en": "A subagent spawned by the main agent counts as level 1. Deeper levels multiply calls; the default is two.",
+    "zh": "主代理派子代理算第 1 层。开太深会成倍放大调用量，默认两层。",
+    "where": "settings"
+  },
+  {
+    "key": "settings_office_mode",
+    "en": "Office-style self-organization",
+    "zh": "办公室式自主分工",
+    "where": "settings"
+  },
+  {
+    "key": "settings_office_mode_hint",
+    "en": "Let agents claim tasks and hand off to each other in group chats",
+    "zh": "群聊时让 Agent 自己认领任务、互相交接",
+    "where": "settings"
+  },
+  {
+    "key": "settings_group_tools",
+    "en": "Allow tools in groups",
+    "zh": "群聊允许工具",
+    "where": "settings"
+  },
+  {
+    "key": "settings_group_tools_hint",
+    "en": "When off, group members only reply with text and never run shell",
+    "zh": "关闭后群成员只回文字，不跑 shell",
+    "where": "settings"
+  },
+  {
+    "key": "settings_group_isolated",
+    "en": "Independent instances when re-added",
+    "zh": "同人多次拉入各自独立",
+    "where": "settings"
+  },
+  {
+    "key": "settings_group_isolated_hint",
+    "en": "When the same agent joins a group more than once, each instance tracks its own context (turn off to share it)",
+    "zh": "同一个 Agent 进群多次时，每个实例各记各的上下文（关掉会退化成共享）",
+    "where": "settings"
+  },
+  {
+    "key": "settings_role_cards",
+    "en": "Group role cards",
+    "zh": "群聊角色卡",
+    "where": "settings"
+  },
+  {
+    "key": "settings_role_cards_sub",
+    "en": "Supervisor / planner / inspector / executor + custom",
+    "zh": "监督 / 规划 / 检测 / 执行 + 自定义",
+    "where": "settings"
+  },
+  {
+    "key": "settings_role_cards_hint",
+    "en": "Role cards only tell the model who it is; scheduling is decided by the group orchestration above.",
+    "zh": "角色卡只决定「告诉模型它是谁」；怎么排队开工由上面的群组编排决定。",
+    "where": "settings"
+  },
+  {
+    "key": "settings_quick_commands",
+    "en": "Quick commands & templates",
+    "zh": "快捷指令与模板",
+    "where": "settings"
+  },
+  {
+    "key": "settings_quick_commands_sub",
+    "en": "Slash commands / common prompts",
+    "zh": "斜杠命令 / 常用提问",
+    "where": "settings"
+  },
+  {
+    "key": "settings_quick_commands_hint",
+    "en": "One per line; shown as quick buttons in chat",
+    "zh": "每行一条，聊天页显示为快捷按钮",
+    "where": "settings"
+  },
+  {
+    "key": "settings_quick_commands_placeholder",
+    "en": "continue\nsummarize\nrun tests",
+    "zh": "继续\n总结一下\n运行测试",
+    "where": "settings"
+  },
+  {
+    "key": "settings_prompt_templates",
+    "en": "Prompt templates",
+    "zh": "Prompt 模板",
+    "where": "settings"
+  },
+  {
+    "key": "settings_prompt_templates_placeholder",
+    "en": "Explain this code\nWrite unit tests",
+    "zh": "解释这段代码\n写单元测试",
+    "where": "settings"
+  },
+  {
+    "key": "settings_section_notify",
+    "en": "Notifications",
+    "zh": "通知",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_sub",
+    "en": "Ongoing panel / thinking / in-notification choices",
+    "zh": "常驻面板 / 思维链 / 通知内选择",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_enabled",
+    "en": "Enable notifications",
+    "zh": "开启通知",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_enabled_hint",
+    "en": "Master switch; off silences every alert",
+    "zh": "总开关，关掉后所有提醒静默",
+    "where": "settings"
+  },
+  {
+    "key": "settings_dnd",
+    "en": "Do not disturb",
+    "zh": "免打扰",
+    "where": "settings"
+  },
+  {
+    "key": "settings_dnd_hint",
+    "en": "Silence all alerts",
+    "zh": "静音所有提醒",
+    "where": "settings"
+  },
+  {
+    "key": "settings_ongoing",
+    "en": "Ongoing summary notification",
+    "zh": "常驻聚合通知",
+    "where": "settings"
+  },
+  {
+    "key": "settings_ongoing_hint",
+    "en": "Show one row per running chat",
+    "zh": "n 个会话在跑时展示 n 行",
+    "where": "settings"
+  },
+  {
+    "key": "settings_ongoing_enabled",
+    "en": "Enable ongoing notification",
+    "zh": "开启常驻通知",
+    "where": "settings"
+  },
+  {
+    "key": "settings_ongoing_enabled_hint",
+    "en": "Keep running chats in the notification shade",
+    "zh": "进行中的会话常驻通知栏",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_thought",
+    "en": "Show thinking",
+    "zh": "展示思维链",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_thought_hint",
+    "en": "Attach current thinking to each row",
+    "zh": "每行附当前思考内容",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_hide_current",
+    "en": "Hide current chat",
+    "zh": "隐藏当前会话",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_hide_current_hint",
+    "en": "The chat you're viewing doesn't take a row",
+    "zh": "正在看的会话不占通知行",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_keep_done",
+    "en": "Keep finished items",
+    "zh": "完成项保留",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_keep_done_hint",
+    "en": "Leave a notification behind after the run",
+    "zh": "跑完后在通知里留一会儿",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_alerts",
+    "en": "Alerts & choices",
+    "zh": "提醒与选择",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_alerts_sub",
+    "en": "Done / confirmation / vibration",
+    "zh": "完成 / 待确认 / 震动",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_complete",
+    "en": "Completion notification",
+    "zh": "完成通知",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_complete_hint",
+    "en": "Notify when a conversation finishes",
+    "zh": "对话跑完时提醒",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_permission",
+    "en": "Confirmation notification",
+    "zh": "待确认通知",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_permission_hint",
+    "en": "Notify when an agent waits for your confirmation",
+    "zh": "Agent 等你确认时提醒",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_inline",
+    "en": "Choose from the notification",
+    "zh": "通知内直接选择",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_inline_hint",
+    "en": "Attach options as tappable notification buttons",
+    "zh": "把选项挂成通知按钮，可直接点",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_snippet",
+    "en": "Reply snippet",
+    "zh": "回复摘要",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_snippet_hint",
+    "en": "Include a short excerpt in completion notifications",
+    "zh": "完成通知里带一小段回复",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_vibrate",
+    "en": "Vibrate",
+    "zh": "震动",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_vibrate_hint",
+    "en": "Vibrate with notifications",
+    "zh": "通知同时震动",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_heads_up",
+    "en": "Heads-up",
+    "zh": "横幅",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_heads_up_hint",
+    "en": "Show as a heads-up banner; when off it stays silently in the shade",
+    "zh": "以悬浮横幅展示，关闭后只在通知栏静默提示",
+    "where": "settings"
+  },
+  {
+    "key": "settings_section_env",
+    "en": "Environment",
+    "zh": "环境",
+    "where": "settings"
+  },
+  {
+    "key": "settings_env_sub",
+    "en": "Runtime / connections / tools / network / Linux",
+    "zh": "运行时 / 连接 / 工具 / 网络 / Linux",
+    "where": "settings"
+  },
+  {
+    "key": "settings_runtime",
+    "en": "Runtime",
+    "zh": "运行时",
+    "where": "settings"
+  },
+  {
+    "key": "settings_runtime_local",
+    "en": "Local runtime",
+    "zh": "本地运行时",
+    "where": "settings"
+  },
+  {
+    "key": "settings_runtime_local_sub",
+    "en": "Built-in engine, no server needed",
+    "zh": "内置引擎，无需服务器",
+    "where": "settings"
+  },
+  {
+    "key": "settings_restart",
+    "en": "Restart",
+    "zh": "重启",
+    "where": "settings"
+  },
+  {
+    "key": "settings_runtime_version",
+    "en": "Runtime version",
+    "zh": "运行时版本",
+    "where": "settings"
+  },
+  {
+    "key": "settings_clear_logs",
+    "en": "Clear logs",
+    "zh": "清日志",
+    "where": "settings"
+  },
+  {
+    "key": "settings_connections",
+    "en": "Connections",
+    "zh": "连接",
+    "where": "settings"
+  },
+  {
+    "key": "settings_connections_sub",
+    "en": "Local / LAN / remote",
+    "zh": "本地 / 局域网 / 远程",
+    "where": "settings"
+  },
+  {
+    "key": "settings_conn_inprocess",
+    "en": "In-process · this device",
+    "zh": "进程内 · 本机",
+    "where": "settings"
+  },
+  {
+    "key": "settings_conn_active",
+    "en": "In use",
+    "zh": "使用中",
+    "where": "settings"
+  },
+  {
+    "key": "settings_conn_add",
+    "en": "Add connection address",
+    "zh": "添加连接地址",
+    "where": "settings"
+  },
+  {
+    "key": "settings_conn_add_sub",
+    "en": "LAN / custom endpoint",
+    "zh": "局域网 / 自定义 endpoint",
+    "where": "settings"
+  },
+  {
+    "key": "settings_heartbeat",
+    "en": "Heartbeat · remote/WebSocket only",
+    "zh": "心跳 · 仅远程/WebSocket 生效",
+    "where": "settings"
+  },
+  {
+    "key": "settings_tool_channels",
+    "en": "Tool channel",
+    "zh": "工具通道",
+    "where": "settings"
+  },
+  {
+    "key": "settings_tool_channels_sub",
+    "en": "Decides where shell commands run",
+    "zh": "决定 shell 命令在哪跑",
+    "where": "settings"
+  },
+  {
+    "key": "settings_open_terminal",
+    "en": "Open terminal",
+    "zh": "打开终端",
+    "where": "settings"
+  },
+  {
+    "key": "settings_open_terminal_sub",
+    "en": "Built-in PTY, tabs and adjustable font size",
+    "zh": "内置 PTY，多标签、字号可调",
+    "where": "settings"
+  },
+  {
+    "key": "settings_phone_control",
+    "en": "Phone control (accessibility)",
+    "zh": "手机控制（无障碍）",
+    "where": "settings"
+  },
+  {
+    "key": "settings_on",
+    "en": "On",
+    "zh": "已开启",
+    "where": "settings"
+  },
+  {
+    "key": "settings_phone_control_off",
+    "en": "Off · when enabled the app can tap, swipe, type and read the screen",
+    "zh": "未开启 · 开启后 App 可直接点击/滑动/输入/读屏",
+    "where": "settings"
+  },
+  {
+    "key": "settings_overlay",
+    "en": "Overlay status",
+    "zh": "悬浮状态",
+    "where": "settings"
+  },
+  {
+    "key": "settings_overlay_on",
+    "en": "Granted · shows the foreground app once the service connects",
+    "zh": "已授权 · 服务连接后显示前台应用",
+    "where": "settings"
+  },
+  {
+    "key": "settings_overlay_off",
+    "en": "Shows service and foreground app status after granting",
+    "zh": "授权后显示服务与前台应用状态",
+    "where": "settings"
+  },
+  {
+    "key": "settings_exec_channel",
+    "en": "Execution channel",
+    "zh": "执行通道",
+    "where": "settings"
+  },
+  {
+    "key": "settings_exec_in_app",
+    "en": "In-app",
+    "zh": "应用内",
+    "where": "settings"
+  },
+  {
+    "key": "settings_exec_channel_hint",
+    "en": "Linux (proot) is preferred, then any other available channel. Linux can be selected while not installed but stays unavailable; install it in the Linux environment section.",
+    "zh": "自动优先 Linux（proot），再选择其它可用通道。Linux 未安装时仍可选，但通道不可用；请在 Linux 环境区完成安装。",
+    "where": "settings"
+  },
+  {
+    "key": "settings_network",
+    "en": "Network & downloads",
+    "zh": "网络与下载",
+    "where": "settings"
+  },
+  {
+    "key": "settings_search_engine",
+    "en": "Search engine",
+    "zh": "搜索引擎",
+    "where": "settings"
+  },
+  {
+    "key": "settings_searxng_url",
+    "en": "SearXNG instance URL",
+    "zh": "SearXNG 实例 URL",
+    "where": "settings"
+  },
+  {
+    "key": "settings_save_searxng",
+    "en": "Save instance URL",
+    "zh": "保存实例 URL",
+    "where": "settings"
+  },
+  {
+    "key": "settings_exa_key_saved",
+    "en": "Exa API key (saved, leave blank to clear)",
+    "zh": "Exa API Key（已保存，留空可清除）",
+    "where": "settings"
+  },
+  {
+    "key": "settings_save_exa_key",
+    "en": "Save / clear key",
+    "zh": "保存 / 清除密钥",
+    "where": "settings"
+  },
+  {
+    "key": "settings_max_download_mb",
+    "en": "Download limit per file in MB (1–4096)",
+    "zh": "单次下载上限 MB（1–4096）",
+    "where": "settings"
+  },
+  {
+    "key": "settings_save_max_download",
+    "en": "Save download limit",
+    "zh": "保存下载上限",
+    "where": "settings"
+  },
+  {
+    "key": "settings_proxy_field",
+    "en": "Proxy address HTTP(S)_PROXY (blank = direct)",
+    "zh": "代理地址 HTTP(S)_PROXY（留空 = 直连）",
+    "where": "settings"
+  },
+  {
+    "key": "settings_save_proxy",
+    "en": "Save proxy",
+    "zh": "保存代理",
+    "where": "settings"
+  },
+  {
+    "key": "settings_proxy_hint",
+    "en": "Once saved, every subprocess (Termux / proot / in-app shell, including pip and git) inherits it; clear it to go direct.",
+    "zh": "保存后所有子进程（Termux / proot / 应用内 shell，含 pip 与 git）都带上它；清空即直连。",
+    "where": "settings"
+  },
+  {
+    "key": "settings_permissions",
+    "en": "Permissions & background",
+    "zh": "权限与后台",
+    "where": "settings"
+  },
+  {
+    "key": "settings_permissions_sub",
+    "en": "Accessibility, notification access, battery optimization, Shizuku",
+    "zh": "无障碍、通知使用权、电池优化、Shizuku",
+    "where": "settings"
+  },
+  {
+    "key": "settings_a11y_service",
+    "en": "Accessibility service",
+    "zh": "无障碍服务",
+    "where": "settings"
+  },
+  {
+    "key": "settings_a11y_on",
+    "en": "Enabled · phone control available",
+    "zh": "已启用 · 手机控制可用",
+    "where": "settings"
+  },
+  {
+    "key": "settings_a11y_off",
+    "en": "Disabled · phone control unavailable",
+    "zh": "未启用 · 手机控制不可用",
+    "where": "settings"
+  },
+  {
+    "key": "settings_go_enable",
+    "en": "Enable",
+    "zh": "去开启",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notif_access",
+    "en": "Notification access",
+    "zh": "通知使用权",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notif_access_on",
+    "en": "Granted · notification tools can read the shade",
+    "zh": "已授权 · 通知类工具可读通知栏",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notif_access_off",
+    "en": "Not granted · notification tools get nothing",
+    "zh": "未授权 · 通知类工具拿不到通知",
+    "where": "settings"
+  },
+  {
+    "key": "settings_authorize",
+    "en": "Grant",
+    "zh": "去授权",
+    "where": "settings"
+  },
+  {
+    "key": "settings_battery_whitelist",
+    "en": "Battery optimization allowlist",
+    "zh": "电池优化白名单",
+    "where": "settings"
+  },
+  {
+    "key": "settings_battery_on",
+    "en": "Added · background isn't restricted",
+    "zh": "已加入 · 后台不被系统限制",
+    "where": "settings"
+  },
+  {
+    "key": "settings_battery_off",
+    "en": "Not added · may be killed after a long time in background",
+    "zh": "未加入 · 长时间后台可能被系统杀掉",
+    "where": "settings"
+  },
+  {
+    "key": "settings_go_settings",
+    "en": "Open settings",
+    "zh": "去设置",
+    "where": "settings"
+  },
+  {
+    "key": "settings_shizuku_not_installed",
+    "en": "Not installed",
+    "zh": "未安装",
+    "where": "settings"
+  },
+  {
+    "key": "settings_shizuku_open",
+    "en": "Open Shizuku",
+    "zh": "打开 Shizuku",
+    "where": "settings"
+  },
+  {
+    "key": "settings_refresh",
+    "en": "Refresh",
+    "zh": "刷新",
+    "where": "settings"
+  },
+  {
+    "key": "settings_probing",
+    "en": "Checking…",
+    "zh": "检测中…",
+    "where": "settings"
+  },
+  {
+    "key": "settings_reprobe",
+    "en": "Re-check",
+    "zh": "重新检测",
+    "where": "settings"
+  },
+  {
+    "key": "settings_refresh_perms",
+    "en": "Refresh permission status",
+    "zh": "刷新权限状态",
+    "where": "settings"
+  },
+  {
+    "key": "settings_linux",
+    "en": "Linux environment",
+    "zh": "Linux 环境",
+    "where": "settings"
+  },
+  {
+    "key": "settings_linux_install",
+    "en": "Install / repair Linux environment",
+    "zh": "安装 / 修复 Linux 环境",
+    "where": "settings"
+  },
+  {
+    "key": "settings_repair_runtime",
+    "en": "Repair runtime",
+    "zh": "修复运行时",
+    "where": "settings"
+  },
+  {
+    "key": "settings_kernel_install",
+    "en": "Install / repair DSH kernel",
+    "zh": "安装 / 修复 DSH 内核",
+    "where": "settings"
+  },
+  {
+    "key": "settings_self_check",
+    "en": "Run self-check",
+    "zh": "运行自检",
+    "where": "settings"
+  },
+  {
+    "key": "settings_refresh_state",
+    "en": "Refresh status",
+    "zh": "刷新状态",
+    "where": "settings"
+  },
+  {
+    "key": "settings_bootstrap_env",
+    "en": "Bootstrap environment (Termux / proot / pip / git)",
+    "zh": "一键补齐环境（Termux / proot / pip / git）",
+    "where": "settings"
+  },
+  {
+    "key": "settings_cleanup_versions",
+    "en": "Clean up inactive versions",
+    "zh": "清理非激活版本",
+    "where": "settings"
+  },
+  {
+    "key": "settings_clear_diagnostics",
+    "en": "Clear diagnostic log",
+    "zh": "清空诊断日志",
+    "where": "settings"
+  },
+  {
+    "key": "settings_no_diagnostics",
+    "en": "No diagnostic log yet",
+    "zh": "暂无诊断日志",
+    "where": "settings"
+  },
+  {
+    "key": "settings_gateway",
+    "en": "Built-in model gateway",
+    "zh": "内置模型网关",
+    "where": "settings"
+  },
+  {
+    "key": "settings_gateway_sub",
+    "en": "Status / credentials / port",
+    "zh": "状态 / 凭据 / 端口",
+    "where": "settings"
+  },
+  {
+    "key": "settings_section_plugins",
+    "en": "Plugin settings",
+    "zh": "插件设置",
+    "where": "settings"
+  },
+  {
+    "key": "settings_manifest_url",
+    "en": "Manifest URL https://…/update.json",
+    "zh": "清单地址 https://…/update.json",
+    "where": "settings"
+  },
+  {
+    "key": "settings_enter",
+    "en": "Open",
+    "zh": "进入",
+    "where": "settings"
+  },
+  {
+    "key": "settings_granted",
+    "en": "Granted",
+    "zh": "已授权",
+    "where": "settings"
+  },
+  {
+    "key": "settings_ungranted",
+    "en": "Not granted",
+    "zh": "未授权",
+    "where": "settings"
+  },
+  {
+    "key": "settings_conn_add_title",
+    "en": "Add connection",
+    "zh": "添加连接",
+    "where": "settings"
+  },
+  {
+    "key": "settings_conn_edit_title",
+    "en": "Edit connection",
+    "zh": "编辑连接",
+    "where": "settings"
+  },
+  {
+    "key": "settings_field_name",
+    "en": "Name",
+    "zh": "名称",
+    "where": "settings"
+  },
+  {
+    "key": "settings_field_url",
+    "en": "Address",
+    "zh": "地址",
+    "where": "settings"
+  },
+  {
+    "key": "settings_field_token",
+    "en": "Token (optional)",
+    "zh": "Token（可选）",
+    "where": "settings"
+  },
+  {
+    "key": "settings_field_cwd",
+    "en": "Working directory (optional)",
+    "zh": "工作目录（可选）",
+    "where": "settings"
+  },
+  {
+    "key": "settings_custom_connection",
+    "en": "Custom connection",
+    "zh": "自定义连接",
+    "where": "settings"
+  },
+  {
+    "key": "settings_title",
+    "en": "Settings",
+    "zh": "设置",
+    "where": "settings"
+  },
+  {
+    "key": "settings_version_sub",
+    "en": "Version %1$s",
+    "zh": "版本 %1$s",
+    "where": "settings"
+  },
+  {
+    "key": "settings_current_version",
+    "en": "Current %1$s",
+    "zh": "当前 %1$s",
+    "where": "settings"
+  },
+  {
+    "key": "settings_ffa_granted",
+    "en": "Granted · file tools can read and write all internal storage",
+    "zh": "已授权 · 文件工具可读写整个内部存储",
+    "where": "settings"
+  },
+  {
+    "key": "settings_ffa_denied",
+    "en": "Not granted · file tools only reach the app private dir; tap to grant",
+    "zh": "未授权 · 文件工具只能读写应用私有目录，点击去授权",
+    "where": "settings"
+  },
+  {
+    "key": "settings_proxy_invalid",
+    "en": "Invalid proxy address; e.g. http://127.0.0.1:7890 or socks5://127.0.0.1:1080",
+    "zh": "代理地址无效，示例：http://127.0.0.1:7890 或 socks5://127.0.0.1:1080",
+    "where": "settings"
+  },
+  {
+    "key": "settings_queue_limit",
+    "en": "Queue limit",
+    "zh": "排队上限",
+    "where": "settings"
+  },
+  {
+    "key": "settings_items_count",
+    "en": "%1$d items",
+    "zh": "%1$d 条",
+    "where": "settings"
+  },
+  {
+    "key": "settings_max_output",
+    "en": "Max output per turn",
+    "zh": "单轮输出上限",
+    "where": "settings"
+  },
+  {
+    "key": "settings_unlimited",
+    "en": "Unlimited",
+    "zh": "不限制",
+    "where": "settings"
+  },
+  {
+    "key": "settings_group_max_parallel",
+    "en": "Max parallel",
+    "zh": "最大并行",
+    "where": "settings"
+  },
+  {
+    "key": "settings_group_agents",
+    "en": "%1$d agents",
+    "zh": "%1$d 个 Agent",
+    "where": "settings"
+  },
+  {
+    "key": "settings_context_budget",
+    "en": "Context budget",
+    "zh": "上下文预算",
+    "where": "settings"
+  },
+  {
+    "key": "settings_chars_k",
+    "en": "%1$dk chars",
+    "zh": "%1$dk 字符",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_thought_lines",
+    "en": "Thinking lines",
+    "zh": "思维链行数",
+    "where": "settings"
+  },
+  {
+    "key": "settings_lines",
+    "en": "%1$d lines",
+    "zh": "%1$d 行",
+    "where": "settings"
+  },
+  {
+    "key": "settings_vibrate_strength",
+    "en": "Vibration strength",
+    "zh": "震动力度",
+    "where": "settings"
+  },
+  {
+    "key": "settings_vibrate_light",
+    "en": "Light",
+    "zh": "轻",
+    "where": "settings"
+  },
+  {
+    "key": "settings_vibrate_heavy",
+    "en": "Heavy",
+    "zh": "重",
+    "where": "settings"
+  },
+  {
+    "key": "settings_vibrate_normal",
+    "en": "Normal",
+    "zh": "标准",
+    "where": "settings"
+  },
+  {
+    "key": "settings_network_sub",
+    "en": "Search engines, keys and download limits · proxy: %1$s",
+    "zh": "搜索引擎、密钥与下载限制 · 代理：%1$s",
+    "where": "settings"
+  },
+  {
+    "key": "settings_direct",
+    "en": "Direct",
+    "zh": "直连",
+    "where": "settings"
+  },
+  {
+    "key": "settings_linux_rootfs",
+    "en": "rootfs: %1$s",
+    "zh": "rootfs：%1$s",
+    "where": "settings"
+  },
+  {
+    "key": "settings_linux_kernel",
+    "en": "DSH kernel: %1$s",
+    "zh": "DSH 内核：%1$s",
+    "where": "settings"
+  },
+  {
+    "key": "settings_linux_usage",
+    "en": "Disk usage: %1$s bytes",
+    "zh": "磁盘占用：%1$s 字节",
+    "where": "settings"
+  },
+  {
+    "key": "settings_processing",
+    "en": "Working…",
+    "zh": "处理中",
+    "where": "settings"
+  },
+  {
+    "key": "settings_plugin_items",
+    "en": "%1$d plugin items",
+    "zh": "%1$d 个插件项",
+    "where": "settings"
+  },
+  {
+    "key": "settings_phone_actions",
+    "en": "Supported actions: %1$s.",
+    "zh": "支持动作：%1$s。",
+    "where": "settings"
+  },
+  {
+    "key": "settings_cwd_unmappable",
+    "en": "This folder can't be mapped to a local path (cloud drive); the grant is kept but the workspace is unchanged",
+    "zh": "该目录无法映射成本机路径（网盘/云端），已保留授权但工作区未改变",
+    "where": "settings"
+  },
+  {
+    "key": "settings_notify_perm_denied",
+    "en": "Notification permission not granted; system notifications won't appear",
+    "zh": "未授予通知权限，系统通知不会弹出",
+    "where": "settings"
+  },
+  {
+    "key": "settings_no_browser",
+    "en": "No app can open web pages",
+    "zh": "没有能打开网页的应用",
+    "where": "settings"
+  },
+  {
+    "key": "common_edit",
+    "en": "Edit",
+    "zh": "编辑",
+    "where": "design"
+  },
+  {
+    "key": "sessions_start_chat",
+    "en": "Start chatting…",
+    "zh": "开始对话…",
+    "where": "design"
+  },
+  {
+    "key": "design_group_members",
+    "en": "Group %1$d",
+    "zh": "群 %1$d",
+    "where": "design"
+  }
+]

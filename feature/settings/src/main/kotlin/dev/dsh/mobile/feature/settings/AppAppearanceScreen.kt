@@ -1,5 +1,7 @@
 package dev.dsh.mobile.feature.settings
 
+import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.R as DesignR
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,7 +41,7 @@ fun AppAppearanceScreen(
     Box(Modifier.fillMaxSize().background(p.bg)) {
         Column(Modifier.fillMaxSize()) {
             QqScreenTopBar(
-                title = "外观",
+                title = stringResource(DesignR.string.settings_appearance_title),
                 isBack = true,
                 onNavigationClick = onBack,
             )
@@ -64,8 +66,8 @@ fun AppAppearanceScreen(
                     QqCardDivider()
                     QqRow(
                         icon = Icons.Filled.Bolt,
-                        title = "恢复默认外观",
-                        subtitle = "重置图标、壁纸、颜色与间距",
+                        title = stringResource(DesignR.string.settings_appearance_reset),
+                        subtitle = stringResource(DesignR.string.settings_appearance_reset_sub),
                         tint = p.t3,
                         onClick = { viewModel.resetAppearance() },
                     )

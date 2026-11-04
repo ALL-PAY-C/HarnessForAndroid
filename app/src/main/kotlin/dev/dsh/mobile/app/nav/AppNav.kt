@@ -1,5 +1,7 @@
 package dev.dsh.mobile.app.nav
 
+import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.R as DesignR
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +26,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -41,6 +44,8 @@ import androidx.navigation.navArgument
 import android.content.Intent
 import android.net.Uri
 import dev.dsh.mobile.app.AppContainer
+import dev.dsh.mobile.app.diag.DiagnosticsScreen
+import dev.dsh.mobile.app.diag.SafeModeBanner
 import dev.dsh.mobile.app.phone.PhoneControlScreen
 import dev.dsh.mobile.app.update.AutoUpdatePrompt
 import dev.dsh.mobile.core.model.RuntimeState
@@ -86,6 +91,7 @@ import dev.dsh.mobile.feature.chat.PresetDrawerViewModel
 import dev.dsh.mobile.feature.sessions.SessionsScreen
 import dev.dsh.mobile.feature.sessions.SessionsViewModel
 import dev.dsh.mobile.feature.settings.AppAppearanceScreen
+import dev.dsh.mobile.feature.settings.BackupRestoreScreen
 import dev.dsh.mobile.feature.settings.AppCapabilityScreen
 import dev.dsh.mobile.feature.settings.AppGatewayScreen
 import dev.dsh.mobile.feature.settings.ExtrasScreen
@@ -112,6 +118,8 @@ private object Routes {
     const val SETTINGS_GATEWAY = "settings/gateway"
     const val SETTINGS_CAPABILITY = "settings/capability"
     const val SETTINGS_MCP = "settings/mcp"
+    const val SETTINGS_BACKUP = "settings/backup"
+    const val DIAGNOSTICS = "settings/diagnostics"
     const val PLUGIN_PAGE = "plugin-page/{pageId}"
     fun chat(id: String) = "chat/$id"
     fun chatSettings(id: String) = "chat/$id/settings"
@@ -119,11 +127,13 @@ private object Routes {
     fun settingsSection(id: String) = "settings/section/$id"
 }
 
+// 内置 tab 的文字走设计模块资源（DesignR）：这里是非 Composable 顶层 val，
+// 只能存资源 id，取值在 QqTabBar 里做（T9.11 §3.2）。
 private val TABS = listOf(
-    TabSpec("会话", Icons.Filled.ChatBubble) to Routes.SESSIONS,
+    TabSpec(null, Icons.Filled.ChatBubble, DesignR.string.nav_tab_sessions) to Routes.SESSIONS,
     TabSpec("Agent", Icons.Filled.SmartToy) to Routes.AGENTS,
-    TabSpec("插件", Icons.Filled.Extension) to Routes.PLUGIN_HUB,
-    TabSpec("设置", Icons.Filled.Settings) to Routes.SETTINGS,
+    TabSpec(null, Icons.Filled.Extension, DesignR.string.nav_tab_plugins) to Routes.PLUGIN_HUB,
+    TabSpec(null, Icons.Filled.Settings, DesignR.string.nav_tab_settings) to Routes.SETTINGS,
 )
 
 /**
@@ -209,7 +219,16 @@ fun AppNav(container: AppContainer) {
     val skillBar = rememberSkillCenterBarState()
     val pluginRevision by container.pluginHost.revision.collectAsStateWithLifecycle()
     val placementRevision = container.pluginHost.placements(drawerContext).revision
-    val drawerEntries = remember(drawerContext, pluginRevision, placementRevision, presetState.defaultName) {
+    // 抽屉条目的标题/副标题要在 remember 里拼（非 @Composable 上下文），所以统一走 Context.getString；
+    // 语言切换会换 Configuration，把它并入 key 让条目重建。
+    val localeConfig = LocalConfiguration.current
+    val drawerEntries = remember(
+        drawerContext,
+        pluginRevision,
+        placementRevision,
+        presetState.defaultName,
+        localeConfig,
+    ) {
         val registry = container.pluginHost.slots
         val resolver = registry.drawerEntryResolver()
         val placed = container.pluginHost.placements(drawerContext)
@@ -252,8 +271,12 @@ fun AppNav(container: AppContainer) {
             .filter { File(it, "package.json").isFile }
         val skills = DrawerEntry(
             id = "skills",
-            label = "技能中心",
-            subtitle = if (skillDirs.isEmpty()) "未装技能插件" else skillDirs.size.toString() + " 个技能插件",
+            label = drawerContext.getString(DesignR.string.nav_drawer_skills),
+            subtitle = if (skillDirs.isEmpty()) {
+                drawerContext.getString(DesignR.string.nav_drawer_skills_none)
+            } else {
+                drawerContext.getString(DesignR.string.nav_drawer_skills_count, skillDirs.size)
+            },
             pluginId = "app",
             content = { SkillCenterScreen(engine = container.nodeEngine, pluginDirs = skillDirs, bar = skillBar) },
         )
@@ -261,8 +284,12 @@ fun AppNav(container: AppContainer) {
         // 页面本身就是「无障碍服务开没开」的真实读数，所以固定摆在抽屉里。
         val phone = DrawerEntry(
             id = "phone",
-            label = "手机控制",
-            subtitle = if (container.phone.isEnabled()) "无障碍已开启" else "免 root 操控 · 待授权",
+            label = drawerContext.getString(DesignR.string.nav_drawer_phone),
+            subtitle = if (container.phone.isEnabled()) {
+                drawerContext.getString(DesignR.string.nav_drawer_phone_on)
+            } else {
+                drawerContext.getString(DesignR.string.nav_drawer_phone_off)
+            },
             pluginId = "app",
             icon = Icons.Filled.TouchApp,
             content = { PhoneControlScreen(container.phone) },
@@ -270,8 +297,8 @@ fun AppNav(container: AppContainer) {
         // Agent 预设（原设置页那个区块）：列表 / 设为默认 / 导入 / 删除都搬进抽屉面板。
         val presets = DrawerEntry(
             id = "presets",
-            label = "Agent 预设",
-            subtitle = "默认：" + presetState.defaultName,
+            label = drawerContext.getString(DesignR.string.nav_drawer_presets),
+            subtitle = drawerContext.getString(DesignR.string.nav_drawer_presets_default, presetState.defaultName),
             pluginId = "app",
             icon = Icons.Filled.Tune,
             content = { PresetDrawerPanel(presetVm) },
@@ -312,6 +339,19 @@ fun AppNav(container: AppContainer) {
         },
     ) {
         Column(Modifier.fillMaxSize()) {
+            // 安全模式是粘性状态，只能从诊断页退出：黄条常驻在最上面，点一下就到诊断页。
+            // 状态在本次进程内不会变（进入/退出都伴随重启），所以只读一次。
+            // 资源在这里取好再进 remember：remember 的 lambda 不是 Composable，不能直接 stringResource。
+            val bootFailed = stringResource(DesignR.string.nav_safe_mode_boot_failed)
+            val safeModeReason = remember(bootFailed) { container.bootGuard.safeModeController.let { c ->
+                if (c.isActive()) c.reason() ?: bootFailed else null
+            } }
+            if (safeModeReason != null) {
+                SafeModeBanner(
+                    reason = safeModeReason,
+                    onOpenDiagnostics = { nav.navigate(Routes.DIAGNOSTICS) { launchSingleTop = true } },
+                )
+            }
             Box(Modifier.weight(1f)) {
                 // 四个转场显式关掉：导航库默认给整页 fade in/out（700ms），一旦动画在
                 // 应用切后台/丢帧时被挂起，新目的地会停在不透明度的第 0 帧——整页空白，
@@ -573,8 +613,8 @@ fun AppNav(container: AppContainer) {
                             pages = container.pluginHost.slots.configPages + listOf(
                                 PluginConfigPage(
                                     id = "app.plugins.market",
-                                    label = "插件安装",
-                                    subtitle = "检索安装、备份与回档",
+                                    label = stringResource(DesignR.string.nav_plugin_market_label),
+                                    subtitle = stringResource(DesignR.string.nav_plugin_market_sub),
                                     icon = Icons.Filled.Extension,
                                     pluginId = "app",
                                     content = {
@@ -590,8 +630,8 @@ fun AppNav(container: AppContainer) {
                                 ),
                                 PluginConfigPage(
                                     id = "app.plugins.manage",
-                                    label = "插件管理",
-                                    subtitle = "启用停用、存档保护",
+                                    label = stringResource(DesignR.string.nav_plugin_manage_label),
+                                    subtitle = stringResource(DesignR.string.nav_plugin_manage_sub),
                                     icon = Icons.Filled.Tune,
                                     pluginId = "app",
                                     content = {
@@ -657,6 +697,8 @@ fun AppNav(container: AppContainer) {
                             onOpenAppearance = { nav.navigate(Routes.SETTINGS_APPEARANCE) { launchSingleTop = true } },
                             onOpenCapability = { nav.navigate(Routes.SETTINGS_CAPABILITY) { launchSingleTop = true } },
                             onOpenMcp = { nav.navigate(Routes.SETTINGS_MCP) { launchSingleTop = true } },
+                            onOpenBackup = { nav.navigate(Routes.SETTINGS_BACKUP) { launchSingleTop = true } },
+                            onOpenDiagnostics = { nav.navigate(Routes.DIAGNOSTICS) { launchSingleTop = true } },
                             onOpenSection = { id -> nav.navigate(Routes.settingsSection(id)) { launchSingleTop = true } },
                             roleCardStore = container.presetStore,
                             tabBarVisible = true,
@@ -678,6 +720,8 @@ fun AppNav(container: AppContainer) {
                             },
                             section = section,
                             onOpenMcp = { nav.navigate(Routes.SETTINGS_MCP) { launchSingleTop = true } },
+                            onOpenBackup = { nav.navigate(Routes.SETTINGS_BACKUP) { launchSingleTop = true } },
+                            onOpenDiagnostics = { nav.navigate(Routes.DIAGNOSTICS) { launchSingleTop = true } },
                             roleCardStore = container.presetStore,
                             tabBarVisible = false,
                             onBack = { nav.popBackStack() },
@@ -712,6 +756,19 @@ fun AppNav(container: AppContainer) {
                     // T9.10 P1 MCP 服务器：列表 + 增删改 + 启停 + 测试连接。
                     composable(Routes.SETTINGS_MCP) {
                         McpServersScreen(onBack = { nav.popBackStack() })
+                    }
+
+                    // T9.12 步骤3 诊断：崩溃记录 / 安全模式状态 / 退出安全模式 / 撤销回滚。
+                    composable(Routes.DIAGNOSTICS) {
+                        DiagnosticsScreen(onBack = { nav.popBackStack() })
+                    }
+
+                    // T9.13 P3 备份与恢复：立即备份 / 已有备份 / SAF 选包恢复。
+                    composable(Routes.SETTINGS_BACKUP) {
+                        BackupRestoreScreen(
+                            onBack = { nav.popBackStack() },
+                            manager = container.backupManager,
+                        )
                     }
 
                     drawerEntries.forEach { entry ->
@@ -751,9 +808,13 @@ fun AppNav(container: AppContainer) {
                                 (it.action as? SlotAction.Page)?.pageId == pageId
                             }
                         if (page == null) {
-                            DrawerPage("插件页面", onBack = { nav.popBackStack() }) {
+                            DrawerPage(stringResource(DesignR.string.nav_plugin_page_title), onBack = { nav.popBackStack() }) {
                                 Box(Modifier.padding(16.dp)) {
-                                    Text("插件页面不存在：$pageId", color = LocalQq.current.t3, fontSize = 13.sp)
+                                    Text(
+                                        stringResource(DesignR.string.nav_plugin_page_missing, pageId),
+                                        color = LocalQq.current.t3,
+                                        fontSize = 13.sp,
+                                    )
                                 }
                             }
                         } else {
@@ -861,13 +922,13 @@ private fun handleSlot(
         is SlotAction.Prompt -> {
             val target = vm
             if (target != null) target.send(action.text)
-            else toast(context, "没有打开的会话，插件动作「${action.text}」无处发送")
+            else toast(context, context.getString(DesignR.string.nav_slot_no_session, action.text))
         }
         // 只切状态、不发消息：插件点一下改自己的 config 并重建界面，会话里不会多一条消息。
         // 走进程级 holder 而不是多加一路参数：9 个调用点都没有「插件实例」在手，只有宿主有。
         is SlotAction.SetConfig -> {
             val ok = PluginHostHolder.instance?.applySlotConfig(action) == true
-            if (!ok) toast(context, "插件配置没改成：" + action.key)
+            if (!ok) toast(context, context.getString(DesignR.string.nav_slot_config_failed, action.key))
         }
         // 破甲注入一键开关：一次点击直接写会话 persona（再点清空），不发消息、不再过确认框。
         is SlotAction.SetPersona -> {
@@ -875,10 +936,10 @@ private fun handleSlot(
             toast(
                 context,
                 when {
-                    ok -> "本会话人设已更新，下一条消息起生效"
+                    ok -> context.getString(DesignR.string.nav_persona_updated)
                     // 清除类动作（text 为空）在人设本来就是空的时候什么也没改，不该报「没写成」。
-                    action.text.isBlank() -> "本会话本来就没设人设"
-                    else -> "没写成人设：先打开一个会话再点"
+                    action.text.isBlank() -> context.getString(DesignR.string.nav_persona_was_empty)
+                    else -> context.getString(DesignR.string.nav_persona_no_session)
                 },
             )
         }
@@ -886,7 +947,9 @@ private fun handleSlot(
             context.startActivity(
                 android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(action.uri)),
             )
-        }.onFailure { toast(context, "打不开链接：${it.message ?: it::class.java.simpleName}") }
+        }.onFailure {
+            toast(context, context.getString(DesignR.string.nav_link_failed, it.message ?: it::class.java.simpleName))
+        }
         // pageId 优先映射到宿主自己的页面：插件写 "settings" / "sessions" 这类名字
         // 指的是内置页，不是合成出来的 plugin/<id> 路由（后者只有底部 tab 插件才有）。
         // 目标不存在时给一句 toast，绝不让 NavController 的 IllegalArgumentException 冒到顶。
@@ -899,7 +962,9 @@ private fun handleSlot(
                 else -> Routes.pluginPage(action.pageId)
             }
             runCatching { nav.navigate(route) { launchSingleTop = true } }
-                .onFailure { toast(context, "插件指向的页面不存在：${action.pageId}") }
+                .onFailure {
+                    toast(context, context.getString(DesignR.string.nav_slot_page_missing, action.pageId))
+                }
         }
         is SlotAction.Http -> runHttp(context, action, scope)
         is SlotAction.Custom -> runCustom(context, action)
@@ -915,19 +980,19 @@ private fun handleSlot(
  * 它是 @Composable 槽位，不能在这里「执行」，只能如实回报当前接管状态。
  */
 private val HOST_CUSTOM_HANDLERS: Map<String, (android.content.Context) -> String> = mapOf(
-    "html.render" to { _ ->
-        if (HtmlBlockRenderers.available) "HTML 渲染已就绪：消息里的 html 代码块会走 WebView"
-        else "HTML 渲染插件没注册，代码块仍是源码视图"
+    "html.render" to { ctx ->
+        if (HtmlBlockRenderers.available) ctx.getString(DesignR.string.nav_custom_html_ready)
+        else ctx.getString(DesignR.string.nav_custom_html_missing)
     },
-    "diagram.render" to { _ ->
-        if (DiagramRenderers.available) "图形渲染已就绪：mermaid / dot / echarts / svg 等代码块会画成图"
-        else "图形渲染插件没注册，代码块仍是源码视图"
+    "diagram.render" to { ctx ->
+        if (DiagramRenderers.available) ctx.getString(DesignR.string.nav_custom_diagram_ready)
+        else ctx.getString(DesignR.string.nav_custom_diagram_missing)
     },
 )
 
 private fun runCustom(context: android.content.Context, action: SlotAction.Custom) {
     val handler = HOST_CUSTOM_HANDLERS[action.id]
-    toast(context, handler?.invoke(context) ?: "由插件处理：${action.id}")
+    toast(context, handler?.invoke(context) ?: context.getString(DesignR.string.nav_custom_handled, action.id))
 }
 
 /**
@@ -956,7 +1021,7 @@ private fun runHttp(
                 val code = conn.responseCode
                 if (code in 200..299) {
                     val text = conn.inputStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-                    text.take(200).ifBlank { "HTTP $code（空响应）" }
+                    text.take(200).ifBlank { app.getString(DesignR.string.nav_http_empty, code) }
                 } else {
                     "HTTP $code"
                 }
@@ -964,7 +1029,7 @@ private fun runHttp(
                 conn.disconnect()
             }
         } catch (e: Throwable) {
-            "请求失败：${e.message ?: e::class.java.simpleName}"
+            app.getString(DesignR.string.nav_http_failed, e.message ?: e::class.java.simpleName)
         }
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
             toast(app, message)

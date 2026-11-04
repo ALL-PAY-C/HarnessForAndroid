@@ -1,5 +1,7 @@
 package dev.dsh.mobile.feature.settings
 
+import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.R as DesignR
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,7 +34,7 @@ fun AppGatewayScreen(
     Box(Modifier.fillMaxSize().background(p.bg)) {
         Column(Modifier.fillMaxSize()) {
             QqScreenTopBar(
-                title = "内置模型网关",
+                title = stringResource(DesignR.string.settings_gateway_title),
                 isBack = true,
                 onNavigationClick = onBack,
             )

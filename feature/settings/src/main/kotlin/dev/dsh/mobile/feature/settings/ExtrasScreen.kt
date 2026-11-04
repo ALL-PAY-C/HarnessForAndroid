@@ -1,5 +1,7 @@
 package dev.dsh.mobile.feature.settings
 
+import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.R as DesignR
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,7 +39,7 @@ fun ExtrasScreen(
         Column(Modifier.fillMaxSize()) {
             // 顶栏骨架与设置页/会话页一致：返回箭头在左、标题居中、无额外右侧槽位。
             QqScreenTopBar(
-                title = "拓展",
+                title = stringResource(DesignR.string.settings_extras_title),
                 isBack = true,
                 onNavigationClick = onBack,
             )

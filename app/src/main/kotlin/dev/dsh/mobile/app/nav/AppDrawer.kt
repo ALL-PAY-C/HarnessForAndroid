@@ -1,5 +1,7 @@
 package dev.dsh.mobile.app.nav
 
+import dev.dsh.mobile.design.R as DesignR
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -144,11 +146,11 @@ private fun DrawerHeader(runtime: RuntimeState) {
                 Text("DSH Mobile", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 Text(
                     when (runtime) {
-                        is RuntimeState.Ready -> "运行时就绪"
-                        is RuntimeState.Starting -> "运行时启动中"
-                        is RuntimeState.Reconnecting -> "重连中"
-                        is RuntimeState.Failed -> "运行时异常"
-                        RuntimeState.NotConfigured -> "未配置运行时"
+                        is RuntimeState.Ready -> stringResource(DesignR.string.nav_drawer_runtime_ready)
+                        is RuntimeState.Starting -> stringResource(DesignR.string.nav_drawer_runtime_starting)
+                        is RuntimeState.Reconnecting -> stringResource(DesignR.string.nav_drawer_runtime_reconnecting)
+                        is RuntimeState.Failed -> stringResource(DesignR.string.nav_drawer_runtime_failed)
+                        RuntimeState.NotConfigured -> stringResource(DesignR.string.nav_drawer_runtime_unconfigured)
                     },
                     color = Color.White.copy(alpha = 0.82f),
                     fontSize = qqFontBody(12.sp),
@@ -167,12 +169,23 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onClear:
         value = query,
         onValueChange = onQueryChange,
         singleLine = true,
-        placeholder = { Text("搜索会话 / 聊天记录", color = p.t3, fontSize = qqFontBody(13.5.sp)) },
+        placeholder = {
+            Text(
+                stringResource(DesignR.string.nav_search_placeholder),
+                color = p.t3,
+                fontSize = qqFontBody(13.5.sp),
+            )
+        },
         leadingIcon = { Icon(Icons.Filled.Search, null, tint = p.t3, modifier = Modifier.size(18.dp)) },
         trailingIcon = {
             if (query.isNotEmpty()) {
                 IconButton(onClick = onClear) {
-                    Icon(Icons.Filled.Close, "清除", tint = p.t3, modifier = Modifier.size(18.dp))
+                    Icon(
+                        Icons.Filled.Close,
+                        stringResource(DesignR.string.nav_search_clear),
+                        tint = p.t3,
+                        modifier = Modifier.size(18.dp),
+                    )
                 }
             }
         },
@@ -205,7 +218,7 @@ private fun BrowsePane(
     var pickingSlot by remember { mutableStateOf(false) }
     Box(modifier.fillMaxWidth()) {
     LazyColumn(Modifier.fillMaxSize().padding(vertical = QqSpace.xs())) {
-        item { SectionLabel("常用") }
+        item { SectionLabel(stringResource(DesignR.string.nav_drawer_section_common)) }
         // 编辑态：分组标题下方给一个「+」，点开复用本页已有的挑组件弹窗（加到抽屉）。
         if (SlotEditState.plusVisible(SlotEditState.Slot.DrawerGroup)) {
             item {
@@ -235,14 +248,20 @@ private fun BrowsePane(
                 },
             )
         }
-        item { DrawerItem(Icons.Filled.Extension, "插件", onPlugins) }
+        item {
+            DrawerItem(
+                Icons.Filled.Extension,
+                stringResource(DesignR.string.plugins_page_title),
+                onPlugins,
+            )
+        }
         item {
             Box(
                 Modifier.padding(horizontal = 14.dp, vertical = QqSpace.s())
                     .fillMaxWidth().height(1.dp).background(p.line),
             )
         }
-        item { SectionLabel("最近会话") }
+        item { SectionLabel(stringResource(DesignR.string.nav_drawer_section_recent)) }
         if (recent.isEmpty()) {
             item {
                 Row(
@@ -251,7 +270,11 @@ private fun BrowsePane(
                 ) {
                     Icon(Icons.Filled.ChatBubble, null, tint = p.t3, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(10.dp))
-                    Text("还没有会话", color = p.t3, fontSize = qqFontBody(12.5.sp))
+                    Text(
+                        stringResource(DesignR.string.nav_drawer_no_sessions),
+                        color = p.t3,
+                        fontSize = qqFontBody(12.5.sp),
+                    )
                 }
             }
         }
@@ -262,9 +285,9 @@ private fun BrowsePane(
     }
         if (pickingSlot) {
             SlotPickerDialog(
-                title = "添加到抽屉",
+                title = stringResource(DesignR.string.nav_drawer_picker_title),
                 items = slotCandidates,
-                emptyHint = "没有可添加的插件组件：先到插件页装一个带抽屉槽位的插件",
+                emptyHint = stringResource(DesignR.string.nav_drawer_picker_empty),
                 onPick = { pickingSlot = false; onSlotAdd(it) },
                 onDismiss = { pickingSlot = false },
             )
@@ -282,22 +305,29 @@ private fun SearchPane(
     val p = LocalQq.current
     when {
         search.searching -> Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Text("搜索中…", color = p.t3, fontSize = qqFontBody(13.sp))
+            Text(
+                stringResource(DesignR.string.nav_search_searching),
+                color = p.t3,
+                fontSize = qqFontBody(13.sp),
+            )
         }
 
         search.noResult -> Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            EmptyState("没有找到相关内容", "换个关键词：会话标题或消息正文")
+            EmptyState(
+                stringResource(DesignR.string.common_no_result),
+                stringResource(DesignR.string.nav_search_empty_hint),
+            )
         }
 
         else -> LazyColumn(modifier.fillMaxWidth().padding(vertical = QqSpace.xs())) {
             if (search.sessions.isNotEmpty()) {
-                item { SectionLabel("会话") }
+                item { SectionLabel(stringResource(DesignR.string.nav_search_section_sessions)) }
                 items(search.sessions) { row ->
                     SessionHitRow(row, search.query) { onOpenSession(row.id) }
                 }
             }
             if (search.messages.isNotEmpty()) {
-                item { SectionLabel("聊天记录") }
+                item { SectionLabel(stringResource(DesignR.string.nav_search_section_messages)) }
                 items(search.messages) { hit ->
                     MessageHitRow(hit, search.query) { onOpenSession(hit.sessionId) }
                 }
@@ -334,7 +364,7 @@ private fun RecentSessionRow(session: Session, onClick: () -> Unit) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    session.title.ifBlank { "未命名会话" },
+                    session.title.ifBlank { stringResource(DesignR.string.common_untitled_session) },
                     color = p.t1,
                     fontSize = qqFontBody(14.sp),
                     fontWeight = FontWeight.Medium,
@@ -344,11 +374,15 @@ private fun RecentSessionRow(session: Session, onClick: () -> Unit) {
                 )
                 if (session.pinned) {
                     Spacer(Modifier.width(6.dp))
-                    Text("置顶", color = p.accent, fontSize = qqFontBody(10.sp))
+                    Text(
+                        stringResource(DesignR.string.common_pinned),
+                        color = p.accent,
+                        fontSize = qqFontBody(10.sp),
+                    )
                 }
             }
             Text(
-                session.preview.ifBlank { "还没有消息" },
+                session.preview.ifBlank { stringResource(DesignR.string.common_no_messages) },
                 color = p.t2,
                 fontSize = qqFontBody(12.sp),
                 maxLines = 1,
@@ -374,7 +408,11 @@ private fun SessionHitRow(row: SessionEntity, query: String, onClick: () -> Unit
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                highlight(row.title.ifBlank { "未命名会话" }, query, p.accent),
+                highlight(
+                    row.title.ifBlank { stringResource(DesignR.string.common_untitled_session) },
+                    query,
+                    p.accent,
+                ),
                 color = p.t1,
                 fontSize = qqFontBody(14.sp),
                 fontWeight = FontWeight.Medium,
@@ -411,7 +449,7 @@ private fun MessageHitRow(hit: ChatSearchHit, query: String, onClick: () -> Unit
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    hit.sessionTitle.ifBlank { "未命名会话" },
+                    hit.sessionTitle.ifBlank { stringResource(DesignR.string.common_untitled_session) },
                     color = p.t1,
                     fontSize = qqFontBody(13.sp),
                     fontWeight = FontWeight.Medium,
@@ -450,7 +488,11 @@ private fun DrawerFooter() {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.Memory, null, tint = p.t3, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(QqSpace.s()))
-            Text("本地 Node 运行时 · 无需联网", color = p.t3, fontSize = qqFontBody(11.sp))
+            Text(
+                stringResource(DesignR.string.nav_drawer_runtime_footer),
+                color = p.t3,
+                fontSize = qqFontBody(11.sp),
+            )
         }
         Spacer(Modifier.height(QqSpace.xs()))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -519,22 +561,25 @@ private fun highlight(text: String, query: String, accent: Color): AnnotatedStri
     }
 }
 
+// 改成 @Composable：角色名与相对时间都要走资源，而这两处都没有 Context 参数。
+@Composable
 private fun roleLabel(role: String): String = when (role.uppercase(Locale.ROOT)) {
-    "USER" -> "我"
-    "ASSISTANT" -> "助手"
-    "SYSTEM" -> "系统"
-    else -> role.ifBlank { "消息" }
+    "USER" -> stringResource(DesignR.string.nav_role_user)
+    "ASSISTANT" -> stringResource(DesignR.string.nav_role_assistant)
+    "SYSTEM" -> stringResource(DesignR.string.nav_role_system)
+    else -> role.ifBlank { stringResource(DesignR.string.nav_role_message) }
 }
 
 /** 刚刚 / N 分钟前 / N 小时前 / 昨天 / MM-dd。 */
+@Composable
 private fun relativeTime(at: Long, now: Long = System.currentTimeMillis()): String {
     if (at <= 0L) return ""
     val diff = now - at
     return when {
-        diff < 60_000L -> "刚刚"
-        diff < 3_600_000L -> (diff / 60_000L).toString() + " 分钟前"
-        diff < 86_400_000L -> (diff / 3_600_000L).toString() + " 小时前"
-        diff < 172_800_000L -> "昨天"
+        diff < 60_000L -> stringResource(DesignR.string.nav_time_just_now)
+        diff < 3_600_000L -> stringResource(DesignR.string.nav_time_minutes, (diff / 60_000L).toInt())
+        diff < 86_400_000L -> stringResource(DesignR.string.nav_time_hours, (diff / 3_600_000L).toInt())
+        diff < 172_800_000L -> stringResource(DesignR.string.nav_time_yesterday)
         else -> SimpleDateFormat("MM-dd", Locale.getDefault()).format(Date(at))
     }
 }
@@ -556,13 +601,29 @@ fun SearchScreen(
     val search by vm.state.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize().background(p.bg)) {
-        QqTopBar(leading = { IconBtn(Icons.AutoMirrored.Filled.ArrowBack, "返回", onBack) }) {
-            Text("搜索历史记录", color = p.t1, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        QqTopBar(
+            leading = {
+                IconBtn(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    stringResource(DesignR.string.common_back),
+                    onBack,
+                )
+            },
+        ) {
+            Text(
+                stringResource(DesignR.string.nav_search_title),
+                color = p.t1,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
         SearchField(query = search.query, onQueryChange = vm::onQueryChange, onClear = vm::clear)
         if (search.query.isBlank()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                EmptyState("搜索会话与聊天记录", "输入会话标题或消息正文里的片段")
+                EmptyState(
+                    stringResource(DesignR.string.nav_search_page_empty_title),
+                    stringResource(DesignR.string.nav_search_page_empty_hint),
+                )
             }
         } else {
             SearchPane(search = search, onOpenSession = onOpenSession, modifier = Modifier.weight(1f))

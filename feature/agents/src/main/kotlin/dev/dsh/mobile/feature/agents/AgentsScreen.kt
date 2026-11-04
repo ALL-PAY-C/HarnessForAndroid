@@ -52,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -66,7 +67,6 @@ import dev.dsh.mobile.core.data.settings.ModelProvider
 import dev.dsh.mobile.core.data.settings.ModelProviders
 import dev.dsh.mobile.core.data.settings.contextWindowOf
 import dev.dsh.mobile.core.data.settings.reasoningEfforts
-import dev.dsh.mobile.core.data.settings.reasoningLabelOf
 import dev.dsh.mobile.core.data.settings.sanitizeDecimalInput
 import dev.dsh.mobile.core.data.settings.sanitizeReasoningEffort
 import dev.dsh.mobile.core.model.AgentProfile
@@ -81,6 +81,7 @@ import dev.dsh.mobile.design.QqRow
 import dev.dsh.mobile.design.QqShape
 import dev.dsh.mobile.design.QqSpace
 import dev.dsh.mobile.design.QqScreenTopBar
+import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.design.RunPill
 import dev.dsh.mobile.design.StatusCapsule
 import dev.dsh.mobile.design.qqFontBody
@@ -126,7 +127,7 @@ fun AgentsScreen(
             QqScreenTopBar(
                 title = "Agent",
                 navigationIcon = Icons.Filled.Menu,
-                navigationDescription = "菜单",
+                navigationDescription = stringResource(DesignR.string.common_menu),
                 onNavigationClick = onOpenDrawer,
                 // 运行状态胶囊占右侧操作槽位，位置与迁移前完全一致。
                 actions = {
@@ -143,7 +144,7 @@ fun AgentsScreen(
             ) {
                 item(key = "runtime") {
                     CollapsibleSection(
-                        title = "运行环境",
+                        title = stringResource(DesignR.string.agents_section_runtime),
                         icon = Icons.Filled.Memory,
                         tint = p.accent,
                         subtitle = runtimeLabel(state.runtime),
@@ -173,18 +174,21 @@ fun AgentsScreen(
                                 )
                                 Text(
                                     when (val r = state.runtime) {
-                                        is RuntimeState.Ready -> "本地运行中 · ${r.detail.ifBlank { "就绪" }}"
-                                        is RuntimeState.Starting -> "启动中 · ${r.detail}"
-                                        is RuntimeState.Reconnecting -> "重连中 · 第 ${r.attempt} 次"
-                                        is RuntimeState.Failed -> "异常 · ${r.reason}"
-                                        RuntimeState.NotConfigured -> "未启动"
+                                        is RuntimeState.Ready -> stringResource(
+                                            DesignR.string.agents_runtime_local_ready,
+                                            r.detail.ifBlank { stringResource(DesignR.string.agents_runtime_ready_detail) },
+                                        )
+                                        is RuntimeState.Starting -> stringResource(DesignR.string.agents_runtime_starting, r.detail)
+                                        is RuntimeState.Reconnecting -> stringResource(DesignR.string.agents_runtime_reconnecting, r.attempt)
+                                        is RuntimeState.Failed -> stringResource(DesignR.string.agents_runtime_failed, r.reason)
+                                        RuntimeState.NotConfigured -> stringResource(DesignR.string.agents_runtime_not_started)
                                     },
                                     color = p.t2,
                                     fontSize = qqFontBody(11.5.sp),
                                 )
                             }
                             Text(
-                                if (state.runtime is RuntimeState.Ready) "重连" else "连接",
+                                stringResource(if (state.runtime is RuntimeState.Ready) DesignR.string.agents_reconnect else DesignR.string.agents_connect),
                                 color = p.accent,
                                 fontSize = qqFontBody(13.sp),
                                 fontWeight = FontWeight.Medium,
@@ -196,8 +200,8 @@ fun AgentsScreen(
 
                 item(key = "models") {
                     CollapsibleSection(
-                        title = "模型接入",
-                        subtitle = "API Key 与默认模型",
+                        title = stringResource(DesignR.string.agents_section_models),
+                        subtitle = stringResource(DesignR.string.agents_section_models_sub),
                         icon = Icons.Filled.SmartToy,
                         tint = p.accent2,
                         count = state.models.size,
@@ -208,13 +212,13 @@ fun AgentsScreen(
                         if (state.models.isEmpty()) {
                             Column(Modifier.fillMaxWidth().padding(QqSpace.l())) {
                                 Text(
-                                    "还没有接入模型",
+                                    stringResource(DesignR.string.agents_no_models),
                                     color = p.t1,
                                     fontSize = qqFontBody(14.sp),
                                     fontWeight = FontWeight.Medium,
                                 )
                                 Text(
-                                    "填一个 API Key 就能让 Agent 干活（DeepSeek / OpenAI 兼容 / 第三方中转都可以）",
+                                    stringResource(DesignR.string.agents_no_models_hint),
                                     color = p.t3,
                                     fontSize = qqFontBody(11.5.sp),
                                     modifier = Modifier.padding(top = QqSpace.xs()),
@@ -235,8 +239,8 @@ fun AgentsScreen(
                         QqCardDivider()
                         QqRow(
                             icon = Icons.Filled.Add,
-                            title = "添加模型",
-                            subtitle = "API Key / Base URL / 模型名",
+                            title = stringResource(DesignR.string.agents_add_model),
+                            subtitle = stringResource(DesignR.string.agents_add_model_sub),
                             tint = p.accent,
                             onClick = { adding = true },
                         )
@@ -247,8 +251,8 @@ fun AgentsScreen(
                 val visibleChannels = state.channels.filter { it.id != "termux" }
                 item(key = "tools") {
                     CollapsibleSection(
-                        title = "手机工具",
-                        subtitle = "通道与授权状态",
+                        title = stringResource(DesignR.string.agents_section_tools),
+                        subtitle = stringResource(DesignR.string.agents_section_tools_sub),
                         icon = Icons.Filled.Build,
                         tint = p.green,
                         count = visibleChannels.count { it.available },
@@ -272,8 +276,8 @@ fun AgentsScreen(
                 if (state.running.isNotEmpty()) {
                     item(key = "running") {
                         CollapsibleSection(
-                            title = "运行中",
-                            subtitle = "正在执行的 Agent",
+                            title = stringResource(DesignR.string.agents_section_running),
+                            subtitle = stringResource(DesignR.string.agents_section_running_sub),
                             icon = Icons.Filled.PlayArrow,
                             tint = p.green,
                             count = state.running.size,
@@ -293,7 +297,7 @@ fun AgentsScreen(
                 if (state.commands.isNotEmpty()) {
                     item(key = "commands") {
                         CollapsibleSection(
-                            title = "可用指令",
+                            title = stringResource(DesignR.string.agents_section_commands),
                             icon = Icons.Filled.Code,
                             tint = p.accent2,
                             expanded = "commands" in openSections,
@@ -306,8 +310,8 @@ fun AgentsScreen(
 
                 item(key = "all") {
                     CollapsibleSection(
-                        title = "全部会话",
-                        subtitle = "全部历史会话",
+                        title = stringResource(DesignR.string.agents_section_all),
+                        subtitle = stringResource(DesignR.string.agents_section_all_sub),
                         icon = Icons.Filled.List,
                         tint = p.accent2,
                         count = state.all.size,
@@ -315,11 +319,14 @@ fun AgentsScreen(
                         onToggle = { toggleSection("all") },
                     ) {
                         if (state.all.isEmpty()) {
-                            EmptyState(title = "还没有 Agent 会话", subtitle = "回到会话页点右上角 + 新建一个")
+                            EmptyState(
+                                title = stringResource(DesignR.string.agents_empty_all_title),
+                                subtitle = stringResource(DesignR.string.agents_empty_all_hint),
+                            )
                         } else {
                             Column(Modifier.fillMaxWidth()) {
                                 state.all.forEachIndexed { i, s ->
-                                    AgentRow(AgentCard(s, "空闲")) { onOpenSession(s.id) }
+                                    AgentRow(AgentCard(s, stringResource(DesignR.string.agents_idle))) { onOpenSession(s.id) }
                                     if (i != state.all.lastIndex) QqCardDivider()
                                 }
                             }
@@ -364,18 +371,23 @@ fun AgentsScreen(
     pendingDelete?.let { profile ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("删除模型") },
+            title = { Text(stringResource(DesignR.string.agents_delete_model_title)) },
             text = {
-                Text("删除「${profile.name.ifBlank { profile.model }}」？API Key 会一起删除，无法恢复。")
+                Text(
+                    stringResource(
+                        DesignR.string.agents_delete_model_body,
+                        profile.name.ifBlank { profile.model },
+                    ),
+                )
             },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteModel(profile.id)
                     pendingDelete = null
-                }) { Text("删除", color = p.red) }
+                }) { Text(stringResource(DesignR.string.common_delete), color = p.red) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text("取消") }
+                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(DesignR.string.common_cancel)) }
             },
         )
     }
@@ -384,27 +396,39 @@ fun AgentsScreen(
 /** 默认展开的区块 id：主列表展开，状态/次要区块收起。 */
 private val DEFAULT_OPEN_SECTIONS = emptyList<String>()
 
-/** engine:// 端点拉到空表时的提示：协议没错，是插件没上报，给下一步动作而不是报错。 */
-private const val ENGINE_NO_MODELS =
-    "引擎插件没有上报模型：确认插件已安装并在插件页启动过，或直接手填模型名"
-
 /** 折叠标题右侧的运行时状态摘要，与卡片内文案同源。 */
+@Composable
 private fun runtimeLabel(r: RuntimeState): String = when (r) {
-    is RuntimeState.Ready -> "运行中 · ${r.detail.ifBlank { "就绪" }}"
-    is RuntimeState.Starting -> "启动中 · ${r.detail}"
-    is RuntimeState.Reconnecting -> "重连中 · 第 ${r.attempt} 次"
-    is RuntimeState.Failed -> "异常 · ${r.reason}"
-    RuntimeState.NotConfigured -> "未启动"
+    is RuntimeState.Ready -> stringResource(
+        DesignR.string.agents_runtime_running,
+        r.detail.ifBlank { stringResource(DesignR.string.agents_runtime_ready_detail) },
+    )
+    is RuntimeState.Starting -> stringResource(DesignR.string.agents_runtime_starting, r.detail)
+    is RuntimeState.Reconnecting -> stringResource(DesignR.string.agents_runtime_reconnecting, r.attempt)
+    is RuntimeState.Failed -> stringResource(DesignR.string.agents_runtime_failed, r.reason)
+    RuntimeState.NotConfigured -> stringResource(DesignR.string.agents_runtime_not_started)
 }
+
+/** 思考强度的显示名：关 / 低 / 中 / 高（文案在 design 资源里，core/data 只存 off/low/medium/high）。 */
+@Composable
+private fun reasoningLabel(effort: String): String = stringResource(
+    when (effort) {
+        "off" -> DesignR.string.agents_reasoning_off
+        "low" -> DesignR.string.agents_reasoning_low
+        "medium" -> DesignR.string.agents_reasoning_medium
+        else -> DesignR.string.agents_reasoning_high
+    },
+)
 
 /** provider 名 + 模型名 + 上下文窗口，一行塞不下就省略中段。 */
 private fun providerLabel(id: String): String =
     ModelProviders.all().firstOrNull { it.id == id }?.label ?: id
 
+@Composable
 private fun tokensLabel(tokens: Int): String = when {
-    tokens >= 1_000_000 -> "${tokens / 1_000_000}M 上下文"
-    tokens >= 1_000 -> "${tokens / 1_000}K 上下文"
-    else -> "$tokens 上下文"
+    tokens >= 1_000_000 -> stringResource(DesignR.string.agents_context_m, tokens / 1_000_000)
+    tokens >= 1_000 -> stringResource(DesignR.string.agents_context_k, tokens / 1_000)
+    else -> stringResource(DesignR.string.agents_context, tokens)
 }
 
 @Composable
@@ -448,11 +472,11 @@ private fun ModelRow(
                 )
                 if (profile.isDefault) {
                     Spacer(Modifier.width(6.dp))
-                    RunPill("默认")
+                    RunPill(stringResource(DesignR.string.agents_badge_default))
                 }
                 Spacer(Modifier.width(6.dp))
                 // 思考强度徽标：关 / 低 / 中 / 高
-                MetaPill("思考${profile.reasoningLabel}")
+                MetaPill(stringResource(DesignR.string.agents_reasoning_badge, reasoningLabel(profile.reasoningEffort)))
             }
             Text(
                 "${providerLabel(profile.providerId)} · ${profile.model} · " +
@@ -464,7 +488,7 @@ private fun ModelRow(
             )
         }
         Text(
-            "测试",
+            stringResource(DesignR.string.agents_test),
             color = p.accent,
             fontSize = qqFontBody(11.5.sp),
             modifier = Modifier
@@ -474,7 +498,7 @@ private fun ModelRow(
         )
         if (!profile.isDefault) {
             Text(
-                "设为默认",
+                stringResource(DesignR.string.agents_set_default),
                 color = p.accent,
                 fontSize = qqFontBody(11.5.sp),
                 modifier = Modifier
@@ -494,7 +518,7 @@ private fun ModelRow(
         ) {
             Icon(
                 Icons.Filled.Delete,
-                "删除",
+                stringResource(DesignR.string.common_delete),
                 tint = p.t3,
                 modifier = Modifier.size(17.dp),
             )
@@ -531,14 +555,14 @@ private fun ChannelRow(
                 Text(status.label, color = p.t1, fontSize = qqFontBody(14.5.sp), fontWeight = FontWeight.Medium)
                 if (active) {
                     Spacer(Modifier.width(6.dp))
-                    RunPill("当前")
+                    RunPill(stringResource(DesignR.string.agents_badge_current))
                 }
             }
             if (status.detail.isNotBlank()) Text(status.detail, color = p.t3, fontSize = qqFontBody(11.5.sp))
         }
         if (!status.available && status.id == "shizuku") {
             Text(
-                "授权",
+                stringResource(DesignR.string.agents_authorize),
                 color = p.accent,
                 fontSize = qqFontBody(12.sp),
                 modifier = Modifier
@@ -548,7 +572,7 @@ private fun ChannelRow(
             )
         } else {
             Text(
-                if (status.available) "可用" else "重新探测",
+                stringResource(if (status.available) DesignR.string.agents_available else DesignR.string.agents_reprobe),
                 color = if (status.available) p.green else p.t3,
                 fontSize = qqFontBody(11.5.sp),
                 modifier = Modifier
@@ -576,13 +600,13 @@ private fun AgentRow(card: AgentCard, onClick: () -> Unit) {
         Spacer(Modifier.width(11.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                card.session.title.ifBlank { "未命名会话" },
+                card.session.title.ifBlank { stringResource(DesignR.string.common_untitled_session) },
                 color = p.t1,
                 fontSize = qqFontBody(14.5.sp),
                 fontWeight = FontWeight.Medium,
             )
             Text(
-                card.session.preview.ifBlank { "无输出" },
+                card.session.preview.ifBlank { stringResource(DesignR.string.agents_no_output) },
                 color = p.t3,
                 fontSize = qqFontBody(11.5.sp),
                 maxLines = 1,
@@ -627,6 +651,8 @@ private fun ModelDialog(
     loadEngineModels: suspend () -> List<String> = { emptyList() },
 ) {
     val p = LocalQq.current
+    // 非 Compose 的协程体（scope.launch / onClick）里取不到 stringResource，先在这里取值。
+    val engineNoModels = stringResource(DesignR.string.agents_engine_no_models)
     val firstTemplate = templateOf(providers.first())
     var provider by remember { mutableStateOf(providers.first()) }
     var name by remember { mutableStateOf(existing?.name ?: "") }
@@ -659,7 +685,12 @@ private fun ModelDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (existing == null) "添加模型" else "编辑模型", color = p.t1) },
+        title = {
+            Text(
+                stringResource(if (existing == null) DesignR.string.agents_add_model else DesignR.string.agents_dialog_edit),
+                color = p.t1,
+            )
+        },
         text = {
             // 字段变多了：内容区自己滚动，保存/取消按钮由 AlertDialog 固定在底部
             Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
@@ -693,10 +724,10 @@ private fun ModelDialog(
                         }
                     }
                 }
-                DialogField("名称", name) { name = it }
+                DialogField(stringResource(DesignR.string.agents_field_name), name) { name = it }
                 DialogField("Base URL", baseUrl) { baseUrl = it }
                 DialogField("API Key", apiKey, secret = true) { apiKey = it }
-                DialogField("模型名", model) { model = it }
+                DialogField(stringResource(DesignR.string.agents_field_model_name), model) { model = it }
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(QqSpace.s()),
                     verticalAlignment = Alignment.CenterVertically,
@@ -712,7 +743,7 @@ private fun ModelDialog(
                                     // engine:// 不打 HTTP：模型列表由引擎插件经宿主通道上报。
                                     val ids = loadEngineModels()
                                     available = ids
-                                    engineNote = if (ids.isEmpty()) ENGINE_NO_MODELS else null
+                                    engineNote = if (ids.isEmpty()) engineNoModels else null
                                 } else {
                                     val result = ModelCatalog.fetch(raw, apiKey.trim())
                                     available = result.getOrDefault(emptyList())
@@ -723,17 +754,33 @@ private fun ModelDialog(
                         },
                         enabled = !fetching && baseUrl.isNotBlank(),
                     ) {
-                        Text(if (fetching) "拉取中…" else "拉取模型列表", color = p.accent, fontSize = qqFontBody(12.sp))
+                        Text(
+                            stringResource(
+                                if (fetching) DesignR.string.agents_fetching else DesignR.string.agents_fetch_models,
+                            ),
+                            color = p.accent,
+                            fontSize = qqFontBody(12.sp),
+                        )
                     }
                     if (available.isNotEmpty()) {
                         Text(
-                            if (picked.isEmpty()) "共 ${available.size} 个 · 可多选" else "已选 ${picked.size} 个",
+                            if (picked.isEmpty()) {
+                                stringResource(DesignR.string.agents_available_count, available.size)
+                            } else {
+                                stringResource(DesignR.string.agents_picked_count, picked.size)
+                            },
                             color = p.t3,
                             fontSize = qqFontBody(11.sp),
                         )
                     }
                 }
-                fetchError?.let { Text("拉取失败：$it", color = p.red, fontSize = qqFontBody(11.sp)) }
+                fetchError?.let {
+                    Text(
+                        stringResource(DesignR.string.agents_fetch_failed, it),
+                        color = p.red,
+                        fontSize = qqFontBody(11.sp),
+                    )
+                }
                 engineNote?.let { Text(it, color = p.t3, fontSize = qqFontBody(11.sp)) }
                 if (available.isNotEmpty()) {
                     // 列表紧跟「拉取模型列表」，勾选就在眼前。
@@ -768,10 +815,15 @@ private fun ModelDialog(
                         }
                     }
                 }
-                DialogField("上下文窗口 tokens（留空自动判断）", contextWindow) { input ->
+                DialogField(stringResource(DesignR.string.agents_field_context_window), contextWindow) { input ->
                     contextWindow = input.filter { ch -> ch.isDigit() }
                 }
-                Text("思考强度", color = p.t3, fontSize = qqFontBody(11.sp), modifier = Modifier.padding(top = 10.dp))
+                Text(
+                    stringResource(DesignR.string.agents_field_reasoning),
+                    color = p.t3,
+                    fontSize = qqFontBody(11.sp),
+                    modifier = Modifier.padding(top = 10.dp),
+                )
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(top = 3.dp),
@@ -786,20 +838,20 @@ private fun ModelDialog(
                                 .padding(horizontal = QqSpace.m(), vertical = 6.dp),
                         ) {
                             Text(
-                                reasoningLabelOf(value),
+                                reasoningLabel(value),
                                 color = if (on) p.accent else p.t2,
                                 fontSize = qqFontBody(12.sp),
                             )
                         }
                     }
                 }
-                DialogField("最大输出 tokens（留空 = 不发送）", maxOutput) { input ->
+                DialogField(stringResource(DesignR.string.agents_field_max_output), maxOutput) { input ->
                     maxOutput = input.filter { ch -> ch.isDigit() }
                 }
-                DialogField("温度（0-2，可小数，留空 = 不发送）", temperature) { input ->
+                DialogField(stringResource(DesignR.string.agents_field_temperature), temperature) { input ->
                     temperature = sanitizeDecimalInput(input)
                 }
-                DialogField("Top P（0-1，可小数，留空 = 不发送）", topP) { input ->
+                DialogField(stringResource(DesignR.string.agents_field_top_p), topP) { input ->
                     topP = sanitizeDecimalInput(input)
                 }
                 Row(
@@ -807,8 +859,16 @@ private fun ModelDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("支持工具调用", color = p.t2, fontSize = qqFontBody(12.5.sp))
-                        Text("关闭后请求里不带 tools", color = p.t3, fontSize = qqFontBody(10.5.sp))
+                        Text(
+                            stringResource(DesignR.string.agents_supports_tools),
+                            color = p.t2,
+                            fontSize = qqFontBody(12.5.sp),
+                        )
+                        Text(
+                            stringResource(DesignR.string.agents_supports_tools_hint),
+                            color = p.t3,
+                            fontSize = qqFontBody(10.5.sp),
+                        )
                     }
                     Switch(checked = supportsTools, onCheckedChange = { supportsTools = it })
                 }
@@ -843,9 +903,11 @@ private fun ModelDialog(
                         ),
                     )
                 }
-            }) { Text("保存", color = p.accent) }
+            }) { Text(stringResource(DesignR.string.common_save), color = p.accent) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = p.t2) } },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(DesignR.string.common_cancel), color = p.t2) }
+        },
         containerColor = p.card,
     )
 }

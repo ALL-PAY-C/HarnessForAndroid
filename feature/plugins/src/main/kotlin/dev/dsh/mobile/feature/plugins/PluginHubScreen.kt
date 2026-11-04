@@ -1,5 +1,7 @@
 package dev.dsh.mobile.feature.plugins
 
+import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.design.R as DesignR
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -72,7 +74,7 @@ import dev.dsh.mobile.pluginhost.rememberHostThemeTokens
 @Composable
 fun PluginHubScreen(
     pages: List<PluginConfigPage>,
-    title: String = "插件",
+    title: String? = null,
     slotContributions: List<SlotContribution> = emptyList(),
     onAction: (SlotAction) -> Unit = {},
     drawerResolver: DrawerEntryResolver? = null,
@@ -193,10 +195,13 @@ fun PluginHubScreen(
 
     Column(Modifier.fillMaxSize().imePadding().background(LocalQq.current.bg)) {
         // 顶栏用全项目统一骨架：左侧汉堡接抽屉，标题正中对齐（QqScreenTopBar 内部委托 QqTopBar）。
-        QqScreenTopBar(title = title, onNavigationClick = onOpenDrawer)
+        QqScreenTopBar(
+            title = title ?: stringResource(DesignR.string.plugins_page_title),
+            onNavigationClick = onOpenDrawer,
+        )
         if (builtin.isEmpty() && settingsCount == 0) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                Text("还没有插件提供页面", color = LocalQq.current.t3)
+                Text(stringResource(DesignR.string.plugins_empty), color = LocalQq.current.t3)
             }
         } else LazyColumn(
             Modifier.fillMaxWidth().weight(1f),
@@ -211,7 +216,7 @@ fun PluginHubScreen(
                 item(key = "slot-placed") {
                     Column(Modifier.fillMaxWidth()) {
                         Text(
-                            "插件组件",
+                            stringResource(DesignR.string.plugins_section_slots),
                             color = LocalQq.current.t3,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -232,7 +237,7 @@ fun PluginHubScreen(
                 item(key = "plugin-settings") {
                     GroupFrame {
                         GroupHeader(
-                            label = "插件设置",
+                            label = stringResource(DesignR.string.plugins_section_settings),
                             count = settingsCount,
                             expanded = settingsOpen,
                             onClick = { settingsOpen = !settingsOpen },
@@ -276,15 +281,15 @@ fun PluginHubScreen(
         // 列表区域下方：编辑态多一条「+」，挑插件组件摆进插件页。
         if (SlotEditState.enabled) {
             SlotPlusButton(
-                label = "编辑插件页",
+                label = stringResource(DesignR.string.plugins_edit_label),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             ) { pickingSlot = true }
         }
         if (pickingSlot) {
             SlotPickerDialog(
-                title = "添加到插件页",
+                title = stringResource(DesignR.string.plugins_picker_title),
                 items = slotCandidates,
-                emptyHint = "没有可添加的插件组件：先到插件页装一个带 PluginPage 槽位的插件",
+                emptyHint = stringResource(DesignR.string.plugins_picker_empty),
                 onPick = { pickingSlot = false; onSlotAdd(it) },
                 onDismiss = { pickingSlot = false },
             )

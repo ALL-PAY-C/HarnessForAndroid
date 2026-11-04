@@ -1,0 +1,3 @@
+# i18n allowlist: Chinese literals that stay in code, with the reason.
+# Format: path<TAB>literal<TAB>reason
+feature/sessions/src/main/kotlin/dev/dsh/mobile/feature/sessions/SessionsScreen.kt	模型	Failure reason text comes from the Node engine at runtime; matched with contains() to pick the "model missing" hint.

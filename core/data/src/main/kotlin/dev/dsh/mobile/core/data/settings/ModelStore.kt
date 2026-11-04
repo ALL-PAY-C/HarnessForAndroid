@@ -33,21 +33,10 @@ data class ModelProfile(
     val topP: Float = -1f,
     /** 支持工具调用：false 时请求里不带 tools。 */
     val supportsTools: Boolean = true,
-) {
-    /** 徽标文案：关 / 低 / 中 / 高。 */
-    val reasoningLabel: String
-        get() = reasoningLabelOf(reasoningEffort)
-}
+)
 
 /** 思考强度取值表，UI chip 与校验共用同一份。 */
 val reasoningEfforts: List<String> = listOf("off", "low", "medium", "high")
-
-fun reasoningLabelOf(effort: String): String = when (effort) {
-    "off" -> "关"
-    "low" -> "低"
-    "medium" -> "中"
-    else -> "高"
-}
 
 /** 未知/异常取值一律落回 "high"，旧数据与手改文件都不会带出非法状态。 */
 fun sanitizeReasoningEffort(raw: String): String =
