@@ -40,7 +40,7 @@ sealed interface NodePluginStatus {
  * 加载编排见 [loadNodePlugins]：成功/失败都 re-register 一次，让卡片刷新成最终状态，
  * 这样用户在插件中心点开它时看到的是「已应用」或「[stage] 原因」，而不是永远「等待加载」。
  */
-class NodeBackedPlugin(
+open class NodeBackedPlugin(
     val spec: PluginManifestFile,
     val dir: File,
     val status: MutableStateFlow<NodePluginStatus> = MutableStateFlow(NodePluginStatus.Pending),
@@ -119,8 +119,15 @@ class NodeBackedPlugin(
             plugins: List<NodeBackedPlugin>,
             isEnabled: (NodeBackedPlugin) -> Boolean = { p -> host.isEnabled(p.spec.id, p.manifest.enabledByDefault) },
         ) {
-            val runnable = plugins.filter(isEnabled)
-            plugins.filterNot { it in runnable }.forEach { p ->
+            // 装配期已判失败的占位（目录已丢失）不送引擎：送也只会拿回一个「目录不存在」的
+            // 二次错误，而真正的原因（哪个路径没了）已经在占位实例里，由 PluginHost.load 落行。
+            val candidates = plugins.filterNot { it is PluginLoadFailure }
+            val runnable = candidates.filter(isEnabled)
+            candidates.filterNot { it in runnable }.forEach { p ->
+                // T9.22 现状（本轮不区分）：「用户禁用 / 安全模式挡住」与「引擎真的加载失败」在
+                // 状态卡上都是同一张 Failed 卡片，只靠 stage 文案（disabled vs load/engine）区分，
+                // 插件管理行更是只看 loadError 有没有值 —— 禁用行没回执，失败行有回执，
+                // 但两者都没有「这是策略还是故障」的显式标记。要分开得加状态位，超出本次边界。
                 p.status.value = NodePluginStatus.Failed(stage = "disabled", message = "插件已禁用或处于安全模式", retryable = false)
             }
             if (runnable.isEmpty()) return
@@ -184,4 +191,31 @@ class NodeBackedPlugin(
             }
         }
     }
+}
+
+/**
+ * 目录已丢失的 Node 插件占位（T9.22）。
+ *
+ * 清单还在、包目录没了：没有实例可 load，以前的行按启用意图显示「已启用」，等于把
+ * 「插件没了」伪装成「它好好的」。占位实例不执行任何东西，只实现 [PluginLoadFailure]，
+ * 让 [PluginHost.load] 把「哪个路径没了」写进列表行；[NodeBackedPlugin.loadNodePlugins]
+ * 会跳过它，不拿一个不存在的目录去问引擎。
+ */
+class NodeMissingDirPlugin(
+    spec: PluginManifestFile,
+    dir: File,
+) : NodeBackedPlugin(
+    spec = spec,
+    dir = dir,
+    status = MutableStateFlow<NodePluginStatus>(
+        NodePluginStatus.Failed(
+            stage = BrokenPlugin.STAGE_MISSING,
+            message = "插件目录已不存在：" + dir.absolutePath,
+            retryable = false,
+        ),
+    ),
+), PluginLoadFailure {
+
+    override val loadFailure: String
+        get() = "[" + BrokenPlugin.STAGE_MISSING + "] 插件目录已不存在：" + this.dir.absolutePath
 }

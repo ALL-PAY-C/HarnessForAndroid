@@ -274,6 +274,17 @@ class ExternalPluginStore(
             } else {
                 val err = loaded.exceptionOrNull()
                 AppLog.w("ext plugin " + entry.pluginId + " load failed: " + err?.message, err)
+                // 只打日志 = 列表里连一行都没有，用户看不出装没装上；占位插件让失败可见。
+                out.putIfAbsent(
+                    entry.pluginId,
+                    brokenPluginFor(
+                        id = entry.pluginId,
+                        name = entry.name,
+                        version = entry.version,
+                        manifestError = probePluginJson(File(entry.apkPath)).error,
+                        error = err,
+                    ),
+                )
                 reports += PluginProbe(entry.pluginId, entry.name, "file", false, err?.message ?: "未知错误")
             }
         }
@@ -297,6 +308,17 @@ class ExternalPluginStore(
             } else {
                 val err = loaded.exceptionOrNull()
                 AppLog.w("system plugin " + pkg + " load failed: " + err?.message, err)
+                // 系统里装着的插件 APK 同理：失败也要留一行，否则用户只会看到「插件列表是空的」。
+                out.putIfAbsent(
+                    pkg,
+                    brokenPluginFor(
+                        id = pkg,
+                        name = pkg,
+                        version = "0",
+                        manifestError = systemApkOf(pkg)?.let { probePluginJson(it).error },
+                        error = err,
+                    ),
+                )
                 reports += PluginProbe(pkg, pkg, "system", false, err?.message ?: "未知错误")
             }
         }
@@ -457,16 +479,33 @@ class ExternalPluginStore(
         prefs.edit().putString(KEY, arr.toString()).apply()
     }
 
-    /** 直接读 zip 条目：不需要先加载插件的代码就能拿到 entry/id/name/version。 */
-    private fun readPluginJson(apk: File): JSONObject? = runCatching {
-        ZipFile(apk).use { zip ->
-            val entry = zip.getEntry("assets/plugin.json") ?: return@use null
-            val text = zip.getInputStream(entry).use { it.readBytes().toString(Charsets.UTF_8) }
-            JSONObject(text)
-        }
-    }.onFailure {
-        AppLog.w("ext plugin " + apk.name + " has no readable assets/plugin.json", it)
+    /** 系统插件包 APK 的落盘路径；PackageManager 不认就返回 null（占位插件退回 apk 阶段）。 */
+    private fun systemApkOf(pkg: String): File? = runCatching {
+        context.packageManager.getPackageInfo(pkg, 0).applicationInfo?.sourceDir?.let { File(it) }
     }.getOrNull()
+
+    /**
+     * assets/plugin.json 的探测结果。
+     *
+     * [json] 为 null 且 [error] 为 null = 包里没有这个条目（老包，走 [DEFAULT_ENTRY] 约定）；
+     * [error] 非 null = 条目在但读不出来 —— declarative/HTML 插件断在这里，必须报给用户，
+     * 而不是悄悄退化成「类找不到」。
+     */
+    private class ManifestProbe(val json: JSONObject?, val error: String? = null)
+
+    private fun probePluginJson(apk: File): ManifestProbe = runCatching {
+        ZipFile(apk).use { zip ->
+            val entry = zip.getEntry("assets/plugin.json") ?: return ManifestProbe(null)
+            val text = zip.getInputStream(entry).use { it.readBytes().toString(Charsets.UTF_8) }
+            ManifestProbe(JSONObject(text))
+        }
+    }.getOrElse { t ->
+        AppLog.w("ext plugin " + apk.name + " has no readable assets/plugin.json", t)
+        ManifestProbe(null, t.message?.takeIf { it.isNotBlank() } ?: t::class.simpleName ?: "解析失败")
+    }
+
+    /** 直接读 zip 条目：不需要先加载插件的代码就能拿到 entry/id/name/version。 */
+    private fun readPluginJson(apk: File): JSONObject? = probePluginJson(apk).json
 
     companion object {
         /** 没有 assets/plugin.json 时的固定类名约定。 */

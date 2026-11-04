@@ -261,7 +261,9 @@ class PluginInstaller(
         val dir = dirOf(id)
         if (!dir.isDirectory) {
             AppLog.w("插件 " + id + " 的目录已不存在，跳过 JS 执行：" + dir.absolutePath)
-            return@mapNotNull null
+            // 清单还在、目录没了：以前直接跳过，行按启用意图显示「已启用」——用户看到的是
+            // 「它好好的」，实际什么都没跑。占位插件把目录路径写进列表行。
+            return@mapNotNull BrokenPlugin.missingDir(spec, dir)
         }
         // Node 插件（node:/@deepseek-ai/ 依赖）改走 loadableNodePlugins → NodeEngineHost，不在 Rhino 里跑。
         if (classifyPlugin(dir) == PluginKind.Node) return@mapNotNull null
@@ -313,7 +315,8 @@ class PluginInstaller(
         val dir = dirOf(id)
         if (!dir.isDirectory) {
             AppLog.w("插件 " + id + " 的目录已不存在，跳过 Node 加载：" + dir.absolutePath)
-            return@mapNotNull null
+            // Node 侧同一件事：没有实例可 load，就没人把失败写进列表行。占位实例自己带原因。
+            return@mapNotNull NodeMissingDirPlugin(spec = spec, dir = dir)
         }
         if (classifyPlugin(dir) != PluginKind.Node) return@mapNotNull null
         NodeBackedPlugin(spec = spec, dir = dir)

@@ -50,6 +50,24 @@ class PluginRowStatusTest {
         assertEquals("[exec] index.js 执行失败", row.detail)
     }
 
+    /**
+     * T9.22：装配期失败占位（apk / missing / manifest）落到行上时必须是失败态。
+     * 这三条文案由 BrokenPlugin.loadFailure 生成，行内只做「失败优先」的判定。
+     */
+    @Test
+    fun placeholderLoadErrorShowsFailedRow() {
+        listOf(
+            "[apk] 加载失败：ClassNotFoundException: dev.dsh.mobile.plugin.html.HtmlPlugin",
+            "[missing] 插件目录已不存在：/data/user/0/dev.dsh.mobile/files/plugins/acme.demo",
+            "[manifest] assets/plugin.json 解析失败：Expected ':' at 12",
+        ).forEach { failure ->
+            val row = pluginRowStatus(enabled = false, loadError = failure)
+            assertEquals(UiText.Res(DesignR.string.plugins_row_load_failed), row.text)
+            assertTrue("占位失败必须显示为失败：" + failure, row.failed)
+            assertEquals(failure, row.detail)
+        }
+    }
+
     @Test
     fun longErrorIsClippedWithEllipsis() {
         val row = pluginRowStatus(enabled = true, loadError = "x".repeat(500))
