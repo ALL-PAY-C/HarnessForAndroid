@@ -5,6 +5,7 @@ import dev.dsh.mobile.core.common.device.CapabilityTier
 import dev.dsh.mobile.core.common.device.CapabilityTiers
 import dev.dsh.mobile.core.common.device.DeviceCapability
 import dev.dsh.mobile.core.protocol.tool.ToolCatalog
+import dev.dsh.mobile.core.protocol.tool.ToolSpec
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -64,8 +65,13 @@ object ToolPolicy {
      * 未注册的名字归 [ToolSensitivity.ReversibleWrite]（不是要拦它，是不敢声称它只读）；
      * 与拆分前 else 分支一致。
      */
-    fun sensitivity(name: String, args: JsonObject): ToolSensitivity =
-        ToolCatalog.spec(name)?.sensitivityOf(args) ?: ToolSensitivity.ReversibleWrite
+    fun sensitivity(
+        name: String,
+        args: JsonObject,
+        /** 解析器：默认只认内置目录；宿主传 ToolRegistry::get，注入的 MCP 工具才拿得到自己的档位。 */
+        resolve: (String) -> ToolSpec? = ToolCatalog::spec,
+    ): ToolSensitivity =
+        resolve(name)?.sensitivityOf(args) ?: ToolSensitivity.ReversibleWrite
 
     /**
      * 判定。规则很少，刻意少：档位不可逆 + 复合动作才问，其余放行。
@@ -78,10 +84,11 @@ object ToolPolicy {
         args: JsonObject,
         capabilityTiers: String = "",
         sessionGranted: Set<DeviceCapability> = emptySet(),
+        resolve: (String) -> ToolSpec? = ToolCatalog::spec,
     ): ToolAuth {
         // T4.5：六类系统能力先按三档判，判完就不再走「不可逆才问」的老规则。
         capabilityVerdict(name, args, capabilityTiers, sessionGranted)?.let { return it }
-        val sensitivity = sensitivity(name, args)
+        val sensitivity = sensitivity(name, args, resolve)
         if (sensitivity != ToolSensitivity.Irreversible) return ToolAuth.Allow
         val title = when (name) {
             "phone" -> "确认执行手机动作：" + (toolArg(args, "action") ?: "?")

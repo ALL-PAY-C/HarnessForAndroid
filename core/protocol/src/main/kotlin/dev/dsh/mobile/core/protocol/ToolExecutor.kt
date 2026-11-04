@@ -22,7 +22,11 @@ data class ToolExecResult(
  * 任何异常都收敛成失败结果——不许把整轮对话炸掉。
  */
 class ToolExecutor(
-    private val executors: Map<String, suspend (JsonObject) -> String>,
+    /**
+     * 执行面。是函数而不是 Map：T9.10 P3 起工具表每轮都可能变（MCP 服务器连上/断开），
+     * 构造时快照一份就等于把首轮的形状焊死，之后新注入的工具永远「未知工具」。
+     */
+    private val executors: () -> Map<String, suspend (JsonObject) -> String>,
     private val timeoutMs: Long = 30_000L,
     private val retries: Int = 1,
     private val retryDelayMs: Long = 500L,
@@ -37,27 +41,55 @@ class ToolExecutor(
      * 但对有副作用的工具就是「把点击/输入再打一遍」——那些工具自己用错误包回业务失败，
      * 唯一需要拦住的就是这一层重试。
      */
-    private val noRetryTools: Set<String> = emptySet(),
+    private val noRetryTools: () -> Set<String> = { emptySet() },
+    /**
+     * 逐工具超时预算（T9.10 P3）：MCP 工具单次可以跑到 120s，默认的 30s 会把它砍在半路。
+     * 返回 null 表示「用 [timeoutMs]」。
+     */
+    private val timeoutOf: (String) -> Long? = { null },
 ) {
+    /** 直接给一张固定 Map 的旧接法（单测与旧调用点）：等价于「工具表永不变化」。 */
+    constructor(
+        executors: Map<String, suspend (JsonObject) -> String>,
+        timeoutMs: Long = 30_000L,
+        retries: Int = 1,
+        retryDelayMs: Long = 500L,
+        maxOutputChars: Int = 6_000,
+        spill: ToolOutputSpill? = null,
+        noRetryTools: Set<String> = emptySet(),
+    ) : this(
+        { executors },
+        timeoutMs,
+        retries,
+        retryDelayMs,
+        maxOutputChars,
+        spill,
+        { noRetryTools },
+        { null },
+    )
+
     /** [callId] 用于落盘文件名：同一轮里同名工具调两次不能互相覆盖输出。 */
     suspend fun run(name: String, args: JsonObject, turnId: String? = null, callId: String? = null): ToolExecResult {
         val started = System.currentTimeMillis()
         var attempts = 0
         var last: String? = null
-        val maxRetries = if (name in noRetryTools) 0 else retries
+        // 一次调用内只取一份快照：重试之间工具表变了也不该中途换执行体。
+        val table = executors()
+        val maxRetries = if (name in noRetryTools()) 0 else retries
         for (i in 0..maxRetries) {
             attempts = i + 1
             try {
-                val exec = executors[name]
+                val exec = table[name]
                     ?: return ToolExecResult(
                         ok = false,
                         output = "",
-                        error = "未知工具：" + name + "（已注册：" + executors.keys.joinToString() + "）",
+                        error = "未知工具：" + name + "（已注册：" + table.keys.joinToString() + "）",
                         elapsedMs = System.currentTimeMillis() - started,
                         attempts = attempts,
                     )
-                val out = withTimeoutOrNull(timeoutMs) { exec(args) }
-                    ?: throw java.util.concurrent.TimeoutException("执行超时（" + timeoutMs + "ms）")
+                val budget = timeoutOf(name)?.coerceAtLeast(1_000L) ?: timeoutMs
+                val out = withTimeoutOrNull(budget) { exec(args) }
+                    ?: throw java.util.concurrent.TimeoutException("执行超时（" + budget + "ms）")
                 return ToolExecResult(
                     ok = true,
                     output = spill?.present(out, turnId, callId ?: name) ?: out.truncateForTool(maxOutputChars),

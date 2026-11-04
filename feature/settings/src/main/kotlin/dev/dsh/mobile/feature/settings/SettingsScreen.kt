@@ -156,6 +156,8 @@ fun SettingsScreen(
     onOpenAppearance: () -> Unit = {},
     /** 手机能力授权（T4.5）也有独立页面（AppCapabilityScreen），走自己的路由。 */
     onOpenCapability: () -> Unit = {},
+    /** MCP 服务器列表（T9.10 P1）同样有独立页面（McpServersScreen）。 */
+    onOpenMcp: () -> Unit = {},
     /** null = 根列表；否则是当前子页的分类 id。 */
     section: String? = null,
     /** 群聊角色卡仓库（T9.7a）；null 时整个「群聊角色卡」分组不渲染。 */
@@ -347,6 +349,14 @@ fun SettingsScreen(
                             subtitle = "拓展插件 UI 配置",
                             tint = p.accent,
                             onClick = onOpenExtras,
+                        )
+                        QqCardDivider()
+                        QqRow(
+                            icon = Icons.Filled.Widgets,
+                            title = "MCP 服务器",
+                            subtitle = "外部工具服务器（HTTP / SSE）",
+                            tint = p.accent,
+                            onClick = onOpenMcp,
                         )
                         QqCardDivider()
                         SubGroup(

@@ -671,9 +671,19 @@ private fun decl_subagent(): JsonObject = buildJsonObject {
  * 拆分前这三样是 toolsJson()、toolRunner 的 Map、ToolPolicy 的字符串集合；
  * 现在都由同一份 [ToolSpec] 派生，加工具只改 ToolCatalog。
  */
-class ToolRegistry(private val ctx: ToolCtx) {
+class ToolRegistry(
+    private val ctx: ToolCtx,
+    /**
+     * 宿主注入的额外工具源（T9.10 P3：MCP 服务器）。
+     *
+     * 是函数而不是列表：工具表每轮都可能变（服务器连上/断开/改了配置），
+     * 取自 snapshot 才「配置变更即生效，不用重启 transport」。
+     */
+    private val extra: () -> List<ToolSpec> = { emptyList() },
+) {
 
-    val specs: List<ToolSpec> = ToolCatalog.specs
+    /** 内置 16 条 + web 三条 + 注入的额外工具（顺序 = 声明顺序）。 */
+    val specs: List<ToolSpec> get() = ToolCatalog.specs + extra()
 
     /** 声明清单：保持拆分前 toolsJson() 的顺序，web 三条在末尾。 */
     fun allDeclarations(): List<JsonObject> = specs.map { it.declaration(ctx) }
@@ -681,7 +691,8 @@ class ToolRegistry(private val ctx: ToolCtx) {
     /** 发给模型的工具表：[dev.dsh.mobile.core.protocol.LocalEngineTransport.toolsJson] 现在就是它。 */
     fun declarations(): JsonArray = JsonArray(allDeclarations())
 
-    fun get(name: String): ToolSpec? = ToolCatalog.spec(name)
+    fun get(name: String): ToolSpec? =
+        ToolCatalog.spec(name) ?: extra().firstOrNull { it.name == name }
 
     fun names(): List<String> = specs.map { it.name }
 

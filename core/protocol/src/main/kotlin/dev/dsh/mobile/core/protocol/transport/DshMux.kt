@@ -31,6 +31,11 @@ data class MuxGeneration(
     val hostName: String,
     val hostVersion: String,
     val protocolVersion: Int = 1,
+    /**
+     * init 响应里的 capabilities 原样留档（T9.10-P4 能力门控读它）。
+     * 旧引擎不报这个字段，此时为 null —— 上层按「全都支持」处理。
+     */
+    val capabilities: JsonObject? = null,
 )
 
 /**
@@ -190,6 +195,7 @@ class DshMux(
             hostName = init.obj("agentInfo")?.str("name") ?: "dsh",
             hostVersion = init.obj("agentInfo")?.str("version") ?: "",
             protocolVersion = init.long("protocolVersion")?.toInt() ?: 1,
+            capabilities = init.obj("capabilities"),
         )
         generation = g
         onPhase(MuxPhase.Ready(g))

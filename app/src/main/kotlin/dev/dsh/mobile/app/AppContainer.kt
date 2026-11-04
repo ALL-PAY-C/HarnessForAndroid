@@ -42,6 +42,9 @@ import dev.dsh.mobile.core.protocol.DshTransport
 import dev.dsh.mobile.core.protocol.WebSocketChannel
 import dev.dsh.mobile.core.protocol.transport.LineCarrier
 import dev.dsh.mobile.core.data.backup.BackupManager
+import dev.dsh.mobile.core.data.mcp.McpRuntime
+import dev.dsh.mobile.core.data.mcp.McpServerStore
+import dev.dsh.mobile.core.data.mcp.toProtocolConfig
 import dev.dsh.mobile.core.data.context.RoomWarmLayerStore
 import dev.dsh.mobile.core.protocol.context.RecallHit
 import dev.dsh.mobile.core.protocol.context.WarmMessage
@@ -742,6 +745,19 @@ class AppContainer(private val context: Context) {
      * kind 仍是 InProcess：这个 transport 确实是进程内的，不是网络端点；语义与
      * LocalEngineTransport 一致。旧的「内置 node 可执行文件」进程内通道已经删了。
      */
+    /**
+     * T9.10-P3：MCP 工具源。设置里 enabled 的服务器把 tools/list 摊成
+     * `mcp__<server>__<tool>` 进工具表；某台连不上只让它自己的工具缺席，不打断对话。
+     * 预热在后台（2s 后），首轮请求不等 MCP。
+     */
+    private val mcpRuntime: McpRuntime by lazy {
+        McpRuntime(
+            store = McpServerStore(context),
+            scope = scope,
+            imageDir = { File(context.filesDir, "workspace/mcp-images") },
+        ).also { it.start() }
+    }
+
     fun defaultEndpoint(): Endpoint =
         Endpoint(id = "embedded", name = "本地运行时", kind = TransportKind.InProcess, cwd = cwd())
 
@@ -815,6 +831,8 @@ class AppContainer(private val context: Context) {
                             db.warmLayerDao().recallInRange(sid, from, to, limit)
                                 .map { RecallHit(it.rowId, it.role, it.text) }
                         },
+                        // T9.10-P3：MCP 服务器注入的工具（每轮从 source 快照取，配置改动即生效）。
+                        extraTools = mcpRuntime.source,
                     ).also { t ->
                         // 子代理嵌套深度跟着设置走（默认 2）：设置页改完下一次派发即生效，不用重连运行时。
                         scope.launch { settings.settings.collect { t.setSubagentMaxDepth(it.subagentMaxDepth) } }
@@ -838,6 +856,12 @@ class AppContainer(private val context: Context) {
                             }
                         },
                         personaProvider = { id -> identityText(id) },
+                        // T9.10-P4：启用的 MCP 服务器随 session/new 下发给引擎，引擎自己连自己执行，
+                        // 工具调用走既有 toolCall 事件回流。每次建会话现读设置：改完配置对新会话生效，
+                        // 旧会话沿用创建时的集合（session/resume 不接受 mcpServers）。
+                        mcpServers = {
+                            McpServerStore(context).load().map { it.toProtocolConfig() }
+                        },
                     )
                 }
                 _transport.value = t

@@ -2,6 +2,9 @@ package dev.dsh.mobile.core.protocol
 
 import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.TransportKind
+import dev.dsh.mobile.core.protocol.mcp.McpHeader
+import dev.dsh.mobile.core.protocol.mcp.McpServerConfig
+import dev.dsh.mobile.core.protocol.mcp.McpTransportKind
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -10,6 +13,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -34,6 +38,8 @@ class AcpTransportTest {
         var dropMethods: Set<String> = emptySet()
         /** session/prompt 响应前先注入的 chunk（模拟 quiescence：旧 chunk 先于终态）。 */
         var promptChunksBeforeResponse: List<String> = emptyList()
+        /** initialize 响应里的 capabilities（P4 能力门控）；null = 旧引擎不报。 */
+        var capabilities: JsonObject? = null
 
         override suspend fun open() = Unit
         override suspend fun close() = Unit
@@ -51,6 +57,7 @@ class AcpTransportTest {
                         put("name", "deepseek-harness-acp")
                         put("version", "0.0.1")
                     })
+                    capabilities?.let { put("capabilities", it) }
                 }
                 "session/list" -> buildJsonObject {
                     put("sessions", kotlinx.serialization.json.JsonArray(listOf()))
@@ -272,6 +279,151 @@ class AcpTransportTest {
         val result = transport.prompt("s1", "hi", emptyList(), turnId = "t2")
         assertEquals("end_turn", result)
         assertTrue("新轮应产生带 turnId 的 TurnEnd marker", received.any { it is DshEvent.TurnEnd && it.turnId == "t2" })
+        transport.disconnect()
+    }
+
+    // ------------------------------------------------- T9.10-P4 mcpServers 下发
+
+    /** 取最后一次指定 method 的请求 params，用来断言下发给引擎的形状。 */
+    private fun sentParams(channel: FakeChannel, method: String): JsonObject =
+        channel.sent.asReversed()
+            .map { DshJson.parseToJsonElement(it).jsonObject }
+            .first { it["method"]?.jsonPrimitive?.content == method }["params"]!!.jsonObject
+
+    private fun http(name: String, url: String = "https://example.com/mcp") = McpServerConfig(
+        id = name,
+        name = name,
+        transport = McpTransportKind.Http,
+        url = url,
+        headers = listOf(McpHeader("Authorization", "Bearer t0ken")),
+    )
+
+    private fun sse(name: String) = McpServerConfig(
+        id = name,
+        name = name,
+        transport = McpTransportKind.Sse,
+        url = "https://example.com/sse",
+    )
+
+    @Test
+    fun `session new sends enabled servers with array shaped headers`() = runTest {
+        val channel = FakeChannel()
+        val transport = AcpTransport(
+            channelProvider = { channel },
+            kind = TransportKind.Loopback,
+            scope = backgroundScope,
+            defaultCwd = { "/tmp" },
+            mcpServers = { listOf(http("files"), sse("feed")) },
+        )
+        transport.connect()
+        transport.newSession("/tmp")
+
+        val servers = sentParams(channel, "session/new")["mcpServers"]!!.jsonArray
+        assertEquals(2, servers.size)
+        val first = servers[0].jsonObject
+        assertEquals("files", first["name"]!!.jsonPrimitive.content)
+        assertEquals("http", first["type"]!!.jsonPrimitive.content)
+        assertEquals("https://example.com/mcp", first["url"]!!.jsonPrimitive.content)
+        // 引擎 schema：headers 是 [{name,value}] 数组，不是 map。
+        val headers = first["headers"]!!.jsonArray
+        assertEquals(1, headers.size)
+        assertEquals("Authorization", headers[0].jsonObject["name"]!!.jsonPrimitive.content)
+        assertEquals("Bearer t0ken", headers[0].jsonObject["value"]!!.jsonPrimitive.content)
+        assertEquals("sse", servers[1].jsonObject["type"]!!.jsonPrimitive.content)
+        transport.disconnect()
+    }
+
+    @Test
+    fun `disabled server is not sent to engine`() = runTest {
+        val channel = FakeChannel()
+        val transport = AcpTransport(
+            channelProvider = { channel },
+            kind = TransportKind.Loopback,
+            scope = backgroundScope,
+            defaultCwd = { "/tmp" },
+            mcpServers = { listOf(http("files").copy(enabled = false)) },
+        )
+        transport.connect()
+        transport.newSession("/tmp")
+
+        assertEquals(0, sentParams(channel, "session/new")["mcpServers"]!!.jsonArray.size)
+        transport.disconnect()
+    }
+
+    @Test
+    fun `stdio server is never sent because the engine owns the process`() = runTest {
+        val channel = FakeChannel()
+        val transport = AcpTransport(
+            channelProvider = { channel },
+            kind = TransportKind.Loopback,
+            scope = backgroundScope,
+            defaultCwd = { "/tmp" },
+            mcpServers = {
+                listOf(McpServerConfig(id = "local", name = "local", transport = McpTransportKind.Stdio, command = "npx"))
+            },
+        )
+        transport.connect()
+        transport.newSession("/tmp")
+
+        assertEquals(0, sentParams(channel, "session/new")["mcpServers"]!!.jsonArray.size)
+        transport.disconnect()
+    }
+
+    @Test
+    fun `broken provider yields empty array and session still opens`() = runTest {
+        val channel = FakeChannel()
+        val transport = AcpTransport(
+            channelProvider = { channel },
+            kind = TransportKind.Loopback,
+            scope = backgroundScope,
+            defaultCwd = { "/tmp" },
+            mcpServers = { throw IllegalStateException("设置读不出来") },
+        )
+        transport.connect()
+        transport.newSession("/tmp")
+
+        assertEquals(0, sentParams(channel, "session/new")["mcpServers"]!!.jsonArray.size)
+        assertTrue(transport.state.value is RuntimeState.Ready)
+        transport.disconnect()
+    }
+
+    @Test
+    fun `engine without http capability drops http but keeps sse`() = runTest {
+        val channel = FakeChannel().apply {
+            capabilities = buildJsonObject {
+                put("session", buildJsonObject { put("mcp", buildJsonObject { put("http", false) }) })
+            }
+        }
+        val transport = AcpTransport(
+            channelProvider = { channel },
+            kind = TransportKind.Loopback,
+            scope = backgroundScope,
+            defaultCwd = { "/tmp" },
+            mcpServers = { listOf(http("files"), sse("feed")) },
+        )
+        transport.connect()
+        transport.newSession("/tmp")
+
+        val servers = sentParams(channel, "session/new")["mcpServers"]!!.jsonArray
+        assertEquals(1, servers.size)
+        assertEquals("sse", servers[0].jsonObject["type"]!!.jsonPrimitive.content)
+        transport.disconnect()
+    }
+
+    @Test
+    fun `engine without capabilities field keeps both transports`() = runTest {
+        val channel = FakeChannel()
+        val transport = AcpTransport(
+            channelProvider = { channel },
+            kind = TransportKind.Loopback,
+            scope = backgroundScope,
+            defaultCwd = { "/tmp" },
+            mcpServers = { listOf(http("files"), sse("feed")) },
+        )
+        transport.connect()
+        transport.newSession("/tmp")
+
+        assertEquals(2, sentParams(channel, "session/new")["mcpServers"]!!.jsonArray.size)
         transport.disconnect()
     }
 }

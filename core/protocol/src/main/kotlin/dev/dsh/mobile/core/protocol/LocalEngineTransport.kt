@@ -17,6 +17,7 @@ import dev.dsh.mobile.core.model.ToolCall
 import dev.dsh.mobile.core.model.ToolCall.ToolStatus
 import dev.dsh.mobile.core.protocol.group.GROUP_SCHEDULER_LEGACY
 import dev.dsh.mobile.core.protocol.group.GROUP_SCHEDULER_MODERATED
+import dev.dsh.mobile.core.protocol.mcp.McpToolSource
 import dev.dsh.mobile.core.protocol.tool.ToolCtx
 import dev.dsh.mobile.core.protocol.tool.contentOrNullSafe
 import dev.dsh.mobile.core.protocol.tool.ToolRegistry
@@ -283,6 +284,12 @@ class LocalEngineTransport(
     private val recallSearch: (suspend (String, String, Int) -> List<RecallHit>)? = null,
     /** 冷层回捞的区间查询（rowid 闭区间）：/recall R<n> 与「最近 200 条」兜底都走它。 */
     private val recallRows: (suspend (String, Long, Long, Int) -> List<RecallHit>)? = null,
+    /**
+     * 额外工具源（T9.10 P3）：MCP 服务器的 tools/list 摊成 ToolSpec 挂进工具表。
+     *
+     * null = 不接 MCP：声明、执行、授权三处都与 P3 之前逐字节相同，单测不受影响。
+     */
+    private val extraTools: McpToolSource? = null,
 ) : DshTransport, Compactor, WarmRefresher, RecallLookup {
 
     /**
@@ -347,16 +354,19 @@ class LocalEngineTransport(
         web = web,
     )
 
-    private val toolRegistry = ToolRegistry(toolCtx)
+    private val toolRegistry = ToolRegistry(toolCtx, extra = { extraTools?.snapshot() ?: emptyList() })
 
     /** internal 而非 private：单测要证明注入的通道真的被走到（toolsJson 只是声明，不执行）。 */
     internal val toolRunner = ToolExecutor(
-        toolRegistry.handlers(),
+        // 每轮现算：MCP 服务器连上/断开后，同一轮之后的工具调用立刻能看见新工具。
+        executors = { toolRegistry.handlers() },
         // 超阈值不再硬截 6000 字符：落盘 + 头尾 + locator，模型按需读回全文。
         spill = spill,
         // 手机动作全是有副作用的（点击/输入/滚动），失败重试 1 次 = 再点一次。
         // 这里只关掉执行器那一层重试；业务失败由 phone 自己用错误包回（ok=false 的 code/message）。
-        noRetryTools = toolRegistry.noRetryNames(),
+        noRetryTools = { toolRegistry.noRetryNames() },
+        // MCP 工具的单次预算由服务器配置给（最长 600s），其余工具仍走执行器默认 30s。
+        timeoutOf = { name -> extraTools?.timeoutOf(name) },
     )
 
     /** 每个会话的插话队列，见 [interject]。 */
@@ -1215,6 +1225,8 @@ class LocalEngineTransport(
                                     args = args,
                                     capabilityTiers = capabilityTiers,
                                     sessionGranted = sessionGrants(sessionId),
+                                    // 注入的 MCP 工具不在 ToolCatalog 里，档位得从注册表现取。
+                                    resolve = toolRegistry::get,
                                 )
                             ) {
                                 is ToolAuth.Allow ->

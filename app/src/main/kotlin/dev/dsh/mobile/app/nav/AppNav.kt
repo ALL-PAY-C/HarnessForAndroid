@@ -89,6 +89,7 @@ import dev.dsh.mobile.feature.settings.AppAppearanceScreen
 import dev.dsh.mobile.feature.settings.AppCapabilityScreen
 import dev.dsh.mobile.feature.settings.AppGatewayScreen
 import dev.dsh.mobile.feature.settings.ExtrasScreen
+import dev.dsh.mobile.feature.settings.McpServersScreen
 import dev.dsh.mobile.feature.settings.SettingsScreen
 import dev.dsh.mobile.feature.settings.SettingsViewModel
 import kotlinx.coroutines.launch
@@ -110,6 +111,7 @@ private object Routes {
     const val SETTINGS_APPEARANCE = "settings/appearance"
     const val SETTINGS_GATEWAY = "settings/gateway"
     const val SETTINGS_CAPABILITY = "settings/capability"
+    const val SETTINGS_MCP = "settings/mcp"
     const val PLUGIN_PAGE = "plugin-page/{pageId}"
     fun chat(id: String) = "chat/$id"
     fun chatSettings(id: String) = "chat/$id/settings"
@@ -652,6 +654,7 @@ fun AppNav(container: AppContainer) {
                             onOpenGateway = { nav.navigate(Routes.SETTINGS_GATEWAY) { launchSingleTop = true } },
                             onOpenAppearance = { nav.navigate(Routes.SETTINGS_APPEARANCE) { launchSingleTop = true } },
                             onOpenCapability = { nav.navigate(Routes.SETTINGS_CAPABILITY) { launchSingleTop = true } },
+                            onOpenMcp = { nav.navigate(Routes.SETTINGS_MCP) { launchSingleTop = true } },
                             onOpenSection = { id -> nav.navigate(Routes.settingsSection(id)) { launchSingleTop = true } },
                             roleCardStore = container.presetStore,
                             tabBarVisible = true,
@@ -672,6 +675,7 @@ fun AppNav(container: AppContainer) {
                                 { item.content() }
                             },
                             section = section,
+                            onOpenMcp = { nav.navigate(Routes.SETTINGS_MCP) { launchSingleTop = true } },
                             roleCardStore = container.presetStore,
                             tabBarVisible = false,
                             onBack = { nav.popBackStack() },
@@ -701,6 +705,11 @@ fun AppNav(container: AppContainer) {
                             onRequest = { capability -> caps.requestMissing(capability) },
                             onBack = { nav.popBackStack() },
                         )
+                    }
+
+                    // T9.10 P1 MCP 服务器：列表 + 增删改 + 启停 + 测试连接。
+                    composable(Routes.SETTINGS_MCP) {
+                        McpServersScreen(onBack = { nav.popBackStack() })
                     }
 
                     drawerEntries.forEach { entry ->

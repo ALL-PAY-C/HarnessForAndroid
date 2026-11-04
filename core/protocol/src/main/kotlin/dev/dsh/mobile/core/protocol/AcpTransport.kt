@@ -10,6 +10,8 @@ import dev.dsh.mobile.core.model.TokenUsage
 import dev.dsh.mobile.core.model.ToolCall
 import dev.dsh.mobile.core.model.TransportKind
 import dev.dsh.mobile.core.protocol.identity.IdentityInjector
+import dev.dsh.mobile.core.protocol.mcp.McpServerConfig
+import dev.dsh.mobile.core.protocol.mcp.McpTransportKind
 import dev.dsh.mobile.core.protocol.transport.DshCarrier
 import dev.dsh.mobile.core.protocol.transport.DshMux
 import dev.dsh.mobile.core.protocol.transport.LineCarrier
@@ -28,7 +30,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -55,6 +59,11 @@ class AcpTransport(
     private val personaProvider: suspend (String) -> String = { "" },
     /** 补注入间隔（轮）。默认 6；测试可传 1 强制每轮，或传大值只看首轮。 */
     identityEveryTurns: Int = IdentityInjector.DEFAULT_EVERY_TURNS,
+    /**
+     * T9.10-P4：要随 session/new 下发给引擎的 MCP 服务器。引擎自己连、自己执行，
+     * 工具调用走既有 toolCall 事件回流。默认空实现 = 老行为（不下发任何 server）。
+     */
+    private val mcpServers: () -> List<McpServerConfig> = { emptyList() },
 ) : DshTransport {
 
     /**
@@ -69,6 +78,7 @@ class AcpTransport(
         defaultCwd: () -> String = { "/" },
         personaProvider: suspend (String) -> String = { "" },
         identityEveryTurns: Int = IdentityInjector.DEFAULT_EVERY_TURNS,
+        mcpServers: () -> List<McpServerConfig> = { emptyList() },
     ) : this(
         carrier = LineCarrier(scope, channelProvider),
         kind = kind,
@@ -77,6 +87,7 @@ class AcpTransport(
         defaultCwd = defaultCwd,
         personaProvider = personaProvider,
         identityEveryTurns = identityEveryTurns,
+        mcpServers = mcpServers,
     )
 
     /** 事件出口（T9.14 修 1）：唯一实现是 [EventSink]，丢弃统一计数。 */
@@ -236,6 +247,62 @@ class AcpTransport(
 
     // ------------------------------------------------------------- convenience
 
+    /**
+     * 下发给 session/new 的 mcpServers 数组（T9.10-P4）。
+     *
+     * 形状严格照引擎 schema：http/sse → {name,url,headers:[{name,value}],type}。
+     * headers 是数组不是 map，写成对象引擎直接拒。
+     * stdio 不下发：Android 上本应用拿不到可执行路径，由引擎侧自行配置。
+     * provider 抛异常时退化成空数组 —— MCP 配置坏了不能阻断建会话。
+     */
+    private fun mcpServersParam(): JsonArray {
+        val configs = try {
+            mcpServers()
+        } catch (t: Throwable) {
+            AppLog.w("mcp servers unavailable: " + (t.message ?: t::class.simpleName))
+            return JsonArray(emptyList())
+        }
+        return buildJsonArray {
+            configs.forEach { cfg ->
+                val type = when (cfg.transport) {
+                    McpTransportKind.Http -> "http"
+                    McpTransportKind.Sse -> "sse"
+                    McpTransportKind.Stdio -> return@forEach
+                }
+                if (!cfg.enabled || !engineSupports(cfg.transport)) return@forEach
+                add(
+                    buildJsonObject {
+                        put("name", cfg.name)
+                        put("url", cfg.url)
+                        put("type", type)
+                        put("headers", buildJsonArray {
+                            cfg.headers.forEach { h ->
+                                add(buildJsonObject { put("name", h.name); put("value", h.value) })
+                            }
+                        })
+                    },
+                )
+            }
+        }
+    }
+
+    /**
+     * 能力门控（init.capabilities.session.mcp.<http|sse>）：显式 false 才剔除该档。
+     * 字段缺失 = 旧引擎没报这个能力，按「支持」处理，免得老引擎一条都发不出去。
+     */
+    private fun engineSupports(kind: McpTransportKind): Boolean {
+        val caps = mux.currentGeneration?.capabilities ?: return true
+        val key = when (kind) {
+            McpTransportKind.Http -> "http"
+            McpTransportKind.Sse -> "sse"
+            McpTransportKind.Stdio -> return false
+        }
+        // 逐层安全转型：引擎给的 capabilities 形状不可信，畸形时按「支持」处理而不是抛穿建会话。
+        val session = caps["session"] as? JsonObject ?: return true
+        val mcp = session["mcp"] as? JsonObject ?: return true
+        return (mcp[key] as? JsonPrimitive)?.booleanOrNull ?: true
+    }
+
     override suspend fun listSessions(cwd: String?): List<Session> {
         val res = mux.call(
             "session/list",
@@ -251,7 +318,7 @@ class AcpTransport(
             "session/new",
             buildJsonObject {
                 put("cwd", cwd.ifBlank { defaultCwd() })
-                put("mcpServers", buildJsonArray { })
+                put("mcpServers", mcpServersParam())
             },
             120_000L,
         )
@@ -263,6 +330,8 @@ class AcpTransport(
     }
 
     override suspend fun resumeSession(sessionId: String): Session {
+        // P4：session/resume 不接受 mcpServers（引擎协议里只有 session/new 带），恢复的会话
+        // 沿用创建时的服务器集合。所以配置改动不热更新：新配置从下一个新会话开始生效。
         // 续接 = 远端历史可能已被裁剪过，身份必须重新落一次。
         identity.invalidate(sessionId)
         val res = mux.call("session/resume", buildJsonObject { put("sessionId", sessionId) }, 120_000L)
