@@ -249,7 +249,9 @@ fun SettingsScreen(
             ) {
 
                 // ---------- 1. 应用与更新 ----------
-                item {
+                // 子页里只有命中的那个分类该进列表：未命中的槽位是零高 item，但 spacedBy(cardGap)
+                // 照样给它留一个间距，首卡会随分类序号逐级下移（环境页因此在会话页基础上再多吃 2×12dp）。
+                if (section == null || section == "basic") item {
                     SectionSlot(
                         id = "basic",
                         section = section,
@@ -453,7 +455,7 @@ fun SettingsScreen(
                 }
 
                 // ---------- 3. 会话 ----------
-                item {
+                if (section == null || section == "chat") item {
                     SectionSlot(
                         id = "chat",
                         section = section,
@@ -642,7 +644,7 @@ fun SettingsScreen(
                 }
 
                 // ---------- 4. 通知 ----------
-                item {
+                if (section == null || section == "notify") item {
                     SectionSlot(
                         id = "notify",
                         section = section,
@@ -735,7 +737,7 @@ fun SettingsScreen(
                 }
 
                 // ---------- 5. 环境 ----------
-                item {
+                if (section == null || section == "env") item {
                     SectionSlot(
                         id = "env",
                         section = section,
@@ -1096,7 +1098,7 @@ fun SettingsScreen(
                 }
 
                 // ---------- 插件自带的设置项 ----------
-                if (extraSettings.isNotEmpty()) {
+                if (extraSettings.isNotEmpty() && (section == null || section == "pluginSettings")) {
                     item {
                         SectionSlot(
                             id = "pluginSettings",
