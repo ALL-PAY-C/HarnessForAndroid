@@ -8043,5 +8043,119 @@
     "en": "API key",
     "zh": "API Key",
     "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "preset_card_export_current",
+    "en": "Export card",
+    "zh": "导出当前卡",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "preset_card_export_all",
+    "en": "Export all",
+    "zh": "导出全部",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "preset_card_import_clip",
+    "en": "Import from clipboard",
+    "zh": "从剪贴板导入",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "preset_card_copied",
+    "en": "Copied %1$d card(s) to clipboard",
+    "zh": "已复制 %1$d 张身份卡",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "preset_card_export_empty",
+    "en": "No identity card to export yet",
+    "zh": "还没有可导出的身份卡",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "preset_card_import_done",
+    "en": "Imported %1$d card(s)",
+    "zh": "已导入 %1$d 张身份卡",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "preset_card_import_done_skipped",
+    "en": "Imported %1$d, skipped %2$d (%3$s)",
+    "zh": "已导入 %1$d 张，跳过 %2$d 张（%3$s）",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "card_err_blank",
+    "en": "Clipboard has no text",
+    "zh": "剪贴板里没有文本",
+    "where": "IdentityCardTransfer.kt"
+  },
+  {
+    "key": "card_err_json",
+    "en": "Not valid JSON",
+    "zh": "不是合法的 JSON",
+    "where": "IdentityCardTransfer.kt"
+  },
+  {
+    "key": "card_err_shape",
+    "en": "Unrecognized card format",
+    "zh": "认不出这个身份卡格式",
+    "where": "IdentityCardTransfer.kt"
+  },
+  {
+    "key": "card_err_schema",
+    "en": "Unsupported card version",
+    "zh": "身份卡版本不支持",
+    "where": "IdentityCardTransfer.kt"
+  },
+  {
+    "key": "card_err_empty",
+    "en": "No card in the data",
+    "zh": "数据里没有身份卡",
+    "where": "IdentityCardTransfer.kt"
+  },
+  {
+    "key": "card_err_too_many",
+    "en": "Too many cards (max %1$d)",
+    "zh": "身份卡太多（上限 %1$d 张）",
+    "where": "IdentityCardTransfer.kt"
+  },
+  {
+    "key": "card_skip_missing_name",
+    "en": "missing name",
+    "zh": "缺少名称",
+    "where": "IdentityCardTransfer.kt"
+  },
+  {
+    "key": "card_skip_too_long",
+    "en": "field too long",
+    "zh": "字段超长",
+    "where": "IdentityCardTransfer.kt"
+  },
+  {
+    "key": "card_skip_bad_type",
+    "en": "wrong field type",
+    "zh": "字段类型不对",
+    "where": "IdentityCardTransfer.kt"
+  },
+  {
+    "key": "card_skip_too_many",
+    "en": "too many cards",
+    "zh": "卡数量超限",
+    "where": "IdentityCardTransfer.kt"
+  },
+  {
+    "key": "card_skip_empty",
+    "en": "empty card",
+    "zh": "空卡",
+    "where": "IdentityCardTransfer.kt"
+  },
+  {
+    "key": "card_skip_bad_json",
+    "en": "unreadable JSON",
+    "zh": "JSON 读不出来",
+    "where": "IdentityCardTransfer.kt"
   }
 ]

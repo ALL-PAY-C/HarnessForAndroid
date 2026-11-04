@@ -55,6 +55,8 @@ open class NodeBackedPlugin(
         capabilities = emptySet(),
         enabledByDefault = true,
         permissions = spec.declaredPermissions(),
+        modelSources = spec.modelSources,
+        systemPrompt = spec.systemPrompt,
     )
 
     /** 可观察状态：UI 或日志侧 collect 它即可拿到加载进度 / 失败阶段。 */

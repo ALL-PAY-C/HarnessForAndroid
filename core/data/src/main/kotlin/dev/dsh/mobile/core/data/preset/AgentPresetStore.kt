@@ -98,6 +98,22 @@ class AgentPresetStore(private val dataStore: DataStore<Preferences>) {
         }
     }
 
+    /**
+     * 批量写入（身份卡导入用）：一次 DataStore 编辑落 N 条，避免逐条 upsert 触发 N 次重写与 N 次刷新。
+     * id 由调用方保证不撞（见 [IdentityCardTransfer.toPresets]），这里仍按 upsert 的口径拒绝内置 id。
+     */
+    suspend fun upsertAll(presets: List<AgentPreset>) {
+        if (presets.isEmpty()) return
+        presets.forEach { requireEditable(it.id, "标准预设不可覆盖", "内置预设不可覆盖") }
+        val ids = presets.mapTo(HashSet()) { it.id }
+        dataStore.edit { prefs ->
+            prefs[key] = json.encodeToString(
+                decode(prefs[key].orEmpty()).filterNot { it.id in ids || it.id == AgentPresets.standard.id } +
+                    presets.map { it.copy(builtin = false) },
+            )
+        }
+    }
+
     suspend fun remove(id: String) {
         requireEditable(id, "标准预设不可删除", "内置预设不可删除")
         dataStore.edit { prefs ->

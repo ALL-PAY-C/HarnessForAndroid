@@ -1349,4 +1349,23 @@
     <string name="act_audio_record_hint">录一段音频到应用缓存目录</string>
     <string name="agents_field_base_url">Base URL</string>
     <string name="agents_field_api_key">API Key</string>
+    <string name="preset_card_export_current">导出当前卡</string>
+    <string name="preset_card_export_all">导出全部</string>
+    <string name="preset_card_import_clip">从剪贴板导入</string>
+    <string name="preset_card_copied">已复制 %1$d 张身份卡</string>
+    <string name="preset_card_export_empty">还没有可导出的身份卡</string>
+    <string name="preset_card_import_done">已导入 %1$d 张身份卡</string>
+    <string name="preset_card_import_done_skipped">已导入 %1$d 张，跳过 %2$d 张（%3$s）</string>
+    <string name="card_err_blank">剪贴板里没有文本</string>
+    <string name="card_err_json">不是合法的 JSON</string>
+    <string name="card_err_shape">认不出这个身份卡格式</string>
+    <string name="card_err_schema">身份卡版本不支持</string>
+    <string name="card_err_empty">数据里没有身份卡</string>
+    <string name="card_err_too_many">身份卡太多（上限 %1$d 张）</string>
+    <string name="card_skip_missing_name">缺少名称</string>
+    <string name="card_skip_too_long">字段超长</string>
+    <string name="card_skip_bad_type">字段类型不对</string>
+    <string name="card_skip_too_many">卡数量超限</string>
+    <string name="card_skip_empty">空卡</string>
+    <string name="card_skip_bad_json">JSON 读不出来</string>
 </resources>

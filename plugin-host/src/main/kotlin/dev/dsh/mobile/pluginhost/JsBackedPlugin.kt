@@ -53,6 +53,8 @@ class JsBackedPlugin(
         apiVersion = spec.apiVersion,
         minHostApi = spec.minHostApi,
         permissions = spec.declaredPermissions(),
+        modelSources = spec.modelSources,
+        systemPrompt = spec.systemPrompt,
     )
 
     override fun register(registry: PluginRegistry) {

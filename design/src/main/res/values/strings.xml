@@ -1349,4 +1349,23 @@ Supports https://github.com/owner/repo, owner/repo, github.com/owner/repo/tree/b
     <string name="act_audio_record_hint">Record a clip into the app cache</string>
     <string name="agents_field_base_url">Base URL</string>
     <string name="agents_field_api_key">API key</string>
+    <string name="preset_card_export_current">Export card</string>
+    <string name="preset_card_export_all">Export all</string>
+    <string name="preset_card_import_clip">Import from clipboard</string>
+    <string name="preset_card_copied">Copied %1$d card(s) to clipboard</string>
+    <string name="preset_card_export_empty">No identity card to export yet</string>
+    <string name="preset_card_import_done">Imported %1$d card(s)</string>
+    <string name="preset_card_import_done_skipped">Imported %1$d, skipped %2$d (%3$s)</string>
+    <string name="card_err_blank">Clipboard has no text</string>
+    <string name="card_err_json">Not valid JSON</string>
+    <string name="card_err_shape">Unrecognized card format</string>
+    <string name="card_err_schema">Unsupported card version</string>
+    <string name="card_err_empty">No card in the data</string>
+    <string name="card_err_too_many">Too many cards (max %1$d)</string>
+    <string name="card_skip_missing_name">missing name</string>
+    <string name="card_skip_too_long">field too long</string>
+    <string name="card_skip_bad_type">wrong field type</string>
+    <string name="card_skip_too_many">too many cards</string>
+    <string name="card_skip_empty">empty card</string>
+    <string name="card_skip_bad_json">unreadable JSON</string>
 </resources>

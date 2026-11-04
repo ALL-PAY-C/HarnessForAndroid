@@ -11,6 +11,22 @@ import dev.dsh.mobile.core.model.Session
  * A plugin declares capabilities and registers native slots; nothing is injected
  * as HTML/JS (no WebView in this app), so rendering is always native and typed.
  */
+/**
+ * 插件声明的模型源：一个可被宿主当成「模型供应商」注册的 baseUrl + 默认模型。
+ *
+ * [id] 与 [baseUrl] 是硬要求 —— 缺任一项宿主直接跳过该条（见 PluginHost.modelSources）。
+ * [apiKeyHint] 只是给用户看的提示（"填 xxx 的 key"），不是密钥本身：插件包是明文 zip，
+ * 里面放不了也不该放真实凭据，真正填 key 的动作在设置页由用户完成。
+ */
+data class PluginModelSource(
+    val id: String,
+    val label: String,
+    val baseUrl: String,
+    val defaultModel: String = "",
+    val apiKeyHint: String = "",
+    val protocol: String = "openai",
+)
+
 data class PluginManifest(
     val id: String,
     val name: String,
@@ -31,6 +47,18 @@ data class PluginManifest(
      * 空集走同一条加载路径，行为逐字不变。
      */
     val permissions: Set<PluginPermission> = emptySet(),
+    /**
+     * 清单声明的模型源；空列表 = 不贡献模型，老插件零改动。
+     *
+     * 与 [capabilities] / [permissions] 三者正交：这是「往宿主的模型供应商列表里加一项」。
+     */
+    val modelSources: List<PluginModelSource> = emptyList(),
+    /**
+     * 追加到系统提示词末尾的一段文本；空串 = 不追加。
+     *
+     * 宿主在拼 system 时把已启用插件的这一段按顺序接上去，插件被停用即消失。
+     */
+    val systemPrompt: String = "",
 )
 
 /**
@@ -77,6 +105,24 @@ interface DshPlugin {
 
     /** Called once when the plugin is loaded. Register slots here. */
     fun register(registry: PluginRegistry)
+}
+
+/**
+ * 贡献模型源的插件（声明式插件由 manifest 直接满足，无需实现本接口）。
+ *
+ * 宿主读的是 [PluginManifest.modelSources]，本接口只是给原生插件一个自述的名字。
+ */
+interface ModelSourceContributor {
+    val modelSources: List<PluginModelSource>
+}
+
+/**
+ * 往系统提示词里追加一段文本的插件（声明式插件由 manifest 直接满足）。
+ *
+ * 宿主读的是 [PluginManifest.systemPrompt]，本接口只是给原生插件一个自述的名字。
+ */
+interface PromptAdder {
+    val systemPromptAddition: String
 }
 
 // ------------------------------------------------------------------- slots

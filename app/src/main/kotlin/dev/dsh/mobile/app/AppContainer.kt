@@ -16,6 +16,8 @@ import dev.dsh.mobile.core.data.repo.ChatRepository
 import dev.dsh.mobile.core.data.repo.SendQueue
 import dev.dsh.mobile.core.data.repo.toModel
 import dev.dsh.mobile.core.data.settings.ModelProfile
+import dev.dsh.mobile.core.data.settings.ModelProvider
+import dev.dsh.mobile.core.data.settings.ModelProviders
 import dev.dsh.mobile.core.data.settings.ModelStore
 import dev.dsh.mobile.core.data.settings.contextWindowOf
 import dev.dsh.mobile.core.data.settings.SettingsStore
@@ -53,6 +55,7 @@ import dev.dsh.mobile.core.protocol.context.RecallHit
 import dev.dsh.mobile.core.protocol.context.WarmMessage
 import dev.dsh.mobile.core.data.backup.BackupScheduler
 import dev.dsh.mobile.plugin.html.HtmlPlugin
+import dev.dsh.mobile.pluginapi.PluginModelSource
 import dev.dsh.mobile.pluginhost.InstalledPlugins
 import dev.dsh.mobile.pluginhost.PluginInstaller
 import kotlinx.coroutines.Dispatchers
@@ -147,7 +150,8 @@ class AppContainer(
      */
     private suspend fun presetSystemPrompt(sessionId: String): String {
         val s = settings.settings.first()
-        val base = dev.dsh.mobile.core.data.preset.CapabilityGuide.augment(LlmConfig.DEFAULT_SYSTEM)
+        val base = dev.dsh.mobile.core.data.preset.CapabilityGuide.augment(LlmConfig.DEFAULT_SYSTEM) +
+            pluginPromptSuffix()
         // 技能目录按库现取而不是按会话存：装了/关了技能，下一轮就生效，不用重建会话。
         val skills = skillsBlock(skillsCatalog())
         val preset = presetStore.get(s.presetFor(sessionId)) ?: return base + skills
@@ -164,8 +168,25 @@ class AppContainer(
     private suspend fun identityText(sessionId: String): String {
         val presetId = settings.settings.first().presetFor(sessionId)
         val card = runCatching { presetStore.cardOf(presetId) }.getOrNull()
-        if (card != null && card.hasContent()) return card.render()
-        return db.sessionDao().byId(sessionId)?.persona.orEmpty()
+        val identity = if (card != null && card.hasContent()) {
+            card.render()
+        } else {
+            db.sessionDao().byId(sessionId)?.persona.orEmpty()
+        }
+        // 插件追加段只在本来就有身份时接上：身份为空说明这个会话没设人设，
+        // 这时候把插件文本塞进身份位，远端路径会把它包成「用户设定的人设」，语义就错了。
+        return if (identity.isBlank()) identity else identity + pluginPromptSuffix()
+    }
+
+    /**
+     * 已启用插件要追加到系统提示词的那一段（前面带两空行）。
+     *
+     * 现算不缓存：插件停用、装新包、拨 `prompt.enabled` 开关，下一轮请求立刻反映。
+     * 远端（首条 user 消息）与本地（extraSystem）两条路径取的是同一个字符串。
+     */
+    private fun pluginPromptSuffix(): String {
+        val text = pluginHost.promptAdditions().joinToString("\n\n")
+        return if (text.isBlank()) "" else "\n\n" + text
     }
 
     /**
@@ -517,6 +538,9 @@ class AppContainer(
             // 需要常驻本地服务的插件（自带本机网关那种）在这里自动拉起，
             // 用户不必先去插件页点一次「启动」。
             startBackgroundPlugins(context, scope)
+            // 模型源必须在 loadAll 之后注册：这一步读的是已加载行的 manifest，
+            // 顺序反了会一个模型都注册不上。传 this 而不是 pluginHost，避免重入自己的 lazy。
+            syncPluginModelSources(this)
             // Node 插件（node:/@deepseek-ai/ 依赖）异步加载到 NodeEngineHost；失败只记该插件不吞别的。
             if (nodePlugins.isNotEmpty()) {
                 scope.launch(Dispatchers.IO) {
@@ -542,6 +566,8 @@ class AppContainer(
             // load 只加不删，幽灵行（目录已删）要靠 keepOnly 收口。
             pluginHost.keepOnly(all.map { it.manifest.id })
             pluginHost.startBackgroundPlugins(context, scope)
+            // 新装的包可能带模型源：重载后补注册一次（register 幂等，重复调用无副作用）。
+            syncPluginModelSources(pluginHost)
             if (nodePlugins.isNotEmpty()) {
                 scope.launch(Dispatchers.IO) {
                     NodeBackedPlugin.loadNodePlugins(pluginHost, nodeEngine, nodePlugins)
@@ -651,6 +677,28 @@ class AppContainer(
         scope.launch(Dispatchers.IO) {
             runCatching { repo.setPersona(sessionId, text) }
                 .onFailure { AppLog.w("写会话人设失败 " + sessionId + "：" + it.message) }
+        }
+    }
+
+    /**
+     * 把插件声明的模型源注册进 [ModelProviders]，装完插件后 Agent 页的模板列表立刻多出这一项。
+     *
+     * 只加不删：[ModelProviders] 是进程级注册表且 register 幂等，插件停用后已注册的 provider
+     * 仍留在列表里（选中它只会连接失败）。为此在 core/data 开一个 unregister 口子的代价大于收益 ——
+     * 那是共享模型层，不是插件层。
+     */
+    private fun syncPluginModelSources(host: PluginHost) {
+        host.modelSources().forEach { src ->
+            ModelProviders.register(object : ModelProvider {
+                override val id: String = src.id
+                override val label: String = src.label
+                override val defaultBaseUrl: String = src.baseUrl
+                override val defaultModel: String = src.defaultModel
+                // 提示里带 baseUrl：同名模型源有好几个时，用户靠地址区分。
+                override val hint: String = src.label + " · " + src.baseUrl
+                // 插件包里放不了真凭据（明文 zip），Key 永远由用户在设置页填。
+                override val defaultApiKey: String = ""
+            })
         }
     }
 

@@ -1,6 +1,7 @@
 package dev.dsh.mobile.pluginhost
 
 import dev.dsh.mobile.pluginapi.PLUGIN_API_VERSION
+import dev.dsh.mobile.pluginapi.PluginModelSource
 import dev.dsh.mobile.pluginapi.SlotAction
 import org.json.JSONArray
 import org.json.JSONObject
@@ -53,6 +54,15 @@ data class PluginManifestFile(
      * 留着给诊断看，而不是在解析阶段就炸掉整个插件包。
      */
     val permissions: Set<String> = emptySet(),
+    /**
+     * 清单声明的模型源（plugin.json 的 `modelSources` 数组）。
+     *
+     * 缺 id 或 baseUrl 的项在解析阶段就丢掉 —— 一个写错的模型源不该让整包加载失败，
+     * 也不该在模型列表里留一行点不动的空壳。
+     */
+    val modelSources: List<PluginModelSource> = emptyList(),
+    /** 追加到系统提示词末尾的文本（plugin.json 顶层 `systemPrompt`）；缺省空串。 */
+    val systemPrompt: String = "",
 ) {
     companion object {
         fun parse(text: String): Result<PluginManifestFile> = runCatching {
@@ -73,6 +83,8 @@ data class PluginManifestFile(
                     (0 until arr.length()).map { arr.optString(it) }
                         .filterTo(LinkedHashSet()) { it.isNotBlank() }
                 }.orEmpty(),
+                modelSources = root.optJSONArray("modelSources").mapModelSources(),
+                systemPrompt = root.optString("systemPrompt"),
             )
         }
     }
@@ -214,6 +226,31 @@ private fun JSONObject.toContribution(): ContributionSpec {
                 toggle = a.optBoolean("toggle", false),
             )
         },
+    )
+}
+
+/** modelSources 数组：逐项解析，坏条目（返回 null）在这里就被丢掉。 */
+private fun JSONArray?.mapModelSources(): List<PluginModelSource> {
+    if (this == null) return emptyList()
+    return (0 until length()).mapNotNull { i -> optJSONObject(i)?.toModelSource() }
+}
+
+/**
+ * 一条模型源；缺 id 或 baseUrl 返回 null 由 [mapModelSources] 丢掉。
+ *
+ * label 缺省回落到 id：模型列表里宁可显示一个英文 id，也不要一行空白。
+ */
+private fun JSONObject.toModelSource(): PluginModelSource? {
+    val id = optString("id").trim()
+    val baseUrl = optString("baseUrl").trim()
+    if (id.isEmpty() || baseUrl.isEmpty()) return null
+    return PluginModelSource(
+        id = id,
+        label = optString("label").ifBlank { id },
+        baseUrl = baseUrl,
+        defaultModel = optString("defaultModel").ifBlank { optString("model") },
+        apiKeyHint = optString("apiKeyHint").ifBlank { optString("keyHint") },
+        protocol = optString("protocol").ifBlank { "openai" },
     )
 }
 

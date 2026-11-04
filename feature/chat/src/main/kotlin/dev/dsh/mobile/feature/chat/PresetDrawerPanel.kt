@@ -1,5 +1,8 @@
 package dev.dsh.mobile.feature.chat
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,11 +27,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,12 +41,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.dsh.mobile.core.data.preset.AgentPreset
+import dev.dsh.mobile.core.data.preset.CardError
 import dev.dsh.mobile.core.model.IdentityCard
 import dev.dsh.mobile.core.data.preset.IdentityCards
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqIdentityCardEditor
 import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.design.text
+import kotlinx.coroutines.launch
 
 /**
  * 会话页左侧抽屉里的「Agent 预设」面板：列预设 + 设默认 + 导入 + 删除。
@@ -56,6 +63,19 @@ fun PresetDrawerPanel(viewModel: PresetDrawerViewModel) {
     /** 同时只展开一个预设的身份卡编辑区，避免一屏八个表单。 */
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
     val scroll = rememberScrollState()
+    // 剪贴板读写留在 UI 层：VM 不持 Context，导出的 JSON 由这里写进系统剪贴板。
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    fun copyToClipboard(text: String) {
+        val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
+        manager.setPrimaryClip(ClipData.newPlainText("dsh-identity-card", text))
+    }
+    fun clipboardText(): String {
+        val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return ""
+        val clip = manager.primaryClip ?: return ""
+        if (clip.itemCount == 0) return ""
+        return clip.getItemAt(0).coerceToText(context)?.toString().orEmpty()
+    }
 
     Column(
         Modifier
@@ -94,6 +114,53 @@ fun PresetDrawerPanel(viewModel: PresetDrawerViewModel) {
                     .background(p.red.copy(alpha = 0.08f))
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             )
+        }
+
+        state.notice?.let { notice ->
+            Text(
+                when (notice) {
+                    is CardNotice.Copied -> stringResource(DesignR.string.preset_card_copied, notice.count)
+                    CardNotice.NothingToExport -> stringResource(DesignR.string.preset_card_export_empty)
+                    is CardNotice.Imported ->
+                        if (notice.skipped.isEmpty()) {
+                            stringResource(DesignR.string.preset_card_import_done, notice.cards)
+                        } else {
+                            stringResource(
+                                DesignR.string.preset_card_import_done_skipped,
+                                notice.cards,
+                                notice.skipped.size,
+                                stringResource(skipReasonRes(notice.skipped.first().reason)),
+                            )
+                        }
+                },
+                color = p.accent,
+                fontSize = 12.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(p.accent.copy(alpha = 0.08f))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            )
+        }
+
+        // 身份卡导入导出：两张导出（当前 / 全部）+ 一张从剪贴板导入。
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(
+                enabled = !state.busy,
+                onClick = { scope.launch { viewModel.requestExport(all = false)?.let { copyToClipboard(it) } } },
+            ) { Text(stringResource(DesignR.string.preset_card_export_current), fontSize = 11.5.sp) }
+            TextButton(
+                enabled = !state.busy,
+                onClick = { scope.launch { viewModel.requestExport(all = true)?.let { copyToClipboard(it) } } },
+            ) { Text(stringResource(DesignR.string.preset_card_export_all), fontSize = 11.5.sp) }
+            TextButton(
+                enabled = !state.busy,
+                onClick = { viewModel.importCards(clipboardText()) },
+            ) { Text(stringResource(DesignR.string.preset_card_import_clip), fontSize = 11.5.sp) }
         }
 
         if (importing) {
@@ -194,5 +261,16 @@ fun PresetDrawerPanel(viewModel: PresetDrawerViewModel) {
             }
         }
     }
+}
+
+/** 单张卡被跳过时的短原因，拼进「导入 N 张，跳过 M 张（原因）」。 */
+private fun skipReasonRes(reason: CardError): Int = when (reason) {
+    CardError.MissingName -> DesignR.string.card_skip_missing_name
+    CardError.TooLong -> DesignR.string.card_skip_too_long
+    CardError.BadType -> DesignR.string.card_skip_bad_type
+    CardError.TooManyCards -> DesignR.string.card_skip_too_many
+    CardError.EmptyCards -> DesignR.string.card_skip_empty
+    CardError.Blank, CardError.BadJson, CardError.Shape, CardError.UnsupportedSchema ->
+        DesignR.string.card_skip_bad_json
 }
 

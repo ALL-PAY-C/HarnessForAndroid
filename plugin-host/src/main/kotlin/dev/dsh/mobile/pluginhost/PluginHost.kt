@@ -11,6 +11,7 @@ import dev.dsh.mobile.pluginapi.DshPlugin
 import dev.dsh.mobile.pluginapi.PluginCompat
 import dev.dsh.mobile.pluginapi.PluginDeclaration
 import dev.dsh.mobile.pluginapi.PluginManifest
+import dev.dsh.mobile.pluginapi.PluginModelSource
 import dev.dsh.mobile.pluginapi.PluginPermission
 import dev.dsh.mobile.pluginapi.PluginRegistry
 import dev.dsh.mobile.pluginapi.SlotAction
@@ -251,10 +252,13 @@ class PluginHost(
      * 插件当前是否「该被启用」：安全模式只放行内置（dsh. 前缀），否则按 [PluginStore] 的启用态。
      * Node 编排在真正执行 JS 前用它判断要不要 plugins.load（禁用插件不能跑 JS）。
      */
+    /** 没有 store（纯宿主/单测场景）时开关落在这里，否则 setEnabled 写不进去、读回来还是默认值。 */
+    private val enabledFallback = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+
     fun isEnabled(id: String, enabledByDefault: Boolean): Boolean =
         safeModeAllows(id) &&
             permissionAllows(instances[id]?.manifest) &&
-            (store?.isEnabled(id, enabledByDefault) ?: enabledByDefault)
+            (store?.isEnabled(id, enabledByDefault) ?: enabledFallback[id] ?: enabledByDefault)
 
     /** 安全模式只放行内置（dsh. 前缀）。放行规则只有这一处，isEnabled 与行状态共用。 */
     private fun safeModeAllows(id: String): Boolean = !safeMode || id.startsWith("dsh.")
@@ -375,7 +379,7 @@ class PluginHost(
         val loadError = runtimeFailures[id]
         // 这里读「启用意图」而不是 isEnabled：安全模式挡住的插件必须能被标成
         // 「被安全模式挡住」，否则开关弹回去、状态写「已停用」，用户看不出发生了什么。
-        val on = wanted ?: (store?.isEnabled(id, row.manifest.enabledByDefault) ?: row.manifest.enabledByDefault)
+        val on = wanted ?: (store?.isEnabled(id, row.manifest.enabledByDefault) ?: enabledFallback[id] ?: row.manifest.enabledByDefault)
         val blocked = on && !safeModeAllows(id)
         val blockedByPermission = on && !permissionAllows(row.manifest)
         return row.copy(
@@ -410,6 +414,63 @@ class PluginHost(
         versionRejections[pluginId]?.let { Compat.Rejected(it) } ?: registry.compat(pluginId)
 
     fun loadAll(plugins: List<DshPlugin>, force: Boolean = false) = plugins.forEach { load(it, force) }
+
+    /**
+     * 当前真正在跑的插件行。
+     *
+     * 模型源与提示词追加共用这一份过滤：被安全模式挡住、权限没授全、加载失败、开关关着
+     * 的插件都不算 —— 否则会出现「插件停用了但模型列表里还留着它的 baseUrl」。
+     * 读的时候现算，不缓存：开关一动下一次读就是新结果。
+     */
+    private fun activeRows(): List<LoadedPlugin> = plugins.value.filter {
+        it.enabled && it.loadError == null && !it.blockedBySafeMode && !it.blockedByPermission
+    }
+
+    /**
+     * 插件贡献的模型源，id 已加上 `plugin.<pluginId>.` 前缀。
+     *
+     * 前缀是必须的：两个插件各自声明 id="local" 是常态，裸 id 会在模型列表里撞车。
+     * 同插件内重复的 source id 追加 `__2`/`__3` 后缀，先到先得、顺序稳定。
+     */
+    fun modelSources(): List<PluginModelSource> {
+        val used = HashSet<String>()
+        return activeRows().flatMap { row ->
+            row.manifest.modelSources.map { src ->
+                src.copy(id = uniqueSourceId("plugin." + row.manifest.id + "." + src.id, used))
+            }
+        }
+    }
+
+    private fun uniqueSourceId(base: String, used: MutableSet<String>): String {
+        var candidate = base
+        var n = 2
+        while (!used.add(candidate)) {
+            candidate = base + "__" + n
+            n++
+        }
+        return candidate
+    }
+
+    /**
+     * 要追加进系统提示词的文本，按加载顺序、去重。
+     *
+     * 单插件内的一键开关（plugin.json config 里的 `prompt.enabled`）关掉时这一段消失，
+     * 但插件本身照常加载 —— 用户只是不想让它改提示词，不是想停用它。
+     */
+    fun promptAdditions(): List<String> {
+        val out = LinkedHashSet<String>()
+        activeRows().forEach { row ->
+            if (!promptEnabled(row.manifest.id)) return@forEach
+            row.manifest.systemPrompt.trim().takeIf { it.isNotEmpty() }?.let { out += it }
+        }
+        return out.toList()
+    }
+
+    /** `prompt.enabled` 缺省视为开；"false"/"0"/"off"/"no" 视为关。 */
+    private fun promptEnabled(pluginId: String): Boolean {
+        val raw = configBridge?.read(pluginId)?.get("prompt.enabled")?.trim()?.lowercase()
+        return raw !in setOf("false", "0", "off", "no")
+    }
 
     /**
      * 拉起需要常驻本地服务的插件（[BackgroundPlugin]）。
@@ -453,7 +514,7 @@ class PluginHost(
             AppLog.w("插件 " + id + " 不在已加载实例里，启用请求被忽略")
             return
         }
-        store?.setEnabled(id, enabled)
+        if (store != null) store.setEnabled(id, enabled) else enabledFallback[id] = enabled
         if (enabled) {
             // 安全模式挡着 / 权限没授全就不注册贡献：注册了会留下「开关关着却有槽位」的幽灵界面，
             // 只把意图写进存储并让这一行显示被挡的原因。

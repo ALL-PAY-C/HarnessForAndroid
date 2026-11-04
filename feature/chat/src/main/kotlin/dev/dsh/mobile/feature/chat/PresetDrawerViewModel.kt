@@ -6,6 +6,10 @@ import dev.dsh.mobile.core.data.preset.AgentPreset
 import dev.dsh.mobile.core.data.preset.AgentPresetImporter
 import dev.dsh.mobile.core.data.preset.AgentPresetStore
 import dev.dsh.mobile.core.data.preset.AgentPresets
+import dev.dsh.mobile.core.data.preset.CardError
+import dev.dsh.mobile.core.data.preset.CardImport
+import dev.dsh.mobile.core.data.preset.CardSkip
+import dev.dsh.mobile.core.data.preset.IdentityCardTransfer
 import dev.dsh.mobile.core.model.IdentityCard
 import dev.dsh.mobile.core.data.preset.IdentityCards
 import dev.dsh.mobile.core.data.settings.SettingsStore
@@ -46,8 +50,20 @@ data class PresetDrawerState(
     val cards: Map<String, IdentityCard> = emptyMap(),
     /** 当前会话还留着的旧自由文本人设；只在「没有卡」时合成只读卡展示。 */
     val legacyPersona: String = "",
+    /** 导入 / 导出的结果提示（成功路径）；失败仍走 [error]。 */
+    val notice: CardNotice? = null,
 ) {
     val defaultName: String get() = presets.firstOrNull { it.id == defaultPresetId }?.name ?: AgentPresets.standard.name
+}
+
+/** 卡导入导出的成功提示；文案在面板里按资源渲染，VM 只交结构化值。 */
+sealed interface CardNotice {
+    /** 已写进剪贴板 N 张。 */
+    data class Copied(val count: Int) : CardNotice
+    /** 一张卡都没有（既没覆盖也没自带卡）。 */
+    object NothingToExport : CardNotice
+    /** 导入成功；[skipped] 非空时面板会带首个原因。 */
+    data class Imported(val cards: Int, val skipped: List<CardSkip>) : CardNotice
 }
 
 /**
@@ -65,6 +81,7 @@ class PresetDrawerViewModel(
 
     private val busy = MutableStateFlow(false)
     private val error = MutableStateFlow<UiText?>(null)
+    private val notice = MutableStateFlow<CardNotice?>(null)
 
     val uiState: StateFlow<PresetDrawerState> = combine(
         settingsStore.settings,
@@ -84,6 +101,7 @@ class PresetDrawerViewModel(
             legacyPersona = if (sessionId.isBlank()) "" else runCatching { personaOf(sessionId) }.getOrDefault(""),
         )
     }.combine(error) { s, e -> s.copy(error = e) }
+        .combine(notice) { s, n -> s.copy(notice = n) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PresetDrawerState())
 
     fun import(input: String) {
@@ -176,8 +194,92 @@ class PresetDrawerViewModel(
             if (preset.id == uiState.value.defaultPresetId) uiState.value.legacyPersona else "",
         )
 
+    /**
+     * 导出身份卡，返回要写进剪贴板的 JSON 文本（null = 没有卡可导）。
+     * [all] = false 只导当前生效的那张：有会话取会话选中的，没会话取全局默认。
+     * 剪贴板由 UI 层负责写（这里不持有 Context），提示走 [notice]。
+     */
+    suspend fun requestExport(all: Boolean): String? = withContext(Dispatchers.IO) {
+        val entries = cardEntries()
+        val picked = if (all) entries else entries.filter { it.first == currentPresetId() }
+        if (picked.isEmpty()) {
+            notice.value = CardNotice.NothingToExport
+            return@withContext null
+        }
+        notice.value = CardNotice.Copied(picked.size)
+        if (all) IdentityCardTransfer.encodeAll(picked)
+        else IdentityCardTransfer.encodeCard(picked.first().first, picked.first().second)
+    }
+
+    /**
+     * 从剪贴板文本导入身份卡：单对象 / 数组 / {cards:[...]} 三种外壳都收。
+     * 每张卡落成一条导入预设（id 撞了自动加后缀，不覆盖已有卡），写完 DataStore 抽屉立刻可见。
+     */
+    fun importCards(text: String) {
+        if (busy.value) return
+        error.value = null
+        notice.value = null
+        if (text.isBlank()) {
+            error.value = UiText.Res(DesignR.string.card_err_blank)
+            return
+        }
+        busy.value = true
+        viewModelScope.launch {
+            try {
+                val outcome = withContext(Dispatchers.IO) {
+                    val parsed = IdentityCardTransfer.decode(text)
+                    if (parsed is CardImport.Ok) {
+                        val taken = HashSet(AgentPresets.builtinIds)
+                        taken += "default"
+                        presetStore.presets.first().forEach { taken += it.id }
+                        presetStore.upsertAll(IdentityCardTransfer.toPresets(parsed.cards, taken))
+                    }
+                    parsed
+                }
+                when (outcome) {
+                    is CardImport.Failed -> error.value = cardErrorText(outcome.reason)
+                    is CardImport.Ok -> notice.value = CardNotice.Imported(outcome.cards.size, outcome.skipped)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                error.value = e.message?.let { UiText.Raw(it) } ?: UiText.Res(DesignR.string.card_err_json)
+            } finally {
+                busy.value = false
+            }
+        }
+    }
+
+    /** 可导出的卡：内置 + 导入的预设，覆盖表优先、其次预设自带卡；空卡不算。 */
+    private suspend fun cardEntries(): List<Pair<String, IdentityCard>> {
+        val overrides = presetStore.cards.first()
+        val presets = AgentPresets.builtins + presetStore.presets.first().filterNot { it.id in AgentPresets.builtinIds }
+        return presets.mapNotNull { preset ->
+            (overrides[preset.id] ?: preset.card)?.takeIf { it.hasContent() }?.let { preset.id to it }
+        }
+    }
+
+    private suspend fun currentPresetId(): String {
+        val session = ActiveChatSession.id.value
+        return settingsStore.settings.first().presetFor(session.ifBlank { null })
+    }
+
+    /** 整包失败的文案；单张被跳过时的短原因由面板按 [CardSkip] 渲染。 */
+    private fun cardErrorText(reason: CardError): UiText = when (reason) {
+        CardError.TooManyCards -> UiText.Res(DesignR.string.card_err_too_many, listOf(IdentityCardTransfer.MAX_CARDS))
+        CardError.Blank -> UiText.Res(DesignR.string.card_err_blank)
+        CardError.BadJson -> UiText.Res(DesignR.string.card_err_json)
+        CardError.Shape -> UiText.Res(DesignR.string.card_err_shape)
+        CardError.UnsupportedSchema -> UiText.Res(DesignR.string.card_err_schema)
+        CardError.EmptyCards -> UiText.Res(DesignR.string.card_err_empty)
+        CardError.MissingName -> UiText.Res(DesignR.string.card_skip_missing_name)
+        CardError.TooLong -> UiText.Res(DesignR.string.card_skip_too_long)
+        CardError.BadType -> UiText.Res(DesignR.string.card_skip_bad_type)
+    }
+
     fun clearError() {
         error.value = null
+        notice.value = null
     }
 
     private suspend fun applySelection(id: String) {
