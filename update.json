@@ -1,13 +1,13 @@
 {
-  "versionCode": 102,
-  "versionName": "v0.08",
-  "apkUrl": "https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk",
-  "apkMirrors": [
-    "https://gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk",
-    "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk",
-    "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v0.08/HarnessForAndroid-release-v0.08.apk"
-  ],
-  "sha256": "77bffa109212d6b2d4c625d66aaafe2abf003950efafb61f5bd709b3a9411dd5",
-  "notes": "v0.08（覆盖更新 · versionCode 102）：\n\n- 新增：槽位动作 SetPersona 与脚本接口 setSessionPersona，插件点一次即可写入或清空当前会话的人设（system 层），不发消息、不污染会话记录。\n- 新增：会话设置槽默认摆放插件贡献，装完插件直接就能看到开关，不必先进「编辑会话设置」手动添加。\n- 修复：远端通道清空人设后再开同一份人设不生效（清空时没连带清注入缓存）。\n- 修复：会话设置是独立路由时拿不到会话 id，点开关只提示「先打开一个会话」。\n- 修复：上游 401/429/5xx 直接显示「鉴权失败（API Key 无效或已过期）」等真实原因，不再统一报「本轮没有产生任何回复」。\n- 新增：破甲会话遇模型拒答或空回复自动重发（最多 2 次，第二次换另一个模型），拒答文本不上屏也不入库。\n- 安装包体积：release 只带 arm64-v8a，135 MB。",
-  "sizeBytes": 135512435
+    "versionCode":  1010,
+    "versionName":  "v1.01",
+    "apkUrl":  "https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v1.01/HarnessForAndroid-release-v1.01.apk",
+    "apkMirrors":  [
+                       "https://gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v1.01/HarnessForAndroid-release-v1.01.apk",
+                       "https://ghfast.top/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v1.01/HarnessForAndroid-release-v1.01.apk",
+                       "https://hk.gh-proxy.com/https://github.com/ALL-PAY-C/HarnessForAndroid/releases/download/v1.01/HarnessForAndroid-release-v1.01.apk"
+                   ],
+    "sha256":  "c2ded00ee3cd4ee2431d2f5e7dc5dafbdb17450cb4a24c651f28544bdfa40398",
+    "notes":  "# v1.01 鍙戝竷璇存槑\n\n棣栦釜鍏紑鍙戝竷鐗堬紙refactor/v2锛夈€傜浉瀵?v0.08 鐨勪富瑕佸彉鍖栵細\n\n- 璇█锛氶粯璁や腑鏂囷紝鑻辨枃鍙樉寮忛€夋嫨锛涚晫闈㈡枃妗堝叏閲忚祫婧愬寲锛?327 鏉￠敭锛夛紝鐩稿鏃堕棿涓嫳鍚勮嚜姝ｇ‘銆?- 涓婁笅鏂囷細浼棤闄愪笂涓嬫枃锛堢儹灞傚師鏂?+ 娓╁眰缁撴瀯鍖栨憳瑕?+ 鍐峰眰鍘熸枃鍥炴崬锛夛紝涓庢彃浠惰嚜甯﹀帇缂╂鏌ョ偣鍏卞瓨銆?- 绋冲畾锛氬穿婧冭惤鐩樸€佽缃揩鐓х幆褰?3 浠姐€佽繛缁惎鍔ㄥけ璐ヨ嚜鍔ㄥ洖婊氥€佸畨鍏ㄦā寮忓彲涓€閿€€鍑猴紱鍓嶅彴鏈嶅姟绫诲瀷鏀?specialUse锛屼笉鍐嶈Е鍙?Android 15 鐨?dataSync 鍏皬鏃惰秴鏃跺穿婧冦€?- 鎻掍欢锛氳缃?schema 鍘熺敓娓叉煋銆佹Ы浣嶉檺娴佷笌婧㈠嚭鑿滃崟銆佸け璐ュ彲瑙侊紙鍚?APK/dex銆佺洰褰曚涪澶便€佹竻鍗曡В鏋愬け璐ワ級銆佸畨鍏ㄦā寮忎笌鍔犺浇澶辫触鍒嗗紑琛ㄨ堪銆?- MCP锛欻TTP/SSE 鏈嶅姟鍣ㄩ厤缃€佹祴璇曡繛鎺ャ€佹寔涔呭寲锛屽伐鍏锋寜 mcp__\u003cserver\u003e__\u003ctool\u003e 娉ㄥ叆锛岀┖闂插洖鏀跺悗鎸夐渶閲嶈繛銆?- 澶囦唤鎭㈠锛歾ip + manifest锛堝垎鑺傚嬀閫夈€佺増鏈瘮瀵广€佸彲閫夊彛浠ゅ姞瀵嗭級锛屾棫鏍煎紡鍖呬粛鍙暣鏈鸿繕鍘熴€?- 韬唤鍗★細鎸夎疆娆′笌鍗″彉鏇存敞鍏ワ紝璺ㄥ帇缂╃画鎺ヤ笉涓€?\n瀹夎锛歚adb install -r HarnessForAndroid-release-v1.01.apk`锛涜鐩栧畨瑁呴渶涓庡凡瑁呯増鏈悓璇佷功锛坙egacy 璇佷功锛孲HA-256 瑙佷粨搴?docs/signing.md锛夈€",
+    "sizeBytes":  116897440
 }
