@@ -158,9 +158,11 @@ fun AppNav(container: AppContainer) {
     }
 
     // First frame is up: tell the crash guard this boot survived.
+    // bootGuard.onFirstFrame() 内部仍调 pluginHost.markBootOk()（插件层的安全模式语义不变），
+    // 另外把 SafeMode 的 boot.attempt 归零并停掉 8s 看门狗。
     LaunchedEffect(Unit) {
         delay(2_500)
-        container.pluginHost.markBootOk()
+        container.bootGuard.onFirstFrame()
     }
 
     val backStack by nav.currentBackStackEntryAsState()

@@ -118,6 +118,8 @@ class PluginHost(
     private val configBridge: PluginConfigBridge? = null,
     /** 没接线时 [applySlotPersona] 一律返回 false（同上）。 */
     private val personaBridge: SessionPersonaBridge? = null,
+    /** 插件注册/常驻服务失败的落盘回调（T9.12）；默认 null，老调用方不用改。 */
+    private val onPluginCrash: ((String, String) -> Unit)? = null,
 ) {
 
     private val registry = PluginRegistry()
@@ -178,6 +180,8 @@ class PluginHost(
                 runCatching { AppLog.w("plugin ${m.id} register failed: ${failure.message}") }
                 // 6a：null/空 message 的异常不能判成成功；用类名兜底。
                 error = failure.message?.takeIf { it.isNotBlank() } ?: failure::class.simpleName ?: "插件注册失败"
+                // 插件失败是「进程没死但功能没了」，只有落盘才能在用户下次反馈时还原现场。
+                runCatching { onPluginCrash?.invoke(m.id, error.orEmpty()) }
             }
         }
         val row = LoadedPlugin(m, enabled = false, error = error)
@@ -293,9 +297,15 @@ class PluginHost(
                 scope.launch {
                     runCatching { plugin.ensureStarted(context) }
                         .onSuccess { result ->
-                            result.exceptionOrNull()?.let { AppLog.w("插件 " + id + " 常驻服务未就绪：" + it.message) }
+                            result.exceptionOrNull()?.let {
+                                AppLog.w("插件 " + id + " 常驻服务未就绪：" + it.message)
+                                runCatching { onPluginCrash?.invoke(id, it.message ?: "ensureStarted 未就绪") }
+                            }
                         }
-                        .onFailure { AppLog.w("插件 " + id + " 常驻服务启动异常：" + it.message) }
+                        .onFailure {
+                            AppLog.w("插件 " + id + " 常驻服务启动异常：" + it.message)
+                            runCatching { onPluginCrash?.invoke(id, it.message ?: (it::class.simpleName ?: "ensureStarted 异常")) }
+                        }
                 }
             }
     }

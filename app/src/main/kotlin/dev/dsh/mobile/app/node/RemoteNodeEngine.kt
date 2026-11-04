@@ -51,6 +51,8 @@ class RemoteNodeEngine(
     context: Context,
     /** 与 [dev.dsh.mobile.runtimehost.NodeEngineHost] 同形的构造参数，调用点不用为两种实现写两套。 */
     scope: CoroutineScope,
+    /** :node 非预期死亡（真崩 / 被系统杀）的回调；主动 stop() 不走这里。 */
+    private val onUnexpectedDeath: ((String) -> Unit)? = null,
 ) : NodeEngine {
 
     private val appContext = context.applicationContext
@@ -282,6 +284,8 @@ class RemoteNodeEngine(
         }
         AppLog.w("ENGINE_REMOTE_LOST $reason")
         _state.value = NodeEngineState.Failed(reason, retryable = true)
+        // 只有「没打算死却死了」才是崩溃物证：主动 stop / 重绑都走上面的 expectedDeath 分支。
+        runCatching { onUnexpectedDeath?.invoke(reason) }
     }
 
     private fun unbindLocked() {

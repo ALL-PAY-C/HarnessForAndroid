@@ -1,6 +1,8 @@
 package dev.dsh.mobile.app
 
 import android.content.Context
+import dev.dsh.mobile.app.diag.AppBootGuard
+import dev.dsh.mobile.app.diag.CrashReporter
 import dev.dsh.mobile.app.gateway.GatewayManager
 import dev.dsh.mobile.core.common.AppLog
 import dev.dsh.mobile.core.common.ProxyEnv
@@ -32,6 +34,7 @@ import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.TransportKind
 import dev.dsh.mobile.core.model.AgentRuntimeState
 import dev.dsh.mobile.core.model.ChatMessage
+import dev.dsh.mobile.core.model.diag.CrashKind
 import dev.dsh.mobile.core.protocol.AcpTransport
 import dev.dsh.mobile.core.protocol.LlmConfig
 import dev.dsh.mobile.core.protocol.GroupMember
@@ -97,7 +100,13 @@ import java.io.File
  * Manual DI container. Everything the app wires together lives here so modules stay
  * framework-free and testable; no annotation processing, no reflection.
  */
-class AppContainer(private val context: Context) {
+class AppContainer(
+    private val context: Context,
+    /** 崩溃落盘器：DshApplication 在 AppContainer 之前装好的同一实例（构造期崩溃也要有记录）。 */
+    val crashReporter: CrashReporter,
+    /** 启动守卫：首帧/看门狗/回滚判定都从这里进。 */
+    val bootGuard: AppBootGuard,
+) {
 
     val scope: CoroutineScope = AppScope.scope
 
@@ -231,7 +240,11 @@ class AppContainer(private val context: Context) {
      * 那个进程，于是 libnode「一个进程只能启动一次」的限制不再挡住重启。
      */
     val nodeEngine: NodeEngine by lazy {
-        RemoteNodeEngine(context, scope).also { it.setHostCallHandler(PluginHostCalls(this, context.filesDir)) }
+        RemoteNodeEngine(
+            context = context,
+            scope = scope,
+            onUnexpectedDeath = { reason -> crashReporter.recordCaught(CrashKind.ENGINE, "binder", reason) },
+        ).also { it.setHostCallHandler(PluginHostCalls(this, context.filesDir)) }
     }
 
     /**
@@ -465,7 +478,12 @@ class AppContainer(private val context: Context) {
 
     val pluginHost: PluginHost by lazy {
         pluginStore.beginBoot()
-        PluginHost(pluginStore, configBridge = pluginConfigBridge, personaBridge = sessionPersonaBridge, onUninstall = { id ->
+        PluginHost(
+            pluginStore,
+            configBridge = pluginConfigBridge,
+            personaBridge = sessionPersonaBridge,
+            onPluginCrash = { id, failure -> crashReporter.recordCaught(CrashKind.PLUGIN, "plugin", id + ": " + failure) },
+            onUninstall = { id ->
             pluginInstaller.uninstall(id).getOrThrow()
             externalPlugins.remove(id)
             pluginHost.placements(context).removePlugin(id)

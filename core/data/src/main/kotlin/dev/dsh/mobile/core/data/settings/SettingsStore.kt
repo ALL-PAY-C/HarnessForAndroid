@@ -16,6 +16,7 @@ import dev.dsh.mobile.core.common.ProxyEnv
 import dev.dsh.mobile.core.data.preset.AgentPresets
 import dev.dsh.mobile.core.model.BackMaterial
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 enum class ThemeMode { System, Light, Dark }
@@ -216,6 +217,9 @@ private val Context.settingsStore: DataStore<Preferences> by preferencesDataStor
     corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
 )
 
+/** 快照里 Set<String> 的分隔符：stringSetPreferencesKey 只能存集合本身，序列化要自己定分隔。 */
+private const val LIST_SEP = "\u0001"
+
 class SettingsStore(private val context: Context) {
 
     // internal 而不是 private：同文件的顶层纯函数 [resolveBackMaterial] / [writeBackMaterial]
@@ -238,6 +242,9 @@ class SettingsStore(private val context: Context) {
         val dnd = booleanPreferencesKey("dnd")
         val heartbeat = longPreferencesKey("heartbeat_ms")
         val endpoint = stringPreferencesKey("active_endpoint")
+        /** 崩溃上传（默认关：只落盘，不联网）。 */
+        val crashUploadEnabled = booleanPreferencesKey("crash.upload.enabled")
+        val crashUploadEndpoint = stringPreferencesKey("crash.upload.endpoint")
         val runtimeVersion = stringPreferencesKey("runtime_version")
         val quickCommands = stringPreferencesKey("quick_commands")
         val templates = stringPreferencesKey("prompt_templates")
@@ -510,6 +517,67 @@ class SettingsStore(private val context: Context) {
     suspend fun setGlassEnabled(v: Boolean) = setBackMaterial(if (v) BackMaterial.MATTE.key else BackMaterial.NONE.key)
     suspend fun setGlassAlpha(v: Float) = edit { it[K.glassAlpha] = BackMaterial.clampStrength(v) }
     suspend fun setGlassBlur(dp: Int) = edit { it[K.glassBlur] = dp.coerceIn(0, 40) }
+
+    /** 崩溃上传开关与端点；步骤 3 的 CrashUploader 读这里。 */
+    suspend fun crashUpload(): Pair<Boolean, String> {
+        val p = context.settingsStore.data.first()
+        return (p[K.crashUploadEnabled] ?: false) to (p[K.crashUploadEndpoint] ?: "")
+    }
+
+    suspend fun setCrashUpload(enabled: Boolean, endpoint: String) = edit {
+        it[K.crashUploadEnabled] = enabled
+        it[K.crashUploadEndpoint] = endpoint
+    }
+
+    /**
+     * 全量快照（步骤 3 的 LastKnownGood 用）：键名 → 字符串化值。
+     * 键名带命名空间前缀，回滚时不至于把别的 DataStore 的键写进来。
+     */
+    suspend fun snapshotEntries(): Map<String, String> =
+        context.settingsStore.data.first().asMap()
+            .mapKeys { it.key.name }
+            .mapValues { encodeEntry(it.value) }
+
+    /**
+     * 按快照写回：只写 [entries] 里出现的键，其余保持原样。
+     * 类型由「当前配置里该键的实际类型」决定 —— DataStore 的强类型键不能用字符串硬塞，
+     * 塞错类型下次读出来就是 ClassCastException，所以按现有值反推。
+     */
+    suspend fun applyEntries(entries: Map<String, String>) = edit { p ->
+        val typed = p.asMap().entries.associate { it.key.name to it.key }
+        entries.forEach { (name, raw) ->
+            val key = typed[name]
+            if (key == null) {
+                // 回滚要恢复「已被删掉」的键：只能按字符串写回，读方按默认值兜底。
+                p[stringPreferencesKey(name)] = raw
+            } else {
+                putTyped(p, key, raw)
+            }
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun putTyped(
+        p: androidx.datastore.preferences.core.MutablePreferences,
+        key: Preferences.Key<*>,
+        raw: String,
+    ) {
+        val value: Any = when (p[key]) {
+            is Boolean -> raw.toBooleanStrictOrNull() ?: return
+            is Int -> raw.toIntOrNull() ?: return
+            is Long -> raw.toLongOrNull() ?: return
+            is Float -> raw.toFloatOrNull() ?: return
+            is Set<*> -> raw.split(LIST_SEP).filter { it.isNotEmpty() }.toSet()
+            else -> raw
+        }
+        p[key as Preferences.Key<Any>] = value
+    }
+
+    private fun encodeEntry(value: Any?): String = when (value) {
+        null -> ""
+        is Set<*> -> value.joinToString(LIST_SEP) { it.toString() }
+        else -> value.toString()
+    }
 
     private suspend fun edit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         context.settingsStore.edit(block)

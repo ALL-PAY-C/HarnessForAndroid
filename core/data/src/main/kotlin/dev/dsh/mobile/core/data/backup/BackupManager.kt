@@ -7,8 +7,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
+
 
 /**
  * Snapshot / rollback for everything a plugin install can disturb.
@@ -92,35 +91,28 @@ class BackupManager(private val context: Context) {
         return snapshot("scheduled")
     }
 
+    /**
+     * 自动 / 插件安装前的存档：委托 [BackupWriter] 产标准包（带 manifest、带分节校验和）。
+     *
+     * 存档是运维手段，不导出凭证（secrets=false）、不带工作区（太大），
+     * 只保证「会话 + 设置 + 插件 + 附件」这四样能回到安装前的状态。
+     */
     fun snapshot(reason: String): File? = runCatching<File> {
         // 迁移屏障：读 DB 前先把遗留 endpoint token 迁走，否则首次迁移前的快照会导出明文 token。
         EndpointTokenMigration.ensureMigrated(context)
         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
         val out = File(dir, "backup-$stamp.zip")
-        ZipOutputStream(out.outputStream().buffered()).use { zip ->
-            fun put(name: String, bytes: ByteArray) {
-                zip.putNextEntry(ZipEntry(name))
-                zip.write(bytes)
-                zip.closeEntry()
-            }
-            // SharedPreferences: plugin flags, installed packages, settings.
-            context.dataDir.listFiles { f -> f.name == "shared_prefs" }
-                ?.flatMap { it.listFiles().orEmpty().toList() }
-                ?.forEach { f -> put("shared_prefs/${f.name}", f.readBytes()) }
-            // Session database (plus WAL/SHM so the copy is consistent enough to open).
-            File(context.getDatabasePath(dev.dsh.mobile.core.data.db.DshDatabase.NAME).absolutePath).let { db ->
-                if (db.exists()) put("db/${db.name}", db.readBytes())
-                listOf("-wal", "-shm").forEach { suffix ->
-                    val side = File(db.absolutePath + suffix)
-                    if (side.exists()) put("db/${side.name}", side.readBytes())
-                }
-            }
-            // Plugin payloads.
-            File(context.filesDir, "plugins").walkTopDown().filter { it.isFile }.forEach { f ->
-                val rel = f.relativeTo(File(context.filesDir, "plugins")).path
-                put("plugins/$rel", f.readBytes())
-            }
-        }
+        writer().write(
+            out,
+            BackupSelection(
+                sessions = null,
+                settings = true,
+                plugins = installedPluginIds(),
+                secrets = false,
+                attachments = true,
+                workspace = false,
+            ),
+        )
         prefs.edit()
             .putLong(KEY_LAST, System.currentTimeMillis())
             .putString("reason.${out.name}", reason)
@@ -129,8 +121,35 @@ class BackupManager(private val context: Context) {
         out
     }.getOrNull()
 
+    /**
+     * 恢复一个备份包（默认 merge）。调用方负责在成功后重启运行时。
+     *
+     * 新包（含 manifest.json）走 [RestoreEngine]：staging + 校验 + 事务式落地。
+     * 老包（本类历史版本产出的三前缀 zip）仍走 [legacyRestore]，否则用户手里
+     * 上一版 App 拍的存档会突然打不开。
+     */
+    fun restorePackage(
+        file: File,
+        mode: RestoreEngine.Mode = RestoreEngine.Mode.Merge,
+        passphrase: String = "",
+    ): Result<RestoreEngine.Report> = runCatching {
+        val engine = engine()
+        val manifest = runCatching { engine.preview(file) }.getOrNull()
+        if (manifest == null) {
+            legacyRestore(file).getOrThrow()
+            RestoreEngine.Report(mode, 0, 0, 0, 0, listOf("旧版存档：按文件覆盖恢复，未做校验"))
+        } else {
+            val report = engine.restore(file, mode, passphrase).getOrThrow()
+            // 库被整包换掉后可能带回迁移前的明文 token：重置屏障，让下次快照重新迁移。
+            EndpointTokenMigration.reset()
+            report
+        }
+    }
+
     /** Restore a snapshot. The caller is expected to restart the app afterwards. */
-    fun restore(file: File): Result<Unit> = runCatching {
+    fun restore(file: File): Result<Unit> = restorePackage(file).map { }
+
+    private fun legacyRestore(file: File): Result<Unit> = runCatching {
         val dbDir = context.getDatabasePath(dev.dsh.mobile.core.data.db.DshDatabase.NAME).parentFile
         ZipExtract.forEachEntry(file.inputStream().buffered(), ZipExtract.Options.pathOnly()) { name, isDirectory, data ->
             if (!isDirectory) {
@@ -157,10 +176,47 @@ class BackupManager(private val context: Context) {
     /** 手动删掉一个存档（界面上要能删，否则只能等它自己滚出去）。 */
     fun delete(file: File): Boolean = runCatching { file.exists() && file.delete() }.getOrDefault(false)
 
-    /** Keep the newest [MAX_BACKUPS] snapshots; install batches can add up fast. */
+    /**
+     * 双重配额：最多 [MAX_BACKUPS] 个，且总量不超过 [MAX_BYTES]。
+     *
+     * 只按个数淘汰是不够的 —— 8 个带附件的包能有几个 GB，等到写满磁盘时
+     * 连备份本身都写不出来。至少保留最新一个，哪怕它自己就超了配额。
+     */
     private fun trim() {
-        rawFiles().drop(MAX_BACKUPS).forEach { runCatching { it.delete() } }
+        val files = rawFiles()
+        var keep = files.take(MAX_BACKUPS)
+        var total = keep.sumOf { it.length() }
+        while (keep.size > 1 && total > MAX_BYTES) {
+            total -= keep.last().length()
+            keep = keep.dropLast(1)
+        }
+        files.drop(keep.size).forEach { runCatching { it.delete() } }
     }
+
+    private fun installedPluginIds(): Set<String> =
+        File(context.filesDir, "plugins").listFiles()
+            ?.filter { it.isDirectory }
+            ?.map { it.name }
+            ?.toSet()
+            .orEmpty()
+
+    private val roots: BackupRoots by lazy { BackupRoots.of(context) }
+
+    private fun writer(): BackupWriter = BackupWriter(
+        roots = roots,
+        db = RoomBackupDb(context, roots),
+        prefs = AndroidPrefsSource(context),
+        app = AppInfo.of(context),
+        device = AppInfo.device(),
+    )
+
+    private fun engine(): RestoreEngine = RestoreEngine(
+        roots = roots,
+        db = RoomBackupDb(context, roots),
+        prefs = AndroidPrefsSource(context),
+        prefsSink = AndroidPrefsSink(context),
+        snapshotBeforeReplace = { snapshot("pre-restore") },
+    )
 
     private fun timeOfDayToday(hhmm: String, now: Long): Long? = runCatching {
         val (h, m) = hhmm.split(":").let { it[0].toInt() to it[1].toInt() }
@@ -181,6 +237,8 @@ class BackupManager(private val context: Context) {
         private const val BATCH_WINDOW_MS = 10 * 60 * 1000L
         /** 只保留最近 8 个存档，超出的按队列丢最旧的。 */
         const val MAX_BACKUPS = 8
+        /** 存档目录总量上限：2 GiB，超过就从最旧的开始删。 */
+        const val MAX_BYTES: Long = 2L * 1024 * 1024 * 1024
         private const val KEY_LAST = "last_at"
         private const val KEY_TIMES = "times"
         private const val KEY_AUTO = "auto"
