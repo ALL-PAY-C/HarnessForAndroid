@@ -1,7 +1,10 @@
 package dev.dsh.mobile.core.common
 
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.res.AssetManager
 import android.content.res.Configuration
+import android.content.res.Resources
 import java.util.Locale
 
 /** 界面语言三态。System = 跟随系统首选语言（zh* → 中文，其余 → 英文）。 */
@@ -72,15 +75,36 @@ object UiLocale {
 
     fun locale(): Locale = localeOf(language(), systemOrDefault())
 
-    /** 按指定语言包装 Context：resources 与布局方向同时改，Locale.setDefault 让 SimpleDateFormat 之类也跟上。 */
+    /**
+     * 应用级包装：返回 createConfigurationContext 的 ConfigurationContext（ContextImpl）。
+     *
+     * 只能给 Application / Service / 通知用。框架在 ActivityThread 里会把 receiver 的 base 强转
+     * ContextImpl，套自定义 wrapper 会 ClassCastException。Compose 侧请用 [wrapForUi]。
+     */
     fun wrap(base: Context, language: UiLanguage): Context {
+        Locale.setDefault(localeOf(language, systemOrDefault()))
+        return base.createConfigurationContext(configOf(base, language))
+    }
+
+    /**
+     * Compose 侧包装：返回 [ContextWrapper]，链路仍通到 Activity。
+     *
+     * activity-compose 的 `findActivity` / `findOwner`（ActivityResultRegistryOwner、LifecycleOwner、
+     * OnBackPressedDispatcherOwner）都沿 `ContextWrapper.baseContext` 往上爬找 Activity。裸
+     * ContextImpl 不是 wrapper，链路一断就炸——设置子页一进去就
+     * 「No ActivityResultRegistryOwner was provided via LocalActivityResultRegistryOwner」。
+     */
+    fun wrapForUi(base: Context, language: UiLanguage): Context {
+        Locale.setDefault(localeOf(language, systemOrDefault()))
+        return LocalizedContext(base, base.createConfigurationContext(configOf(base, language)))
+    }
+
+    private fun configOf(base: Context, language: UiLanguage): Configuration {
         val loc = localeOf(language, systemOrDefault())
-        val cfg = Configuration(base.resources.configuration).apply {
+        return Configuration(base.resources.configuration).apply {
             setLocale(loc)
             setLayoutDirection(loc)
         }
-        Locale.setDefault(loc)
-        return base.createConfigurationContext(cfg)
     }
 
     fun wrap(base: Context): Context = wrap(base, language())
@@ -106,4 +130,20 @@ object UiLocale {
         latchTag(want)
         refresh(base)
     }
+}
+
+/**
+ * 只换资源不换链路：base 仍是原 Context，Activity / ActivityResultRegistry / Lifecycle 的查找照旧。
+ * getTheme 走 base，避免丢掉 Activity 主题属性。
+ */
+private class LocalizedContext(
+    base: Context,
+    private val configured: Context,
+) : ContextWrapper(base) {
+    override fun getResources(): Resources = configured.resources
+
+    override fun getAssets(): AssetManager = configured.assets
+
+    override fun createConfigurationContext(overrideConfiguration: Configuration): Context =
+        configured.createConfigurationContext(overrideConfiguration)
 }

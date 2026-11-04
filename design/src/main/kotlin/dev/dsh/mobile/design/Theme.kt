@@ -420,7 +420,8 @@ fun DshTheme(
     // 语言覆盖放在最外层：里面所有 Composable（含 design 自己的组件）拿到的 LocalContext 都是目标语言。
     val language = LocalUiLanguage.current
     val baseContext = LocalContext.current
-    val localized = remember(language, baseContext) { UiLocale.wrap(baseContext, language) }
+    // wrapForUi：必须是 ContextWrapper，否则 findActivity/findOwner 断链（设置页 launcher 直接崩）。
+    val localized = remember(language, baseContext) { UiLocale.wrapForUi(baseContext, language) }
     CompositionLocalProvider(
         LocalContext provides localized,
         LocalConfiguration provides localized.resources.configuration,
