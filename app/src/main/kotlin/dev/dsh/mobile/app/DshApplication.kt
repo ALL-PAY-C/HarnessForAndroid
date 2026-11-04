@@ -51,6 +51,8 @@ class DshApplication : Application() {
             versionCode = versionCode(),
             settings = DataModule.createSettings(this),
             lkgDir = java.io.File(filesDir, "lkg"),
+            // container 在下一行才建：首帧时它一定已就位，不需要为了这个回调去提前构造。
+            onBootOk = { if (this::container.isInitialized) container.pluginHost.markBootOk() },
         )
         bootGuard.onApplicationCreate()
         // 富内容渲染槽：:render 的实现注入 plugin-api，plugin-host 只持接口（T1.2 分层）。

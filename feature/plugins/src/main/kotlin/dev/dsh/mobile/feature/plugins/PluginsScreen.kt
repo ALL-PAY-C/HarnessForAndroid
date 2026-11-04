@@ -178,6 +178,34 @@ fun PluginsScreen(
             }
         } else LazyColumn(Modifier.fillMaxSize().padding(padding)) {
             item { hint() }
+            if (viewModel.host.safeMode) {
+                // 安全模式是插件页唯一的「点了开关却什么都不会发生」来源：给出原因 + 出口，
+                // 否则第三方插件在这台机器上永远启用不了，界面上还没有任何解释。
+                item {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.errorContainer)
+                            .clickable { viewModel.clearSafeMode() }
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(DesignR.string.plugins_safe_mode_block),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            stringResource(DesignR.string.plugins_safe_mode_exit),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            }
             items(plugins, key = { it.manifest.id }) { plugin ->
                 PluginCard(
                     plugin = plugin,
@@ -301,7 +329,13 @@ private fun PluginCard(
     val p = LocalQq.current
     var expanded by rememberSaveable(plugin.manifest.id) { mutableStateOf(false) }
     // 运行期回执优先于启用意图：装上了但加载失败，这一行必须是失败态而不是「已启用」。
-    val status = pluginRowStatus(plugin.enabled, plugin.loadError ?: plugin.error)
+    // 安全模式挡住的行没有插件自己的错误，原因换成宿主策略文案 —— 否则用户只看到
+    // 开关自己弹回去、状态写「已停用」，页面上一个字的原因都没有。
+    val status = pluginRowStatus(
+        plugin.enabled,
+        plugin.loadError ?: plugin.error
+            ?: if (plugin.blockedBySafeMode) stringResource(DesignR.string.plugins_reason_safe_mode) else null,
+    )
     GroupFrame(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
         GroupHeader(
             label = plugin.manifest.name,

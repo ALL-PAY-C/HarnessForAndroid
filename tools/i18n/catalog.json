@@ -6209,6 +6209,24 @@
     "where": "PluginHubRows.kt"
   },
   {
+    "key": "plugins_reason_safe_mode",
+    "en": "blocked by safe mode — exit it above, then re-enable",
+    "zh": "被安全模式挡住：先退出安全模式，再重新启用",
+    "where": "PluginsScreen.kt"
+  },
+  {
+    "key": "plugins_safe_mode_block",
+    "en": "Safe mode: third-party plugins are paused after repeated boot failures",
+    "zh": "安全模式：连续启动失败后第三方插件已暂停",
+    "where": "PluginsScreen.kt"
+  },
+  {
+    "key": "plugins_safe_mode_exit",
+    "en": "Exit safe mode",
+    "zh": "退出安全模式",
+    "where": "PluginsScreen.kt"
+  },
+  {
     "key": "plugins_schema_unsupported",
     "en": "Unsupported setting type %1$s — shown as a hint row",
     "zh": "不支持的设置类型 %1$s，已按说明行显示",
@@ -7119,5 +7137,35 @@
     "en": "Add entry",
     "zh": "添加配置项",
     "where": "feature/plugins"
+  },
+  {
+    "key": "time_just_now",
+    "en": "Just now",
+    "zh": "刚刚",
+    "where": "design/UiText.kt"
+  },
+  {
+    "key": "time_minutes_ago",
+    "en": "%1$d min ago",
+    "zh": "%1$d 分钟前",
+    "where": "design/UiText.kt"
+  },
+  {
+    "key": "time_days_ago",
+    "en": "%1$d d ago",
+    "zh": "%1$d 天前",
+    "where": "design/UiText.kt"
+  },
+  {
+    "key": "time_today",
+    "en": "Today %1$s",
+    "zh": "今天 %1$s",
+    "where": "design/UiText.kt"
+  },
+  {
+    "key": "time_yesterday",
+    "en": "Yesterday %1$s",
+    "zh": "昨天 %1$s",
+    "where": "design/UiText.kt"
   }
 ]

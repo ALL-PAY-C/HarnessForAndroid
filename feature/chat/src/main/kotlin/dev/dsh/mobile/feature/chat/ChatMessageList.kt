@@ -48,6 +48,7 @@ import dev.dsh.mobile.core.model.PermissionRequest
 import dev.dsh.mobile.core.protocol.RecallReport
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.MessageBubble
+import dev.dsh.mobile.design.dividerText
 import dev.dsh.mobile.design.EmptyState
 import dev.dsh.mobile.design.QqShape
 import dev.dsh.mobile.render.ChatContent
@@ -476,7 +477,7 @@ internal fun ChatMessageList(
             val gap = if (previous == null) Long.MAX_VALUE else msg.at - previous.at
             if (gap >= TIME_DIVIDER_GAP_MS) {
                 Text(
-                    TimeFmt.divider(msg.at),
+                    dividerText(TimeFmt.dividerParts(msg.at)),
                     color = p.t3,
                     fontSize = 11.sp,
                     modifier = Modifier

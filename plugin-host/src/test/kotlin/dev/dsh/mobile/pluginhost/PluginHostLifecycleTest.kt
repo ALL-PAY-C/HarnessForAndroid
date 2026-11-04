@@ -151,4 +151,63 @@ class PluginHostLifecycleTest {
         assertEquals(1, host.plugins.value.size)
         assertEquals(1, host.slots.quickCommands.size)
     }
+
+    // ---- T9.18-③ 装配期失败（JS/APK 占位插件）也必须进列表行 ----
+
+    /**
+     * JsBrokenPlugin 的形态：register() 不抛（只贡献一张错误卡），失败原因在装配期就有。
+     * 以前这种插件在列表里显示「已停用 + 开关可点」，失败原因只留在 logcat。
+     */
+    private fun brokenPlugin(reason: String = "[exec] index.js 执行失败") = object : DshPlugin, PluginLoadFailure {
+        override val manifest = PluginManifest(id = "test.jsbroken", name = "Broken", version = "1")
+        override val loadFailure: String get() = reason
+        override fun register(registry: PluginRegistry) {
+            // 故意什么都不做：占位插件不跑用户代码，正是「注册成功但跑不起来」。
+        }
+    }
+
+    private fun repairedPlugin() = object : DshPlugin {
+        override val manifest = PluginManifest(id = "test.jsbroken", name = "Broken", version = "1")
+        override fun register(registry: PluginRegistry) {
+            registry.quickCommand(QuickCommand("jsbroken.command", "Fixed", "fixed", manifest.id))
+        }
+    }
+
+    @Test fun assemblyFailureMarksRowFailedEvenWhenRegisterSucceeds() {
+        val host = PluginHost()
+        host.load(brokenPlugin())
+        val row = host.plugins.value.single()
+        assertEquals("[exec] index.js 执行失败", row.loadError)
+        assertFalse("装配期失败的插件不许显示已启用", row.enabled)
+    }
+
+    @Test fun replacingBrokenPluginWithWorkingInstanceClearsFailure() {
+        val host = PluginHost()
+        host.load(brokenPlugin())
+        assertEquals("[exec] index.js 执行失败", host.plugins.value.single().loadError)
+
+        host.load(repairedPlugin(), force = true)
+        val fixed = host.plugins.value.single()
+        assertNull("修好重装后旧回执必须清掉", fixed.loadError)
+        assertTrue(fixed.enabled)
+        assertEquals(1, host.slots.quickCommands.size)
+    }
+
+    @Test fun safeModeBlockedRowSaysSoInsteadOfLookingDisabled() {
+        val host = PluginHost(extraSafeMode = { true })
+        host.load(plugin())
+        val blocked = host.plugins.value.single()
+        assertFalse("安全模式挡住的插件不跑 register", blocked.enabled)
+        assertTrue("行内必须能说出「被安全模式挡住」", blocked.blockedBySafeMode)
+        assertNull("这不是插件自己的加载失败", blocked.loadError)
+        assertTrue("挡住时不许注册贡献", host.slots.quickCommands.isEmpty())
+
+        host.load(object : DshPlugin {
+            override val manifest = PluginManifest(id = "dsh.builtin", name = "Builtin", version = "1")
+            override fun register(registry: PluginRegistry) {
+                registry.quickCommand(QuickCommand("builtin.command", "Builtin", "b", manifest.id))
+            }
+        })
+        assertTrue("内置插件在安全模式下照常放行", host.plugins.value.last().enabled)
+    }
 }

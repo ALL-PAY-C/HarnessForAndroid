@@ -35,6 +35,8 @@ class AppBootGuard(
     /** 快照目录（filesDir/lkg）；null 时同样退化为只打日志。 */
     lkgDir: File? = null,
     private val clock: () -> Long = System::currentTimeMillis,
+    /** 首帧后要一并归零的外部计数（插件宿主的 boot.failures）；由 app 层接 pluginHost.markBootOk。 */
+    private val onBootOk: () -> Unit = {},
 ) {
 
     private val safeMode = SafeMode(store, clock)
@@ -97,6 +99,9 @@ class AppBootGuard(
         store.markBootOk()
         // SafeMode.markBootOk 把 boot.attempt 写回 0：这是「本次启动成功」唯一的持久信号。
         safeMode.markBootOk()
+        // 插件宿主另有一份 boot.failures（PluginStore 用它决定要不要暂停第三方插件）：
+        // 这里不一起归零，它只增不减，安全模式会永久粘连在每一台机器上。
+        runCatching { onBootOk() }.onFailure { AppLog.w("BOOT_OK plugin hook failed: " + it.message) }
         AppLog.i("BOOT_OK attempt=" + attemptCount + " engineReady=" + engineReady)
         snapshotIfReady()
     }

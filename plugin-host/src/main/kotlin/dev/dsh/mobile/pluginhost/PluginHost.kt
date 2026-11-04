@@ -35,11 +35,29 @@ data class LoadedPlugin(
      */
     val loadError: String? = null,
     /**
+     * 安全模式挡住了这一行（用户想启用，但连续启动失败后第三方插件被暂停）。
+     *
+     * 与 [loadError] 分开：这不是插件自己的错，是宿主策略；界面据此给出唯一可行的动作
+     * （退出安全模式），而不是把策略原因伪装成插件加载失败。
+     */
+    val blockedBySafeMode: Boolean = false,
+    /**
      * 版本/能力协商结果：全量兼容、降级（[Compat.Degraded]，列出没生效的槽位/动作/超配额项）、
      * 拒载（[Compat.Rejected]，apiVersion 比宿主新）。插件管理页直接显示 [Compat.summary]。
      */
     val compat: Compat = Compat.Compatible,
 )
+
+/**
+ * 装配期就注定跑不起来的插件自带失败原因。
+ *
+ * 典型是 PluginInstaller 装配 JS 包时抛错生成的 JsBrokenPlugin：失败发生在 PluginHost
+ * 之前，没有引擎回执可调 [PluginHost.noteLoadResult]，于是原因只进 logcat、列表照旧显示
+ * 「已停用」。宿主在 [PluginHost.load] 里把这个原因收进运行期回执，行内才看得见真相。
+ */
+interface PluginLoadFailure {
+    val loadFailure: String
+}
 
 /**
  * 6b：后台插件是否该自动拉起。抽成纯函数便于单测。
@@ -156,6 +174,10 @@ class PluginHost(
 
     fun clearSafeMode() {
         store?.clearSafeMode()
+        // 解除安全模式必须立刻重算每一行：挡住的原因来自 safeMode 本身，不重算的话
+        // 行内会一直挂着「安全模式」的失败态，用户以为没生效。
+        _plugins.update { list -> list.map { recompute(it, null, it.error) } }
+        bump()
     }
 
     /** Call once the first screen is up: proves this boot did not crash. */
@@ -166,14 +188,25 @@ class PluginHost(
     fun load(plugin: DshPlugin, force: Boolean = false) {
         val m = plugin.manifest
         if (instances.containsKey(m.id) && !force) return
+        // 被换掉的那个实例：同一 id 换了实现（修好重装 / 占位插件被真插件顶掉）时，
+        // 上一份运行期失败必须一起丢掉，否则「修好了还显示加载失败」。
+        val previous = instances[m.id]
         if (force && instances.containsKey(m.id)) {
             // 4c：强制重载（装完插件就地热加载 / 失败恢复）先清旧注册再重注册，避免 load 直接 return 吞掉重载。
             registry.clearPlugin(m.id)
             instances.remove(m.id)
         }
         instances[m.id] = plugin
-        // 是否启用由 isEnabled 统一算（安全模式只放行内置，否则按 store 启用态）。
-        val wanted = isEnabled(m.id, m.enabledByDefault)
+        when {
+            // 装配期失败自带原因（JsBrokenPlugin 这类）：先落回执再算行，
+            // 列表才不会把一个跑不起来的插件显示成「已停用」。
+            plugin is PluginLoadFailure -> runtimeFailures[m.id] = plugin.loadFailure
+            previous != null && previous !== plugin -> runtimeFailures.remove(m.id)
+        }
+        // 启用意图与安全模式放行分开算：注册受安全模式约束，但行内要说得清「是你想开、
+        // 被安全模式挡住了」，所以回执按意图算，不用 isEnabled 的合取结果。
+        val intent = store?.isEnabled(m.id, m.enabledByDefault) ?: m.enabledByDefault
+        val wanted = safeModeAllows(m.id) && intent
         // 版本协商先于注册：清单声明的 apiVersion 比宿主新就拒载，register() 一次都不调，
         // 免得插件按新版契约写的槽位在旧宿主上跑出半个界面。
         val rejected = versionReject(m)
@@ -191,7 +224,7 @@ class PluginHost(
         }
         val row = LoadedPlugin(m, enabled = false, error = error)
         _plugins.update { list ->
-            list.filterNot { it.manifest.id == m.id } + recompute(row, wanted, error)
+            list.filterNot { it.manifest.id == m.id } + recompute(row, intent, error)
         }
         bump()
     }
@@ -200,10 +233,11 @@ class PluginHost(
      * 插件当前是否「该被启用」：安全模式只放行内置（dsh. 前缀），否则按 [PluginStore] 的启用态。
      * Node 编排在真正执行 JS 前用它判断要不要 plugins.load（禁用插件不能跑 JS）。
      */
-    fun isEnabled(id: String, enabledByDefault: Boolean): Boolean {
-        val allowed = !safeMode || id.startsWith("dsh.")
-        return allowed && (store?.isEnabled(id, enabledByDefault) ?: enabledByDefault)
-    }
+    fun isEnabled(id: String, enabledByDefault: Boolean): Boolean =
+        safeModeAllows(id) && (store?.isEnabled(id, enabledByDefault) ?: enabledByDefault)
+
+    /** 安全模式只放行内置（dsh. 前缀）。放行规则只有这一处，isEnabled 与行状态共用。 */
+    private fun safeModeAllows(id: String): Boolean = !safeMode || id.startsWith("dsh.")
 
     /**
      * 仅当 [plugin] 仍是当前已装实例（未被卸载/替换）时才强制重注册。
@@ -248,11 +282,15 @@ class PluginHost(
     ): LoadedPlugin {
         val id = row.manifest.id
         val loadError = runtimeFailures[id]
-        val on = wanted ?: isEnabled(id, row.manifest.enabledByDefault)
+        // 这里读「启用意图」而不是 isEnabled：安全模式挡住的插件必须能被标成
+        // 「被安全模式挡住」，否则开关弹回去、状态写「已停用」，用户看不出发生了什么。
+        val on = wanted ?: (store?.isEnabled(id, row.manifest.enabledByDefault) ?: row.manifest.enabledByDefault)
+        val blocked = on && !safeModeAllows(id)
         return row.copy(
-            enabled = on && registerError == null && loadError == null,
+            enabled = on && registerError == null && loadError == null && !blocked,
             error = registerError,
             loadError = loadError,
+            blockedBySafeMode = blocked,
             compat = compatOf(id),
         )
     }
@@ -316,9 +354,21 @@ class PluginHost(
     }
 
     fun setEnabled(id: String, enabled: Boolean) {
-        val plugin = instances[id] ?: return
+        val plugin = instances[id] ?: run {
+            // 实例不在（装配被跳过 / 已卸载）时写存储只会造出「存储说开、列表没这行」，
+            // 用户点了开关却什么都没有 —— 至少留一条可查的日志。
+            AppLog.w("插件 " + id + " 不在已加载实例里，启用请求被忽略")
+            return
+        }
         store?.setEnabled(id, enabled)
         if (enabled) {
+            // 安全模式挡着就不注册贡献：注册了会留下「开关关着却有槽位」的幽灵界面，
+            // 只把意图写进存储并让这一行显示被挡的原因。
+            if (!safeModeAllows(id)) {
+                _plugins.update { list -> list.map { if (it.manifest.id == id) recompute(it, null, it.error) else it } }
+                bump()
+                return
+            }
             registry.clearPlugin(id)
             val rejected = versionReject(plugin.manifest)
             val err = if (rejected != null) {
@@ -334,7 +384,9 @@ class PluginHost(
             bump()
         } else {
             registry.clearPlugin(id)
-            _plugins.update { list -> list.map { if (it.manifest.id == id) it.copy(enabled = false) else it } }
+            // 走同一条重算：停用后 blockedBySafeMode 必须一起清掉，否则「关掉的安全模式
+            // 失败行」会跟着下一次启用又冒出来。
+            _plugins.update { list -> list.map { if (it.manifest.id == id) recompute(it, null, it.error) else it } }
             bump()
         }
     }

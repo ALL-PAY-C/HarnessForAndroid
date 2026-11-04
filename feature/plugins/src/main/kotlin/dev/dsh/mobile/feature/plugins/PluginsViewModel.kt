@@ -23,6 +23,9 @@ class PluginsViewModel(
 
     fun setEnabled(id: String, enabled: Boolean) = host.setEnabled(id, enabled)
 
+    /** 退出安全模式：插件页顶部的横幅点一下就走这里，否则被挡的插件没有恢复路径。 */
+    fun clearSafeMode() = host.clearSafeMode()
+
     /** 卸载：清持久化条目 + 拉黑 id → 摘注册表 → 重新加载，三步缺一条就「刷新又回来」。
      *  返回结果供 UI 显示真实成败 —— 文件删除失败时绝不假装成功。 */
     fun uninstall(id: String): Result<Unit> = runCatching {

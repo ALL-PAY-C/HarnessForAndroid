@@ -1041,6 +1041,9 @@ Write unit tests</string>
     <string name="plugins_row_enabled">Enabled</string>
     <string name="plugins_row_disabled">Disabled</string>
     <string name="plugins_row_load_failed">Load failed</string>
+    <string name="plugins_reason_safe_mode">blocked by safe mode — exit it above, then re-enable</string>
+    <string name="plugins_safe_mode_block">Safe mode: third-party plugins are paused after repeated boot failures</string>
+    <string name="plugins_safe_mode_exit">Exit safe mode</string>
     <string name="plugins_schema_unsupported">Unsupported setting type %1$s — shown as a hint row</string>
     <string name="skill_remove_confirm_bundled">Remove “%1$s”? It ships with the app and is restored on next launch.</string>
     <string name="skill_remove_confirm">Remove “%1$s”? Its folder and enabled state are deleted; reinstall it to use it again.</string>
@@ -1195,4 +1198,9 @@ Supports https://github.com/owner/repo, owner/repo, github.com/owner/repo/tree/b
     <string name="plugins_set_key_hint">Key, e.g. apiKey</string>
     <string name="plugins_set_value_hint">Value</string>
     <string name="plugins_set_add">Add entry</string>
+    <string name="time_just_now">Just now</string>
+    <string name="time_minutes_ago">%1$d min ago</string>
+    <string name="time_days_ago">%1$d d ago</string>
+    <string name="time_today">Today %1$s</string>
+    <string name="time_yesterday">Yesterday %1$s</string>
 </resources>

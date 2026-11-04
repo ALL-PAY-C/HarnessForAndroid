@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import dev.dsh.mobile.core.common.DividerLabel
+import dev.dsh.mobile.core.common.RelativeTime
 
 /**
  * 一条还没定语言的界面文案。
@@ -26,4 +28,24 @@ fun UiText.text(): String = when (this) {
 fun UiText.resolve(context: Context): String = when (this) {
     is UiText.Res -> context.getString(id, *args.toTypedArray())
     is UiText.Raw -> value
+}
+
+/** 相对时间（会话列表右侧）：结构化档位 → 资源文案；时间戳无效（null）渲染空串。 */
+@Composable
+fun relativeTimeText(value: RelativeTime?): String = when (value) {
+    null -> ""
+    RelativeTime.JustNow -> stringResource(R.string.time_just_now)
+    is RelativeTime.Minutes -> stringResource(R.string.time_minutes_ago, value.n.toInt())
+    is RelativeTime.Clock -> value.hhmm
+    is RelativeTime.Days -> stringResource(R.string.time_days_ago, value.n.toInt())
+    is RelativeTime.Absolute -> value.text
+}
+
+/** 消息分隔条：今天 / 昨天带时刻，更远的日期原样展示。 */
+@Composable
+fun dividerText(value: DividerLabel): String = when (value) {
+    DividerLabel.None -> ""
+    is DividerLabel.Today -> stringResource(R.string.time_today, value.hhmm)
+    is DividerLabel.Yesterday -> stringResource(R.string.time_yesterday, value.hhmm)
+    is DividerLabel.Text -> value.text
 }

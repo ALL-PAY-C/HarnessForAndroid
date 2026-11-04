@@ -204,11 +204,16 @@ class JsBackedPlugin(
  * 选它而不是「日志 + 跳过」的理由：跳过的话用户在插件列表里看不到任何东西，
  * 只会觉得「装是装上了但没反应」。占位插件正常登记进列表、register 里不做任何
  * 执行、只贡献一张错误卡，错误原文就在设置页里，插件本身零副作用。
+ *
+ * 同时实现 [PluginLoadFailure]：装配期就失败的事实必须进列表行，否则「已停用 + 开关可点」
+ * 会把一次 JS 崩溃伪装成「用户没启用」。
  */
 class JsBrokenPlugin(
     val spec: PluginManifestFile,
     val error: JsPluginError,
-) : DshPlugin {
+) : DshPlugin, PluginLoadFailure {
+
+    override val loadFailure: String get() = "[" + error.stage + "] " + error.message
 
     override val manifest: PluginManifest = PluginManifest(
         id = spec.id,

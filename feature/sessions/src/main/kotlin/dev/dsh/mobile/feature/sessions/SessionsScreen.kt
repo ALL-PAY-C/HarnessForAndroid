@@ -86,6 +86,7 @@ import dev.dsh.mobile.design.SwipeableRow
 import dev.dsh.mobile.design.TokenPill
 import dev.dsh.mobile.design.UiEditSlotPlusRow
 import dev.dsh.mobile.design.qqFontBody
+import dev.dsh.mobile.design.relativeTimeText
 import dev.dsh.mobile.feature.sessions.groupLabel
 import dev.dsh.mobile.pluginapi.SlotAction
 import dev.dsh.mobile.pluginapi.SlotContribution
@@ -422,7 +423,7 @@ fun SessionsScreen(
                                                             },
                                                             selected = session.id in state.selected,
                                                             selectionMode = state.selectionMode,
-                                                            timeText = TimeFmt.relative(session.updatedAt, System.currentTimeMillis()),
+                                                            timeText = relativeTimeText(TimeFmt.relativeParts(session.updatedAt)),
                                                             showDivider = false,
                                                             extras = sessionRowExtras,
                                                         )

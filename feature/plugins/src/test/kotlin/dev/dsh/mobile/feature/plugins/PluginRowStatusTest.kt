@@ -38,6 +38,18 @@ class PluginRowStatusTest {
         assertEquals("[load] Cannot find package '@deepseek-ai/dsh-credentials'", row.detail)
     }
 
+    /**
+     * T9.18-③ 的现场形态：插件跑不起来时 enabled 恒为 false，旧逻辑据此写「已停用」，
+     * 用户看到的是「我没启用」而不是「它坏了」。失败态必须压过 enabled=false。
+     */
+    @Test
+    fun disabledRowWithLoadErrorStillShowsFailure() {
+        val row = pluginRowStatus(enabled = false, loadError = "[exec] index.js 执行失败")
+        assertEquals(UiText.Res(DesignR.string.plugins_row_load_failed), row.text)
+        assertTrue(row.failed)
+        assertEquals("[exec] index.js 执行失败", row.detail)
+    }
+
     @Test
     fun longErrorIsClippedWithEllipsis() {
         val row = pluginRowStatus(enabled = true, loadError = "x".repeat(500))
