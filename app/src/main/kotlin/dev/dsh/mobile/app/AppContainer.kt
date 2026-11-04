@@ -477,6 +477,11 @@ class AppContainer(private val context: Context) {
             //  · Rhino/声明式数据包插件 → pluginInstaller.loadablePlugins()
             //  · Node 插件（node:/@deepseek-ai/ 依赖）→ pluginInstaller.loadableNodePlugins()，走 NodeEngineHost
             // Markdown/LaTeX 已内置在 :render（不算插件）；HTML 渲染由 dsh.html 插件提供。
+            // 启动这一趟也要先拿磁盘对齐注册表：reloadPlugins 有 resync，boot 以前没有，
+            // 于是「目录在、注册表缺条目」（装到一半、恢复了旧备份、清过 data）的插件
+            // 启动时彻底不加载，界面上什么提示都没有 —— 这是「装上了却不起作用」的头号成因。
+            runCatching { pluginInstaller.packages.resync() }
+                .onFailure { AppLog.w("启动时对齐插件注册表失败：" + it.message, it) }
             val jsPlugins = externalPlugins.load() + pluginInstaller.loadablePlugins()
             val nodePlugins = pluginInstaller.loadableNodePlugins()
             loadAll(builtinPlugins + jsPlugins + nodePlugins)

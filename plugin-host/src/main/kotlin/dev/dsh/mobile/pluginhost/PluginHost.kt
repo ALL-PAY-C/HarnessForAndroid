@@ -95,6 +95,22 @@ interface SessionPersonaBridge {
     fun writePersona(sessionId: String, text: String): Boolean
 }
 
+/**
+ * 会话内槽位未摆放时的默认可见上限；返回 null 表示该槽位必须用户显式摆放。
+ *
+ * 只放开会话内的四类贴身槽位：抽屉 / 插件页 / 设置页仍然要用户自己摆，
+ * 否则一个插件装上就改主界面结构，比「没反应」更烦人。
+ * 会话内还有硬性布局上限（[COMPOSER_SLOT_CAP] / [HEADER_SLOT_CAP] 一类），这里给的是
+ * 「宿主愿意默认显示几个」，两边取较小值。
+ */
+internal fun defaultSlotCap(slot: SlotId): Int? = when (slot) {
+    SlotId.ComposerPlus -> 4
+    SlotId.ChatOverflow -> 2
+    SlotId.ChatBottom -> 2
+    SlotId.ChatSettings -> 3
+    else -> null
+}
+
 class PluginHost(
     private val store: PluginStore? = null,
     private val onUninstall: (String) -> Unit = {},
@@ -355,14 +371,19 @@ class PluginHost(
         val placements = placements(context)
         placements.revision
         val visible = placements.visible(slot, registry.contributions)
-        // 会话设置槽默认摆上插件贡献：装完插件就能直接点开关，不必先进「编辑会话设置」手动添加。
-        // 用户在这个槽里显式摆过至少一项时，仍以摆放结果为准，不自作主张。
-        if (visible.isNotEmpty() || slot != SlotId.ChatSettings) return visible
+        // 用户在这个槽里显式摆过至少一项时，以摆放结果为准，不自作主张。
+        if (visible.isNotEmpty()) return visible
+        val cap = defaultVisibleCap(slot) ?: return visible
         val placed = placements.all().map { it.pluginId to it.contributionId }.toSet()
-        return registry.contributions.filter {
-            it.slot == SlotId.ChatSettings && (it.pluginId to it.id) !in placed
-        }
+        // 会话内槽位默认展示插件贡献：装完就能点，不必先进「编辑槽位」手动摆放——
+        // 只认摆放结果是「装上插件毫无反应」的头号原因（用户原话：很多插件装上后根本不起作用）。
+        return registry.contributions
+            .filter { it.slot == slot && (it.pluginId to it.id) !in placed }
+            .sortedWith(compareBy({ it.pluginId }, { it.id }))
+            .take(cap)
     }
+
+    private fun defaultVisibleCap(slot: SlotId): Int? = defaultSlotCap(slot)
 
     /**
      * 应用一次「只切状态」的槽位点击：写插件自己的 config，再让宿主重建插件。

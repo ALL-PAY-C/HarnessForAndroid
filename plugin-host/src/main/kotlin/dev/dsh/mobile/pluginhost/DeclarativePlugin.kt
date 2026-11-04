@@ -4,6 +4,7 @@ import dev.dsh.mobile.pluginapi.DshPlugin
 import dev.dsh.mobile.pluginapi.PluginCapability
 import dev.dsh.mobile.pluginapi.PluginManifest
 import dev.dsh.mobile.pluginapi.PluginRegistry
+import dev.dsh.mobile.pluginapi.PluginUiNode
 import dev.dsh.mobile.pluginapi.PluginUiSpec
 import dev.dsh.mobile.pluginapi.SlotAction
 import dev.dsh.mobile.pluginapi.SlotContribution
@@ -102,7 +103,9 @@ class DeclarativePlugin(
         registry: PluginRegistry,
         knownActions: Set<String>,
     ): PluginUiSpec? {
-        contribution.ui?.let { json -> PluginUiJson.spec(json)?.let { return it } }
+        contribution.ui?.let { json ->
+            PluginUiJson.spec(json)?.let { spec -> return claimConfigWrites(spec) }
+        }
         val view = contribution.view ?: return null
         val result = PluginViewJson.parse(view, knownActions)
         val rejection = result.rejection
@@ -113,7 +116,37 @@ class DeclarativePlugin(
         if (result.issues.isNotEmpty()) {
             registry.degrade(spec.id, result.summary() + "（id=" + contribution.id + "）")
         }
-        return result.spec?.let { PluginViewAdapter.toUiSpec(it) }
+        return result.spec?.let { PluginViewAdapter.toUiSpec(it) }?.let { claimConfigWrites(it) }
+    }
+
+    /**
+     * ui 树里的 SetConfig 在解析期不知道插件 id（节点只带 key），这里统一补成自身的 id。
+     *
+     * 为什么要补：app 侧 applySlotConfig 只写「这个插件自己的」config，pluginId 空着
+     * 一律写失败，于是声明式插件里的开关点了没反应。
+     */
+    private fun claimConfigWrites(ui: PluginUiSpec): PluginUiSpec =
+        ui.copy(root = claimConfigWrites(ui.root))
+    /** 单个动作补 id：只认 SetConfig，其余动作原样返回。 */
+    private fun claim(action: SlotAction?): SlotAction? =
+        if (action is SlotAction.SetConfig && action.pluginId.isBlank()) {
+            action.copy(pluginId = spec.id)
+        } else {
+            action
+        }
+
+    private fun claimConfigWrites(node: PluginUiNode): PluginUiNode = when (node) {
+        is PluginUiNode.Button -> node.copy(action = claim(node.action))
+        is PluginUiNode.IconButton -> node.copy(action = claim(node.action))
+        is PluginUiNode.Toggle -> node.copy(action = claim(node.action))
+        is PluginUiNode.Slider -> node.copy(action = claim(node.action))
+        is PluginUiNode.TextField -> node.copy(action = claim(node.action))
+        is PluginUiNode.Row -> node.copy(children = node.children.map { claimConfigWrites(it) })
+        is PluginUiNode.Column -> node.copy(children = node.children.map { claimConfigWrites(it) })
+        is PluginUiNode.Card -> node.copy(children = node.children.map { claimConfigWrites(it) })
+        is PluginUiNode.Section -> node.copy(children = node.children.map { claimConfigWrites(it) })
+        is PluginUiNode.Menu -> node.copy(items = node.items.map { it.copy(action = claim(it.action)) })
+        else -> node
     }
 
     /** Value for the auto-generated form, falling back to the manifest default. */
@@ -128,11 +161,12 @@ class DeclarativePlugin(
      */
     private fun ActionSpec.toSlotAction(): SlotAction? =
         configAction(spec.id) ?: personaAction() ?: when (kind.trim().lowercase()) {
-            "", "prompt" -> SlotAction.Prompt(text, submit = true)
-            "http" -> SlotAction.Http(method = method, url = url, body = body)
-            "link" -> SlotAction.Link(uri)
-            "page" -> SlotAction.Page(pageId)
-            "custom" -> SlotAction.Custom(custom)
+            // 同义写法：桌面端同一个动作在不同插件里叫法不一，认得出就不该让它失效。
+            "", "prompt", "send", "message" -> SlotAction.Prompt(text, submit = true)
+            "http", "request", "fetch", "post" -> SlotAction.Http(method = method, url = url, body = body)
+            "link", "uri", "open", "url" -> SlotAction.Link(uri.ifBlank { url })
+            "page", "navigate", "screen" -> SlotAction.Page(pageId)
+            "custom", "run", "callback" -> SlotAction.Custom(custom)
             else -> null
         }
 }

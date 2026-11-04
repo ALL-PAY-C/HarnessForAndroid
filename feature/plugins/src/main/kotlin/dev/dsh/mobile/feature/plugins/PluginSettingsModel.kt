@@ -3,6 +3,7 @@ package dev.dsh.mobile.feature.plugins
 import dev.dsh.mobile.pluginapi.ConfigField
 import dev.dsh.mobile.pluginapi.ConfigFieldType
 import dev.dsh.mobile.pluginapi.SlotContribution
+import dev.dsh.mobile.core.common.AppLog
 import dev.dsh.mobile.pluginhost.ConfigSpec
 import dev.dsh.mobile.pluginhost.PluginManifestFile
 
@@ -32,6 +33,13 @@ data class PluginSettingsEntry(
     val page: SlotContribution?,
     /** 插件声明的网页控制台；只有 http(s) 才值得给「在浏览器打开」。 */
     val webUrl: String?,
+    /**
+     * 宿主自渲染的设置页（含分组标题 / 滑杆 / 说明行）。
+     *
+     * 与 [fields] 同源但更宽：fields 只有输入型字段（老路径），schema 还包含分组和只读行，
+     * 且有「未知类型降级成说明行」的明确落点。
+     */
+    val schema: SettingsSchema = SettingsSchema(emptyList()),
 ) {
     /** 有没有能画出来的插件自绘界面（ui 或 content 任一即可，都没有只剩 label 一行）。 */
     val hasPage: Boolean get() = page?.ui != null || page?.content != null
@@ -53,7 +61,7 @@ data class PluginSettingsEntry(
 
     /** 有没有可操作的东西：config 字段、自绘界面，或用户自己加的键值。 */
     val hasSettings: Boolean
-        get() = fields.isNotEmpty() || actions.isNotEmpty() || hasPage || extraValues.isNotEmpty()
+        get() = !schema.isEmpty || fields.isNotEmpty() || actions.isNotEmpty() || hasPage || extraValues.isNotEmpty()
 
     /**
      * 列表副标题。顺序即优先级：没设置项时先喊空态（用户抱怨的就是「点进去是介绍页」），
@@ -109,6 +117,12 @@ fun pluginSettingsEntries(
             // 优先取带 ui 的那条：没有 ui 的只剩 label，画不出设置界面。
             page = mine.firstOrNull { it.ui != null } ?: mine.firstOrNull(),
             webUrl = manifest.homepage.takeIf { it.startsWith("http://") || it.startsWith("https://") },
+            schema = settingsSchema(manifest.config).also { parsed ->
+                // 未知类型不静默：日志 + 设置页说明行，两个地方都能看到。
+                if (parsed.unsupported.isNotEmpty()) {
+                    AppLog.w("插件 " + manifest.id + " 有 " + parsed.unsupported.size + " 个不支持的设置类型：" + parsed.unsupported.joinToString())
+                }
+            },
         )
     }
 

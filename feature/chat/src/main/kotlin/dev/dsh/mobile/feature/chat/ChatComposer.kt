@@ -2,7 +2,11 @@
 package dev.dsh.mobile.feature.chat
 
 import dev.dsh.mobile.core.data.repo.SendQueue
+import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -264,6 +268,13 @@ internal fun Composer(
     queued: Int = 0,
     /** 群成员名字，用于 @ 自动补全。 */
     mentions: List<String> = emptyList(),
+    /**
+     * 插件注册在输入框上方的动作按钮（SlotId.ComposerPlus）。
+     *
+     * 只取前 [COMPOSER_SLOT_CAP] 个、按 pluginId + id 稳定排序：插件装多了不会把输入区顶走，
+     * 也不会因为注册顺序变了就换位置。
+     */
+    composerSlots: List<SlotContribution> = emptyList(),
     /** 已放置到「会话底部」槽的插件组件；点一下沿用 onSlot 回到宿主。 */
     slotPlaced: List<SlotContribution> = emptyList(),
     /** 「会话底部」槽的候选清单，编辑态点「+」时弹出来。 */
@@ -288,6 +299,7 @@ internal fun Composer(
         .orEmpty()
     Box(Modifier.fillMaxWidth().height(1.dp).background(p.line))
     Column(Modifier.fillMaxWidth().background(p.card)) {
+        ComposerSlotRow(composerSlots, onSlot)
         if (mentionMatches.isNotEmpty()) {
             FlowRow(
                 Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
@@ -599,6 +611,65 @@ private fun ChipFlow(items: List<String>, onClick: (String) -> Unit) {
                     .clickable { onClick(item) }
                     .padding(horizontal = 11.dp, vertical = 7.dp),
             )
+        }
+    }
+}
+
+/** 输入框上方最多挂几个插件按钮：再多就会把输入行挤到键盘后面。 */
+internal const val COMPOSER_SLOT_CAP = 4
+
+/**
+ * 输入框上方的插件动作行（SlotId.ComposerPlus）。
+ *
+ * 布局约束是硬要求：单个高度 ≤32dp、宽度 ≤96dp、单行省略、最多 [COMPOSER_SLOT_CAP] 个，
+ * 放不下横向滚动 —— 插件的文案再长也不会把原生输入框和发送键挤走。
+ * 某一项渲染抛异常时只跳过它自己，并用一条 Toast 告诉用户，不静默。
+ */
+@Composable
+private fun ComposerSlotRow(slots: List<SlotContribution>, onSlot: (SlotContribution) -> Unit) {
+    if (slots.isEmpty()) return
+    val p = LocalQq.current
+    val context = LocalContext.current
+    var failed by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(failed) {
+        val msg = failed ?: return@LaunchedEffect
+        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+        failed = null
+    }
+    // 稳定排序 + 上限：插件注册顺序变化不会让按钮跳位。
+    val shown = remember(slots) {
+        slots.sortedWith(compareBy({ it.pluginId }, { it.id })).take(COMPOSER_SLOT_CAP)
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        shown.forEach { slot ->
+            val ok = runCatching {
+                Text(
+                    slot.label,
+                    color = p.accent,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .heightIn(max = 32.dp)
+                        .widthIn(max = 96.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(p.accent.copy(alpha = 0.12f))
+                        .clickable { onSlot(slot) }
+                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                )
+            }.isSuccess
+            if (!ok) failed = "插件按钮「" + slot.label + "」没能显示"
+        }
+        val hidden = slots.size - shown.size
+        if (hidden > 0) {
+            Text("+" + hidden, color = p.t3, fontSize = 11.sp)
         }
     }
 }

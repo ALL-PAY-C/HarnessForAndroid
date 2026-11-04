@@ -19,10 +19,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -93,36 +95,46 @@ internal fun PluginSettingsDetail(
             }
         }
 
-        if (entry.fields.isNotEmpty() || entry.actions.isNotEmpty()) {
+        // 设置页统一走 schema：分组标题 / 开关 / 输入 / 下拉 / 滑杆 / 按钮 / 说明行都在这里画。
+        // 每一行单独兜底：某一行（或者未知类型降级）画不出来只损失那一行，整页照常可用。
+        if (!entry.schema.isEmpty) {
             GroupFrame {
                 GroupHeader(
                     label = "设置项",
-                    count = entry.fields.size + entry.actions.size,
+                    count = entry.schema.items.count { it !is SettingItem.Section },
                     collapsible = false,
                 )
                 Column(Modifier.padding(vertical = 4.dp)) {
-                    entry.fields.forEach { field ->
-                        ConfigFieldRow(field, overrides[field.key] ?: entry.valueOf(field), resetTick) { value ->
-                            onSave(field.key, value)
+                    entry.schema.items.forEach { item ->
+                        val rendered = runCatching {
+                            SchemaRow(
+                                item = item,
+                                current = overrides[item.key] ?: currentValueOf(item, entry),
+                                resetKey = resetTick,
+                                onSave = { key, value -> onSave(key, value) },
+                                onReset = { action ->
+                                    val fallback = action.default
+                                    if (fallback == null) {
+                                        Toast.makeText(
+                                            context,
+                                            "找不到要重置的设置项：" + action.target,
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    } else {
+                                        focusManager.clearFocus()
+                                        overrides = overrides + (action.target to fallback)
+                                        resetTick++
+                                        onSave(action.target, fallback)
+                                        Toast.makeText(context, "已重置为默认", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                            )
                         }
-                    }
-                    // type = "action" 的行：点一下就把它 target 那项写回默认值。
-                    entry.actions.forEach { action ->
-                        ActionRow(action) {
-                            val fallback = action.default
-                            if (fallback == null) {
-                                Toast.makeText(
-                                    context,
-                                    "找不到要重置的设置项：" + action.target,
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            } else {
-                                focusManager.clearFocus()
-                                overrides = overrides + (action.target to fallback)
-                                resetTick++
-                                onSave(action.target, fallback)
-                                Toast.makeText(context, "已重置为默认", Toast.LENGTH_SHORT).show()
-                            }
+                        if (rendered.isFailure) {
+                            InlineNote(
+                                "这一项没能画出来：" + item.key,
+                                "插件声明的类型宿主认不出或数据坏了，其余设置不受影响",
+                            )
                         }
                     }
                 }
@@ -437,6 +449,127 @@ private fun ExtraConfigSection(entry: PluginSettingsEntry, onSave: (key: String,
                 }
             }
         }
+    }
+}
+
+/**
+ * schema 的一行 → 宿主自己的控件。
+ *
+ * 只做映射，不做容错以外的判断：类型认不出时 [settingsSchema] 早就换成 Info 行，
+ * 走到这里还抛异常说明数据坏了 —— 外层 runCatching 会把它压成一条可见提示。
+ */
+@Composable
+private fun SchemaRow(
+    item: SettingItem,
+    current: String,
+    resetKey: Int,
+    onSave: (key: String, value: String) -> Unit,
+    onReset: (ConfigAction) -> Unit,
+) {
+    when (item) {
+        is SettingItem.Section -> SectionRow(item.title)
+        is SettingItem.Toggle -> ConfigFieldRow(
+            ConfigField(item.key, item.label, ConfigFieldType.Switch, current, item.hint),
+            current,
+            resetKey,
+        ) { onSave(item.key, it) }
+        is SettingItem.Entry -> ConfigFieldRow(
+            ConfigField(
+                key = item.key,
+                label = item.label,
+                type = when {
+                    item.secret -> ConfigFieldType.Secret
+                    item.numeric -> ConfigFieldType.Number
+                    else -> ConfigFieldType.Text
+                },
+                default = current,
+                hint = item.hint,
+            ),
+            current,
+            resetKey,
+        ) { onSave(item.key, it) }
+        is SettingItem.Choice -> ConfigFieldRow(
+            ConfigField(item.key, item.label, ConfigFieldType.Select, current, item.hint, item.options),
+            current,
+            resetKey,
+        ) { onSave(item.key, it) }
+        is SettingItem.Slider -> SliderRow(item, current, resetKey) { onSave(item.key, it) }
+        is SettingItem.Action -> ActionRow(ConfigAction(item.key, item.label, item.target, item.default)) {
+            onReset(ConfigAction(item.key, item.label, item.target, item.default))
+        }
+        is SettingItem.Info -> InfoRow(item.label, item.hint)
+    }
+}
+
+/** 读当前值：用户改过的优先（overrides），否则插件的默认值。 */
+private fun currentValueOf(item: SettingItem, entry: PluginSettingsEntry): String = when (item) {
+    is SettingItem.Toggle -> if (switchOn(entry.valueOf(ConfigField(item.key, item.label, ConfigFieldType.Switch, item.value, item.hint))))
+        "true" else "false"
+    else -> entry.values[item.key] ?: when (item) {
+        is SettingItem.Entry -> item.value
+        is SettingItem.Choice -> item.value
+        is SettingItem.Slider -> sliderText(item)
+        else -> ""
+    }
+}
+
+/** 分组标题：一段设置的小标题，不是卡片，跟着 GroupFrame 走。 */
+@Composable
+private fun SectionRow(title: String) {
+    val p = LocalQq.current
+    Text(
+        title,
+        color = p.t3,
+        fontSize = MaterialTheme.typography.bodySmall.fontSize,
+        fontWeight = FontWeight.Medium,
+        modifier = Modifier.fillMaxWidth().padding(start = 13.dp, end = 13.dp, top = 10.dp, bottom = 2.dp),
+    )
+}
+
+/** 滑杆：本地状态跟着手指走，松手才写回存储（拖动期间写会一直打存储）。 */
+@Composable
+private fun SliderRow(item: SettingItem.Slider, current: String, resetKey: Int, onSave: (String) -> Unit) {
+    val p = LocalQq.current
+    var value by remember(item.key, resetKey) {
+        mutableFloatStateOf(current.toFloatOrNull()?.coerceIn(item.min, item.max) ?: item.value)
+    }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 9.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(item.label, color = p.t1, fontSize = MaterialTheme.typography.bodyLarge.fontSize, modifier = Modifier.weight(1f))
+            Text(sliderText(item, value), color = p.t3, fontSize = MaterialTheme.typography.bodySmall.fontSize)
+        }
+        if (item.hint.isNotBlank()) {
+            Text(item.hint, color = p.t3, fontSize = MaterialTheme.typography.bodySmall.fontSize)
+        }
+        Slider(
+            value = value,
+            onValueChange = { next -> value = next.coerceIn(item.min, item.max) },
+            onValueChangeFinished = { onSave(sliderText(item, value)) },
+            valueRange = item.min..item.max,
+            steps = item.steps,
+        )
+    }
+}
+
+/** 只读行：插件声明的说明文字，或未知类型的降级落点。 */
+@Composable
+private fun InfoRow(label: String, hint: String) {
+    val p = LocalQq.current
+    Column(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 9.dp)) {
+        Text(label, color = p.t1, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
+        if (hint.isNotBlank()) {
+            Text(hint, color = p.t3, fontSize = MaterialTheme.typography.bodySmall.fontSize)
+        }
+    }
+}
+
+/** 单行渲染失败的可见兜底：这一行画不出来，其余设置照旧，且用户知道是哪一条。 */
+@Composable
+private fun InlineNote(title: String, detail: String) {
+    val p = LocalQq.current
+    Column(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 9.dp)) {
+        Text(title, color = p.accent, fontSize = MaterialTheme.typography.bodyMedium.fontSize)
+        Text(detail, color = p.t3, fontSize = MaterialTheme.typography.bodySmall.fontSize)
     }
 }
 

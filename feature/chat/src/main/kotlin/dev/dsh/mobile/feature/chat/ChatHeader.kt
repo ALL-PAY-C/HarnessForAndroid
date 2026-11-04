@@ -46,6 +46,16 @@ import dev.dsh.mobile.core.protocol.ProjectedTodo
 import dev.dsh.mobile.core.protocol.SessionProjection
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
+import dev.dsh.mobile.pluginapi.SlotContribution
 
 /**
  * todo / goal 只读面板：抬头一行永远可见（进度一眼可读），点开铺开清单。
@@ -154,6 +164,14 @@ internal fun ChatHeader(
     /** 规划书未完成条目数（T9.7a）：0 时入口只写「规划」，不显示 0。 */
     ledgerOpen: Int,
     onOpenLedger: () -> Unit,
+    /**
+     * 插件注册到顶栏的动作（SlotId.ChatOverflow）。
+     *
+     * 以前这个槽位只被当成「会话设置」页的列表，聊天顶栏里一个都不显示 ——
+     * 插件作者按文档挂了 chat.topbar.menu，装上却毫无反应就是这个原因。
+     */
+    overflowSlots: List<SlotContribution> = emptyList(),
+    onSlot: (SlotContribution) -> Unit = {},
 ) {
     val p = LocalQq.current
     QqTopBar(
@@ -216,6 +234,7 @@ internal fun ChatHeader(
         },
         trailing = {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                HeaderSlotActions(overflowSlots, onSlot)
                 // 规划书入口（T9.7a）：群聊才有；条数是未完成数，全清时不显示 0。
                 if (state.isGroup) {
                     Text(
@@ -376,6 +395,52 @@ internal fun ChatBusyStrip(state: ChatUiState) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+}
+
+/** 顶栏最多挂几个插件动作：顶栏横向空间只够两个，再多就把标题挤没了。 */
+internal const val HEADER_SLOT_CAP = 2
+
+/**
+ * 顶栏插件动作（SlotId.ChatOverflow）。
+ *
+ * 约束：最多 [HEADER_SLOT_CAP] 个、单个高 ≤32dp、宽 ≤72dp、单行省略，按 pluginId + id 稳定排序。
+ * 单个按钮渲染失败只跳过它自己并弹一条 Toast —— 顶栏是主界面的必经路径，不能因为插件崩掉。
+ */
+@Composable
+private fun HeaderSlotActions(slots: List<SlotContribution>, onSlot: (SlotContribution) -> Unit) {
+    if (slots.isEmpty()) return
+    val p = LocalQq.current
+    val context = LocalContext.current
+    var failed by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(failed) {
+        val msg = failed ?: return@LaunchedEffect
+        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+        failed = null
+    }
+    val shown = remember(slots) {
+        slots.sortedWith(compareBy({ it.pluginId }, { it.id })).take(HEADER_SLOT_CAP)
+    }
+    shown.forEach { slot ->
+        val ok = runCatching {
+            Text(
+                slot.label,
+                color = p.accent,
+                fontSize = qqFontBody(12.sp),
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .padding(start = 3.dp)
+                    .heightIn(max = 32.dp)
+                    .widthIn(max = 72.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(p.accent.copy(alpha = 0.12f))
+                    .clickable { onSlot(slot) }
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+            )
+        }.isSuccess
+        if (!ok) failed = "顶栏插件按钮「" + slot.label + "」没能显示"
     }
 }
 

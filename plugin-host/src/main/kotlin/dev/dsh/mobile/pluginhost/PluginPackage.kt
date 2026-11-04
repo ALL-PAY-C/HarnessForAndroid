@@ -155,7 +155,20 @@ data class ConfigSpec(
      * 点一下把那行写回它的 [default]。
      */
     val target: String = "",
+    /** 数值/滑杆的下界与上界；没声明时由设置页按 [default] 兜底（0..100 / 0..1）。 */
+    val min: Double? = null,
+    val max: Double? = null,
+    /** 滑杆步长；null 表示连续。 */
+    val step: Double? = null,
+    /** 分组标题：同 section 的字段在设置页归到同一个组下。 */
+    val section: String = "",
+    /** 占位文案（text/secret/number 输入框用）。 */
+    val placeholder: String = "",
 )
+
+/** 缺字段 / 显式 null / 非数字一律当「没声明」，交给设置页兜底，别把 0 当成用户写的值。 */
+private fun JSONObject.optDoubleOrNull(key: String): Double? =
+    if (has(key) && !isNull(key) && opt(key) is Number) optDouble(key) else null
 
 private fun <T> JSONArray?.mapObjects(block: (JSONObject) -> T): List<T> {
     if (this == null) return emptyList()
@@ -203,4 +216,9 @@ private fun JSONObject.toConfig(): ConfigSpec = ConfigSpec(
         (0 until arr.length()).map { arr.optString(it) }.filter { it.isNotBlank() }
     }.orEmpty(),
     target = optString("target"),
+    min = optDoubleOrNull("min"),
+    max = optDoubleOrNull("max"),
+    step = optDoubleOrNull("step"),
+    section = optString("section").ifBlank { optString("group") },
+    placeholder = optString("placeholder"),
 )

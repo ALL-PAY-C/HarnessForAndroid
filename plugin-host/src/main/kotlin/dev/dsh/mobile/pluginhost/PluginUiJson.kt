@@ -215,6 +215,19 @@ object PluginUiJson {
             "link", "uri", "open" -> SlotAction.Link(json.optString("uri").ifBlank { json.optString("url") })
             "page", "navigate" -> SlotAction.Page(json.optString("pageId").ifBlank { json.optString("id") })
             "custom" -> SlotAction.Custom(json.optString("custom").ifBlank { json.optString("id") })
+            // 声明式 ui 里的开关/下拉：点一下就写插件自己的 config，不发消息。
+            // pluginId 留空，由 DeclarativePlugin 在装配时补成当前插件 id（解析期拿不到）。
+            "setconfig", "set_config", "config" -> SlotAction.SetConfig(
+                pluginId = json.optString("pluginId"),
+                key = json.optString("key"),
+                value = json.optString("value"),
+                toggle = json.optBoolean("toggle", false),
+            )
+            "flip" -> SlotAction.SetConfig(
+                pluginId = json.optString("pluginId"),
+                key = json.optString("key"),
+                toggle = true,
+            )
             // 一键写会话人设：与 plugin.json / JS 侧同一个 kind，换界面形态不改行为。
             "setpersona", "set_persona" -> SlotAction.SetPersona(
                 text = json.optString("text").ifBlank { json.optString("value") },

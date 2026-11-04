@@ -410,6 +410,8 @@ fun ChatScreen(
             onOpenAgentSheet = { picking = true },
             ledgerOpen = groupLedger.entries.count { it.status != LedgerStatus.Done },
             onOpenLedger = { ledgerOpen = true },
+            overflowSlots = overflowSlots,
+            onSlot = onSlot,
         )
 
         // 规划书面板：负责人可能是角色（supervisor/planner/…）也可能是群成员 id，两种都还原成名字。
@@ -526,6 +528,11 @@ fun ChatScreen(
                     viewModel.compactContext()
                     true
                 }
+                // T9.8-S2 手动温层：走 repo.refreshWarm → transport.refreshWarm（与 /compact 同款 shim）。
+                "/warm", "/温层" -> {
+                    viewModel.refreshWarmContext()
+                    true
+                }
                 "/new" -> {
                     notice = "新建会话请回到会话列表点右上角 ＋"
                     true
@@ -547,6 +554,7 @@ fun ChatScreen(
             quickCommands = state.settings.quickCommands,
             templates = state.settings.promptTemplates,
             extras = composerExtras.map { it.first } + composerSlots.map { it.label },
+            composerSlots = composerSlots,
             onQuickCommand = { cmd ->
                 input = TextFieldValue(cmd, TextRange(cmd.length))
                 panelOpen = false
