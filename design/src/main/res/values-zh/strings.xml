@@ -877,7 +877,7 @@
     <string name="linux_log_cancelled">%1$s 已取消</string>
     <string name="linux_log_failed_prefix">%1$s 失败：</string>
     <string name="linux_log_done">完成</string>
-    <string name="linux_check_failed">失败 · </string>
+    <string name="linux_check_failed">"失败 · "</string>
     <string name="linux_exit_code">%1$s 退出码 %2$d</string>
     <string name="linux_msg_repair_done">运行时修复完成，已补齐 %1$d 项执行权限</string>
     <string name="linux_msg_repair_failed">运行时修复后健康检查失败：%1$s</string>
@@ -899,7 +899,7 @@
     <string name="linux_err_kernel_manifest">DSH 内核清单缺失必填字段</string>
     <string name="linux_err_need_env">请先安装 Linux 环境</string>
     <string name="diag_title">诊断</string>
-    <string name="diag_safe_on_prefix">已开启 · </string>
+    <string name="diag_safe_on_prefix">"已开启 · "</string>
     <string name="diag_safe_reason_unknown">原因未知</string>
     <string name="diag_safe_off">未开启</string>
     <string name="diag_safe_active_title">安全模式已开启</string>
@@ -926,7 +926,7 @@
     <string name="diag_crashes_dir_empty">崩溃目录为空</string>
     <string name="diag_not_uploaded">未上传</string>
     <string name="diag_maintenance">维护动作</string>
-    <string name="diag_upload_on_prefix">上传已开启 · </string>
+    <string name="diag_upload_on_prefix">"上传已开启 · "</string>
     <string name="diag_endpoint_empty">端点为空</string>
     <string name="diag_upload_off_hint">上传未开启（下面可以打开；关闭时全程不联网）</string>
     <string name="diag_restore_title">恢复上次配置（pre-rollback）</string>
@@ -1097,8 +1097,8 @@
     <string name="market_backup_deleted">已删除这个存档</string>
     <string name="market_backup_delete_failed">删除失败</string>
     <string name="market_sources_title">插件源</string>
-    <string name="market_source_count"> · %1$d 条</string>
-    <string name="market_source_failed"> · 失败</string>
+    <string name="market_source_count">" · %1$d 条"</string>
+    <string name="market_source_failed">" · 失败"</string>
     <string name="market_source_error">（%1$s）</string>
     <string name="market_cache_stale">还没刷新，当前展示上次成功索引的缓存。</string>
     <string name="market_offline_builtin">离线或全部源不可达，当前展示内置目录。</string>
@@ -1112,7 +1112,7 @@
     <string name="market_via_archive">直链归档</string>
     <string name="market_via_repo">GitHub 仓库</string>
     <string name="market_via_command">仅命令</string>
-    <string name="market_join_sep"> · </string>
+    <string name="market_join_sep">" · "</string>
     <string name="market_downloads">%1$d 次下载</string>
     <string name="market_github_detail">GitHub 详情</string>
     <string name="market_busy_downloading">下载中…</string>

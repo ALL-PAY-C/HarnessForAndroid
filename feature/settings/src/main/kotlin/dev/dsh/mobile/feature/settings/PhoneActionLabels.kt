@@ -1,4 +1,4 @@
-package dev.dsh.mobile.app.phone
+package dev.dsh.mobile.feature.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
@@ -8,7 +8,8 @@ import dev.dsh.mobile.toolbridge.phone.PhoneAction
 /**
  * 手机动作词表的显示层映射。
  *
- * PhoneAction 在 toolbridge（design 不依赖 toolbridge），所以映射放 app 层。
+ * PhoneAction 在 toolbridge（design 不依赖 toolbridge），所以映射放本模块：feature:settings 已依赖
+ * toolbridge，app 与设置页都从这里取同一份文案。
  * when 穷尽：给 PhoneAction 加一个动作，这里漏了分支就编译不过，不会静默显示 id。
  */
 @Composable

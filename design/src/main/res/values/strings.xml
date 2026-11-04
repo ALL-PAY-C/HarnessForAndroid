@@ -153,7 +153,7 @@
     <string name="sessions_pick_agent_single">Pick an agent</string>
     <string name="sessions_no_agent">No agents connected yet — add an API key on the Agents page</string>
     <string name="sessions_selected_members">%1$d selected: %2$s</string>
-    <string name="common_list_separator">, </string>
+    <string name="common_list_separator">", "</string>
     <string name="sessions_pick_group">Pick a group</string>
     <string name="common_recent">Recent</string>
     <string name="sessions_new_group_name_hint">New group name (blank = Recent)</string>
@@ -759,7 +759,7 @@ Write unit tests</string>
     <string name="design_activity_thought_steps">Thinking process · %1$d steps</string>
     <string name="design_activity_thought_collapse">Collapse thinking</string>
     <string name="design_activity_thought_expand">Expand thinking</string>
-    <string name="design_activity_phrase_sep">, </string>
+    <string name="design_activity_phrase_sep">", "</string>
     <string name="design_activity_tool_count">%1$d items</string>
     <string name="design_activity_copy_thought">Copy reasoning</string>
     <string name="design_activity_no_reasoning">This turn returned no reasoning. Switch to a model with reasoning (such as deepseek-reasoner) to see the full chain of thought here.</string>
@@ -851,7 +851,7 @@ Write unit tests</string>
     <string name="phone_section_permissions">Permission setup</string>
     <string name="phone_state_pending">Not connected</string>
     <string name="phone_section_capabilities">System capabilities</string>
-    <string name="phone_tap_to_request"> (tap to request)</string>
+    <string name="phone_tap_to_request">" (tap to request)"</string>
     <string name="phone_section_actions">Actions</string>
     <string name="phone_selftest_running">Checking screen reader…</string>
     <string name="phone_selftest">Screen reader self-test</string>
@@ -875,9 +875,9 @@ Write unit tests</string>
     <string name="linux_op_bootstrap">Fill in environment dependencies</string>
     <string name="linux_log_start">%1$s started</string>
     <string name="linux_log_cancelled">%1$s cancelled</string>
-    <string name="linux_log_failed_prefix">%1$s failed: </string>
+    <string name="linux_log_failed_prefix">"%1$s failed: "</string>
     <string name="linux_log_done">Done</string>
-    <string name="linux_check_failed">failed · </string>
+    <string name="linux_check_failed">"failed · "</string>
     <string name="linux_exit_code">%1$s exit code %2$d</string>
     <string name="linux_msg_repair_done">Runtime repaired; fixed execute permission on %1$d item(s)</string>
     <string name="linux_msg_repair_failed">Health check failed after repair: %1$s</string>
@@ -899,7 +899,7 @@ Write unit tests</string>
     <string name="linux_err_kernel_manifest">DSH kernel manifest is missing required fields</string>
     <string name="linux_err_need_env">Install the Linux environment first</string>
     <string name="diag_title">Diagnostics</string>
-    <string name="diag_safe_on_prefix">On · </string>
+    <string name="diag_safe_on_prefix">"On · "</string>
     <string name="diag_safe_reason_unknown">Reason unknown</string>
     <string name="diag_safe_off">Off</string>
     <string name="diag_safe_active_title">Safe mode is on</string>
@@ -926,7 +926,7 @@ Write unit tests</string>
     <string name="diag_crashes_dir_empty">Crash directory is empty</string>
     <string name="diag_not_uploaded">Not uploaded</string>
     <string name="diag_maintenance">Maintenance</string>
-    <string name="diag_upload_on_prefix">Upload on · </string>
+    <string name="diag_upload_on_prefix">"Upload on · "</string>
     <string name="diag_endpoint_empty">No endpoint</string>
     <string name="diag_upload_off_hint">Upload off (you can turn it on below; nothing goes online while it stays off)</string>
     <string name="diag_restore_title">Restore the previous config (pre-rollback)</string>
@@ -1097,9 +1097,9 @@ Write unit tests</string>
     <string name="market_backup_deleted">Snapshot deleted</string>
     <string name="market_backup_delete_failed">Delete failed</string>
     <string name="market_sources_title">Plugin sources</string>
-    <string name="market_source_count"> · %1$d entries</string>
-    <string name="market_source_failed"> · failed</string>
-    <string name="market_source_error"> (%1$s)</string>
+    <string name="market_source_count">" · %1$d entries"</string>
+    <string name="market_source_failed">" · failed"</string>
+    <string name="market_source_error">" (%1$s)"</string>
     <string name="market_cache_stale">Not refreshed yet; showing the cache of the last successful index.</string>
     <string name="market_offline_builtin">Offline or all sources unreachable; showing the built-in catalogue.</string>
     <string name="market_refreshing">Loading more sources…</string>
@@ -1112,7 +1112,7 @@ Write unit tests</string>
     <string name="market_via_archive">direct archive</string>
     <string name="market_via_repo">GitHub repository</string>
     <string name="market_via_command">command only</string>
-    <string name="market_join_sep"> · </string>
+    <string name="market_join_sep">" · "</string>
     <string name="market_downloads">%1$d downloads</string>
     <string name="market_github_detail">GitHub details</string>
     <string name="market_busy_downloading">Downloading…</string>

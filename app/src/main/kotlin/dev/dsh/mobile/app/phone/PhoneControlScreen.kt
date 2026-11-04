@@ -51,6 +51,8 @@ import dev.dsh.mobile.design.SectionCard
 import dev.dsh.mobile.design.SectionTitle
 import dev.dsh.mobile.design.hint
 import dev.dsh.mobile.design.title
+import dev.dsh.mobile.feature.settings.hint
+import dev.dsh.mobile.feature.settings.title
 import dev.dsh.mobile.toolbridge.phone.PhoneAccessibilityService
 import dev.dsh.mobile.toolbridge.phone.PhoneAction
 import dev.dsh.mobile.toolbridge.phone.PhoneActionLog

@@ -932,10 +932,12 @@ fun SettingsScreen(
                                 onClick = { ctx.startActivity(PhoneBridge(ctx).overlaySettingsIntent()) },
                             )
                             // 文案由动作目录派生：以前手写 9 项，实际早就 24 项，加动作没人记得改文案。
+                            // title() 是 @Composable，先整体求值再 join，不能塞进 joinToString 的 lambda。
+                            val actionTitles = PhoneAction.entries.map { it.title() }
                             Hint(
                                 stringResource(
                                     DesignR.string.settings_phone_actions,
-                                    PhoneAction.entries.joinToString(stringResource(DesignR.string.common_list_separator)) { it.label },
+                                    actionTitles.joinToString(stringResource(DesignR.string.common_list_separator)),
                                 ),
                             )
                             QqCardDivider()
