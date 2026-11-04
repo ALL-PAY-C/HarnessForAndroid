@@ -59,3 +59,6 @@ feature/plugins/src/main/kotlin/dev/dsh/mobile/feature/plugins/SkillInstaller.kt
 feature/settings/src/main/kotlin/dev/dsh/mobile/feature/settings/BackupRestoreScreen.kt
 feature/settings/src/main/kotlin/dev/dsh/mobile/feature/settings/BackupSummary.kt
 feature/settings/src/main/kotlin/dev/dsh/mobile/feature/settings/McpServersScreen.kt
+# T9.21 — 设备能力 / 手机动作词表的显示层映射，只允许 resource reference，不写死文案
+design/src/main/kotlin/dev/dsh/mobile/design/DeviceLabels.kt
+app/src/main/kotlin/dev/dsh/mobile/app/phone/PhoneActionLabels.kt

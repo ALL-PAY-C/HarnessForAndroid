@@ -37,7 +37,10 @@ import dev.dsh.mobile.design.QqCardDivider
 import dev.dsh.mobile.design.QqScreenTopBar
 import dev.dsh.mobile.design.QqShape
 import dev.dsh.mobile.design.SectionSpacing
+import dev.dsh.mobile.design.hint
+import dev.dsh.mobile.design.label
 import dev.dsh.mobile.design.qqFontBody
+import dev.dsh.mobile.design.title
 import dev.dsh.mobile.design.qqPageBottomInset
 
 /**
@@ -114,8 +117,8 @@ private fun CapabilityRow(
     Column(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(capability.label, color = p.t1, fontSize = 15.sp)
-                Text(capability.hint, color = p.t3, fontSize = qqFontBody(11.5.sp))
+                Text(capability.title(), color = p.t1, fontSize = 15.sp)
+                Text(capability.hint(), color = p.t3, fontSize = qqFontBody(11.5.sp))
             }
             if (!granted) {
                 Text(
@@ -143,7 +146,7 @@ private fun CapabilityRow(
             CapabilityTier.entries.forEach { option ->
                 val on = option == tier
                 Text(
-                    option.label,
+                    option.label(),
                     color = if (on) Color.White else p.t2,
                     fontSize = qqFontBody(12.sp),
                     modifier = Modifier

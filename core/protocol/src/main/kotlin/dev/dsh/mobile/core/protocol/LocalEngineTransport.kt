@@ -1082,10 +1082,10 @@ class LocalEngineTransport(
                             sessionId,
                             ToolCall(
                                 id,
-                                title = name + "（参数不完整）",
+                                title = name + " (incomplete args)",
                                 kind = name,
                                 status = ToolStatus.Failed,
-                                detail = "工具参数不是合法 JSON（多半被流截断），本次没有执行。原始参数：" + argsRaw.take(200),
+                                detail = "Tool arguments are not valid JSON (likely truncated by the stream); nothing was executed. Raw arguments: " + argsRaw.take(200),
                                 args = argsRaw.take(200),
                                 requestJson = describeRequest(body, round, name, argsRaw.take(200)),
                             ),
@@ -1094,7 +1094,7 @@ class LocalEngineTransport(
                             turnId,
                         ),
                     )
-                    val note = "（工具参数不完整，本轮没有执行工具：可以让我重试一次）"
+                    val note = "(Incomplete tool arguments — no tool ran this round; ask me to retry.)"
                     post(DshEvent.MessageChunk(sessionId, if (visibleChars > 0) "\n\n" + note else note, authorId, authorName, turnId))
                     visibleChars += note.length
                     postCritical(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
@@ -1107,7 +1107,7 @@ class LocalEngineTransport(
                     args.toString()
                 }
                 // 子代理的标题要带 name（「子代理 · 查日志」）；其余工具仍是命令前 60 字。
-                val titleText = if (name == "subagent") "子代理 · " + subagentLabel(args) else command.take(60)
+                val titleText = if (name == "subagent") "Subagent · " + subagentLabel(args) else command.take(60)
                 val signature = ToolSignature.of(name, command)
                 val requestJson = describeRequest(body, round, name, command)
 
@@ -1396,10 +1396,10 @@ class LocalEngineTransport(
         val request = PermissionRequest(
             sessionId = sessionId,
             requestId = UUID.randomUUID().toString(),
-            title = "确认执行：" + command.take(100),
+            title = "Run: " + command.take(100),
             options = listOf(
-                PermissionOption("allow", "允许", "allow"),
-                PermissionOption("deny", "拒绝", "deny"),
+                PermissionOption("allow", "Allow", "allow"),
+                PermissionOption("deny", "Deny", "deny"),
             ),
         )
         if (task != null) return pool.requestPermission(task, request) ?: "deny"

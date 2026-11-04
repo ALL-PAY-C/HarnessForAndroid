@@ -118,7 +118,11 @@ class RuntimeService : Service() {
 
     /** 把一条通知推成前台服务通知。必须在主线程调用。 */
     private fun push(n: Notification): Boolean = runCatching {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (Build.VERSION.SDK_INT >= 34) {
+            // specialUse 而不是 dataSync：后者在 Android 15 有 6 小时上限，到点系统会判
+            // 「did not stop within its timeout」并记一次崩溃；引擎是常驻的，没有自然结束点。
+            startForeground(OngoingCenter.ID_ONGOING, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(OngoingCenter.ID_ONGOING, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {
             startForeground(OngoingCenter.ID_ONGOING, n)

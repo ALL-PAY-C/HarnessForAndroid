@@ -9,6 +9,8 @@ import dev.dsh.mobile.core.data.preset.AgentPresets
 import dev.dsh.mobile.core.model.IdentityCard
 import dev.dsh.mobile.core.data.preset.IdentityCards
 import dev.dsh.mobile.core.data.settings.SettingsStore
+import dev.dsh.mobile.design.R as DesignR
+import dev.dsh.mobile.design.UiText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,7 +40,8 @@ data class PresetDrawerState(
     val sessionScoped: Boolean = false,
     val busy: Boolean = false,
     /** 面板内常驻的红字错误；null 表示没有错误。 */
-    val error: String? = null,
+    /** 面板顶部那行红字；[UiText] 让语言切换后重渲染即生效。 */
+    val error: UiText? = null,
     /** presetId -> 身份卡（覆盖表；内置预设的卡也在这里）。 */
     val cards: Map<String, IdentityCard> = emptyMap(),
     /** 当前会话还留着的旧自由文本人设；只在「没有卡」时合成只读卡展示。 */
@@ -61,7 +64,7 @@ class PresetDrawerViewModel(
 ) : ViewModel() {
 
     private val busy = MutableStateFlow(false)
-    private val error = MutableStateFlow<String?>(null)
+    private val error = MutableStateFlow<UiText?>(null)
 
     val uiState: StateFlow<PresetDrawerState> = combine(
         settingsStore.settings,
@@ -87,7 +90,7 @@ class PresetDrawerViewModel(
         if (busy.value) return
         val value = input.trim()
         if (value.isEmpty()) {
-            error.value = "请输入 GitHub owner/repo、ZIP/JSON 链接、本地路径或 JSON 文本"
+            error.value = UiText.Res(DesignR.string.preset_err_input)
             return
         }
         busy.value = true
@@ -100,7 +103,7 @@ class PresetDrawerViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error.value = e.message ?: "预设导入失败"
+                error.value = e.message?.let { UiText.Raw(it) } ?: UiText.Res(DesignR.string.preset_err_import)
             } finally {
                 busy.value = false
             }
@@ -112,12 +115,12 @@ class PresetDrawerViewModel(
         error.value = null
         viewModelScope.launch {
             try {
-                require(presetStore.get(id) != null) { "预设不存在" }
+                require(presetStore.get(id) != null) { "preset not found" }
                 applySelection(id)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error.value = e.message ?: "设置默认预设失败"
+                error.value = e.message?.let { UiText.Raw(it) } ?: UiText.Res(DesignR.string.preset_err_default)
             }
         }
     }
@@ -137,7 +140,7 @@ class PresetDrawerViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error.value = e.message ?: "删除预设失败"
+                error.value = e.message?.let { UiText.Raw(it) } ?: UiText.Res(DesignR.string.preset_err_delete)
             }
         }
     }
@@ -151,7 +154,7 @@ class PresetDrawerViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error.value = e.message ?: "身份卡保存失败"
+                error.value = e.message?.let { UiText.Raw(it) } ?: UiText.Res(DesignR.string.preset_err_card)
             }
         }
     }
@@ -163,7 +166,7 @@ class PresetDrawerViewModel(
     fun adoptLegacyPersona(preset: AgentPreset, persona: String) {
         val text = persona.trim()
         if (text.isEmpty()) return
-        saveCard(preset.id, IdentityCard(name = preset.name.ifBlank { "身份卡" }, freeform = text))
+        saveCard(preset.id, IdentityCard(name = preset.name.ifBlank { "Identity card" }, freeform = text))
     }
 
     /** 某预设当前生效的卡：覆盖表 > 预设自带 > 旧人设合成的只读卡。 */

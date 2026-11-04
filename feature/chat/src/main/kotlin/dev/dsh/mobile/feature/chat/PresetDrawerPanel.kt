@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,6 +40,8 @@ import dev.dsh.mobile.core.model.IdentityCard
 import dev.dsh.mobile.core.data.preset.IdentityCards
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqIdentityCardEditor
+import dev.dsh.mobile.design.R as DesignR
+import dev.dsh.mobile.design.text
 
 /**
  * 会话页左侧抽屉里的「Agent 预设」面板：列预设 + 设默认 + 导入 + 删除。
@@ -65,7 +68,8 @@ fun PresetDrawerPanel(viewModel: PresetDrawerViewModel) {
             Column(Modifier.weight(1f)) {
                 // 标题已经在外壳顶栏上，这里只报当前默认是谁，免得同一页出现两行同名。
                 Text(
-                    (if (state.sessionScoped) "本会话：" else "默认：") + state.defaultName,
+                    if (state.sessionScoped) stringResource(DesignR.string.preset_scope_session, state.defaultName)
+                    else stringResource(DesignR.string.preset_scope_default, state.defaultName),
                     color = p.t2,
                     fontSize = 12.5.sp,
                 )
@@ -76,12 +80,12 @@ fun PresetDrawerPanel(viewModel: PresetDrawerViewModel) {
                     importing = !importing
                     viewModel.clearError()
                 },
-            ) { Text(if (importing) "收起" else "导入") }
+            ) { Text(stringResource(if (importing) DesignR.string.common_collapse else DesignR.string.preset_import)) }
         }
 
         state.error?.let { message ->
             Text(
-                message,
+                message.text(),
                 color = p.red,
                 fontSize = 12.sp,
                 modifier = Modifier
@@ -99,16 +103,16 @@ fun PresetDrawerPanel(viewModel: PresetDrawerViewModel) {
                     input = it
                     viewModel.clearError()
                 },
-                label = { Text("GitHub owner/repo、ZIP/JSON 链接、本地路径或 JSON 文本") },
+                label = { Text(stringResource(DesignR.string.preset_import_placeholder)) },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp, max = 220.dp),
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { importing = false }) { Text("取消") }
+                TextButton(onClick = { importing = false }) { Text(stringResource(DesignR.string.common_cancel)) }
                 Spacer(Modifier.width(4.dp))
                 TextButton(
                     enabled = !state.busy && input.isNotBlank(),
                     onClick = { viewModel.import(input) },
-                ) { Text(if (state.busy) "导入中…" else "导入并设为默认") }
+                ) { Text(stringResource(if (state.busy) DesignR.string.preset_importing else DesignR.string.preset_import_apply)) }
             }
         }
 
@@ -142,7 +146,10 @@ fun PresetDrawerPanel(viewModel: PresetDrawerViewModel) {
                         }
                         if (card != null) {
                             Text(
-                                "身份卡：" + card.name.ifBlank { "未命名" },
+                                stringResource(
+                                    DesignR.string.preset_card_label,
+                                    card.name.ifBlank { stringResource(DesignR.string.preset_card_unnamed) },
+                                ),
                                 color = p.accent,
                                 fontSize = 10.5.sp,
                                 maxLines = 1,
@@ -165,11 +172,11 @@ fun PresetDrawerPanel(viewModel: PresetDrawerViewModel) {
                             editing = if (editing == preset.id) null else preset.id
                             viewModel.clearError()
                         },
-                    ) { Text(if (editing == preset.id) "收起" else "身份卡", fontSize = 12.sp) }
+                    ) { Text(stringResource(if (editing == preset.id) DesignR.string.common_collapse else DesignR.string.preset_card), fontSize = 12.sp) }
                     // 内置预设不可删（Store 会拒绝），导入的才给删除入口。
                     if (!preset.builtin) {
                         TextButton(enabled = !state.busy, onClick = { viewModel.delete(preset.id) }) {
-                            Text("删除", color = p.red, fontSize = 12.sp)
+                            Text(stringResource(DesignR.string.common_delete), color = p.red, fontSize = 12.sp)
                         }
                     }
                 }
@@ -181,7 +188,7 @@ fun PresetDrawerPanel(viewModel: PresetDrawerViewModel) {
                         onSave = { viewModel.saveCard(preset.id, it) },
                         legacyPersona = if (selected) state.legacyPersona else "",
                         onAdopt = { viewModel.adoptLegacyPersona(preset, state.legacyPersona) },
-                        hint = if (preset.builtin) "内置预设的卡存在本机覆盖层里，不修改内置本体。" else null,
+                        hint = if (preset.builtin) stringResource(DesignR.string.preset_card_note) else null,
                     )
                 }
             }

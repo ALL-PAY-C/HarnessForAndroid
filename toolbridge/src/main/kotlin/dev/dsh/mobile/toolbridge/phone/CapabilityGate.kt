@@ -73,7 +73,7 @@ class CapabilityGate(
         val capability = CapabilityActions.capabilityOf(action)
         val json = phoneErrorJson(
             PhoneErrorCode.PermissionDenied,
-            "缺少「" + (capability?.label ?: action) + "」权限：" + action + " 需要用户授权后重试",
+            "缺少「" + (capability?.id ?: action) + "」权限：" + action + " 需要用户授权后重试",
         )
             .put("needsPermission", true)
             .put("action", action)

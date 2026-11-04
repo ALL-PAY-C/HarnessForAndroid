@@ -33,6 +33,9 @@ import dev.dsh.mobile.core.protocol.RecallReport
 import dev.dsh.mobile.core.protocol.group.LedgerSnapshot
 import dev.dsh.mobile.core.protocol.group.RoomLedgers
 import dev.dsh.mobile.core.protocol.SessionProjection
+import dev.dsh.mobile.design.R as DesignR
+import dev.dsh.mobile.design.UiText
+import dev.dsh.mobile.design.resolve
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -114,7 +117,7 @@ data class ChatUiState(
     val contextUsed: Long get() = usage.lastPrompt + completionTokens
     val contextPercent: Long get() = if (contextWindow > 0) contextUsed * 100 / contextWindow else 0
     val contextUsageText: String
-        get() = "${compact(contextUsed)} / ${compact(contextWindow.toLong())}（$contextPercent%）"
+        get() = "${compact(contextUsed)} / ${compact(contextWindow.toLong())} ($contextPercent%)"
 
     /** 累计消耗放右侧，标题下只显示最近请求的实际上下文。 */
     val tokenText: String
@@ -122,7 +125,7 @@ data class ChatUiState(
             val used = contextUsed
             val pct = contextPercent
             val speed = if (tokensPerSecond > 0.05) " · " + speedText(tokensPerSecond) else ""
-            return "上下文 $pct% · ${compact(used)} / ${compact(contextWindow.toLong())}$speed"
+            return "Context $pct% · ${compact(used)} / ${compact(contextWindow.toLong())}$speed"
         }
     val isGroup: Boolean get() = kind == SessionKind.Group
     /** Name of the agent bound to a single chat (falls back to the default model). */
@@ -130,7 +133,7 @@ data class ChatUiState(
         get() = models.firstOrNull { it.id == agentId }?.name
             ?: models.firstOrNull { it.isDefault }?.name
             ?: models.firstOrNull()?.name
-            ?: "未选择 Agent"
+            ?: "No agent selected"
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -145,6 +148,8 @@ class ChatViewModel(
     private val ledgerStore: GroupLedgerStore,
     /** 执行池的 Agent 快照（core:protocol ExecutionPool.agents）；拿不到就传 null。 */
     executionAgents: StateFlow<List<AgentRuntimeState>>? = null,
+    /** T9.19：系统回执按当前语言解析，ViewModel 自己没有 Context，由 AppNav 注入 applicationContext。 */
+    private val appContext: android.content.Context,
     // 放在最后：调用方（app/AppNav）用尾随 lambda 传 cwd，尾随 lambda 只认最后一个参数。
     private val cwdProvider: () -> String,
 ) : ViewModel() {
@@ -450,7 +455,7 @@ class ChatViewModel(
                 } catch (e: Throwable) {
                     CompactResult(
                         compacted = false,
-                        message = "压缩失败：" + (e.message ?: e.javaClass.simpleName),
+                        message = "Compaction failed: " + (e.message ?: e.javaClass.simpleName),
                     )
                 }
                 pushNote(compactNote(result))
@@ -478,9 +483,10 @@ class ChatViewModel(
                 }
                 pushNote(
                     when {
-                        report == null -> "当前引擎不支持温层刷新。"
-                        report.refreshed -> report.message
-                        else -> report.message.ifBlank { "温层没有更新。" }
+                        report == null -> UiText.Res(DesignR.string.chat_warm_unsupported)
+                        report.refreshed -> UiText.Raw(report.message)
+                        report.message.isNotBlank() -> UiText.Raw(report.message)
+                        else -> UiText.Res(DesignR.string.chat_warm_unchanged)
                     },
                 )
             } finally {
@@ -517,14 +523,15 @@ class ChatViewModel(
                 } catch (e: Throwable) {
                     null
                 }
-                recallNoteState.value = report ?: RecallReport(message = "当前引擎不支持历史回捞。")
+                recallNoteState.value = report ?: RecallReport(message = "This engine does not support history recall.")
             } finally {
                 recallingState.value = false
             }
         }
     }
 
-    private fun pushNote(text: String) {
+    private fun pushNote(ui: UiText) {
+        val text = ui.resolve(appContext)
         val now = System.currentTimeMillis()
         val note = ChatMessage(
             id = "note-" + now + "-" + notesState.value.size,
@@ -645,7 +652,7 @@ class ChatViewModel(
                 }
                 SendMode.Queue -> {
                     val ok = sendQueue.enqueue(sessionId, outgoing, images, uiState.value.settings.queueLimit)
-                    if (!ok) error.value = "排队已达上限 " + uiState.value.settings.queueLimit + " 条"
+                    if (!ok) error.value = "Queue is full (" + uiState.value.settings.queueLimit + ")"
                     return
                 }
             }
@@ -768,12 +775,12 @@ class ChatViewModel(
      */
     suspend fun renameParticipant(participantId: String, newName: String): String? {
         val trimmed = newName.trim()
-        if (trimmed.isEmpty()) return "名字不能为空"
-        val session = repo.session(sessionId) ?: return "会话不存在"
+        if (trimmed.isEmpty()) return "Name cannot be empty"
+        val session = repo.session(sessionId) ?: return "Session does not exist"
         val clash = session.participants.any {
             it.id != participantId && it.name.trim().equals(trimmed, ignoreCase = true)
         }
-        if (clash) return "已经有成员叫「$trimmed」了"
+        if (clash) return "A member named '$trimmed' already exists"
         val updated = session.participants.map {
             if (it.id == participantId) it.copy(name = trimmed) else it
         }

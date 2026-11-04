@@ -67,6 +67,7 @@ import dev.dsh.mobile.design.SlotEditState
 import dev.dsh.mobile.design.SlotPickerDialog
 import dev.dsh.mobile.design.SlotPlusButton
 import dev.dsh.mobile.design.SlotStrip
+import dev.dsh.mobile.design.text
 import dev.dsh.mobile.design.qqFontBody
 import dev.dsh.mobile.pluginapi.SlotAction
 import dev.dsh.mobile.pluginapi.SlotContribution
@@ -540,7 +541,7 @@ private fun AgentPresetDialog(
 
             state.error?.let { message ->
                 Spacer(Modifier.height(QqSpace.s()))
-                Text(message, color = p.red, fontSize = qqFontBody(11.5.sp))
+                Text(message.text(), color = p.red, fontSize = qqFontBody(11.5.sp))
             }
 
             Spacer(Modifier.height(10.dp))

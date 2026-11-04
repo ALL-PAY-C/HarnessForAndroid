@@ -49,11 +49,15 @@ import dev.dsh.mobile.design.QqPalette
 import dev.dsh.mobile.design.QqRow
 import dev.dsh.mobile.design.SectionCard
 import dev.dsh.mobile.design.SectionTitle
+import dev.dsh.mobile.design.hint
+import dev.dsh.mobile.design.title
 import dev.dsh.mobile.toolbridge.phone.PhoneAccessibilityService
 import dev.dsh.mobile.toolbridge.phone.PhoneAction
 import dev.dsh.mobile.toolbridge.phone.PhoneActionLog
 import dev.dsh.mobile.toolbridge.phone.PhoneActionRecord
 import dev.dsh.mobile.toolbridge.phone.PhoneBridge
+import dev.dsh.mobile.toolbridge.phone.PhoneHeadline
+import dev.dsh.mobile.toolbridge.phone.PhoneHint
 import dev.dsh.mobile.toolbridge.phone.PhonePermissionState
 import dev.dsh.mobile.toolbridge.phone.PhonePermissionStep
 import dev.dsh.mobile.toolbridge.phone.PhoneStepStatus
@@ -104,8 +108,8 @@ fun PhoneControlScreen(phone: PhoneBridge) {
                     val status = state.status(step)
                     QqRow(
                         icon = Icons.Filled.TouchApp,
-                        title = step.title,
-                        subtitle = if (status == PhoneStepStatus.Granted) stringResource(DesignR.string.settings_granted) else step.body,
+                        title = stepTitle(step),
+                        subtitle = if (status == PhoneStepStatus.Granted) stringResource(DesignR.string.settings_granted) else stepBody(step),
                         tint = statusColor(p, status),
                         onClick = {
                             val intent = when (step) {
@@ -119,7 +123,7 @@ fun PhoneControlScreen(phone: PhoneBridge) {
                                 when (status) {
                                     PhoneStepStatus.Granted -> stringResource(DesignR.string.settings_granted)
                                     PhoneStepStatus.Pending -> stringResource(DesignR.string.phone_state_pending)
-                                    PhoneStepStatus.Off -> step.actionLabel
+                                    PhoneStepStatus.Off -> stepAction(step)
                                 },
                                 color = statusColor(p, status),
                                 fontSize = 12.sp,
@@ -137,8 +141,8 @@ fun PhoneControlScreen(phone: PhoneBridge) {
                     val granted = capabilities.granted(capability)
                     QqRow(
                         icon = Icons.Filled.Lock,
-                        title = capability.label,
-                        subtitle = if (granted) stringResource(DesignR.string.settings_granted) else capability.hint + stringResource(DesignR.string.phone_tap_to_request),
+                        title = capability.title(),
+                        subtitle = if (granted) stringResource(DesignR.string.settings_granted) else capability.hint() + stringResource(DesignR.string.phone_tap_to_request),
                         tint = if (granted) p.green else p.t3,
                         onClick = { capabilities.requestMissing(capability) },
                         trailing = {
@@ -159,8 +163,8 @@ fun PhoneControlScreen(phone: PhoneBridge) {
                     val last = records.firstOrNull { it.action == action.id }
                     QqRow(
                         icon = Icons.Filled.TouchApp,
-                        title = action.label,
-                        subtitle = action.hint + " · " + action.id,
+                        title = action.title(),
+                        subtitle = action.hint() + " · " + action.id,
                         tint = p.accent,
                         trailing = { LastOutcome(last) },
                     )
@@ -211,7 +215,7 @@ fun PhoneControlScreen(phone: PhoneBridge) {
                         if (index > 0) QqCardDivider()
                         QqRow(
                             icon = if (record.ok) Icons.Filled.Check else Icons.Filled.Close,
-                            title = record.label,
+                            title = PhoneAction.of(record.action)?.title() ?: record.action,
                             subtitle = record.message.ifBlank { record.action },
                             tint = if (record.ok) p.green else p.red,
                         )
@@ -243,7 +247,7 @@ private fun HeadCard(state: PhonePermissionState, onRefresh: () -> Unit) {
             Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(color))
             Spacer(Modifier.width(8.dp))
             Text(
-                state.headline(),
+                headlineText(state.headline()),
                 color = p.t1,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -260,7 +264,7 @@ private fun HeadCard(state: PhonePermissionState, onRefresh: () -> Unit) {
         if (!state.canControl) {
             Spacer(Modifier.height(8.dp))
             Text(
-                state.missingHint(),
+                hintText(state.missingHint()),
                 color = p.t2,
                 fontSize = 11.5.sp,
             )
@@ -309,4 +313,47 @@ private fun statusColor(p: QqPalette, status: PhoneStepStatus): Color = when (st
     PhoneStepStatus.Granted -> p.green
     PhoneStepStatus.Pending -> p.amber
     PhoneStepStatus.Off -> p.red
+}
+/** T9.19：权限引导的文案全部走资源，枚举只负责「是哪一步 / 缺哪一步」。 */
+@Composable
+private fun stepTitle(step: PhonePermissionStep): String = stringResource(
+    when (step) {
+        PhonePermissionStep.Accessibility -> DesignR.string.phone_step_a11y_title
+        PhonePermissionStep.Overlay -> DesignR.string.phone_step_overlay_title
+    },
+)
+
+@Composable
+private fun stepBody(step: PhonePermissionStep): String = stringResource(
+    when (step) {
+        PhonePermissionStep.Accessibility -> DesignR.string.phone_step_a11y_body
+        PhonePermissionStep.Overlay -> DesignR.string.phone_step_overlay_body
+    },
+)
+
+@Composable
+private fun stepAction(step: PhonePermissionStep): String = stringResource(
+    when (step) {
+        PhonePermissionStep.Accessibility -> DesignR.string.phone_step_a11y_action
+        PhonePermissionStep.Overlay -> DesignR.string.phone_step_overlay_action
+    },
+)
+
+@Composable
+private fun headlineText(headline: PhoneHeadline): String = when (headline) {
+    PhoneHeadline.Ready -> stringResource(DesignR.string.phone_headline_ready)
+    PhoneHeadline.OneStepLeft -> stringResource(DesignR.string.phone_headline_one_step)
+    is PhoneHeadline.StepsLeft -> stringResource(DesignR.string.phone_headline_steps, headline.count)
+}
+
+@Composable
+private fun hintText(hints: List<PhoneHint>): String = buildString {
+    for (hint in hints) append(hintLabel(hint))
+}
+
+@Composable
+private fun hintLabel(hint: PhoneHint): String = when (hint) {
+    PhoneHint.ServiceNotConnected -> stringResource(DesignR.string.phone_hint_service_disconnected)
+    PhoneHint.EnableAccessibility -> stringResource(DesignR.string.phone_hint_enable_a11y)
+    PhoneHint.GrantOverlay -> stringResource(DesignR.string.phone_hint_grant_overlay)
 }

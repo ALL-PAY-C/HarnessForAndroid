@@ -15,14 +15,14 @@ class ContextUsageTest {
 
     @Test fun contextUsesLatestPromptInsteadOfAccumulatedTotal() {
         val s = state(TokenUsage(input = 1_300_000, output = 80_000, cached = 20_000, lastPrompt = 32_000), 1_000_000)
-        assertTrue(s.tokenText.contains("上下文 3%"))
+        assertTrue(s.tokenText.contains("Context 3%"))
         assertTrue(s.tokenText.contains("32k / 1M"))
         assertEquals(1_400_000L, s.sessionTotalTokens)
     }
 
     @Test fun overWindowShowsRealCountAndPercentage() {
         val s = state(TokenUsage(lastPrompt = 1_380_000), 1_000_000)
-        assertTrue(s.tokenText.contains("上下文 138%"))
+        assertTrue(s.tokenText.contains("Context 138%"))
         assertTrue(s.tokenText.contains("1.4M / 1M"))
     }
 
@@ -36,7 +36,7 @@ class ContextUsageTest {
 
     @Test fun legacyUsageHasNoInventedContext() {
         assertEquals(0L, TokenUsage(100, 20, 30).lastPrompt)
-        assertTrue(state(TokenUsage(100, 20, 30)).tokenText.contains("上下文 0%"))
+        assertTrue(state(TokenUsage(100, 20, 30)).tokenText.contains("Context 0%"))
     }
 
     @Test fun compactDropsThousandsSeparator() {
@@ -62,22 +62,22 @@ class ContextUsageTest {
 
     @Test fun speedUsesIntegerAboveTenAndOneDecimalBelow() {
         val s = state(TokenUsage(lastPrompt = 1_500), 32_000, tokensPerSecond = 223.0)
-        assertEquals("上下文 4% · 1.5k / 32k · 223 tok/s", s.tokenText)
+        assertEquals("Context 4% · 1.5k / 32k · 223 tok/s", s.tokenText)
         assertTrue(state(TokenUsage(lastPrompt = 1_500), 32_000, 4.23).tokenText.endsWith("· 4.2 tok/s"))
         assertFalse(state(TokenUsage(lastPrompt = 1_500), 32_000, 0.0).tokenText.contains("tok/s"))
     }
 
     @Test fun tokenTextExamplesForTopBar() {
-        assertEquals("上下文 0% · 0 / 32k", state(contextWindow = 32_000).tokenText)
-        assertEquals("上下文 4% · 1.5k / 32k", state(TokenUsage(lastPrompt = 1_500), 32_000).tokenText)
+        assertEquals("Context 0% · 0 / 32k", state(contextWindow = 32_000).tokenText)
+        assertEquals("Context 4% · 1.5k / 32k", state(TokenUsage(lastPrompt = 1_500), 32_000).tokenText)
         assertEquals(
-            "上下文 4% · 1.5k / 32k · 223 tok/s",
+            "Context 4% · 1.5k / 32k · 223 tok/s",
             state(TokenUsage(lastPrompt = 1_500), 32_000, 223.0).tokenText,
         )
     }
 
     @Test fun contextUsageTextAlsoCompact() {
         val s = state(TokenUsage(lastPrompt = 1_500), 32_000)
-        assertEquals("1.5k / 32k（4%）", s.contextUsageText)
+        assertEquals("1.5k / 32k (4%)", s.contextUsageText)
     }
 }

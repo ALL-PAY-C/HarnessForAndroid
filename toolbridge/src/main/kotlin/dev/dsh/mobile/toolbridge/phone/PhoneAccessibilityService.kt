@@ -157,7 +157,7 @@ class PhoneAccessibilityService : AccessibilityService() {
 
     private fun statusText(): String = buildString {
         append("手机控制已就绪 · ").append(foregroundPkg ?: "等待前台应用")
-        lastAction?.let { append(" · ").append(if (it.ok) "✓" else "✗").append(it.label) }
+        lastAction?.let { append(" · ").append(if (it.ok) "✓" else "✗").append(it.action) }
     }
 
     private fun removeOverlay() {

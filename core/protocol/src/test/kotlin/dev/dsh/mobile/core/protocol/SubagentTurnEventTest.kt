@@ -65,7 +65,7 @@ class SubagentTurnEventTest {
             assertTrue("没有任何 subagent 工具事件：" + events, subagentCalls.isNotEmpty())
             assertTrue(
                 "标题不带子代理名字：" + subagentCalls.map { it.title },
-                subagentCalls.any { it.title == "子代理 · 查PONG" },
+                subagentCalls.any { it.title == "Subagent · 查PONG" },
             )
             assertTrue(
                 "子代理没有结算成 Completed：" + subagentCalls.map { it.status },

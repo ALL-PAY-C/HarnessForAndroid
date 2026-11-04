@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
 import dev.dsh.mobile.core.model.GroupLedger
 import dev.dsh.mobile.core.model.LedgerEntry
@@ -38,6 +39,7 @@ import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider
 import dev.dsh.mobile.design.QqShape
 import dev.dsh.mobile.design.QqSpace
+import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.design.qqFontBody
 
 /**
@@ -75,10 +77,11 @@ internal fun GroupLedgerBoard(
         containerColor = p.card,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("项目规划书", color = p.t1, fontSize = qqFontBody(15.sp), fontWeight = FontWeight.SemiBold)
+                Text(stringResource(DesignR.string.ledger_board_title), color = p.t1, fontSize = qqFontBody(15.sp), fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.width(QqSpace.s()))
                 Text(
-                    if (total == 0) "空" else "完成 " + done + " / " + total,
+                    if (total == 0) stringResource(DesignR.string.ledger_board_empty_count)
+                    else stringResource(DesignR.string.ledger_board_progress, done, total),
                     color = p.t3,
                     fontSize = qqFontBody(11.sp),
                     maxLines = 1,
@@ -92,19 +95,19 @@ internal fun GroupLedgerBoard(
                     OutlinedTextField(
                         value = draft,
                         onValueChange = { draft = it },
-                        label = { Text("新增条目", fontSize = 12.sp) },
+                        label = { Text(stringResource(DesignR.string.ledger_new_entry), fontSize = 12.sp) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
                     TextButton(
                         enabled = draft.isNotBlank(),
                         onClick = { onAdd(draft, ""); draft = "" },
-                    ) { Text("添加", color = if (draft.isNotBlank()) p.accent else p.t3, fontSize = 12.sp) }
+                    ) { Text(stringResource(DesignR.string.ledger_add), color = if (draft.isNotBlank()) p.accent else p.t3, fontSize = 12.sp) }
                 }
 
                 if (total == 0) {
                     Text(
-                        "还没有条目。规划者把这一轮要做的事写进来，执行者做完、检测者确认后改状态。",
+                        stringResource(DesignR.string.ledger_board_empty_hint),
                         color = p.t3,
                         fontSize = qqFontBody(11.5.sp),
                         modifier = Modifier.padding(top = QqSpace.s()),
@@ -115,7 +118,7 @@ internal fun GroupLedgerBoard(
                     val items = groups.getValue(status)
                     if (items.isEmpty()) return@forEach
                     if (status != LedgerStatus.Todo) QqCardDivider()
-                    BoardGroupTitle(status.label + " · " + items.size)
+                    BoardGroupTitle(stringResource(DesignR.string.ledger_group_header, statusText(status), items.size))
                     items.forEach { entry ->
                         BoardEntryLine(
                             entry = entry,
@@ -135,7 +138,7 @@ internal fun GroupLedgerBoard(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭", color = p.accent) } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(DesignR.string.common_close), color = p.accent) } },
     )
 }
 
@@ -196,7 +199,7 @@ private fun BoardEntryLine(
                             contentPadding = PaddingValues(0.dp),
                         ) {
                             Text(
-                                s.label,
+                                statusText(s),
                                 color = if (s == entry.status) p.t3 else p.accent,
                                 fontSize = 11.sp,
                                 maxLines = 1,
@@ -208,14 +211,14 @@ private fun BoardEntryLine(
                     OutlinedTextField(
                         value = noteDraft,
                         onValueChange = onNoteDraft,
-                        label = { Text("追加备注", fontSize = 11.sp) },
+                        label = { Text(stringResource(DesignR.string.ledger_append_note), fontSize = 11.sp) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
                     TextButton(enabled = noteDraft.isNotBlank(), onClick = onNote) {
-                        Text("写入", color = if (noteDraft.isNotBlank()) p.accent else p.t3, fontSize = 11.sp)
+                        Text(stringResource(DesignR.string.ledger_write), color = if (noteDraft.isNotBlank()) p.accent else p.t3, fontSize = 11.sp)
                     }
-                    TextButton(onClick = onRemove) { Text("删除", color = p.red, fontSize = 11.sp) }
+                    TextButton(onClick = onRemove) { Text(stringResource(DesignR.string.common_delete), color = p.red, fontSize = 11.sp) }
                 }
             }
         }
@@ -234,3 +237,15 @@ private fun statusColor(status: LedgerStatus): Color {
         LedgerStatus.Blocked -> p.red
     }
 }
+
+/** 五态标签：core:model 的 [LedgerStatus.label] 是数据层中文兜底，界面这里按语言取资源。 */
+@Composable
+private fun statusText(status: LedgerStatus): String = stringResource(
+    when (status) {
+        LedgerStatus.Todo -> DesignR.string.ledger_status_todo
+        LedgerStatus.Doing -> DesignR.string.ledger_status_doing
+        LedgerStatus.Review -> DesignR.string.ledger_status_review
+        LedgerStatus.Done -> DesignR.string.ledger_status_done
+        LedgerStatus.Blocked -> DesignR.string.ledger_status_blocked
+    },
+)

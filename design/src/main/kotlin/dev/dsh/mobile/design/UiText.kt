@@ -21,12 +21,13 @@ sealed interface UiText {
 
 @Composable
 fun UiText.text(): String = when (this) {
-    is UiText.Res -> stringResource(id, *args.toTypedArray())
+    // 参数里允许再嵌一层 [UiText]（比如「目标 · 进行中」里的 phase 标签），先递归解成字符串再格式化。
+    is UiText.Res -> stringResource(id, *args.map { if (it is UiText) it.text() else it }.toTypedArray())
     is UiText.Raw -> value
 }
 
 fun UiText.resolve(context: Context): String = when (this) {
-    is UiText.Res -> context.getString(id, *args.toTypedArray())
+    is UiText.Res -> context.getString(id, *args.map { if (it is UiText) it.resolve(context) else it }.toTypedArray())
     is UiText.Raw -> value
 }
 

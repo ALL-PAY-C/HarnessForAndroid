@@ -68,25 +68,25 @@ class PhoneBridge(
     }
 
     fun describeForModel(): String = buildString {
-        append("phone 工具：直接操控手机（无需 root/ADB，需先在 设置→无障碍 开启「DSH Mobile 手机控制」）。")
-        append("动作 action：tap（点击，用 fx/fy 分数坐标最稳，或 x/y 像素；带 query 按文本点；带 durationMs 变长按）")
-        append("、swipe（滑动，起点 fx/fy 或 x/y，终点 fx2/fy2 或 x2/y2，durationMs 控制快慢）")
-        append("、type（往聚焦输入框写字，参数 text）、back/home/recents（系统键）")
-        append("、readscreen（读当前屏幕文本，紧凑列表，maxItems 限条目）")
-        append("、openapp（package 包名或 query 应用名模糊匹配）、screenshot（Android 11+ 存本地文件）。")
-        append("坐标优先用 fx/fy（0-1 相对屏幕），模型看的是缩放截图，绝对像素容易点偏。")
-        append("读屏输出每行 text|desc|cx,cy|clickable|class。")
-        append("结构化读屏（viewId/bounds/节点身份/快照代次）用 phone_tree 工具。")
-        append("定位统一用 target（选择器对象 {text,textContains,desc,viewId,viewIdSuffix,className,package,index,clickable,editable,scrollable}）")
-        append("或 nodeId（\"<snapshotId>:<seq>\"，来自 phone_tree）；nodeId 跨代回 E_STALE_SNAPSHOT、选择器多命中回 E_NODE_AMBIGUOUS，两者都不派发任何手势。")
-        append("新动作：scroll（滚 scrollable=true 容器，direction=forward/backward、times、until 选择器命中即停、verify 判是否真滚）")
-        append("、wait_for（cond.type=node_present/node_absent/text_present/package_is/generation_changed，timeoutMs 默认 3000，超时回 E_WAIT_TIMEOUT）")
-        append("、pinch（双指缩放，center 或 centerTarget + scale 或 fromRadius/toRadius）、drag（拖拽，from/to 或 fromTarget/toTarget，也可给 dx/dy 位移）")
-        append("、key（enter/delete/tab 打在聚焦输入框；back/home/recents 走系统键）、currentapp（当前前台应用）、apps（已装可启动应用，query/limit/offset 分页）")
-        append("、sequence（steps 数组一次下发，单步失败即停并回第几步）。type 另支持 target、mode=set|append|clear、perChar 逐字（intervalMs）。")
-        append("系统能力动作（不依赖无障碍，但要运行时权限，缺权限回 E_PERMISSION_DENIED + needsPermission）：")
-        append("contacts（query 查联系人）、sms_list（读收件箱）、sms_send（number + text）、")
-        append("dial（number，直接拨出）、location（最近已知位置）、audio_record（durationMs 录音到缓存目录）。")
+        append("phone tool: control the phone directly (no root/ADB; first enable 'DSH Mobile phone control' under Settings → Accessibility).")
+        append("action: tap (click; fx/fy fractional coords are most stable, or x/y pixels; with query it taps by text; with durationMs it long-presses)")
+        append(", swipe (drag from fx/fy or x/y to fx2/fy2 or x2/y2; durationMs sets the speed)")
+        append(", type (write into the focused field; param text), back/home/recents (system keys)")
+        append(", readscreen (read on-screen text as a compact list; maxItems caps entries)")
+        append(", openapp (package name, or fuzzy app-name query), screenshot (Android 11+; saves a local file).")
+        append("Prefer fx/fy (0-1 relative to the screen): the model sees a scaled screenshot, so absolute pixels often miss.")
+        append("Each readscreen line is text|desc|cx,cy|clickable|class.")
+        append("For structured reads (viewId/bounds/node identity/snapshot generation) use the phone_tree tool.")
+        append("Targeting always uses target (a selector object {text,textContains,desc,viewId,viewIdSuffix,className,package,index,clickable,editable,scrollable})")
+        append("or nodeId (\"<snapshotId>:<seq>\" from phone_tree). A nodeId from an older generation returns E_STALE_SNAPSHOT and an ambiguous selector returns E_NODE_AMBIGUOUS; neither dispatches any gesture.")
+        append("More actions: scroll (scroll a scrollable=true container; direction=forward/backward, times, until stops at a selector hit, verify checks real movement)")
+        append(", wait_for (cond.type=node_present/node_absent/text_present/package_is/generation_changed; timeoutMs defaults to 3000; on timeout returns E_WAIT_TIMEOUT)")
+        append(", pinch (two-finger zoom; center or centerTarget plus scale or fromRadius/toRadius), drag (from/to or fromTarget/toTarget, or a dx/dy offset)")
+        append(", key (enter/delete/tab into the focused field; back/home/recents use system keys), currentapp (foreground app), apps (installed launchable apps; query/limit/offset paging)")
+        append(", sequence (send a steps array in one call; stops at the first failing step and reports its index). type also accepts target, mode=set|append|clear, and perChar typing (intervalMs).")
+        append("System actions (no accessibility needed, but runtime permissions; a missing permission returns E_PERMISSION_DENIED + needsPermission):")
+        append("contacts (query contacts), sms_list (read the inbox), sms_send (number + text),")
+        append("dial (number, dials directly), location (last known location), audio_record (record durationMs into the cache dir).")
     }
 
     fun isEnabled(): Boolean {
@@ -164,34 +164,34 @@ class PhoneBridge(
         if (svc == null) {
             // 读侧新工具要带错误码；旧 9 个动作的失败文案保持逐字符不变。
             if (isTreeAction(json)) {
-                return treeFailure(PhoneErrorCode.A11yOff, "无障碍服务未开启")
+                return treeFailure(PhoneErrorCode.A11yOff, "Accessibility service is not enabled")
             }
             // apps 只问 PackageManager，不依赖无障碍；其余 v2 动作同样回 A11yOff，但带错误码。
             if (isV2Action(json)) {
                 val obj = runCatching { JSONObject(json) }.getOrNull()
-                    ?: return treeFailure(PhoneErrorCode.BadArgs, "参数不是合法 JSON")
+                    ?: return treeFailure(PhoneErrorCode.BadArgs, "Arguments are not valid JSON")
                 val name = obj.optString("action", "")
                 if (name == ACTION_APPS || name == ACTION_APPS_ALIAS) return doApps(obj)
-                return treeFailure(PhoneErrorCode.A11yOff, "无障碍服务未开启（" + name + " 需要无障碍）")
+                return treeFailure(PhoneErrorCode.A11yOff, "Accessibility service is not enabled (" + name + " needs accessibility)")
             }
             return PhoneResult(
                 ok = false,
                 output = "",
-                error = "手机控制不可用：无障碍服务未开启。请到 设置 → 无障碍 → DSH Mobile 手机控制 开启后重试",
+                error = "Phone control unavailable: the accessibility service is off. Enable DSH Mobile phone control under Settings → Accessibility, then retry",
             )
         }
         val obj = try {
             JSONObject(json)
         } catch (t: Throwable) {
-            return PhoneResult(false, "", "参数不是合法 JSON：" + t.message)
+            return PhoneResult(false, "", "Arguments are not valid JSON: " + t.message)
         }
         return when (val action = obj.optString("action", "")) {
             "tap" -> doTap(svc, obj)
             "swipe" -> doSwipe(svc, obj)
             "type" -> doType(svc, obj)
-            "back" -> doGlobal(svc, AccessibilityService.GLOBAL_ACTION_BACK, "返回")
-            "home" -> doGlobal(svc, AccessibilityService.GLOBAL_ACTION_HOME, "回主页")
-            "recents" -> doGlobal(svc, AccessibilityService.GLOBAL_ACTION_RECENTS, "最近任务")
+            "back" -> doGlobal(svc, AccessibilityService.GLOBAL_ACTION_BACK, "Back")
+            "home" -> doGlobal(svc, AccessibilityService.GLOBAL_ACTION_HOME, "Home")
+            "recents" -> doGlobal(svc, AccessibilityService.GLOBAL_ACTION_RECENTS, "Recents")
             "readscreen" -> doReadScreen(svc, obj)
             "openapp" -> doOpenApp(obj)
             "screenshot" -> doScreenshot(svc)
@@ -211,10 +211,10 @@ class PhoneBridge(
             else -> PhoneResult(
                 false,
                 "",
-                "未知 action: " + action +
-                    "（支持 tap/swipe/type/back/home/recents/readscreen/openapp/screenshot/tree/" +
+                "Unknown action: " + action +
+                    "(supported: tap/swipe/type/back/home/recents/readscreen/openapp/screenshot/tree/" +
                     "scroll/pinch/drag/wait_for/currentapp/apps/sequence/key/" +
-                    "contacts/sms_list/sms_send/dial/location/audio_record）",
+                    "contacts/sms_list/sms_send/dial/location/audio_record)",
             )
         }
     }
@@ -246,7 +246,7 @@ class PhoneBridge(
         } catch (t: Throwable) {
             // 取消必须原样上抛：吞掉 CancellationException 会把「取消」变成「继续执行」。
             if (t is CancellationException) throw t
-            failResult(PhoneErrorCode.ActionRejected, action + " 失败：" + (t.message ?: t.javaClass.simpleName))
+            failResult(PhoneErrorCode.ActionRejected, action + " failed: " + (t.message ?: t.javaClass.simpleName))
         }
     }
 
@@ -303,14 +303,14 @@ class PhoneBridge(
     private fun doSmsSend(obj: JSONObject, started: Long): PhoneResult {
         val number = obj.optString("number", "").trim()
         val text = obj.optString("text", "")
-        if (number.isEmpty()) return failResult(PhoneErrorCode.BadArgs, "sms_send 需要 number")
-        if (text.isEmpty()) return failResult(PhoneErrorCode.BadArgs, "sms_send 需要 text")
+        if (number.isEmpty()) return failResult(PhoneErrorCode.BadArgs, "sms_send requires number")
+        if (text.isEmpty()) return failResult(PhoneErrorCode.BadArgs, "sms_send requires text")
         val manager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             context.getSystemService(SmsManager::class.java)
         } else {
             @Suppress("DEPRECATION")
             SmsManager.getDefault()
-        } ?: return failResult(PhoneErrorCode.ActionRejected, "拿不到 SmsManager")
+        } ?: return failResult(PhoneErrorCode.ActionRejected, "SmsManager unavailable")
         val parts = manager.divideMessage(text)
         manager.sendMultipartTextMessage(number, null, parts, null, null)
         return okEnvelope(started, JSONObject().put("sent", true).put("number", number).put("parts", parts.size))
@@ -318,7 +318,7 @@ class PhoneBridge(
 
     private fun doDial(obj: JSONObject, started: Long): PhoneResult {
         val number = obj.optString("number", "").trim()
-        if (number.isEmpty()) return failResult(PhoneErrorCode.BadArgs, "dial 需要 number")
+        if (number.isEmpty()) return failResult(PhoneErrorCode.BadArgs, "dial requires number")
         context.startActivity(
             Intent(Intent.ACTION_CALL, Uri.parse("tel:" + Uri.encode(number)))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -328,7 +328,7 @@ class PhoneBridge(
 
     private fun doLocation(started: Long): PhoneResult {
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-            ?: return failResult(PhoneErrorCode.ActionRejected, "拿不到 LocationManager")
+            ?: return failResult(PhoneErrorCode.ActionRejected, "LocationManager unavailable")
         val providers = listOf(
             LocationManager.GPS_PROVIDER,
             LocationManager.NETWORK_PROVIDER,
@@ -336,7 +336,7 @@ class PhoneBridge(
         )
         val best = providers.mapNotNull { provider -> runCatching { lm.getLastKnownLocation(provider) }.getOrNull() }
             .maxByOrNull { it.time }
-            ?: return failResult(PhoneErrorCode.ActionRejected, "没有可用的最近位置（先让系统拿到一次定位）")
+            ?: return failResult(PhoneErrorCode.ActionRejected, "No recent location available (let the system obtain a fix first)")
         return okEnvelope(
             started,
             JSONObject()
@@ -349,7 +349,7 @@ class PhoneBridge(
     }
 
     private suspend fun doAudioRecord(obj: JSONObject, started: Long): PhoneResult {
-        if (recording) return failResult(PhoneErrorCode.Busy, "正在录音，等这一条结束")
+        if (recording) return failResult(PhoneErrorCode.Busy, "Already recording; wait for the current take to finish")
         val durationMs = obj.optLong("durationMs", 3000L).coerceIn(500L, 15_000L)
         val dir = File(context.cacheDir, "recordings").apply { mkdirs() }
         val out = File(dir, "rec-" + System.currentTimeMillis() + ".m4a")
@@ -367,12 +367,12 @@ class PhoneBridge(
         } catch (t: Throwable) {
             if (t is CancellationException) throw t
             runCatching { recorder.reset() }
-            return failResult(PhoneErrorCode.ArtifactWrite, "录音失败：" + (t.message ?: t.javaClass.simpleName))
+            return failResult(PhoneErrorCode.ArtifactWrite, "Recording failed: " + (t.message ?: t.javaClass.simpleName))
         } finally {
             runCatching { recorder.release() }
             recording = false
         }
-        if (!out.exists() || out.length() == 0L) return failResult(PhoneErrorCode.ArtifactWrite, "录音文件为空")
+        if (!out.exists() || out.length() == 0L) return failResult(PhoneErrorCode.ArtifactWrite, "Recording file is empty")
         return okEnvelope(
             started,
             JSONObject().put("path", out.absolutePath).put("bytes", out.length()).put("durationMs", durationMs),
@@ -400,27 +400,27 @@ class PhoneBridge(
         val query = obj.optString("query", "").trim()
         if (query.isNotEmpty()) return tapByQuery(svc, query)
         val p = point(obj, "x", "y", "fx", "fy")
-            ?: return PhoneResult(false, "", "tap 需要 query 或坐标（fx/fy 或 x/y）")
+            ?: return PhoneResult(false, "", "tap requires query or coordinates (fx/fy or x/y)")
         val duration = obj.optLong("durationMs", 60L).coerceIn(20L, 5000L)
         val ok = gesture(svc, Path().apply { moveTo(p.first.toFloat(), p.second.toFloat()) }, duration)
-        return if (ok) PhoneResult(true, "已点击 (" + p.first + "," + p.second + ")，时长 " + duration + "ms")
-        else PhoneResult(false, "", "dispatchGesture 未接受点击手势")
+        return if (ok) PhoneResult(true, "Tapped (" + p.first + "," + p.second + "), duration " + duration + "ms")
+        else PhoneResult(false, "", "dispatchGesture rejected the tap gesture")
     }
 
     private fun doSwipe(svc: AccessibilityService, obj: JSONObject): PhoneResult {
         if (obj.has("startTarget") || obj.has("endTarget")) return doSwipeTarget(svc, obj)
         val a = point(obj, "x", "y", "fx", "fy")
-            ?: return PhoneResult(false, "", "swipe 需要起点坐标（fx/fy 或 x/y）")
+            ?: return PhoneResult(false, "", "swipe requires start coordinates (fx/fy or x/y)")
         val b = point(obj, "x2", "y2", "fx2", "fy2")
-            ?: return PhoneResult(false, "", "swipe 需要终点坐标（fx2/fy2 或 x2/y2）")
+            ?: return PhoneResult(false, "", "swipe requires end coordinates (fx2/fy2 or x2/y2)")
         val duration = obj.optLong("durationMs", 300L).coerceIn(20L, 5000L)
         val path = Path().apply {
             moveTo(a.first.toFloat(), a.second.toFloat())
             lineTo(b.first.toFloat(), b.second.toFloat())
         }
         val ok = gesture(svc, path, duration)
-        return if (ok) PhoneResult(true, "已从 (" + a.first + "," + a.second + ") 滑到 (" + b.first + "," + b.second + ")，时长 " + duration + "ms")
-        else PhoneResult(false, "", "dispatchGesture 未接受滑动手势")
+        return if (ok) PhoneResult(true, "Swiped from (" + a.first + "," + a.second + ") to (" + b.first + "," + b.second + "), duration " + duration + "ms")
+        else PhoneResult(false, "", "dispatchGesture rejected the swipe gesture")
     }
 
     private suspend fun doType(svc: AccessibilityService, obj: JSONObject): PhoneResult {
@@ -428,7 +428,7 @@ class PhoneBridge(
         val spec = PhoneTarget.parse(obj)
         if (spec != PhoneTargetSpec.None || obj.has("perChar") || obj.has("mode")) return doTypeV2(svc, obj, spec)
         val text = obj.optString("text", "")
-        if (text.isEmpty()) return PhoneResult(false, "", "type 需要 text 参数")
+        if (text.isEmpty()) return PhoneResult(false, "", "type requires the text parameter")
         val outcome = a11y(6000) {
             val node = findEditable(svc)
             when {
@@ -441,16 +441,16 @@ class PhoneBridge(
             }
         }
         return when (outcome) {
-            null -> PhoneResult(false, "", "输入超时或服务不可用")
-            "NO_EDITABLE" -> PhoneResult(false, "", "找不到可输入的编辑框（可能当前界面无输入框，或输入框是 WebView/contenteditable）")
-            "FAIL" -> PhoneResult(false, "", "ACTION_SET_TEXT 失败（输入框可能是 WebView/contenteditable，不支持无障碍写入）")
-            else -> PhoneResult(true, "已输入 " + text.length + " 个字符")
+            null -> PhoneResult(false, "", "Input timed out or the service is unavailable")
+            "NO_EDITABLE" -> PhoneResult(false, "", "No editable field found (this screen may have none, or the field is a WebView/contenteditable)")
+            "FAIL" -> PhoneResult(false, "", "ACTION_SET_TEXT failed (the field may be a WebView/contenteditable, which does not accept accessibility writes)")
+            else -> PhoneResult(true, "Typed " + text.length + " characters")
         }
     }
 
     private fun doGlobal(svc: AccessibilityService, action: Int, label: String): PhoneResult {
-        return if (svc.performGlobalAction(action)) PhoneResult(true, "已执行 " + label)
-        else PhoneResult(false, "", label + " 失败")
+        return if (svc.performGlobalAction(action)) PhoneResult(true, "Executed " + label)
+        else PhoneResult(false, "", label + " failed")
     }
 
     private fun doReadScreen(svc: AccessibilityService, obj: JSONObject): PhoneResult {
@@ -482,10 +482,10 @@ class PhoneBridge(
                     for (i in 0 until n.childCount) n.getChild(i)?.let { queue.addLast(it) }
                 }
             }
-            "screen:" + w + "x" + h + "\n" + if (count == 0) "(无可读文本节点)" else out.toString().trimEnd()
+            "screen:" + w + "x" + h + "\n" + if (count == 0) "(no readable text nodes)" else out.toString().trimEnd()
         }
         return if (body != null) PhoneResult(true, body)
-        else PhoneResult(false, "", "读屏超时或服务不可用")
+        else PhoneResult(false, "", "Screen read timed out or the service is unavailable")
     }
 
     // ---- T4.1 读侧：结构化节点树（旧 readscreen 路径不受影响，见 doReadScreen / rootsOf）----
@@ -644,13 +644,13 @@ class PhoneBridge(
     private fun doTree(svc: AccessibilityService, obj: JSONObject): PhoneResult {
         val started = System.currentTimeMillis()
         val params = parseTreeParams(obj)
-            ?: return treeFailure(PhoneErrorCode.BadArgs, "filter 必须是对象；maxNodes/maxDepth 越界会被夹取而非报错")
+            ?: return treeFailure(PhoneErrorCode.BadArgs, "filter must be an object; out-of-range maxNodes/maxDepth are clamped, not rejected")
         // 代次在遍历前取：nodeId 与这个代次绑定，跨代复用由调用方判 E_STALE_SNAPSHOT。
         val snapshotId = generationOf(svc)
         val snapshot = a11y(8000L) { buildTree(svc, snapshotId, params) }
-            ?: return treeFailure(PhoneErrorCode.Timeout, "读屏超时（无障碍线程 8s 未返回）")
+            ?: return treeFailure(PhoneErrorCode.Timeout, "Screen read timed out (the accessibility thread did not return within 8s)")
         if (params.selector != null && snapshot.nodes.isEmpty()) {
-            return treeFailure(PhoneErrorCode.NodeNotFound, "没有匹配 filter 的节点（快照 " + snapshotId + "）")
+            return treeFailure(PhoneErrorCode.NodeNotFound, "No node matches filter (snapshot " + snapshotId + ")")
         }
         val drift = generationOf(svc) != snapshotId
         return PhoneResult(true, treeEnvelope(snapshot, params, drift, System.currentTimeMillis() - started))
@@ -756,15 +756,15 @@ class PhoneBridge(
             is PhoneResolveResult.Hit -> LiveResolve.Hit(walked, r.index)
             is PhoneResolveResult.Ambiguous -> LiveResolve.Fail(ambiguousPayload(r))
             PhoneResolveResult.NotFound -> LiveResolve.Fail(
-                errorEnvelope(PhoneErrorCode.NodeNotFound, "没找到匹配节点；先 phone_tree 看一眼当前界面再给 target"),
+                errorEnvelope(PhoneErrorCode.NodeNotFound, "No matching node; inspect the current screen with phone_tree first, then pass target"),
             )
             PhoneResolveResult.StaleSnapshot -> {
                 val from = (spec as? PhoneTargetSpec.ByNodeId)?.snapshotId ?: -1L
                 LiveResolve.Fail(
                     errorEnvelope(
                         PhoneErrorCode.StaleSnapshot,
-                        "nodeId 属于旧快照 " + from + "，当前代次 " + generation +
-                            "；重新 phone_tree 取新 nodeId（本次没有派发任何动作）",
+                        "nodeId belongs to a stale snapshot " + from + "; current generation " + generation +
+                            "; call phone_tree again for a fresh nodeId (no action was dispatched)",
                         effectLanded = false,
                     ),
                 )
@@ -776,7 +776,7 @@ class PhoneBridge(
         for (n in r.candidates) candidates.put(nodeJson(n))
         return errorEnvelope(
             PhoneErrorCode.NodeAmbiguous,
-            "命中 " + r.count + " 个节点，加 index 或换更精确的选择器（本次没有派发任何动作）",
+            "Matched " + r.count + " nodes; add index or use a more precise selector (no action was dispatched)",
             effectLanded = false,
         ).put("count", r.count).put("candidates", candidates)
     }
@@ -824,10 +824,10 @@ class PhoneBridge(
     private fun doTapTarget(svc: AccessibilityService, obj: JSONObject, spec: PhoneTargetSpec): PhoneResult {
         val started = System.currentTimeMillis()
         if (spec == PhoneTargetSpec.Invalid) {
-            return failResult(PhoneErrorCode.BadArgs, "target 解不出定位：给 {nodeId} 或非空选择器对象")
+            return failResult(PhoneErrorCode.BadArgs, "target does not resolve: pass {nodeId} or a non-empty selector object")
         }
-        val p = parseTreeParams(obj) ?: return failResult(PhoneErrorCode.BadArgs, "filter 必须是对象")
-        val walked = readActionTree(svc, p) ?: return failResult(PhoneErrorCode.Timeout, "读节点树超时")
+        val p = parseTreeParams(obj) ?: return failResult(PhoneErrorCode.BadArgs, "filter must be an object")
+        val walked = readActionTree(svc, p) ?: return failResult(PhoneErrorCode.Timeout, "Node tree read timed out")
         val index = when (val r = resolveLive(walked, spec, generationOf(svc))) {
             is LiveResolve.Fail -> return PhoneResult(true, r.payload.toString())
             is LiveResolve.Hit -> r.index
@@ -858,7 +858,7 @@ class PhoneBridge(
         if (route == "none") {
             body.put("code", PhoneErrorCode.ActionRejected.code)
                 .put("retryable", false)
-                .put("message", "节点不可点且手势没进去：可以在 target 里加 clickable=true 上溯，或直接给坐标")
+                .put("message", "The node is not clickable and the gesture did not land: add clickable=true to target to walk up, or pass coordinates")
         }
         return PhoneResult(true, body.toString())
     }
@@ -866,13 +866,13 @@ class PhoneBridge(
     /** swipe 的新路径：startTarget/endTarget 各自解成点（nodeId 串或选择器对象）。 */
     private fun doSwipeTarget(svc: AccessibilityService, obj: JSONObject): PhoneResult {
         val started = System.currentTimeMillis()
-        val p = parseTreeParams(obj) ?: return failResult(PhoneErrorCode.BadArgs, "filter 必须是对象")
-        val walked = readActionTree(svc, p) ?: return failResult(PhoneErrorCode.Timeout, "读节点树超时")
+        val p = parseTreeParams(obj) ?: return failResult(PhoneErrorCode.BadArgs, "filter must be an object")
+        val walked = readActionTree(svc, p) ?: return failResult(PhoneErrorCode.Timeout, "Node tree read timed out")
         val generation = generationOf(svc)
         val from = resolvePointOn(walked, obj.opt("startTarget"), generation)
-            ?: return failResult(PhoneErrorCode.NodeNotFound, "startTarget 没定位到节点")
+            ?: return failResult(PhoneErrorCode.NodeNotFound, "startTarget did not resolve to a node")
         val to = resolvePointOn(walked, obj.opt("endTarget"), generation)
-            ?: return failResult(PhoneErrorCode.NodeNotFound, "endTarget 没定位到节点")
+            ?: return failResult(PhoneErrorCode.NodeNotFound, "endTarget did not resolve to a node")
         val durationMs = obj.optLong("durationMs", 300L).coerceIn(100L, 5_000L)
         val path = Path().apply {
             moveTo(from.first.toFloat(), from.second.toFloat())
@@ -915,21 +915,21 @@ class PhoneBridge(
      */
     private suspend fun doTypeV2(svc: AccessibilityService, obj: JSONObject, spec: PhoneTargetSpec): PhoneResult {
         val started = System.currentTimeMillis()
-        if (spec == PhoneTargetSpec.Invalid) return failResult(PhoneErrorCode.BadArgs, "target 解不出定位")
+        if (spec == PhoneTargetSpec.Invalid) return failResult(PhoneErrorCode.BadArgs, "target does not resolve")
         val mode = obj.optString("mode", "set").lowercase()
         if (mode != "set" && mode != "append" && mode != "clear") {
-            return failResult(PhoneErrorCode.BadArgs, "mode 只能是 set/append/clear")
+            return failResult(PhoneErrorCode.BadArgs, "mode must be set/append/clear")
         }
         val raw = obj.optString("text", "")
-        if (mode != "clear" && raw.isEmpty()) return failResult(PhoneErrorCode.BadArgs, "type 需要 text（mode=clear 除外）")
+        if (mode != "clear" && raw.isEmpty()) return failResult(PhoneErrorCode.BadArgs, "type requires text (except mode=clear)")
         val perChar = obj.optBoolean("perChar", false)
         val intervalMs = obj.optLong("intervalMs", 80L).coerceIn(20L, 1_000L)
-        val p = parseTreeParams(obj) ?: return failResult(PhoneErrorCode.BadArgs, "filter 必须是对象")
-        val walked = readActionTree(svc, p) ?: return failResult(PhoneErrorCode.Timeout, "读节点树超时")
+        val p = parseTreeParams(obj) ?: return failResult(PhoneErrorCode.BadArgs, "filter must be an object")
+        val walked = readActionTree(svc, p) ?: return failResult(PhoneErrorCode.Timeout, "Node tree read timed out")
         val resolved = if (spec == PhoneTargetSpec.None) {
             val i = walked.nodes.indexOfFirst { it.editable && it.enabled }
             if (i < 0) {
-                return failResult(PhoneErrorCode.NoFocusedEditable, "没有可编辑节点（includeInvisible=true 也许能看到）")
+                return failResult(PhoneErrorCode.NoFocusedEditable, "No editable node (includeInvisible=true may reveal it)")
             }
             LiveResolve.Hit(walked, i)
         } else {
@@ -940,7 +940,7 @@ class PhoneBridge(
             is LiveResolve.Hit -> resolved.index
         }
         val node = walked.nodes[index]
-        val info = walked.infos.getOrNull(index) ?: return failResult(PhoneErrorCode.NodeNotFound, "节点句柄已失效")
+        val info = walked.infos.getOrNull(index) ?: return failResult(PhoneErrorCode.NodeNotFound, "The node handle is no longer valid")
         val target = when (mode) {
             "clear" -> ""
             "append" -> node.text + raw
@@ -963,8 +963,8 @@ class PhoneBridge(
         if (sent < target.length) {
             val payload = errorEnvelope(
                 PhoneErrorCode.ActionRejected,
-                "输入框没接受 ACTION_SET_TEXT（已写 " + sent + "/" + target.length + " 字符）；" +
-                    "换 key 逐字或先 tap 到输入框再试",
+                "The field did not accept ACTION_SET_TEXT (wrote " + sent + "/" + target.length + " characters); " +
+                    "use key to type character by character, or tap the field first and retry",
                 effectLanded = sent > 0,
             )
             return PhoneResult(true, payload.put("backend", backend).put("requested", target.length).put("written", sent).toString())
@@ -1011,13 +1011,13 @@ class PhoneBridge(
         if (key != "enter" && key != "delete" && key != "tab") {
             return failResult(
                 PhoneErrorCode.BadArgs,
-                "key 只支持 back/home/recents/enter/delete/tab，收到 " + key,
+                "key only supports back/home/recents/enter/delete/tab, got " + key,
             )
         }
         val outcome = a11y(3_000L) {
             val info = focusedEditableOrNull(svc)
             if (info == null) {
-                return@a11y Pair(null, "没有聚焦的输入框；先 tap/type 到输入框再发 key=" + key)
+                return@a11y Pair(null, "No focused input field; tap/type into the field before sending key=" + key)
             }
             var dispatched = 0
             repeat(times) {
@@ -1038,7 +1038,7 @@ class PhoneBridge(
                 if (ok) dispatched++
             }
             Pair(dispatched, "")
-        } ?: return failResult(PhoneErrorCode.Timeout, "无障碍线程 3s 未返回")
+        } ?: return failResult(PhoneErrorCode.Timeout, "The accessibility thread did not return within 3s")
         val dispatched = outcome.first
             ?: return PhoneResult(
                 true,
@@ -1047,7 +1047,7 @@ class PhoneBridge(
             )
         if (dispatched == 0) {
             val code = if (key == "enter") PhoneErrorCode.NodeNoImeAction else PhoneErrorCode.ActionRejected
-            return failResult(code, "节点不接受 key=" + key + " 对应的无障碍动作（控件可能不是输入框）")
+            return failResult(code, "The node does not accept key=" + key + " (the control may not be an input field)")
         }
         return okEnvelope(
             started,
@@ -1091,24 +1091,24 @@ class PhoneBridge(
         val until = obj.opt("until")
         val untilSelector = if (until is JSONObject) PhoneSelector.parse(until) else null
         val spec = PhoneTarget.parse(obj)
-        if (spec == PhoneTargetSpec.Invalid) return failResult(PhoneErrorCode.BadArgs, "target 解不出定位")
-        val p = parseTreeParams(obj) ?: return failResult(PhoneErrorCode.BadArgs, "filter 必须是对象")
+        if (spec == PhoneTargetSpec.Invalid) return failResult(PhoneErrorCode.BadArgs, "target does not resolve")
+        val p = parseTreeParams(obj) ?: return failResult(PhoneErrorCode.BadArgs, "filter must be an object")
         if (spec is PhoneTargetSpec.ByNodeId && spec.snapshotId != generationOf(svc)) {
             return failResult(
                 PhoneErrorCode.StaleSnapshot,
-                "nodeId 属于旧快照 " + spec.snapshotId + "，当前代次 " + generationOf(svc) + "（未派发任何手势）",
+                "nodeId belongs to a stale snapshot " + spec.snapshotId + "; current generation " + generationOf(svc) + " (no gesture was dispatched)",
                 effectLanded = false,
             )
         }
         val generation0 = generationOf(svc)
         // 只读一次树：容器下标、活句柄、初始指纹都取自同一张快照，序号才对得上。
-        val walked = readActionTree(svc, p) ?: return failResult(PhoneErrorCode.Timeout, "读节点树超时")
+        val walked = readActionTree(svc, p) ?: return failResult(PhoneErrorCode.Timeout, "Node tree read timed out")
         val containerIndex: Int
         val container: PhoneBounds
         if (spec == PhoneTargetSpec.None) {
             containerIndex = walked.nodes.indexOfFirst { it.scrollable && it.enabled }
             if (containerIndex < 0) {
-                return failResult(PhoneErrorCode.NodeNotActionable, "界面里没有 scrollable=true 的容器；给 target 指定可滚节点")
+                return failResult(PhoneErrorCode.NodeNotActionable, "No scrollable=true container on screen; point target at a scrollable node")
             }
             container = walked.nodes[containerIndex].bounds
         } else {
@@ -1176,7 +1176,7 @@ class PhoneBridge(
             .put("elapsedMs", System.currentTimeMillis() - started)
         if (scrolls == 0) {
             body.put("code", PhoneErrorCode.ActionRejected.code).put("retryable", false)
-                .put("message", "既没派发出滚动动作，手势也没进去")
+                .put("message", "Neither a scroll action nor a gesture landed")
         }
         return PhoneResult(true, body.toString())
     }
@@ -1191,7 +1191,7 @@ class PhoneBridge(
         val fromRadius = explicit?.first ?: ((scale.takeIf { it > 0.0 }?.let { 1.0 / it } ?: 1.0) * 300.0).toInt()
         val toRadius = explicit?.second ?: (fromRadius * (scale.takeIf { it > 0.0 } ?: 1.0)).toInt()
         if (fromRadius < 20 || toRadius < 20) {
-            return failResult(PhoneErrorCode.BadArgs, "半径至少 20px（fromRadius/toRadius 或 scale）")
+            return failResult(PhoneErrorCode.BadArgs, "Radius must be at least 20px (fromRadius/toRadius or scale)")
         }
         // 手势路径的坐标不能越界：GestureDescription 对负坐标直接抛
         // IllegalArgumentException("Path bounds must not be negative")，真机上表现为整条命令崩掉。
@@ -1203,8 +1203,8 @@ class PhoneBridge(
         if (fitFrom < 20 || fitTo < 20) {
             return failResult(
                 PhoneErrorCode.BadArgs,
-                "中心点 (" + centerPoint.first + "," + centerPoint.second + ") 距屏幕左右边界只有 " + room +
-                    "px，放不下缩放半径；换一个靠中间的中心点（cx/cy）或缩小半径",
+                "Center (" + centerPoint.first + "," + centerPoint.second + ") is only " + room +
+                    "px from a screen edge, which cannot fit the zoom radius; pick a more central center (cx/cy) or shrink the radius",
             )
         }
         val durationMs = obj.optLong("durationMs", 400L).coerceIn(100L, 3_000L)
@@ -1222,7 +1222,7 @@ class PhoneBridge(
                 GestureDescription.StrokeDescription(p2, 0L, durationMs),
             )
         }.getOrElse {
-            return failResult(PhoneErrorCode.GestureRejected, "双指路径被系统拒绝：" + it.message)
+            return failResult(PhoneErrorCode.GestureRejected, "The system rejected the two-finger path: " + it.message)
         }
         val dispatched = gestureStrokes(svc, strokes)
         val body = JSONObject()
@@ -1243,23 +1243,23 @@ class PhoneBridge(
         // 目标形态优先：给了 startTarget/endTarget 就按节点定位（与 swipe 的写法一致），
         // 只给坐标的老形态原样保留。
         if (obj.has("startTarget") || obj.has("endTarget")) {
-            val p = parseTreeParams(obj) ?: return failResult(PhoneErrorCode.BadArgs, "filter 必须是对象")
-            val walked = readActionTree(svc, p) ?: return failResult(PhoneErrorCode.Timeout, "读节点树超时")
+            val p = parseTreeParams(obj) ?: return failResult(PhoneErrorCode.BadArgs, "filter must be an object")
+            val walked = readActionTree(svc, p) ?: return failResult(PhoneErrorCode.Timeout, "Node tree read timed out")
             val generation = generationOf(svc)
             val fromNode = resolvePointOn(walked, obj.opt("startTarget"), generation)
-                ?: return failResult(PhoneErrorCode.NodeNotFound, "startTarget 没定位到节点")
+                ?: return failResult(PhoneErrorCode.NodeNotFound, "startTarget did not resolve to a node")
             val toNode = resolvePointOn(walked, obj.opt("endTarget"), generation)
-                ?: return failResult(PhoneErrorCode.NodeNotFound, "endTarget 没定位到节点")
+                ?: return failResult(PhoneErrorCode.NodeNotFound, "endTarget did not resolve to a node")
             return dragPoints(svc, obj, fromNode, toNode)
         }
         val from = pointOf(obj, "fromX", "fromY") ?: pointOf(obj, "x", "y")
-            ?: return failResult(PhoneErrorCode.BadArgs, "drag 需要 fromX/fromY（或用 x/y 起点）")
+            ?: return failResult(PhoneErrorCode.BadArgs, "drag requires fromX/fromY (or an x/y start)")
         val to = pointOf(obj, "toX", "toY") ?: run {
             val dx = obj.optInt("dx", Int.MIN_VALUE)
             val dy = obj.optInt("dy", Int.MIN_VALUE)
             if (dx == Int.MIN_VALUE && dy == Int.MIN_VALUE) null
             else Pair(from.first + (if (dx == Int.MIN_VALUE) 0 else dx), from.second + (if (dy == Int.MIN_VALUE) 0 else dy))
-        } ?: return failResult(PhoneErrorCode.BadArgs, "drag 需要 toX/toY 或 dx/dy")
+        } ?: return failResult(PhoneErrorCode.BadArgs, "drag requires toX/toY or dx/dy")
         return dragPoints(svc, obj, from, to)
     }
 
@@ -1307,9 +1307,9 @@ class PhoneBridge(
     /** wait_for：轮询判条件，超时回独立 E_WAIT_TIMEOUT（不复用 E_TIMEOUT）。 */
     private suspend fun doWaitFor(svc: AccessibilityService, obj: JSONObject): PhoneResult {
         val started = System.currentTimeMillis()
-        val req = PhoneWait.parse(obj) ?: return failResult(PhoneErrorCode.BadArgs, "wait_for 需要 cond 对象（type=…）")
+        val req = PhoneWait.parse(obj) ?: return failResult(PhoneErrorCode.BadArgs, "wait_for requires a cond object (type=…)")
         val phone = svcForeground()
-        if (phone == null) return failResult(PhoneErrorCode.A11yOff, "无障碍服务未开启")
+        if (phone == null) return failResult(PhoneErrorCode.A11yOff, "Accessibility service is not enabled")
         if (req.cond is PhoneWaitCond.GenerationChanged) {
             return awaitGenerationChange(phone, req, started)
         }
@@ -1355,7 +1355,7 @@ class PhoneBridge(
                 true,
                 errorEnvelope(
                     PhoneErrorCode.WaitTimeout,
-                    "等 " + payload + " 超时（" + req.timeoutMs + "ms，" + polls + " 次轮询）",
+                    "Waited " + payload + " and timed out (" + req.timeoutMs + "ms, " + polls + " polls)",
                     effectLanded = false,
                 ).put("satisfied", false).put("requestedMs", req.timeoutMs)
                     .put("waitedMs", System.currentTimeMillis() - started).put("polls", polls).toString(),
@@ -1387,7 +1387,7 @@ class PhoneBridge(
                 true,
                 errorEnvelope(
                     PhoneErrorCode.WaitTimeout,
-                    "等界面变化超时（" + req.timeoutMs + "ms，代次仍是 " + since + "）",
+                    "Timed out waiting for the screen to change (" + req.timeoutMs + "ms, generation is still " + since + ")",
                     effectLanded = false,
                 ).put("satisfied", false).put("requestedMs", req.timeoutMs)
                     .put("waitedMs", System.currentTimeMillis() - started).toString(),
@@ -1547,8 +1547,8 @@ class PhoneBridge(
             parts.add(label.take(24) + pos + "#" + c.optString("nodeId"))
         }
         if (parts.isEmpty()) return ""
-        val more = if (arr.length() > parts.size) " 等 " + arr.length() + " 个" else ""
-        return "；候选：" + parts.joinToString(" | ") + more
+        val more = if (arr.length() > parts.size) " and " + arr.length() + " more" else ""
+        return "; candidates: " + parts.joinToString(" | ") + more
     }
 
     private fun doOpenApp(obj: JSONObject): PhoneResult {
@@ -1557,23 +1557,23 @@ class PhoneBridge(
         val target = when {
             pkg.isNotEmpty() -> pkg
             query.isNotEmpty() -> resolveByQuery(query)
-            else -> return PhoneResult(false, "", "openapp 需要 package 或 query 参数")
+            else -> return PhoneResult(false, "", "openapp requires the package or query parameter")
         }
-        if (target.isEmpty()) return PhoneResult(false, "", "没找到匹配应用：" + query)
+        if (target.isEmpty()) return PhoneResult(false, "", "No matching app: " + query)
         val launch = context.packageManager.getLaunchIntentForPackage(target)
-            ?: return PhoneResult(false, "", "无法启动应用：" + target + "（找不到可启动的 Activity）")
+            ?: return PhoneResult(false, "", "Cannot launch app: " + target + " (no launchable Activity found)")
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return try {
             context.startActivity(launch)
-            PhoneResult(true, "已启动 " + target)
+            PhoneResult(true, "Launched " + target)
         } catch (t: Throwable) {
-            PhoneResult(false, "", "启动 " + target + " 失败：" + t.message)
+            PhoneResult(false, "", "Launch of " + target + " failed: " + t.message)
         }
     }
 
     private fun doScreenshot(svc: AccessibilityService): PhoneResult {
         if (Build.VERSION.SDK_INT < 30) {
-            return PhoneResult(false, "", "截图需要 Android 11+（当前 " + Build.VERSION.SDK_INT + "），请改用 readscreen 读节点树")
+            return PhoneResult(false, "", "Screenshot requires Android 11+ (current " + Build.VERSION.SDK_INT + "); use readscreen to read the node tree instead")
         }
         val done = CountDownLatch(1)
         val result = AtomicReference<ScreenshotOutcome>(ScreenshotOutcome.Timeout)
@@ -1589,15 +1589,15 @@ class PhoneBridge(
                     done.countDown()
                 }
             })
-            if (!done.await(5000, TimeUnit.MILLISECONDS)) return PhoneResult(false, "", "截图超时")
+            if (!done.await(5000, TimeUnit.MILLISECONDS)) return PhoneResult(false, "", "Screenshot timed out")
         } catch (t: Throwable) {
-            return PhoneResult(false, "", "截图失败：" + t.message)
+            return PhoneResult(false, "", "Screenshot failed: " + t.message)
         }
         return when (val r = result.get()) {
-            is ScreenshotOutcome.Failure -> PhoneResult(false, "", "截图失败：errorCode=" + r.code + "，降级请用 readscreen 读节点树")
+            is ScreenshotOutcome.Failure -> PhoneResult(false, "", "Screenshot failed: errorCode=" + r.code + "; fall back to readscreen to read the node tree")
             is ScreenshotOutcome.Success -> {
                 val bitmap = Bitmap.wrapHardwareBuffer(r.shot.hardwareBuffer, r.shot.colorSpace)
-                    ?: return PhoneResult(false, "", "无法解码截图（wrapHardwareBuffer 返回 null）")
+                    ?: return PhoneResult(false, "", "Cannot decode the screenshot (wrapHardwareBuffer returned null)")
                 val dir = File(context.cacheDir, "screenshots").apply { mkdirs() }
                 val f = File(dir, "shot_" + System.currentTimeMillis() + ".png")
                 FileOutputStream(f).use { bitmap.compress(Bitmap.CompressFormat.PNG, 90, it) }
@@ -1605,13 +1605,13 @@ class PhoneBridge(
                 val queued = PhoneImageQueue.enqueue(f.absolutePath, "image/png", f.length())
                 val out = buildString {
                     // 第一行逐字节保持旧文案（悬浮窗/动作日志只取第一行）。
-                    append("已保存 ").append(bitmap.width).append("x").append(bitmap.height).append(" → ").append(f.absolutePath)
+                    append("Saved ").append(bitmap.width).append("x").append(bitmap.height).append(" → ").append(f.absolutePath)
                     append("\nimageQueued: ").append(queued.queued)
-                    if (!queued.queued) append("（未入队原因：").append(queued.reason ?: "未知").append("）")
+                    if (!queued.queued) append(" (not queued: ").append(queued.reason ?: "unknown").append(")")
                 }
                 PhoneResult(true, out, imageQueued = queued.queued, imageQueueReason = queued.reason)
             }
-            else -> PhoneResult(false, "", "截图失败：无结果")
+            else -> PhoneResult(false, "", "Screenshot failed: no result")
         }
     }
 
@@ -1647,15 +1647,15 @@ class PhoneBridge(
             }
         }
         return when {
-            outcome == null -> PhoneResult(false, "", "点击超时或服务不可用")
-            outcome == "NOT_FOUND" -> PhoneResult(false, "", "没有找到文本包含「" + query + "」的节点")
+            outcome == null -> PhoneResult(false, "", "Tap timed out or the service is unavailable")
+            outcome == "NOT_FOUND" -> PhoneResult(false, "", "No node whose text contains '" + query + "'")
             outcome.startsWith("GESTURE:") -> {
                 val xy = outcome.removePrefix("GESTURE:").split(",")
                 val ok = gesture(svc, Path().apply { moveTo(xy[0].toFloat(), xy[1].toFloat()) }, 60L)
-                if (ok) PhoneResult(true, "已点击文本「" + query + "」（坐标 " + xy[0] + "," + xy[1] + "）")
-                else PhoneResult(false, "", "节点 ACTION_CLICK 失败，手势点击也失败")
+                if (ok) PhoneResult(true, "Tapped text '" + query + "' at (" + xy[0] + "," + xy[1] + ")")
+                else PhoneResult(false, "", "Node ACTION_CLICK failed and the gesture tap failed too")
             }
-            else -> PhoneResult(true, "已点击文本「" + query + "」")
+            else -> PhoneResult(true, "Tapped text '" + query + "'")
         }
     }
 

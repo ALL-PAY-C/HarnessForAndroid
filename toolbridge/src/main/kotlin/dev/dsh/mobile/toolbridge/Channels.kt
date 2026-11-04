@@ -31,14 +31,14 @@ import moe.shizuku.server.IShizukuService
  */
 class AppChannel(private val context: Context) : ShellChannel {
     override val id = "app"
-    override val label = "应用内 Shell"
+    override val label = "App shell"
     override val kind = ChannelKind.App
     override fun available() = true
 
     private val busybox: File? by lazy { Busybox.ensure(context) }
 
     override fun detail(): String =
-        if (busybox != null) "内置 busybox，无需 root / 无需 Termux" else "系统 sh，作用域限于应用沙箱"
+        if (busybox != null) "Built-in busybox (no root, no Termux)" else "System sh, limited to the app sandbox"
 
     override suspend fun exec(command: String, timeoutMs: Long): ShellResult {
         val bb = busybox
@@ -171,7 +171,7 @@ class RootChannel : ShellChannel {
         val current = PrivilegedExecutor.root()
         // su 起的是新 shell，拿不到本进程 env，代理只能写进命令串。
         val argv = current.form.wrap(ProxyEnv.prefix(command))
-            ?: return ShellResult(current.code, "", "root 不可用（code=" + current.code + "）：" + current.detail)
+            ?: return ShellResult(current.code, "", "root unavailable (code=" + current.code + "): " + current.detail)
         return runProcess(argv, timeoutMs)
     }
 }
@@ -257,10 +257,10 @@ class ShizukuChannel(private val context: Context? = null) : ShellChannel {
     override suspend fun exec(command: String, timeoutMs: Long): ShellResult {
         if (!available()) return ShellResult.unavailable(detail())
         val remote = runCatching {
-            val binder = Shizuku.getBinder() ?: error("Shizuku binder 未就绪")
+            val binder = Shizuku.getBinder() ?: error("Shizuku binder not ready")
             IShizukuService.Stub.asInterface(binder)
                 .newProcess(arrayOf("sh", "-c", ProxyEnv.prefix(command)), null, null)
-        }.getOrElse { return ShellResult.unavailable("Shizuku 调用失败: ${it.message}") }
+        }.getOrElse { return ShellResult.unavailable("Shizuku call failed: ${it.message}") }
         return drainRemote(remote, timeoutMs)
     }
 
@@ -304,8 +304,8 @@ class TermuxChannel(private val context: Context) : ShellChannel {
     // 界面上不再展示这条可选增强，避免被误读成「缺依赖」。
     override fun detail() = when {
         !installed() -> ""
-        !permitted() -> "已安装，未授予 RUN_COMMAND"
-        else -> "Termux 环境（python/git/ffmpeg）"
+        !permitted() -> "Installed, RUN_COMMAND not granted"
+        else -> "Termux environment (python/git/ffmpeg)"
     }
 
     override suspend fun exec(command: String, timeoutMs: Long): ShellResult {
@@ -323,7 +323,7 @@ class TermuxChannel(private val context: Context) : ShellChannel {
             putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
         }
         val sent = runCatching { context.sendBroadcast(intent); true }.getOrDefault(false)
-        if (!sent) return ShellResult.unavailable("无法唤起 Termux")
+        if (!sent) return ShellResult.unavailable("Cannot launch Termux")
         val started = System.currentTimeMillis()
         val deadline = started + timeoutMs
         while (System.currentTimeMillis() < deadline) {
@@ -344,11 +344,11 @@ class TermuxChannel(private val context: Context) : ShellChannel {
                 !outFile.exists() && !errFile.exists() && !rcFile.exists()
             ) {
                 return ShellResult.unavailable(
-                    "Termux 没有响应 RUN_COMMAND：请在 Termux 里确认已授权，或改用应用内 Shell / Shizuku",
+                    "Termux did not respond to RUN_COMMAND: confirm the permission inside Termux, or switch to the app shell / Shizuku",
                 )
             }
         }
-        return ShellResult.unavailable("Termux 执行超时（${timeoutMs}ms），rc 文件 ${rcFile.absolutePath} 未出现")
+        return ShellResult.unavailable("Termux timed out after ${timeoutMs}ms; rc file ${rcFile.absolutePath} never appeared")
     }
 }
 
@@ -365,7 +365,7 @@ internal suspend fun runProcess(
                 workdir?.let { if (it.isDirectory) directory(it) }
                 env?.let { environment().putAll(it) }
             }.start()
-        }.getOrElse { return@withContext ShellResult.unavailable("启动失败: ${it.message}") }
+        }.getOrElse { return@withContext ShellResult.unavailable("Failed to start: ${it.message}") }
         drain(proc, timeoutMs)
     }
 
@@ -382,7 +382,7 @@ internal suspend fun drain(proc: Process, timeoutMs: Long): ShellResult =
         if (result == null) {
             runCatching { proc.destroyForcibly() }
             AppLog.w("shell timeout after ${timeoutMs}ms")
-            ShellResult(-1, "", "命令超时（${timeoutMs}ms）已终止")
+            ShellResult(-1, "", "Command timed out after ${timeoutMs}ms and was killed")
         } else {
             ShellResult(result.third, result.first, result.second)
         }
@@ -412,7 +412,7 @@ private suspend fun drainRemote(proc: IRemoteProcess, timeoutMs: Long): ShellRes
         if (result == null) {
             runCatching { proc.destroy() }
             AppLog.w("shizuku timeout after ${timeoutMs}ms")
-            ShellResult(-1, "", "命令超时（${timeoutMs}ms）已终止")
+            ShellResult(-1, "", "Command timed out after ${timeoutMs}ms and was killed")
         } else {
             ShellResult(result.third, result.first, result.second)
         }

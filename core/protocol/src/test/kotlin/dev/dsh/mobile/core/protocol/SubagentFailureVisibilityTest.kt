@@ -80,7 +80,7 @@ class SubagentFailureVisibilityTest {
             assertTrue("没有任何 subagent 工具事件：" + events, calls.isNotEmpty())
             assertTrue(
                 "标题不带子代理名字：" + calls.map { it.title },
-                calls.any { it.title == "子代理 · 查PONG" },
+                calls.any { it.title == "Subagent · 查PONG" },
             )
             val failed = calls.firstOrNull { it.status == ToolCall.ToolStatus.Failed }
             assertTrue("子代理没有结算成 Failed，卡片会一直转圈：" + calls.map { it.status }, failed != null)

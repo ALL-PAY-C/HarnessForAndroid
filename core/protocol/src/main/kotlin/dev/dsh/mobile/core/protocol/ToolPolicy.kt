@@ -115,7 +115,7 @@ object ToolPolicy {
         val action = toolArg(args, "action") ?: return null
         val capability = CapabilityActions.capabilityOf(action) ?: return null
         // 调用点的确认卡会自己加「确认执行：」前缀，这里不再重复写「确认」。
-        val ask = ToolAuth.Ask("使用「" + capability.label + "」能力：" + action, capability)
+        val ask = ToolAuth.Ask("使用「" + capability.id + "」能力：" + action, capability)
         return when (CapabilityTiers.tierOf(capabilityTiers, capability)) {
             CapabilityTier.Always -> ToolAuth.Allow
             CapabilityTier.Session -> if (capability in sessionGranted) ToolAuth.Allow else ask

@@ -43,6 +43,7 @@ import dev.dsh.mobile.design.qqFontBody
 import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.ContextRing
 import dev.dsh.mobile.design.SessionStatusDot
+import dev.dsh.mobile.design.text
 import dev.dsh.mobile.core.model.SessionStatus
 import dev.dsh.mobile.core.protocol.ProjectedTodo
 import dev.dsh.mobile.core.protocol.SessionProjection
@@ -82,7 +83,7 @@ internal fun ProjectionPanel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                projectionHead(goal, projection.todos),
+                projectionHead(goal, projection.todos).text(),
                 color = p.accent,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -118,7 +119,7 @@ internal fun ProjectionPanel(
             }
             todoGroups(projection.todos).forEach { group ->
                 Text(
-                    group.title + " " + group.todos.size,
+                    stringResource(DesignR.string.chat_todo_group_header, group.title.text(), group.todos.size),
                     color = p.t3,
                     fontSize = 10.5.sp,
                     fontWeight = FontWeight.Medium,
@@ -204,7 +205,7 @@ internal fun ChatHeader(
                         compactionBadge(projection.compaction)?.let { badge ->
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                badge,
+                                badge.text(),
                                 color = p.accent,
                                 fontSize = qqFontBody(10.sp),
                                 maxLines = 1,
@@ -223,8 +224,8 @@ internal fun ChatHeader(
                         ContextRing(usagePercent(projection.usage) ?: state.contextPercent.toInt())
                         Spacer(Modifier.width(5.dp))
                         Text(
-                            if (state.streaming) stringResource(DesignR.string.chat_streaming_line, usageLine(state, projection.usage))
-                            else usageLine(state, projection.usage),
+                            if (state.streaming) stringResource(DesignR.string.chat_streaming_line, usageLine(state, projection.usage).text())
+                            else usageLine(state, projection.usage).text(),
                             color = p.t2,
                             fontSize = qqFontBody(11.sp),
                             maxLines = 1,

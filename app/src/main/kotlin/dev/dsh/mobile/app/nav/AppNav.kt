@@ -418,6 +418,7 @@ fun AppNav(container: AppContainer) {
                                         id,
                                         container.groupLedger,
                                         container.executionAgents,
+                                        container.appContext,
                                     ) { container.cwd() }
                                 }
                             },
@@ -507,6 +508,7 @@ fun AppNav(container: AppContainer) {
                                         id,
                                         container.groupLedger,
                                         container.executionAgents,
+                                        container.appContext,
                                     ) { container.cwd() }
                                 }
                             },

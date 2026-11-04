@@ -7167,5 +7167,743 @@
     "en": "Yesterday %1$s",
     "zh": "昨天 %1$s",
     "where": "design/UiText.kt"
+  },
+  {
+    "key": "phone_step_a11y_title",
+    "en": "Accessibility service",
+    "zh": "无障碍服务",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_step_a11y_body",
+    "en": "Settings → Accessibility → Downloaded services → DSH Mobile phone control",
+    "zh": "设置 → 无障碍 → 已下载的服务 → DSH Mobile 手机控制",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_step_a11y_action",
+    "en": "Turn on",
+    "zh": "去开启",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_step_overlay_title",
+    "en": "Overlay",
+    "zh": "悬浮窗",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_step_overlay_body",
+    "en": "Allow drawing over other apps to see the live status overlay (control is unaffected)",
+    "zh": "允许显示在其他应用上层，才能看到实时状态浮层（不影响操控）",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_step_overlay_action",
+    "en": "Grant",
+    "zh": "去授权",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_headline_ready",
+    "en": "Phone control ready",
+    "zh": "手机控制可用",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_headline_one_step",
+    "en": "One more step to control the phone",
+    "zh": "还差一步才能操控",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_headline_steps",
+    "en": "%1$d more steps to control the phone",
+    "zh": "还差 %1$d 步才能操控",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_hint_service_disconnected",
+    "en": "The system toggle is on but the service is not connected yet: go back to Settings and confirm the service switch is on.",
+    "zh": "系统已勾选，服务还没连上：回到设置确认服务开关是打开的。",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_hint_enable_a11y",
+    "en": "Open Settings → Accessibility and turn on DSH Mobile phone control.",
+    "zh": "先去 设置 → 无障碍 开启「DSH Mobile 手机控制」。",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "phone_hint_grant_overlay",
+    "en": "Then grant the overlay permission (only affects the live status overlay, not control).",
+    "zh": "再给悬浮窗授权（只影响实时状态浮层，不影响操控）。",
+    "where": "PhoneControlScreen.kt"
+  },
+  {
+    "key": "ledger_board_title",
+    "en": "Project plan",
+    "zh": "项目规划书",
+    "where": "GroupLedgerBoard.kt"
+  },
+  {
+    "key": "ledger_board_progress",
+    "en": "%1$d / %2$d done",
+    "zh": "完成 %1$d / %2$d",
+    "where": "GroupLedgerBoard.kt"
+  },
+  {
+    "key": "ledger_board_empty_count",
+    "en": "Empty",
+    "zh": "空",
+    "where": "GroupLedgerBoard.kt"
+  },
+  {
+    "key": "ledger_new_entry",
+    "en": "New item",
+    "zh": "新增条目",
+    "where": "GroupLedgerBoard.kt"
+  },
+  {
+    "key": "ledger_add",
+    "en": "Add",
+    "zh": "添加",
+    "where": "GroupLedgerBoard.kt"
+  },
+  {
+    "key": "ledger_board_empty_hint",
+    "en": "No items yet. The planner writes what this round should do; the executor finishes it and the checker confirms, then the status changes.",
+    "zh": "还没有条目。规划者把这一轮要做的事写进来，执行者做完、检测者确认后改状态。",
+    "where": "GroupLedgerBoard.kt"
+  },
+  {
+    "key": "ledger_append_note",
+    "en": "Append note",
+    "zh": "追加备注",
+    "where": "GroupLedgerBoard.kt"
+  },
+  {
+    "key": "ledger_write",
+    "en": "Write",
+    "zh": "写入",
+    "where": "GroupLedgerBoard.kt"
+  },
+  {
+    "key": "ledger_group_header",
+    "en": "%1$s · %2$d",
+    "zh": "%1$s · %2$d",
+    "where": "GroupLedgerBoard.kt"
+  },
+  {
+    "key": "ledger_status_todo",
+    "en": "Todo",
+    "zh": "待办",
+    "where": "GroupLedgerBoard.kt"
+  },
+  {
+    "key": "ledger_status_doing",
+    "en": "Doing",
+    "zh": "进行",
+    "where": "GroupLedgerBoard.kt"
+  },
+  {
+    "key": "ledger_status_review",
+    "en": "Needs work",
+    "zh": "需改",
+    "where": "GroupLedgerBoard.kt"
+  },
+  {
+    "key": "ledger_status_done",
+    "en": "Done",
+    "zh": "完成",
+    "where": "GroupLedgerBoard.kt"
+  },
+  {
+    "key": "ledger_status_blocked",
+    "en": "Blocked",
+    "zh": "阻塞",
+    "where": "GroupLedgerBoard.kt"
+  },
+  {
+    "key": "preset_scope_session",
+    "en": "This session: %1$s",
+    "zh": "本会话：%1$s",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "preset_scope_default",
+    "en": "Default: %1$s",
+    "zh": "默认：%1$s",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "preset_import",
+    "en": "Import",
+    "zh": "导入",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "preset_import_placeholder",
+    "en": "GitHub owner/repo, ZIP/JSON URL, local path, or JSON text",
+    "zh": "GitHub owner/repo、ZIP/JSON 链接、本地路径或 JSON 文本",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "preset_importing",
+    "en": "Importing…",
+    "zh": "导入中…",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "preset_import_apply",
+    "en": "Import and set as default",
+    "zh": "导入并设为默认",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "preset_card_label",
+    "en": "Identity card: %1$s",
+    "zh": "身份卡：%1$s",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "preset_card_unnamed",
+    "en": "Unnamed",
+    "zh": "未命名",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "preset_card",
+    "en": "Identity card",
+    "zh": "身份卡",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "preset_card_note",
+    "en": "A built-in preset's card lives in the local override layer; the built-in itself is untouched.",
+    "zh": "内置预设的卡存在本机覆盖层里，不修改内置本体。",
+    "where": "PresetDrawerPanel.kt"
+  },
+  {
+    "key": "chat_compact_nothing",
+    "en": "Nothing to compact",
+    "zh": "无需压缩",
+    "where": "ProjectionUi.kt"
+  },
+  {
+    "key": "chat_compact_note",
+    "en": "%1$d messages compacted · saved %2$s tokens (%3$s → %4$s)",
+    "zh": "已压缩 %1$d 条历史 · 省 %2$s tokens（%3$s → %4$s）",
+    "where": "ProjectionUi.kt"
+  },
+  {
+    "key": "chat_compact_note_summary",
+    "en": "%1$d messages compacted · saved %2$s tokens (%3$s → %4$s) · summary %5$s chars",
+    "zh": "已压缩 %1$d 条历史 · 省 %2$s tokens（%3$s → %4$s）· 摘要 %5$s 字",
+    "where": "ProjectionUi.kt"
+  },
+  {
+    "key": "chat_compact_badge",
+    "en": "%1$d compactions · saved %2$s",
+    "zh": "已压缩 %1$d 次 · 省 %2$s",
+    "where": "ProjectionUi.kt"
+  },
+  {
+    "key": "chat_compact_detail",
+    "en": "%1$d compactions · last saved %2$s tokens · summary %3$s chars",
+    "zh": "%1$d 次 · 最近省 %2$s tokens · 摘要 %3$s 字",
+    "where": "ProjectionUi.kt"
+  },
+  {
+    "key": "chat_usage_line",
+    "en": "Context %1$d%% · %2$s / %3$s%4$s",
+    "zh": "上下文 %1$d%% · %2$s / %3$s%4$s",
+    "where": "ProjectionUi.kt"
+  },
+  {
+    "key": "chat_todo_doing",
+    "en": "In progress",
+    "zh": "进行中",
+    "where": "ProjectionUi.kt"
+  },
+  {
+    "key": "chat_todo_pending",
+    "en": "Pending",
+    "zh": "待办",
+    "where": "ProjectionUi.kt"
+  },
+  {
+    "key": "chat_todo_done",
+    "en": "Done",
+    "zh": "已完成",
+    "where": "ProjectionUi.kt"
+  },
+  {
+    "key": "chat_todo_group_header",
+    "en": "%1$s %2$d",
+    "zh": "%1$s %2$d",
+    "where": "ChatHeader.kt"
+  },
+  {
+    "key": "chat_phase_active",
+    "en": "In progress",
+    "zh": "进行中",
+    "where": "ProjectionUi.kt"
+  },
+  {
+    "key": "chat_phase_paused",
+    "en": "Paused",
+    "zh": "已暂停",
+    "where": "ProjectionUi.kt"
+  },
+  {
+    "key": "chat_phase_blocked",
+    "en": "Blocked",
+    "zh": "受阻",
+    "where": "ProjectionUi.kt"
+  },
+  {
+    "key": "chat_phase_complete",
+    "en": "Completed",
+    "zh": "已完成",
+    "where": "ProjectionUi.kt"
+  },
+  {
+    "key": "chat_proj_head_goal",
+    "en": "Goal · %1$s",
+    "zh": "目标 · %1$s",
+    "where": "ProjectionUi.kt"
+  },
+  {
+    "key": "chat_proj_head_todos",
+    "en": "Todos %1$d/%2$d",
+    "zh": "待办 %1$d/%2$d",
+    "where": "ProjectionUi.kt"
+  },
+  {
+    "key": "chat_proj_head_both",
+    "en": "Goal · %1$s · Todos %2$d/%3$d",
+    "zh": "目标 · %1$s · 待办 %2$d/%3$d",
+    "where": "ProjectionUi.kt"
+  },
+  {
+    "key": "chat_warm_unsupported",
+    "en": "This engine does not support warm-layer refresh.",
+    "zh": "当前引擎不支持温层刷新。",
+    "where": "ChatViewModel.kt"
+  },
+  {
+    "key": "chat_warm_unchanged",
+    "en": "The warm layer was not updated.",
+    "zh": "温层没有更新。",
+    "where": "ChatViewModel.kt"
+  },
+  {
+    "key": "preset_err_input",
+    "en": "Enter a GitHub owner/repo, ZIP/JSON URL, local path, or JSON text",
+    "zh": "请输入 GitHub owner/repo、ZIP/JSON 链接、本地路径或 JSON 文本",
+    "where": "PresetDrawerViewModel.kt"
+  },
+  {
+    "key": "preset_err_import",
+    "en": "Import failed",
+    "zh": "预设导入失败",
+    "where": "PresetDrawerViewModel.kt"
+  },
+  {
+    "key": "preset_err_default",
+    "en": "Could not set the default preset",
+    "zh": "设置默认预设失败",
+    "where": "PresetDrawerViewModel.kt"
+  },
+  {
+    "key": "preset_err_delete",
+    "en": "Could not delete the preset",
+    "zh": "删除预设失败",
+    "where": "PresetDrawerViewModel.kt"
+  },
+  {
+    "key": "preset_err_card",
+    "en": "Could not save the identity card",
+    "zh": "身份卡保存失败",
+    "where": "PresetDrawerViewModel.kt"
+  },
+  {
+    "key": "cap_camera_title",
+    "en": "Camera",
+    "zh": "相机",
+    "where": "DeviceLabels.kt"
+  },
+  {
+    "key": "cap_camera_hint",
+    "en": "Take photos · scan codes",
+    "zh": "拍照 / 扫码",
+    "where": "DeviceLabels.kt"
+  },
+  {
+    "key": "cap_microphone_title",
+    "en": "Microphone",
+    "zh": "麦克风",
+    "where": "DeviceLabels.kt"
+  },
+  {
+    "key": "cap_microphone_hint",
+    "en": "Record audio",
+    "zh": "录音",
+    "where": "DeviceLabels.kt"
+  },
+  {
+    "key": "cap_contacts_title",
+    "en": "Contacts",
+    "zh": "联系人",
+    "where": "DeviceLabels.kt"
+  },
+  {
+    "key": "cap_contacts_hint",
+    "en": "Read contacts",
+    "zh": "读联系人",
+    "where": "DeviceLabels.kt"
+  },
+  {
+    "key": "cap_sms_title",
+    "en": "SMS",
+    "zh": "短信",
+    "where": "DeviceLabels.kt"
+  },
+  {
+    "key": "cap_sms_hint",
+    "en": "Read and send messages",
+    "zh": "读短信 / 发短信",
+    "where": "DeviceLabels.kt"
+  },
+  {
+    "key": "cap_dial_title",
+    "en": "Phone dialer",
+    "zh": "拨号",
+    "where": "DeviceLabels.kt"
+  },
+  {
+    "key": "cap_dial_hint",
+    "en": "Open the dialer",
+    "zh": "拉起拨号盘",
+    "where": "DeviceLabels.kt"
+  },
+  {
+    "key": "cap_location_title",
+    "en": "Location",
+    "zh": "定位",
+    "where": "DeviceLabels.kt"
+  },
+  {
+    "key": "cap_location_hint",
+    "en": "Read location",
+    "zh": "读位置",
+    "where": "DeviceLabels.kt"
+  },
+  {
+    "key": "cap_tier_always",
+    "en": "Always",
+    "zh": "始终允许",
+    "where": "DeviceLabels.kt"
+  },
+  {
+    "key": "cap_tier_session",
+    "en": "This session",
+    "zh": "本会话",
+    "where": "DeviceLabels.kt"
+  },
+  {
+    "key": "cap_tier_ask",
+    "en": "Every time",
+    "zh": "每次询问",
+    "where": "DeviceLabels.kt"
+  },
+  {
+    "key": "act_tap_title",
+    "en": "Tap",
+    "zh": "点击",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_tap_hint",
+    "en": "Tap the screen by coordinate or selector",
+    "zh": "按坐标或选择器点一下屏幕",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_swipe_title",
+    "en": "Swipe",
+    "zh": "滑动",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_swipe_hint",
+    "en": "Swipe between two points",
+    "zh": "两点之间滑动",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_type_title",
+    "en": "Type",
+    "zh": "输入",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_type_hint",
+    "en": "Type text into the focused field",
+    "zh": "往当前焦点输入文本",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_key_title",
+    "en": "Key",
+    "zh": "按键",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_key_hint",
+    "en": "System or input key (back/home/enter…)",
+    "zh": "系统键或输入框键（back/home/enter…）",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_back_title",
+    "en": "Back",
+    "zh": "返回",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_back_hint",
+    "en": "Global back",
+    "zh": "全局返回",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_home_title",
+    "en": "Home",
+    "zh": "主页",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_home_hint",
+    "en": "Go to the home screen",
+    "zh": "回到桌面",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_recents_title",
+    "en": "Recents",
+    "zh": "最近任务",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_recents_hint",
+    "en": "Open the task switcher",
+    "zh": "打开任务列表",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_scroll_title",
+    "en": "Scroll",
+    "zh": "滚动",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_scroll_hint",
+    "en": "Scroll a container until the content actually moves",
+    "zh": "滚可滚容器直到内容真的动",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_pinch_title",
+    "en": "Pinch",
+    "zh": "缩放",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_pinch_hint",
+    "en": "Two-finger zoom around a point",
+    "zh": "以某点为中心双指缩放",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_drag_title",
+    "en": "Drag",
+    "zh": "拖拽",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_drag_hint",
+    "en": "Drag from start to end (press and hold supported)",
+    "zh": "从起点拖到终点（可按住）",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_readscreen_title",
+    "en": "Read screen",
+    "zh": "读屏",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_readscreen_hint",
+    "en": "Export current UI nodes as plain text",
+    "zh": "导出当前界面节点（纯文本）",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_tree_title",
+    "en": "Read tree",
+    "zh": "读屏树",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_tree_hint",
+    "en": "Export structured nodes with viewId and bounds",
+    "zh": "导出带 viewId/坐标的结构化节点树",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_wait_for_title",
+    "en": "Wait for condition",
+    "zh": "等待条件",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_wait_for_hint",
+    "en": "Wait for a node, text or foreground app to appear",
+    "zh": "等节点/文本/前台应用出现",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_currentapp_title",
+    "en": "Current app",
+    "zh": "当前应用",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_currentapp_hint",
+    "en": "Read the foreground package and activity",
+    "zh": "读前台包名与 activity",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_apps_title",
+    "en": "App list",
+    "zh": "应用列表",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_apps_hint",
+    "en": "List launchable installed apps",
+    "zh": "列出可启动的已装应用",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_sequence_title",
+    "en": "Batch steps",
+    "zh": "批量步骤",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_sequence_hint",
+    "en": "Send several steps at once, stop on first failure",
+    "zh": "一次下发多步，失败即停",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_openapp_title",
+    "en": "Open app",
+    "zh": "打开应用",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_openapp_hint",
+    "en": "Launch an app by package name",
+    "zh": "按包名启动应用",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_screenshot_title",
+    "en": "Screenshot",
+    "zh": "截图",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_screenshot_hint",
+    "en": "Capture the screen to a file",
+    "zh": "截当前屏幕到文件",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_contacts_title",
+    "en": "Contacts",
+    "zh": "联系人",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_contacts_hint",
+    "en": "Look up name and number by query",
+    "zh": "按 query 查联系人姓名与号码",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_sms_list_title",
+    "en": "Read SMS",
+    "zh": "读短信",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_sms_list_hint",
+    "en": "Read the latest received messages",
+    "zh": "读最近收到的短信",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_sms_send_title",
+    "en": "Send SMS",
+    "zh": "发短信",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_sms_send_hint",
+    "en": "Send a message to a number",
+    "zh": "按号码发一条短信",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_dial_title",
+    "en": "Dial",
+    "zh": "拨号",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_dial_hint",
+    "en": "Place a call by number (needs CALL_PHONE)",
+    "zh": "按号码直接拨出（要 CALL_PHONE）",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_location_title",
+    "en": "Location",
+    "zh": "定位",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_location_hint",
+    "en": "Read the last known location",
+    "zh": "读最近一次已知位置",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_audio_record_title",
+    "en": "Record audio",
+    "zh": "录音",
+    "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "act_audio_record_hint",
+    "en": "Record a clip into the app cache",
+    "zh": "录一段音频到应用缓存目录",
+    "where": "PhoneActionLabels.kt"
   }
 ]

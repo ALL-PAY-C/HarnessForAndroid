@@ -95,7 +95,10 @@ class GatewayService : Service() {
             .setOnlyAlertOnce(true)
             .build()
         foreground = runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= 34) {
+                // 同 RuntimeService：dataSync 有 6 小时上限，网关是常驻进程。
+                startForeground(ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
             } else {
                 startForeground(ID, n)

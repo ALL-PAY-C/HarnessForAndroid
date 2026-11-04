@@ -35,23 +35,23 @@ class PhonePermissionTest {
 
     @Test
     fun headlineCountsRealGaps() {
-        // 两步都缺时说「两步」；只剩无障碍没连上时说「一步」；能操控就是可用（缺悬浮窗不影响操控）。
-        assertEquals("还差 2 步才能操控", PhonePermissionState().headline())
-        assertEquals("还差一步才能操控", PhonePermissionState(serviceEnabled = true, serviceBound = false, overlayGranted = true).headline())
-        assertEquals("手机控制可用", PhonePermissionState(serviceEnabled = true, serviceBound = true).headline())
+        // 两步都缺时报「两步」；只剩无障碍没连上时报「一步」；能操控就是可用（缺悬浮窗不影响操控）。
+        assertEquals(PhoneHeadline.StepsLeft(2), PhonePermissionState().headline())
+        assertEquals(PhoneHeadline.OneStepLeft, PhonePermissionState(serviceEnabled = true, serviceBound = false, overlayGranted = true).headline())
+        assertEquals(PhoneHeadline.Ready, PhonePermissionState(serviceEnabled = true, serviceBound = true).headline())
     }
 
     @Test
     fun missingHintNamesTheNextAction() {
         assertEquals(
-            "先去 设置 → 无障碍 开启「DSH Mobile 手机控制」。再给悬浮窗授权（只影响实时状态浮层，不影响操控）。",
+            listOf(PhoneHint.EnableAccessibility, PhoneHint.GrantOverlay),
             PhonePermissionState().missingHint(),
         )
         assertEquals(
-            "系统已勾选，服务还没连上：回到设置确认服务开关是打开的。",
+            listOf(PhoneHint.ServiceNotConnected),
             PhonePermissionState(serviceEnabled = true, serviceBound = false, overlayGranted = true).missingHint(),
         )
-        assertEquals("", PhonePermissionState(true, true, true).missingHint())
+        assertEquals(emptyList<PhoneHint>(), PhonePermissionState(true, true, true).missingHint())
     }
 
     @Test
@@ -82,17 +82,9 @@ class PhonePermissionTest {
     }
 
     @Test
-    fun everyActionHasLabelAndHint() {
-        PhoneAction.entries.forEach {
-            assertTrue(it.label.isNotBlank())
-            assertTrue(it.hint.isNotBlank())
-        }
-    }
-
-    @Test
     fun recordStatusIsBinary() {
-        assertEquals(PhoneActionStatus.Ok, PhoneActionRecord("tap", "点击", true, "ok", 1L).status())
-        assertEquals(PhoneActionStatus.Failed, PhoneActionRecord("tap", "点击", false, "boom", 1L).status())
+        assertEquals(PhoneActionStatus.Ok, PhoneActionRecord("tap", true, "ok", 1L).status())
+        assertEquals(PhoneActionStatus.Failed, PhoneActionRecord("tap", false, "boom", 1L).status())
     }
 
     @Test
@@ -102,7 +94,7 @@ class PhonePermissionTest {
         val records = PhoneActionLog.records.value
         assertEquals(PhoneActionLog.LIMIT, records.size)
         assertEquals((PhoneActionLog.LIMIT + 4).toLong(), records.first().at)
-        assertEquals("点击", records.first().label)
+        assertEquals("tap", records.first().action)
         PhoneActionLog.clear()
         assertTrue(PhoneActionLog.records.value.isEmpty())
     }

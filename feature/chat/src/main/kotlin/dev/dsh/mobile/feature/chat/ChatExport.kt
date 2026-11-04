@@ -32,10 +32,10 @@ internal data class ExportLine(val text: String, val kind: ExportLineKind = Expo
 
 internal fun layoutExportLines(messages: List<ExportMsg>, maxCharsPerLine: Int): List<ExportLine> {
     require(maxCharsPerLine > 0)
-    if (messages.isEmpty()) return listOf(ExportLine("（空会话）"))
+    if (messages.isEmpty()) return listOf(ExportLine("(empty session)"))
     val lines = mutableListOf<ExportLine>()
     for (message in messages) {
-        val source = "【" + message.author.ifBlank { "未知" } + "】" + message.body
+        val source = "[" + message.author.ifBlank { "unknown" } + "]" + message.body
         var offset = 0
         var first = true
         do {
@@ -48,7 +48,7 @@ internal fun layoutExportLines(messages: List<ExportMsg>, maxCharsPerLine: Int):
             lines += ExportLine(source.substring(start, offset).trimEnd('\r'), if (first) ExportLineKind.AUTHOR else ExportLineKind.BODY)
             first = false
             if (lines.size > EXPORT_MAX_LINES) {
-                return lines.take(EXPORT_MAX_LINES - 1) + ExportLine("…（已截断）", ExportLineKind.TRUNCATION)
+                return lines.take(EXPORT_MAX_LINES - 1) + ExportLine("… (truncated)", ExportLineKind.TRUNCATION)
             }
             if (offset < source.length && source[offset] == '\n') offset++
         } while (offset < source.length)
@@ -71,7 +71,7 @@ suspend fun exportChatToPng(context: Context, title: String, messages: List<Expo
         val canvas = Canvas(image)
         canvas.drawColor(Color.WHITE)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(35, 35, 40); textSize = 42f; typeface = Typeface.DEFAULT_BOLD }
-        val heading = title.ifBlank { "会话" }.replace('\n', ' ')
+        val heading = title.ifBlank { "Session" }.replace('\n', ' ')
         val headingLength = paint.breakText(heading, true, (WIDTH - PADDING * 2).toFloat(), null)
         canvas.drawText(heading.take(headingLength), PADDING.toFloat(), 72f, paint)
         paint.textSize = 38f
@@ -90,13 +90,13 @@ suspend fun exportChatToPng(context: Context, title: String, messages: List<Expo
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }
             val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                ?: throw IOException("创建相册文件失败")
+                ?: throw IOException("Failed to create the gallery file")
             try {
-                val output = resolver.openOutputStream(uri) ?: throw IOException("打开相册文件失败")
-                output.use { if (!image.compress(Bitmap.CompressFormat.PNG, 100, it)) throw IOException("PNG 编码失败") }
+                val output = resolver.openOutputStream(uri) ?: throw IOException("Failed to open the gallery file")
+                output.use { if (!image.compress(Bitmap.CompressFormat.PNG, 100, it)) throw IOException("Failed to encode PNG") }
                 values.clear()
                 values.put(MediaStore.Images.Media.IS_PENDING, 0)
-                if (resolver.update(uri, values, null, null) <= 0) throw IOException("发布相册文件失败")
+                if (resolver.update(uri, values, null, null) <= 0) throw IOException("Failed to publish the gallery file")
                 uri
             } catch (error: Exception) {
                 runCatching { resolver.delete(uri, null, null) }
@@ -105,10 +105,10 @@ suspend fun exportChatToPng(context: Context, title: String, messages: List<Expo
         } else {
             @Suppress("DEPRECATION")
             val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "DSH")
-            if (!dir.isDirectory && !dir.mkdirs()) throw IOException("创建 Pictures/DSH 失败")
+            if (!dir.isDirectory && !dir.mkdirs()) throw IOException("Failed to create Pictures/DSH")
             val file = File(dir, name)
             try {
-                file.outputStream().use { if (!image.compress(Bitmap.CompressFormat.PNG, 100, it)) throw IOException("PNG 编码失败") }
+                file.outputStream().use { if (!image.compress(Bitmap.CompressFormat.PNG, 100, it)) throw IOException("Failed to encode PNG") }
                 MediaScannerConnection.scanFile(context, arrayOf(file.absolutePath), arrayOf("image/png"), null)
                 Uri.fromFile(file)
             } catch (error: Exception) {

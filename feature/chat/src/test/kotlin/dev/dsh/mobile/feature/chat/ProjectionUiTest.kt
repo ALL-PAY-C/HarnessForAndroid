@@ -5,12 +5,19 @@ import dev.dsh.mobile.core.protocol.CompactResult
 import dev.dsh.mobile.core.protocol.ContextUsage
 import dev.dsh.mobile.core.protocol.ProjectedGoal
 import dev.dsh.mobile.core.protocol.ProjectedTodo
+import dev.dsh.mobile.design.R as DesignR
+import dev.dsh.mobile.design.UiText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 投影 → UI 文案的纯函数层：/compact 回执、压缩徽标、用量口径、待办分组。 */
+/**
+ * 投影 → UI 文案的纯函数层：/compact 回执、压缩徽标、用量口径、待办分组。
+ *
+ * T9.19：函数只产出 [UiText]（资源 id + 参数 / 原样串），这里按 UiText 断言，
+ * 不绑死任何一种语言的渲染结果；语言本身由 design 的 strings.xml 决定。
+ */
 class ProjectionUiTest {
 
     // ---------------------------------------------------------------- /compact 回执
@@ -19,37 +26,45 @@ class ProjectionUiTest {
         val note = compactNote(
             CompactResult(compacted = true, summaryChars = 1_200, beforeTokens = 9_000, afterTokens = 1_500, droppedMessages = 14),
         )
-        assertTrue(note.contains("已压缩 14 条历史"))
-        assertTrue(note.contains("省 7.5k tokens"))
-        assertTrue(note.contains("9k → 1.5k"))
-        assertTrue(note.contains("摘要 1.2k 字"))
+        assertEquals(
+            UiText.Res(DesignR.string.chat_compact_note_summary, listOf(14, "7.5k", "9k", "1.5k", "1.2k")),
+            note,
+        )
     }
 
     @Test fun compactNoteKeepsEngineReasonWhenNothingCompacted() {
         val reason = "上下文还没超预算（已用约 900 tokens，预算 8000），不需要压缩。"
-        assertEquals(reason, compactNote(CompactResult(compacted = false, message = reason)))
+        assertEquals(UiText.Raw(reason), compactNote(CompactResult(compacted = false, message = reason)))
     }
 
     @Test fun compactNoteFallsBackWhenReasonBlank() {
-        assertEquals("无需压缩", compactNote(CompactResult(compacted = false, message = "")))
+        assertEquals(
+            UiText.Res(DesignR.string.chat_compact_nothing),
+            compactNote(CompactResult(compacted = false, message = "")),
+        )
     }
 
     @Test fun compactNoteOmitsSummaryWhenAbsent() {
         val note = compactNote(CompactResult(compacted = true, beforeTokens = 4_000, afterTokens = 3_000, droppedMessages = 2))
-        assertTrue(note.contains("已压缩 2 条历史"))
-        assertTrue(!note.contains("摘要"))
+        assertEquals(
+            UiText.Res(DesignR.string.chat_compact_note, listOf(2, "1k", "4k", "3k")),
+            note,
+        )
     }
 
     // ---------------------------------------------------------------- 压缩徽标 / 明细
 
     @Test fun badgeHiddenUntilSomethingWasCompacted() {
         assertNull(compactionBadge(CompactionStats(count = 0, beforeTokens = 0, afterTokens = 0, summaryChars = 0)))
-        assertEquals("已压缩 3 次 · 省 2.5k", compactionBadge(CompactionStats(3, 5_000, 2_500, 800)))
+        assertEquals(
+            UiText.Res(DesignR.string.chat_compact_badge, listOf(3, "2.5k")),
+            compactionBadge(CompactionStats(3, 5_000, 2_500, 800)),
+        )
     }
 
     @Test fun detailShowsCountSavingAndSummary() {
         assertEquals(
-            "2 次 · 最近省 1.5k tokens · 摘要 600 字",
+            UiText.Res(DesignR.string.chat_compact_detail, listOf(2, "1.5k", "600")),
             compactionDetail(CompactionStats(2, 4_000, 2_500, 600)),
         )
     }
@@ -64,15 +79,19 @@ class ProjectionUiTest {
 
     @Test fun usageLineFallsBackToTokenTextWithoutBudget() {
         val state = ChatUiState(sessionId = "s", tokensPerSecond = 12.0)
-        assertEquals(state.tokenText, usageLine(state, ContextUsage()))
+        assertEquals(UiText.Raw(state.tokenText), usageLine(state, ContextUsage()))
     }
 
     @Test fun usageLineUsesCharBudgetAndKeepsSpeed() {
         val state = ChatUiState(sessionId = "s", tokensPerSecond = 12.0)
         val line = usageLine(state, ContextUsage(usedChars = 25_000, fullChars = 40_000, budgetChars = 50_000))
-        assertTrue(line.startsWith("上下文 50%"))
-        assertTrue(line.contains("25k / 50k"))
-        assertTrue(line.contains(speedText(12.0)))
+        assertEquals(
+            UiText.Res(
+                DesignR.string.chat_usage_line,
+                listOf(50, "25k", "50k", " · " + speedText(12.0)),
+            ),
+            line,
+        )
     }
 
     // ---------------------------------------------------------------- 待办分组
@@ -84,7 +103,14 @@ class ProjectionUiTest {
             ProjectedTodo("接线", ProjectedTodo.STATUS_DOING),
         )
         val groups = todoGroups(todos)
-        assertEquals(listOf("进行中", "待办", "已完成"), groups.map { it.title })
+        assertEquals(
+            listOf(
+                UiText.Res(DesignR.string.chat_todo_doing),
+                UiText.Res(DesignR.string.chat_todo_pending),
+                UiText.Res(DesignR.string.chat_todo_done),
+            ),
+            groups.map { it.title },
+        )
         assertEquals(listOf("接线"), groups[0].todos.map { it.content })
         assertEquals(listOf("改 UI"), groups[2].todos.map { it.content })
     }
@@ -108,13 +134,22 @@ class ProjectionUiTest {
             ProjectedTodo("a", ProjectedTodo.STATUS_DONE),
             ProjectedTodo("b", ProjectedTodo.STATUS_PENDING),
         )
-        assertEquals("目标 · 进行中 · 待办 1/2", projectionHead(goal, todos))
-        assertEquals("目标 · 进行中", projectionHead(goal, emptyList()))
-        assertEquals("待办 0/1", projectionHead(null, listOf(ProjectedTodo("a", ProjectedTodo.STATUS_PENDING))))
+        assertEquals(
+            UiText.Res(DesignR.string.chat_proj_head_both, listOf(UiText.Res(DesignR.string.chat_phase_active), 1, 2)),
+            projectionHead(goal, todos),
+        )
+        assertEquals(
+            UiText.Res(DesignR.string.chat_proj_head_goal, listOf(UiText.Res(DesignR.string.chat_phase_active))),
+            projectionHead(goal, emptyList()),
+        )
+        assertEquals(
+            UiText.Res(DesignR.string.chat_proj_head_todos, listOf(0, 1)),
+            projectionHead(null, listOf(ProjectedTodo("a", ProjectedTodo.STATUS_PENDING))),
+        )
     }
 
     @Test fun blockedGoalUsesBlockedPhaseLabel() {
         val goal = ProjectedGoal(objective = "x", phase = ProjectedGoal.PHASE_BLOCKED, revision = 1, blockedReason = "等权限")
-        assertEquals("受阻", goalPhaseLabel(goal))
+        assertEquals(UiText.Res(DesignR.string.chat_phase_blocked), goalPhaseLabel(goal))
     }
 }

@@ -57,6 +57,7 @@ import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.pluginapi.SlotContribution
 import dev.dsh.mobile.design.EmptyState
 import dev.dsh.mobile.design.QqShape
+import dev.dsh.mobile.design.text
 import dev.dsh.mobile.core.protocol.SessionProjection
 import kotlinx.coroutines.launch
 
@@ -117,7 +118,7 @@ internal fun UsageDialog(
                 // 压缩明细也挂在同一个弹窗里：没压过就不加这两行。
                 if (projection.compaction.count > 0) Column {
                     Text(stringResource(DesignR.string.chat_context_compaction), color = p.t2, fontSize = 12.sp)
-                    Text(compactionDetail(projection.compaction), color = p.t1, fontSize = 14.sp)
+                    Text(compactionDetail(projection.compaction).text(), color = p.t1, fontSize = 14.sp)
                 }
             }
         },

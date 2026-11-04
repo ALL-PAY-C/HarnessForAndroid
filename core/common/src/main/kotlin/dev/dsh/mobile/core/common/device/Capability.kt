@@ -3,14 +3,17 @@ package dev.dsh.mobile.core.common.device
 /**
  * 六类系统能力。词表只此一份：设置页、授权裁决、手机动作执行三处都读这里，
  * 加一类能力不需要在三个模块里各改一次字符串。
+ *
+ * 只带 [id]：面向用户的文案不留在数据层，UI 层按 id 查资源（design 的 DeviceLabels.kt）。
+ * 这样系统语言切了就跟着变，本类在 JVM 单测里也不需要 Context。
  */
-enum class DeviceCapability(val id: String, val label: String, val hint: String) {
-    Camera("camera", "相机", "拍照 / 扫码"),
-    Microphone("microphone", "麦克风", "录音"),
-    Contacts("contacts", "联系人", "读联系人"),
-    Sms("sms", "短信", "读短信 / 发短信"),
-    Dial("dial", "拨号", "拉起拨号盘"),
-    Location("location", "定位", "读位置"),
+enum class DeviceCapability(val id: String) {
+    Camera("camera"),
+    Microphone("microphone"),
+    Contacts("contacts"),
+    Sms("sms"),
+    Dial("dial"),
+    Location("location"),
     ;
 
     companion object {
@@ -24,10 +27,10 @@ enum class DeviceCapability(val id: String, val label: String, val hint: String)
  * [Always] 常驻放行；[Session] 本会话内放行（进程内记住，重启失效）；[Ask] 每次都问。
  * 默认 [Ask] —— 没有设置过的能力一律要问，静默放行只能靠用户显式选。
  */
-enum class CapabilityTier(val id: String, val label: String) {
-    Always("always", "始终允许"),
-    Session("session", "本会话"),
-    Ask("ask", "每次询问"),
+enum class CapabilityTier(val id: String) {
+    Always("always"),
+    Session("session"),
+    Ask("ask"),
     ;
 
     companion object {
