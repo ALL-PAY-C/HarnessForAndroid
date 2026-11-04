@@ -1,6 +1,7 @@
 package dev.dsh.mobile.core.protocol.transport
 
 import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.protocol.EventSink
 import dev.dsh.mobile.core.protocol.ReconnectPolicy
 import dev.dsh.mobile.core.protocol.long
 import dev.dsh.mobile.core.protocol.obj
@@ -102,12 +103,10 @@ class DshMux(
      */
     private val streams = ConcurrentHashMap<String, suspend (MuxGeneration) -> Unit>()
 
-    private val _generations = MutableSharedFlow<MuxGeneration>(
-        replay = 1,
-        extraBufferCapacity = 4,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST,
-    )
-    val generations: SharedFlow<MuxGeneration> = _generations.asSharedFlow()
+    /** 世代流（T9.14 修 1）：出口统一走 [EventSink]，保留「只留最新一条」语义。 */
+    private val sink = EventSink<MuxGeneration>(capacity = 4, replay = 1, overflow = BufferOverflow.DROP_OLDEST)
+
+    val generations: SharedFlow<MuxGeneration> = sink.events
 
     @Volatile private var generation: MuxGeneration? = null
 
@@ -194,7 +193,7 @@ class DshMux(
         )
         generation = g
         onPhase(MuxPhase.Ready(g))
-        _generations.tryEmit(g)
+        sink.emit(g)
         streams.values.forEach { reopen -> scope.launch { runCatching { reopen(g) } } }
     }
 

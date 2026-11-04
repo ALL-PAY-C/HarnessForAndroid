@@ -21,6 +21,8 @@ import dev.dsh.mobile.core.protocol.Compactor
 import dev.dsh.mobile.core.protocol.DshEvent
 import dev.dsh.mobile.core.protocol.DshTransport
 import dev.dsh.mobile.core.protocol.LocalEngineTransport
+import dev.dsh.mobile.core.protocol.RecallLookup
+import dev.dsh.mobile.core.protocol.RecallReport
 import dev.dsh.mobile.core.protocol.SessionProjection
 import dev.dsh.mobile.core.protocol.SessionProjections
 import dev.dsh.mobile.core.protocol.WarmRefresher
@@ -167,6 +169,24 @@ internal suspend fun ChatRepository.refreshWarmImpl(sessionId: String): WarmRefr
     } catch (e: Throwable) {
         AppLog.w("refreshWarm failed: " + (e.message ?: e.javaClass.simpleName))
         WarmRefreshReport(null, "温层刷新失败：" + (e.message ?: e.javaClass.simpleName))
+    }
+}
+
+/**
+ * T9.8-S4：/recall 真入口。查库在 transport 侧（要 messages.rowid），仓库只做门面与异常兜底。
+ *
+ * 与 [refreshWarmImpl] 同形：不支持就返回 null，让 UI 说「当前引擎不支持回捞」而不是假装查过。
+ */
+internal suspend fun ChatRepository.recallImpl(sessionId: String, query: String): RecallReport? {
+    val t = requireTransport()
+    val lookup = t as? RecallLookup ?: return null
+    return try {
+        lookup.recall(sessionId, query)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        AppLog.w("recall failed: " + (e.message ?: e.javaClass.simpleName))
+        RecallReport(message = "回捞失败：" + (e.message ?: e.javaClass.simpleName))
     }
 }
 

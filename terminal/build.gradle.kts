@@ -25,6 +25,15 @@ android {
             path = file("src/main/jni/Android.mk")
         }
     }
+
+    testOptions {
+        unitTests {
+            // TerminalEmulator 只在 OSC 52 / 日志路径上碰 android.util.Base64 与 android.util.Log。
+            // JVM 单测拿到的 android.jar 是桩，不打这个开关会抛 "not mocked"；返回默认值即可，
+            // 这些调用不参与任何断言。
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
@@ -34,4 +43,7 @@ dependencies {
     // terminal 需要更高的 1.9.1 / 1.15.0（Gradle 取高版本，其它模块的解析结果不变）。
     implementation("androidx.annotation:annotation:1.9.1")
     implementation("androidx.core:core-ktx:1.15.0")
+
+    // TerminalEmulatorTest：只吃 JVM（emulator / buffer / WcWidth 全是纯 Kotlin），不引 Robolectric。
+    testImplementation(libs.junit)
 }

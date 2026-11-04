@@ -29,6 +29,7 @@ import dev.dsh.mobile.core.model.Session
 import dev.dsh.mobile.core.model.SessionKind
 import dev.dsh.mobile.core.model.TokenUsage
 import dev.dsh.mobile.core.protocol.CompactResult
+import dev.dsh.mobile.core.protocol.RecallReport
 import dev.dsh.mobile.core.protocol.group.LedgerSnapshot
 import dev.dsh.mobile.core.protocol.group.RoomLedgers
 import dev.dsh.mobile.core.protocol.SessionProjection
@@ -484,6 +485,41 @@ class ChatViewModel(
                 )
             } finally {
                 warmingState.value = false
+            }
+        }
+    }
+
+    /** /recall 正在查（T9.8-S4）：同 /compact 一样不并发。 */
+    private val recallingState = MutableStateFlow(false)
+
+    val recalling: StateFlow<Boolean> = recallingState.asStateFlow()
+
+    /** 最近一次 /recall 的回执：只给 UI 折叠加行用（rowid + 角色），原文不倒进界面。 */
+    private val recallNoteState = MutableStateFlow<RecallReport?>(null)
+
+    val recallNote: StateFlow<RecallReport?> = recallNoteState.asStateFlow()
+
+    /**
+     * T9.8-S4 /recall 真入口：查库在 transport 侧（要 messages.rowid），这里只拿回执。
+     *
+     * 命中块由 transport 留到下一轮装配，本方法**不**往消息表写任何东西 —— UI 条数不变。
+     * 返回 null = 当前引擎不支持回捞（远端 ACP 之类），如实回一句。
+     */
+    fun recallHistory(query: String) {
+        if (recallingState.value) return
+        recallingState.value = true
+        viewModelScope.launch {
+            try {
+                val report = try {
+                    repo.recall(sessionId, query)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    null
+                }
+                recallNoteState.value = report ?: RecallReport(message = "当前引擎不支持历史回捞。")
+            } finally {
+                recallingState.value = false
             }
         }
     }

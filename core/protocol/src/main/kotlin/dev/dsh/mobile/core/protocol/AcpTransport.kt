@@ -79,12 +79,10 @@ class AcpTransport(
         identityEveryTurns = identityEveryTurns,
     )
 
-    private val _events = MutableSharedFlow<DshEvent>(
-        replay = 0,
-        extraBufferCapacity = 512,
-        onBufferOverflow = BufferOverflow.SUSPEND,
-    )
-    override val events: SharedFlow<DshEvent> = _events.asSharedFlow()
+    /** 事件出口（T9.14 修 1）：唯一实现是 [EventSink]，丢弃统一计数。 */
+    private val sink = EventSink<DshEvent>()
+
+    override val events: SharedFlow<DshEvent> = sink.events
 
     private val _state = MutableStateFlow<RuntimeState>(RuntimeState.NotConfigured)
     override val state: StateFlow<RuntimeState> = _state.asStateFlow()
@@ -140,7 +138,7 @@ class AcpTransport(
         when (method) {
             "session/update" -> handleUpdate(params)
             "session/request_permission" -> handlePermissionRequest(params, obj.long("id"))
-            else -> _events.tryEmit(DshEvent.Raw(method, params))
+            else -> sink.emit(DshEvent.Raw(method, params))
         }
     }
 
@@ -148,22 +146,22 @@ class AcpTransport(
         val sid = params.str("sessionId") ?: return
         val up = params.obj("update") ?: params
         when (val kind = up.str("sessionUpdate")) {
-            "agent_message_chunk" -> textOf(up)?.let { _events.tryEmit(DshEvent.MessageChunk(sid, it)) }
-            "agent_thought_chunk" -> textOf(up)?.let { _events.tryEmit(DshEvent.ThoughtChunk(sid, it)) }
+            "agent_message_chunk" -> textOf(up)?.let { sink.emit(DshEvent.MessageChunk(sid, it)) }
+            "agent_thought_chunk" -> textOf(up)?.let { sink.emit(DshEvent.ThoughtChunk(sid, it)) }
             "user_message_chunk" -> Unit
             "tool_call", "tool_call_update" -> parseToolCall(sid, up)
             "plan" -> {
                 val steps = up.arr("entries")?.mapNotNull { (it as? JsonObject)?.str("content") } ?: emptyList()
-                _events.tryEmit(DshEvent.Plan(sid, steps))
+                sink.emit(DshEvent.Plan(sid, steps))
             }
             "usage_update" -> parseUsage(sid, up)
             "available_commands_update" -> {
                 val cmds = up.arr("availableCommands")
                     ?.mapNotNull { (it as? JsonObject)?.str("name") } ?: emptyList()
-                _events.tryEmit(DshEvent.Commands(sid, cmds))
+                sink.emit(DshEvent.Commands(sid, cmds))
             }
             "config_option_update" -> parseConfigOptions(sid, up)
-            else -> _events.tryEmit(DshEvent.Raw("session/update:$kind", up))
+            else -> sink.emit(DshEvent.Raw("session/update:$kind", up))
         }
     }
 
@@ -185,7 +183,7 @@ class AcpTransport(
             },
             detail = up.str("content") ?: "",
         )
-        _events.tryEmit(DshEvent.ToolCallEvent(sid, call))
+        sink.emit(DshEvent.ToolCallEvent(sid, call))
     }
 
     private fun parseUsage(sid: String, up: JsonObject) {
@@ -195,7 +193,7 @@ class AcpTransport(
             output = u.long("outputTokens") ?: u.long("output") ?: 0L,
             cached = u.long("cachedReadTokens") ?: u.long("cached") ?: 0L,
         )
-        _events.tryEmit(DshEvent.Usage(sid, usage, cumulative = true))
+        sink.emit(DshEvent.Usage(sid, usage, cumulative = true))
     }
 
     private fun parseConfigOptions(sid: String, up: JsonObject) {
@@ -212,7 +210,7 @@ class AcpTransport(
                 } ?: emptyList(),
             )
         }
-        _events.tryEmit(DshEvent.ConfigOptions(sid, options))
+        sink.emit(DshEvent.ConfigOptions(sid, options))
     }
 
     private fun handlePermissionRequest(params: JsonObject, rpcId: Long?) {
@@ -228,7 +226,7 @@ class AcpTransport(
         val reqId = rpcId?.toString() ?: mux.nextRequestId().toString()
         if (rpcId != null) mux.registerApproval(reqId, rpcId)
         val title = params.obj("toolCall")?.str("title") ?: "请求权限"
-        _events.tryEmit(DshEvent.Permission(sid, PermissionRequest(sid, reqId, title, options)))
+        sink.emit(DshEvent.Permission(sid, PermissionRequest(sid, reqId, title, options)))
     }
 
     // ------------------------------------------------------------------- rpc
@@ -289,7 +287,7 @@ class AcpTransport(
         )
         val stopReason = res.str("stopReason") ?: "end_turn"
         if (turnId != null) {
-            // P5 barrier：响应到达后把带 turnId 的终态 marker 可靠送入事件流（emit 非 tryEmit），
+            // P5 barrier：响应到达后把带 turnId 的终态 marker 可靠送入事件流（走挂起发送，不用非挂起门面），
             // 并等 collector 消费完 marker（即消费完所有先到的旧 chunk）后才返回。
             // 这样 sendGate 释放时旧流一定已被消费，不会污染新轮。
             val ack = CompletableDeferred<Unit>()
@@ -298,7 +296,7 @@ class AcpTransport(
                 // N-3：emit 与 ack 同纳入有界等待 —— collector 卡死时 buffer 满 emit 会无限挂起，
                 // 必须整体受超时约束，超时抛明确 Err（不假成功、不永挂、不泄漏 turnAcks）。
                 withTimeout(30_000L) {
-                    _events.emit(DshEvent.TurnEnd(sessionId, stopReason, turnId = turnId))
+                    sink.emitOrAwait(DshEvent.TurnEnd(sessionId, stopReason, turnId = turnId))
                     ack.await()
                 }
             } catch (e: TimeoutCancellationException) {

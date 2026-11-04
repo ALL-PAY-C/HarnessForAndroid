@@ -25,8 +25,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -57,6 +55,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import dev.dsh.mobile.core.model.context.WarmLayerStore
 import dev.dsh.mobile.core.protocol.context.Compaction
+import dev.dsh.mobile.core.protocol.context.RecallHit
+import dev.dsh.mobile.core.protocol.context.RecallPlanner
 import dev.dsh.mobile.core.protocol.context.WarmAssembly
 import dev.dsh.mobile.core.protocol.context.WarmMessage
 import dev.dsh.mobile.core.protocol.context.WarmRefreshReport
@@ -274,43 +274,44 @@ class LocalEngineTransport(
     private val warmStore: WarmLayerStore? = null,
     /** 温层输入历史（带 messages.rowid）：不注入时温层拿不到输入，等于关闭。 */
     private val warmHistoryProvider: (suspend (String) -> List<WarmMessage>)? = null,
-) : DshTransport, Compactor, WarmRefresher {
+    /**
+     * 冷层回捞的词搜索（T9.8 S4）：(sessionId, 已转义 LIKE, limit) -> 命中行（带 rowid）。
+     *
+     * 不注入 = 自动回捞整段关闭，装配出的消息序列与 S3 逐字节相同 —— 宿主没有 messages 表时
+     * 本类不该假装能查。
+     */
+    private val recallSearch: (suspend (String, String, Int) -> List<RecallHit>)? = null,
+    /** 冷层回捞的区间查询（rowid 闭区间）：/recall R<n> 与「最近 200 条」兜底都走它。 */
+    private val recallRows: (suspend (String, Long, Long, Int) -> List<RecallHit>)? = null,
+) : DshTransport, Compactor, WarmRefresher, RecallLookup {
 
     /**
-     * 事件出口（T96 P0-3）：无界缓冲的 SharedFlow。
+     * 事件出口（T9.14 修 1）：唯一实现是 [EventSink]，本类只保留「非挂起 / 挂起」两个门面。
      *
-     * 以前是 MutableSharedFlow(extraBufferCapacity = 512)，默认 onBufferOverflow = SUSPEND，
-     * 而调用侧用的是 tryEmit —— 慢 collector 一来事件就静默丢弃：正文缺一段、TurnEnd 没送到，
-     * 界面表现成「说着说着停了」且没有任何报错。
-     *
-     * 这里把缓冲抬到 [Channel.UNLIMITED]（= Int.MAX_VALUE），与 Channel(UNLIMITED) 等价，
-     * 发送端在慢 collector 下不再失败；[post] 仍然检查 tryEmit 的返回值并计数，丢事件从无声变成可查。
-     * 没换成 Channel + receiveAsSharedFlow：kotlinx-coroutines 1.9.0 没有这个扩展
-     * （receiveAsFlow 返回的是 Flow、不是 SharedFlow）；用 shareIn 起泵协程又会在 runTest 的
-     * TestScope 里留下永不结束的子协程，测试收尾直接失败。
+     * 以前是 MutableSharedFlow(extraBufferCapacity = 512) + 非挂起发送：慢 collector 一来事件就静默丢弃，
+     * 正文缺一段、TurnEnd 没送到，界面表现成「说着说着停了」且没有任何报错。
+     * 现在缓冲无界、丢弃统一计数（[droppedEventCount]），关键事件走 [postCritical] 阻塞到消费者接走。
      */
-    private val _events = MutableSharedFlow<DshEvent>(
-        extraBufferCapacity = Channel.UNLIMITED,
-        onBufferOverflow = BufferOverflow.SUSPEND,
-    )
+    private val sink = EventSink<DshEvent>()
 
-    override val events: SharedFlow<DshEvent> = _events.asSharedFlow()
+    override val events: SharedFlow<DshEvent> = sink.events
 
-    /** 累计丢弃的事件数：正常恒为 0（只有缓冲溢出时才会增长）。 */
-    private val droppedEvents = java.util.concurrent.atomic.AtomicLong()
+    /** 累计丢弃的事件数（正常恒为 0）：只有流式 delta 这类可丢事件在缓冲溢出时才会增长。 */
+    val droppedEventCount: Long get() = sink.droppedEventCount
 
     /** 最后一次推出事件的时间戳：prompt 用它区分「这一轮真卡死了」和「只是慢」。 */
     private val lastEventAt = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
 
-    internal fun droppedEventCount(): Long = droppedEvents.get()
-
-    /** 非挂起发送：tryEmit 失败（缓冲溢出）才计数，不让丢事件变成静默行为。 */
+    /** 非挂起发送（流式 delta 等可丢事件）：溢出时由 [EventSink] 计数 + 打日志。 */
     private fun post(e: DshEvent) {
         lastEventAt.set(System.currentTimeMillis())
-        if (!_events.tryEmit(e)) {
-            droppedEvents.incrementAndGet()
-            AppLog.w("event dropped(" + droppedEvents.get() + "): " + e.javaClass.simpleName)
-        }
+        sink.emit(e)
+    }
+
+    /** 挂起发送（TurnEnd / ToolCallEvent / Compacted / Permission）：缓冲满时等消费者接走，丢一条 UI 就永远转圈。 */
+    private suspend fun postCritical(e: DshEvent) {
+        lastEventAt.set(System.currentTimeMillis())
+        sink.emitOrAwait(e)
     }
 
     private val _state = MutableStateFlow<RuntimeState>(RuntimeState.NotConfigured)
@@ -383,7 +384,7 @@ class LocalEngineTransport(
      * 有界并行执行池：最多 [GROUP_MAX_PARALLEL] 个成员同时跑；同 session 同 agent 串行。
      * 以前是单协程串行消费，群里 4 个人排队 4 轮，等于串行聊天。
      */
-    private val pool = ExecutionPool(scope, maxParallelSetting = GROUP_MAX_PARALLEL, permissionEvent = { _events.emit(it) }) { task -> groupRunner.runMemberTask(task) }
+    private val pool = ExecutionPool(scope, maxParallelSetting = GROUP_MAX_PARALLEL, permissionEvent = { sink.emitOrAwait(it) }) { task -> groupRunner.runMemberTask(task) }
     val agentStates: StateFlow<Map<String, AgentRuntimeState>> get() = pool.agents
 
     private val http = OkHttpClient.Builder()
@@ -412,7 +413,7 @@ class LocalEngineTransport(
         onCompacted = { sid ->
             // 压缩后把温层水位/版本一起带出去（S3）：消费者不必回读库就知道「记忆已经换过代」。
             val layer = runCatching { warmStore?.layer(sid) }.getOrNull()
-            post(
+            postCritical(
                 DshEvent.Compacted(
                     sessionId = sid,
                     warmVersion = layer?.warmVersion ?: 0,
@@ -563,7 +564,7 @@ class LocalEngineTransport(
             AppLog.w("turn idle timeout (" + TURN_IDLE_TIMEOUT_MS + "ms): " + sessionId)
             job.cancel()
             post(DshEvent.MessageChunk(sessionId, "（本轮超时：超过 " + TURN_IDLE_TIMEOUT_MS / 1000 + " 秒没有任何输出，已中止）", turnId = turnId))
-            post(DshEvent.TurnEnd(sessionId, "error", turnId = turnId))
+            postCritical(DshEvent.TurnEnd(sessionId, "error", turnId = turnId))
         }
         jobs.remove(sessionId)
         return "ok"
@@ -694,6 +695,16 @@ class LocalEngineTransport(
                 messages.add(1, buildJsonObject {
                     put("role", "system")
                     put("content", warmText)
+                })
+            }
+            // [装配·回捞] 最终序列 system（含身份卡）→ 温层 → 回捞 → 历史 → 尾部 user。
+            // 回捞排在温层之后、历史之前：它是「历史里被裁掉那段的线索」，位置比历史更靠前才读得到。
+            // 判定为假 / 没命中时这里一条都不加 —— 消息序列与 S3 逐字节相同（有单测锁死）。
+            val recallText = recallBlock(sessionId, userText, assembly.fullChars, budgetChars)
+            if (recallText != null) {
+                messages.add(if (warmText != null) 2 else 1, buildJsonObject {
+                    put("role", "system")
+                    put("content", recallText)
                 })
             }
             AppLog.w("single context usedChars=${assembly.usedChars} fullChars=${assembly.fullChars} overBudget=${assembly.overBudget} overflowChars=${assembly.overflowChars}")
@@ -852,13 +863,13 @@ class LocalEngineTransport(
                         kotlinx.coroutines.currentCoroutineContext().ensureActive()
                         AppLog.w("llm retry failed: ${second.message}")
                         post(DshEvent.MessageChunk(sessionId, "\n\n[请求失败] " + stream.friendlyRequestError(second, cfg.baseUrl, userImages.isNotEmpty()), authorId, authorName, turnId))
-                        post(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
+                        postCritical(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
                         return
                     }
                 } else {
                     AppLog.w("llm call failed: ${e.message}")
                     post(DshEvent.MessageChunk(sessionId, "\n\n[请求失败] " + stream.friendlyRequestError(e, cfg.baseUrl, userImages.isNotEmpty()), authorId, authorName, turnId))
-                    post(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
+                    postCritical(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
                     return
                 }
             }
@@ -976,7 +987,7 @@ class LocalEngineTransport(
             // 断流：上游在 [DONE] 之前就关了连接。正文已流式发出，补一句标注并落到终态（不再 Running）。
             if (resp.bool("dsh_eof_without_done") == true) {
                 post(DshEvent.MessageChunk(sessionId, "（回复中断 · 连接意外断开，请重试）", authorId, authorName, turnId))
-                post(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
+                postCritical(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
                 return
             }
 
@@ -998,7 +1009,7 @@ class LocalEngineTransport(
                     val note = "（本轮工具调用被截断：上游在闭合标签前断了流，这个调用没有执行。可以让我重试一次。）"
                     post(DshEvent.MessageChunk(sessionId, if (visibleChars > 0) "\n\n" + note else note, authorId, authorName, turnId))
                     visibleChars += note.length
-                    post(DshEvent.TurnEnd(sessionId, "truncated", authorId, turnId, truncatedToolCall = true))
+                    postCritical(DshEvent.TurnEnd(sessionId, "truncated", authorId, turnId, truncatedToolCall = true))
                     return
                 }
                 // 上游这一轮什么都没给（error 字段 / choices 为空 / 被长度截断 / 纯空正文）时，
@@ -1014,12 +1025,12 @@ class LocalEngineTransport(
                             DshEvent.MessageChunk(sessionId, "（本轮没有任何输出：" + cause + "）", authorId, authorName, turnId),
                         )
                     }
-                    post(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
+                    postCritical(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
                     return
                 }
                 // 模型自己收尾：工具失败后没再说话、上游只回空，都在这里交代一句。
                 emitTurnEndNotice(reason = "stop")
-                post(DshEvent.TurnEnd(sessionId, "stop", authorId, turnId))
+                postCritical(DshEvent.TurnEnd(sessionId, "stop", authorId, turnId))
                 return
             }
 
@@ -1054,7 +1065,7 @@ class LocalEngineTransport(
                 }
                 if (args == null) {
                     AppLog.w("tool args is not json (truncated?): " + argsRaw.take(120))
-                    post(
+                    postCritical(
                         DshEvent.ToolCallEvent(
                             sessionId,
                             ToolCall(
@@ -1074,7 +1085,7 @@ class LocalEngineTransport(
                     val note = "（工具参数不完整，本轮没有执行工具：可以让我重试一次）"
                     post(DshEvent.MessageChunk(sessionId, if (visibleChars > 0) "\n\n" + note else note, authorId, authorName, turnId))
                     visibleChars += note.length
-                    post(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
+                    postCritical(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
                     return
                 }
                 // shell 用 command 字段；phone 等工具用完整参数 JSON 作为展示与去重键（含坐标，避免同动作不同坐标被误合并）。
@@ -1091,7 +1102,7 @@ class LocalEngineTransport(
                 // A：死循环 → 本次不执行，结束本轮；同轮重复 → 复用上次结果，不再执行。
                 val verdict = loopGuard.check(signature)
                 if (verdict is ToolVerdict.Loop) {
-                    post(
+                    postCritical(
                         DshEvent.ToolCallEvent(
                             sessionId,
                             ToolCall(
@@ -1109,11 +1120,11 @@ class LocalEngineTransport(
                         ),
                     )
                     emitTurnEndNotice(reason = "tool_loop", loopDetail = verdict.detail)
-                    post(DshEvent.TurnEnd(sessionId, "tool_loop", authorId, turnId))
+                    postCritical(DshEvent.TurnEnd(sessionId, "tool_loop", authorId, turnId))
                     return
                 }
                 val output: String = if (verdict is ToolVerdict.Reuse) {
-                    post(
+                    postCritical(
                         DshEvent.ToolCallEvent(
                             sessionId,
                             ToolCall(
@@ -1133,7 +1144,7 @@ class LocalEngineTransport(
                     )
                     verdict.cachedOutput
                 } else {
-                    post(
+                    postCritical(
                         DshEvent.ToolCallEvent(
                             sessionId,
                             ToolCall(
@@ -1247,7 +1258,7 @@ class LocalEngineTransport(
                     } else {
                         "[执行失败] " + (result.error ?: "未知错误") + "\n" + result.output
                     }
-                    post(
+                    postCritical(
                         DshEvent.ToolCallEvent(
                             sessionId,
                             ToolCall(
@@ -1292,14 +1303,14 @@ class LocalEngineTransport(
                     turnId,
                 ),
             )
-            post(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
+            postCritical(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
             return
         }
 
         // 兜底：最后一轮本该无工具、正常 return；万一上游还硬塞 tool_calls，
         // 也不能让这一轮悬着不结算。
         emitTurnEndNotice(reason = "stop", roundsExhausted = true)
-        post(DshEvent.TurnEnd(sessionId, "stop", authorId, turnId))
+        postCritical(DshEvent.TurnEnd(sessionId, "stop", authorId, turnId))
     }
 
 
@@ -1382,13 +1393,13 @@ class LocalEngineTransport(
         directPermissions[request.requestId] = gate
         directOwners[request.requestId] = sessionId
         return try {
-            _events.emit(DshEvent.Permission(sessionId, request))
+            sink.emitOrAwait(DshEvent.Permission(sessionId, request))
             withTimeoutOrNull(PERMISSION_TIMEOUT_MS) { gate.await() } ?: "deny"
         } finally {
             directPermissions.remove(request.requestId)
             directOwners.remove(request.requestId)
             kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                _events.emit(DshEvent.PermissionResolved(sessionId, request.requestId))
+                sink.emitOrAwait(DshEvent.PermissionResolved(sessionId, request.requestId))
             }
         }
     }
@@ -1535,6 +1546,108 @@ class LocalEngineTransport(
     // （去重水位在 Compaction.refreshWarm 里按 rowid 判断）。返回 null = 没可刷的东西。
     override suspend fun refreshWarm(sessionId: String): WarmRefreshReport =
         compaction.refreshWarm(sessionId)
+
+    // ------------------------------------------------------------------ 冷层回捞（T9.8 S4）
+
+    /** 手动 /recall 攒下的命中：只喂下一轮装配一次，用完即弃；绝不写回 messages 表。 */
+    private val manualRecall = java.util.concurrent.ConcurrentHashMap<String, List<RecallHit>>()
+
+    /**
+     * 本轮要不要插一条回捞 system 块。
+     *
+     * 两个来源：① 手动 /recall 攒下的命中（优先，用掉即清）；② 自动回捞 —— 只有历史真被截断
+     * （[historyChars] > [budgetChars]）且抽到检索词时才查库，否则一条 SQL 都不发。
+     * 预算吃紧时上限收到 800（先砍回捞，温层 LOCKED 不动）。返回 null = 不插。
+     */
+    private suspend fun recallBlock(
+        sessionId: String,
+        userText: String,
+        historyChars: Int,
+        budgetChars: Int,
+    ): String? {
+        val cap = RecallPlanner.capFor(historyChars, budgetChars)
+        val manual = manualRecall.remove(sessionId)
+        if (manual != null && manual.isNotEmpty()) {
+            return RecallPlanner.format(manual, minOf(cap, RecallPlanner.CAP_CHARS))
+        }
+        if (!RecallPlanner.needsRecall(userText, historyChars, budgetChars)) return null
+        val search = recallSearch ?: return null
+        val terms = RecallPlanner.keywords(userText).take(RecallPlanner.MAX_TERMS)
+        if (terms.isEmpty()) return null
+        val hits = java.util.LinkedHashMap<Long, RecallHit>()
+        for (term in terms) {
+            val rows = runCatching { search(sessionId, RecallPlanner.escapeLike(term), RecallPlanner.PER_TERM_LIMIT) }
+                .onFailure { AppLog.w("回捞查询失败，忽略：" + (it.message ?: it.javaClass.simpleName)) }
+                .getOrDefault(emptyList())
+            rows.forEach { hits.putIfAbsent(it.rowId, it) }
+        }
+        return RecallPlanner.format(topHits(hits.values), cap)
+    }
+
+    /**
+     * /recall：`<词>` 按词查，`R<n>` 按第 n 次压缩的区间查（区间丢了按最近 200 条兜底）。
+     *
+     * 命中块留给下一轮装配（[manualRecall]），原文只回一句 rowid 摘要给 UI —— 不倒正文。
+     */
+    override suspend fun recall(sessionId: String, query: String): RecallReport {
+        val q = query.trim()
+        if (q.isEmpty()) return RecallReport(message = "用法：/recall <词> 或 /recall R<序号>。")
+        val round = RecallPlanner.roundOf(q)
+        val hits = if (round != null) recallByRound(sessionId, round) else recallByTerm(sessionId, q)
+        if (hits.isEmpty()) {
+            return RecallReport(message = "没有回捞到匹配「" + q.take(40) + "」的历史。")
+        }
+        manualRecall[sessionId] = hits
+        val from = hits.minOf { it.rowId }
+        val to = hits.maxOf { it.rowId }
+        return RecallReport(
+            hits = hits.size,
+            fromRowId = from,
+            toRowId = to,
+            rows = hits.map { "rowid " + it.rowId + " · " + it.role },
+            message = "已回捞 " + hits.size + " 条历史（rowid " + from + "-" + to + "），下一条消息带上。",
+            text = RecallPlanner.format(hits, RecallPlanner.CAP_CHARS),
+        )
+    }
+
+    /** 按词查：词本身也当检索词，逐词 LIKE，最多 3 个词，去重后取最新 6 条。 */
+    private suspend fun recallByTerm(sessionId: String, text: String): List<RecallHit> {
+        val search = recallSearch ?: return emptyList()
+        val terms = (listOf(text.trim()) + RecallPlanner.keywords(text))
+            .filter { it.length >= 2 }
+            .take(RecallPlanner.MAX_TERMS)
+        val hits = java.util.LinkedHashMap<Long, RecallHit>()
+        for (term in terms) {
+            val rows = runCatching { search(sessionId, RecallPlanner.escapeLike(term), RecallPlanner.PER_TERM_LIMIT) }
+                .getOrDefault(emptyList())
+            rows.forEach { hits.putIfAbsent(it.rowId, it) }
+        }
+        return topHits(hits.values)
+    }
+
+    /**
+     * 按压缩轮次查：区间记得就直接取该区间（新→旧取 200 条再挑 6 条）；
+     * 区间没记过（进程重启过）就退回最近 200 条。
+     */
+    private suspend fun recallByRound(sessionId: String, round: Int): List<RecallHit> {
+        val rows = recallRows ?: return emptyList()
+        val range = compaction.recallRange(sessionId, round)
+        if (range != null) {
+            val inRange = runCatching {
+                rows(sessionId, range.first, range.last, RecallPlanner.FALLBACK_WINDOW)
+            }.getOrDefault(emptyList())
+            if (inRange.isNotEmpty()) return inRange.take(RecallPlanner.MAX_HITS)
+        }
+        val window = runCatching {
+            rows(sessionId, 0L, Long.MAX_VALUE, RecallPlanner.FALLBACK_WINDOW)
+        }.getOrDefault(emptyList())
+        return window.take(RecallPlanner.MAX_HITS)
+    }
+
+    private fun topHits(all: Collection<RecallHit>): List<RecallHit> =
+        all.filter { it.text.isNotBlank() }
+            .sortedByDescending { it.rowId }
+            .take(RecallPlanner.MAX_HITS)
 
     /**
      * 子代理嵌套上限（T5.3）：默认 2。深度口径 = 当前执行者层级，主代理第 0 层。

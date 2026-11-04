@@ -24,6 +24,7 @@ import android.view.accessibility.AccessibilityWindowInfo
 import dev.dsh.mobile.core.common.device.CapabilityActions
 import dev.dsh.mobile.toolbridge.ShizukuChannel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -34,6 +35,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToInt
 
 data class PhoneResult(
@@ -154,7 +156,7 @@ class PhoneBridge(
             .also { PhoneAccessibilityService.current()?.onActionRecorded(it) }
     }
 
-    private fun execBlocking(json: String): PhoneResult {
+    private suspend fun execBlocking(json: String): PhoneResult {
         // T4.5 六类系统能力走系统 API，不依赖无障碍，也不依赖前台界面 ——
         // 必须排在 svc 判空之前，否则没开无障碍就永远用不了这六个动作。
         capabilityBlocking(json)?.let { return it }
@@ -225,7 +227,7 @@ class PhoneBridge(
      * 缺权限不抛异常，回 E_PERMISSION_DENIED + needsPermission，模型据此提示用户去授权；
      * 系统 API 抛的异常同样翻成错误包 —— 抛出去会被执行器当可重试错误，副作用可能已经落地。
      */
-    private fun capabilityBlocking(json: String): PhoneResult? {
+    private suspend fun capabilityBlocking(json: String): PhoneResult? {
         val obj = runCatching { JSONObject(json) }.getOrNull() ?: return null
         val action = obj.optString("action", "")
         if (!CapabilityActions.isCapabilityAction(action)) return null
@@ -242,6 +244,8 @@ class PhoneBridge(
                 else -> null
             }
         } catch (t: Throwable) {
+            // 取消必须原样上抛：吞掉 CancellationException 会把「取消」变成「继续执行」。
+            if (t is CancellationException) throw t
             failResult(PhoneErrorCode.ActionRejected, action + " 失败：" + (t.message ?: t.javaClass.simpleName))
         }
     }
@@ -344,7 +348,7 @@ class PhoneBridge(
         )
     }
 
-    private fun doAudioRecord(obj: JSONObject, started: Long): PhoneResult {
+    private suspend fun doAudioRecord(obj: JSONObject, started: Long): PhoneResult {
         if (recording) return failResult(PhoneErrorCode.Busy, "正在录音，等这一条结束")
         val durationMs = obj.optLong("durationMs", 3000L).coerceIn(500L, 15_000L)
         val dir = File(context.cacheDir, "recordings").apply { mkdirs() }
@@ -358,9 +362,10 @@ class PhoneBridge(
             recorder.setOutputFile(out.absolutePath)
             recorder.prepare()
             recorder.start()
-            Thread.sleep(durationMs)
+            cancellableDelay(durationMs)
             recorder.stop()
         } catch (t: Throwable) {
+            if (t is CancellationException) throw t
             runCatching { recorder.reset() }
             return failResult(PhoneErrorCode.ArtifactWrite, "录音失败：" + (t.message ?: t.javaClass.simpleName))
         } finally {
@@ -418,7 +423,7 @@ class PhoneBridge(
         else PhoneResult(false, "", "dispatchGesture 未接受滑动手势")
     }
 
-    private fun doType(svc: AccessibilityService, obj: JSONObject): PhoneResult {
+    private suspend fun doType(svc: AccessibilityService, obj: JSONObject): PhoneResult {
         // 只有真要用 v2 能力（定位/模式/逐字）才换路径；plain text 的旧串一字不动。
         val spec = PhoneTarget.parse(obj)
         if (spec != PhoneTargetSpec.None || obj.has("perChar") || obj.has("mode")) return doTypeV2(svc, obj, spec)
@@ -908,7 +913,7 @@ class PhoneBridge(
      * 输入法的过滤/联想会按字符触发，和一次性灌入语义不同。真正的按键注入需要 IME 侧支持，
      * 没有就如实回 E_ACTION_REJECTED，而不是假装输入成功。
      */
-    private fun doTypeV2(svc: AccessibilityService, obj: JSONObject, spec: PhoneTargetSpec): PhoneResult {
+    private suspend fun doTypeV2(svc: AccessibilityService, obj: JSONObject, spec: PhoneTargetSpec): PhoneResult {
         val started = System.currentTimeMillis()
         if (spec == PhoneTargetSpec.Invalid) return failResult(PhoneErrorCode.BadArgs, "target 解不出定位")
         val mode = obj.optString("mode", "set").lowercase()
@@ -950,7 +955,7 @@ class PhoneBridge(
             for (ch in target) {
                 prefix += ch
                 if (setTextOn(info, prefix)) sent++ else break
-                if (sent < target.length) Thread.sleep(intervalMs)
+                if (sent < target.length) cancellableDelay(intervalMs)
             }
         } else if (setTextOn(info, target)) {
             sent = target.length
@@ -1077,7 +1082,7 @@ class PhoneBridge(
      *
      * advanced 不看动作返回值，用滚动前后的树指纹判——dispatched=true 但没滚必须如实回。
      */
-    private fun doScroll(svc: AccessibilityService, obj: JSONObject): PhoneResult {
+    private suspend fun doScroll(svc: AccessibilityService, obj: JSONObject): PhoneResult {
         val started = System.currentTimeMillis()
         val direction = obj.optString("direction", "forward").lowercase()
         val forward = direction != "backward"
@@ -1123,11 +1128,11 @@ class PhoneBridge(
         // 判据用「树代次」而不是树指纹：代次由无障碍事件（CONTENT_CHANGED / WINDOWS_CHANGED）推进，
         // 事件驱动没有指纹那样的一致性延迟（实测同一次广播里连读 2.5s 指纹始终没变，
         // 而前后两次广播读到的内容确实移动了）。代次没动 = 这次滚动没落地。
-        fun awaitGeneration(since: Long, windowMs: Long): Boolean {
+        suspend fun awaitGeneration(since: Long, windowMs: Long): Boolean {
             val deadline = System.currentTimeMillis() + windowMs
             while (System.currentTimeMillis() < deadline) {
                 if (generationOf(svc) != since) return true
-                Thread.sleep(60)
+                cancellableDelay(60)
             }
             return generationOf(svc) != since
         }
@@ -1300,7 +1305,7 @@ class PhoneBridge(
     }
 
     /** wait_for：轮询判条件，超时回独立 E_WAIT_TIMEOUT（不复用 E_TIMEOUT）。 */
-    private fun doWaitFor(svc: AccessibilityService, obj: JSONObject): PhoneResult {
+    private suspend fun doWaitFor(svc: AccessibilityService, obj: JSONObject): PhoneResult {
         val started = System.currentTimeMillis()
         val req = PhoneWait.parse(obj) ?: return failResult(PhoneErrorCode.BadArgs, "wait_for 需要 cond 对象（type=…）")
         val phone = svcForeground()
@@ -1342,7 +1347,7 @@ class PhoneBridge(
                 }
             }
             if (System.currentTimeMillis() >= deadline) break
-            Thread.sleep(req.pollMs)
+            cancellableDelay(req.pollMs)
         }
         val payload = PhoneWait.describe(req.cond)
         if (!satisfied) {
@@ -1370,7 +1375,7 @@ class PhoneBridge(
     }
 
     /** 代次变化用服务自带的 awaitChange 等，别再自己轮询一次。 */
-    private fun awaitGenerationChange(
+    private suspend fun awaitGenerationChange(
         phone: PhoneAccessibilityService,
         req: PhoneWaitRequest,
         started: Long,
@@ -1477,7 +1482,7 @@ class PhoneBridge(
     }
 
     /** sequence：一次下发多步，单步失败即停（不回滚），把第几步与错误码回给模型。 */
-    private fun doSequence(svc: AccessibilityService, obj: JSONObject): PhoneResult {
+    private suspend fun doSequence(svc: AccessibilityService, obj: JSONObject): PhoneResult {
         val started = System.currentTimeMillis()
         val steps = when (val r = PhoneSequence.parse(obj.opt("steps"))) {
             is PhoneStepsResult.Bad -> return failResult(PhoneErrorCode.BadArgs, r.message)
@@ -1501,7 +1506,7 @@ class PhoneBridge(
                 abortCode = code
                 if (stopOnError) break
             }
-            if (step.waitAfterMs > 0) Thread.sleep(step.waitAfterMs)
+            if (step.waitAfterMs > 0) cancellableDelay(step.waitAfterMs)
         }
         return PhoneResult(
             true,
@@ -1510,7 +1515,7 @@ class PhoneBridge(
     }
 
     /** 单步判定：旧动作看 PhoneResult.ok，新动作看内层错误包（外层恒 ok）。 */
-    private fun classifyStep(svc: AccessibilityService, action: String, json: String): Triple<Boolean, String, String> {
+    private suspend fun classifyStep(svc: AccessibilityService, action: String, json: String): Triple<Boolean, String, String> {
         val result = execBlocking(json)
         val payload = runCatching { JSONObject(result.output) }.getOrNull()
         if (payload != null && payload.has("code")) {
@@ -1778,4 +1783,15 @@ class PhoneBridge(
         data class Failure(val code: Int) : ScreenshotOutcome()
         data object Timeout : ScreenshotOutcome()
     }
+}
+
+/**
+ * 协程可取消的等待：替代阻塞式线程睡眠。
+ *
+ * 取消时 [delay] 立刻抛 CancellationException —— 调用链上的 catch 必须原样上抛，
+ * 吞掉会让「用户取消」退化成「后台继续执行」。
+ */
+internal suspend fun cancellableDelay(ms: Long) {
+    if (ms <= 0L) return
+    delay(ms)
 }

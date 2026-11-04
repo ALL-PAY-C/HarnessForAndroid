@@ -92,8 +92,10 @@ class ExecutionPool(
     private val _stats = MutableStateFlow(PoolStats())
     val stats: StateFlow<PoolStats> = _stats.asStateFlow()
 
-    private val _events = MutableSharedFlow<AgentEvent>(extraBufferCapacity = 256)
-    val events: SharedFlow<AgentEvent> = _events.asSharedFlow()
+    /** 事件出口（T9.14 修 1）：唯一实现是 [EventSink]，丢弃统一计数。 */
+    private val sink = EventSink<AgentEvent>(capacity = 256)
+
+    val events: SharedFlow<AgentEvent> = sink.events
 
     private val lock = Any()
     private val completions = HashMap<String, CompletableDeferred<Unit>>()
@@ -409,7 +411,7 @@ class ExecutionPool(
     }
 
     private fun emit(event: AgentEvent) {
-        _events.tryEmit(event)
+        sink.emit(event)
     }
 
     /** 依赖先入队：保证 pump 看到的是「依赖在前」的顺序，同轮唤醒不会乱序。 */

@@ -26,6 +26,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import java.io.File
+import java.util.UUID
+import kotlin.coroutines.cancellation.CancellationException
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * 主进程侧的 [NodeEngine]：把每一条调用转发给 `:node` 进程里的 [NodeEngineService]。
@@ -92,6 +95,22 @@ class RemoteNodeEngine(
         }
     }
 
+    /** 在途请求：requestId → 应答信封。:node 侧 oneway 调用一发出就登记，结果从 [resultCallback] 回来。 */
+    private val pendingResults = ConcurrentHashMap<String, CompletableDeferred<String>>()
+
+    /** :node → 主进程的应答通道（T9.14 修 4）。这里只做 complete，不阻塞 binder 线程。 */
+    private val resultCallback = object : IDshNodeEngineResult.Stub() {
+        override fun onResult(requestId: String?, envelopeJson: String?) {
+            val id = requestId.orEmpty()
+            val deferred = pendingResults.remove(id)
+            if (deferred == null) {
+                AppLog.w("ENGINE_REMOTE_RESULT orphan id=${id.take(8)}")
+                return
+            }
+            deferred.complete(envelopeJson.orEmpty())
+        }
+    }
+
     override fun setHostCallHandler(handler: HostCallHandler?) {
         hostHandler = handler
     }
@@ -109,33 +128,41 @@ class RemoteNodeEngine(
         try {
             val svc = service()
             _state.value = NodeEngineState.Starting("等待 :node 引擎监听")
-            val port = svc.ensureStarted(pluginDirs.map { it.absolutePath }.toTypedArray())
+            val dirs = pluginDirs.map { it.absolutePath }.toTypedArray()
+            val envelope = JSONObject(awaitEnvelope("start", START_TIMEOUT_MS) { id -> svc.ensureStarted(id, dirs) })
+            if (!envelope.optBoolean("ok", false)) {
+                val err = envelope.optJSONObject("error") ?: JSONObject()
+                throw NodeEngineException(
+                    err.optString("stage").ifEmpty { "start" },
+                    err.optString("message").ifEmpty { "远程引擎启动失败" },
+                )
+            }
+            val port = envelope.optJSONObject("result")?.optInt("port", 0) ?: 0
             _state.value = NodeEngineState.Ready(port)
             AppLog.i("ENGINE_REMOTE_READY port=$port mainPid=${Process.myPid()}")
             Result.success(port)
-        } catch (t: RemoteException) {
-            // 服务端用 RemoteException 表达「引擎起不来」，message 就是原因原文。
+        } catch (t: Throwable) {
+            if (t is CancellationException) throw t
             val msg = t.message ?: "远程引擎启动失败"
             AppLog.e("ENGINE_REMOTE_START failed: $msg", t)
             _state.value = NodeEngineState.Failed(msg, retryable = true)
-            Result.failure(NodeEngineException("start", msg, t))
-        } catch (t: NodeEngineException) {
-            val msg = t.message ?: "引擎通道不可用"
-            AppLog.e("ENGINE_REMOTE_START failed: $msg", t)
-            _state.value = NodeEngineState.Failed(msg, retryable = true)
-            Result.failure(t)
+            Result.failure(if (t is NodeEngineException) t else NodeEngineException("start", msg, t))
         }
     }
 
     override suspend fun call(method: String, params: JSONObject): JSONObject = withContext(Dispatchers.IO) {
         val svc = service()
-        decode(remoteCall("$method") { svc.call(method, params.toString()) })
+        decode(awaitEnvelope("call $method", CALL_TIMEOUT_MS) { id -> svc.call(id, method, params.toString()) })
     }
 
     override suspend fun rpc(path: String, endpoint: String, payload: JSONObject): JSONObject =
         withContext(Dispatchers.IO) {
             val svc = service()
-            decode(remoteCall("rpc $path") { svc.rpc(path, endpoint, payload.toString()) })
+            decode(
+                awaitEnvelope("rpc $path", CALL_TIMEOUT_MS) { id ->
+                    svc.rpc(id, path, endpoint, payload.toString())
+                },
+            )
         }
 
     /**
@@ -153,7 +180,8 @@ class RemoteNodeEngine(
         }
         expectedDeath = true
         withContext(Dispatchers.IO) {
-            runCatching { svc.stop() }.onFailure { AppLog.w("ENGINE_REMOTE_STOP ${it.message}") }
+            runCatching { awaitEnvelope("stop", STOP_TIMEOUT_MS) { id -> svc.stop(id) } }
+                .onFailure { AppLog.w("ENGINE_REMOTE_STOP ${it.message}") }
             runCatching { svc.restart() }.onFailure { AppLog.w("ENGINE_REMOTE_RESTART ${it.message}") }
             // 立刻解绑：只要还有 client 绑着，系统就会在 :node 死后按 BIND_AUTO_CREATE 再把它拉起来，
             // stop() 就等于没停。解绑之后那个进程没有活下去的理由，restart() 的 kill 又保证它必死。
@@ -217,6 +245,8 @@ class RemoteNodeEngine(
             alive = true
             runCatching { svc.setCallback(callback) }
                 .onFailure { AppLog.w("ENGINE_NODE_SET_CALLBACK ${it.message}") }
+            runCatching { svc.setResultCallback(resultCallback) }
+                .onFailure { AppLog.w("ENGINE_NODE_SET_RESULT_CALLBACK ${it.message}") }
             AppLog.i("ENGINE_REMOTE_BOUND :node mainPid=${Process.myPid()}")
             pending?.complete(svc)
             pending = null
@@ -241,6 +271,9 @@ class RemoteNodeEngine(
         remote = null
         pending?.completeExceptionally(NodeEngineException("transport", reason))
         pending = null
+        // 在途请求全部就地失败，别让调用方干等到自己的超时。
+        pendingResults.values.forEach { it.completeExceptionally(NodeEngineException("transport", reason)) }
+        pendingResults.clear()
         if (expectedDeath) {
             expectedDeath = false
             _state.value = NodeEngineState.Stopped
@@ -263,13 +296,31 @@ class RemoteNodeEngine(
         }
     }
 
-    private fun remoteCall(what: String, block: () -> String): String = try {
-        block()
-    } catch (t: RemoteException) {
-        val msg = "引擎进程连接中断（$what）: ${t.message}"
-        AppLog.e("ENGINE_REMOTE_CALL $msg", t)
-        _state.value = NodeEngineState.Failed(msg, retryable = true)
-        throw NodeEngineException("transport", msg, t)
+    /**
+     * 发一条 oneway 调用并等它的应答（T9.14 修 4）。
+     *
+     * 以前这里是同步 AIDL：一条 llm.chat 就占住一条 binder 线程几分钟，16 条线程池一满，
+     * 连 :node 的反向 handleHostCall 都排不上。现在 binder 只做入队，结果从 [resultCallback] 回来。
+     *
+     * requestId 每次新生成，finally 里必定移除：:node 死了的话应答永远不来，
+     * 超时抛 NodeEngineException，调用方按 transport 失败处理。
+     */
+    private suspend fun awaitEnvelope(what: String, timeoutMs: Long, send: (String) -> Unit): String {
+        val id = UUID.randomUUID().toString()
+        val deferred = CompletableDeferred<String>()
+        pendingResults[id] = deferred
+        try {
+            send(id)
+            return withTimeoutOrNull(timeoutMs) { deferred.await() }
+                ?: throw NodeEngineException("transport", "引擎应答超时（$what，${timeoutMs}ms）")
+        } catch (t: RemoteException) {
+            val msg = "引擎进程连接中断（$what）: ${t.message}"
+            AppLog.e("ENGINE_REMOTE_CALL $msg", t)
+            _state.value = NodeEngineState.Failed(msg, retryable = true)
+            throw NodeEngineException("transport", msg, t)
+        } finally {
+            pendingResults.remove(id)
+        }
     }
 
     private fun decode(raw: String): JSONObject {
@@ -295,5 +346,12 @@ class RemoteNodeEngine(
     private companion object {
         const val BIND_TIMEOUT_MS = 15_000L
         const val STOP_SETTLE_MS = 500L
+
+        /** 启动要等 libnode 起来，给足 60s。 */
+        const val START_TIMEOUT_MS = 60_000L
+
+        /** 引擎调用没有上限（llm.chat 可能很久），这里只是防止应答永久丢失。 */
+        const val CALL_TIMEOUT_MS = 600_000L
+        const val STOP_TIMEOUT_MS = 30_000L
     }
 }

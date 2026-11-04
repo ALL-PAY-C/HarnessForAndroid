@@ -170,6 +170,8 @@ fun ChatScreen(
     val projection by viewModel.projection.collectAsStateWithLifecycle()
     val compacting by viewModel.compacting.collectAsStateWithLifecycle()
     val systemNotes by viewModel.systemNotes.collectAsStateWithLifecycle()
+    // /recall 回执（T9.8-S4）：只显示「回捞了几条、rowid 段」，原文不在这里。
+    val recallNote by viewModel.recallNote.collectAsStateWithLifecycle()
     // 手动指定的下一位发言人（一次有效，只在本会话内存里）。
     val pinnedSpeaker by viewModel.pinnedSpeaker.collectAsStateWithLifecycle()
     // 预设选择状态机：发出第一条消息前可选，之后锁定只读（与桌面 DSH 一致）。
@@ -499,6 +501,7 @@ fun ChatScreen(
             listState = listState,
             compacting = compacting,
             systemNotes = systemNotes,
+            recallNote = recallNote,
             messageSlot = messageSlot,
             composerFocus = composerFocus,
             onActionMessage = { actionMessage = it },
@@ -531,6 +534,11 @@ fun ChatScreen(
                 // T9.8-S2 手动温层：走 repo.refreshWarm → transport.refreshWarm（与 /compact 同款 shim）。
                 "/warm", "/温层" -> {
                     viewModel.refreshWarmContext()
+                    true
+                }
+                // T9.8-S4 手动回捞：带参数的形式在下面的发送闸门里分流（含空格也算指令）。
+                "/recall", "/回捞" -> {
+                    notice = "用法：/recall <词> 或 /recall R<序号>"
                     true
                 }
                 "/new" -> {
@@ -593,8 +601,20 @@ fun ChatScreen(
                 drafts = emptyList()
                 panelOpen = false
                 val cmd = text.trim()
-                val handled = images.isEmpty() && cmd.startsWith("/") && !cmd.contains(' ') &&
-                    runCatching { handleCommand(cmd) }.getOrDefault(false)
+                // /recall 带参数要带空格（/recall 温层、/recall R2）：只对这一条放宽「指令不许带空格」，
+                // 其余指令仍然只认单个 token，免得把「/clear 顺便说说」当指令吞掉。
+                val recallCmd = cmd.startsWith("/recall ") || cmd.startsWith("/回捞 ")
+                val handled = images.isEmpty() && cmd.startsWith("/") &&
+                    (recallCmd || !cmd.contains(' ')) &&
+                    runCatching {
+                        if (recallCmd) {
+                            // 命中块由 transport 留给下一轮装配：这里只把词交出去，消息表一条不写。
+                            viewModel.recallHistory(cmd.substringAfter(' ').trim())
+                            true
+                        } else {
+                            handleCommand(cmd)
+                        }
+                    }.getOrDefault(false)
                 if (!handled) {
                     // 三档策略跟设置走：默认排队，用户可以在设置里改成插入或打断。
                     viewModel.send(text, state.settings.sendMode, images)

@@ -19,6 +19,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
+import java.util.concurrent.Executors
 
 /**
  * 跑在 `:node` 独立进程里的引擎宿主。
@@ -30,13 +31,13 @@ import java.io.File
  *  2. 反向请求：NodeEngineHost 的 HostCallHandler 换成调 [IDshNodeEngineCallback]，
  *     也就是回主进程的 PluginHostCalls（llm.chat / credentials.*）。
  *
- * 为什么 binder 线程上可以直接阻塞：AIDL 方法是同步的，:node 只有主进程一个客户端，
- * 每个请求各自占一条 binder 线程，被阻塞的是 binder 线程池而不是主进程 UI 线程；
- * 反向回调走主进程的另一条 binder 线程，不构成环。
+ * 线程模型：binder 上收到的四个会落到引擎的方法（ensureStarted / call / rpc / stop）全是
+ * oneway，binder 线程只做入队就返回；真正的 runBlocking 跑在 [worker] 这条专用单线程上，
+ * 结果通过 [IDshNodeEngineResult] 异步送回主进程。binder 池因此永远不会被引擎的长调用占满。
  *
- * 失败语义：
- *  * [ensureStarted] 抛 [RemoteException]（message 即原因，主进程侧拿到 RemoteException 再包成 NodeEngineException）；
- *  * call / rpc 不抛，返回信封 JSON，把 stage / detail 原样带回去。
+ * 失败语义：一律走应答信封，不再抛 [RemoteException] ——
+ *  * ensureStarted 失败 → {"ok":false,"error":{"stage":"start","message":"..."}}；
+ *  * call / rpc 失败 → stage / message / detail 原样带回（见 [envelope]）。
  */
 class NodeEngineService : Service() {
 
@@ -47,6 +48,18 @@ class NodeEngineService : Service() {
     /** 主进程注册的回调；null 时引擎的反向请求会立刻得到 stage=host 的错误而不是超时。 */
     @Volatile
     private var callback: IDshNodeEngineCallback? = null
+
+    /** 主进程注册的应答回调；null 时结果只进日志（主进程已解绑）。 */
+    @Volatile
+    private var results: IDshNodeEngineResult? = null
+
+    /**
+     * 引擎调用的唯一执行线程。
+     *
+     * 单线程是刻意的：引擎侧是「一条 socket 行协议 + 一个 node-main 线程」，并发进来也只是排队，
+     * 单线程反而省掉了引擎内部的锁竞争；更关键的是它把阻塞从 binder 线程上彻底摘走。
+     */
+    private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "node-engine-calls") }
 
     override fun onCreate() {
         super.onCreate()
@@ -64,7 +77,9 @@ class NodeEngineService : Service() {
 
     override fun onDestroy() {
         AppLog.i("ENGINE_NODE_PROCESS destroy pid=${Process.myPid()}")
-        runCatching { runBlocking { engine.stop() } }
+        // 停引擎同样不能在主线程上阻塞：丢给 worker，shutdown() 会把它排队里的任务跑完再收线程。
+        worker.execute { runCatching { runBlocking { engine.stop() } } }
+        worker.shutdown()
         scope.cancel()
         super.onDestroy()
     }
@@ -115,6 +130,13 @@ class NodeEngineService : Service() {
             errorEnvelope("internal", t.message ?: t.toString(), null).toString()
         }
 
+    /** 把结果送回主进程；主进程已解绑/已死时静默丢弃（它那边的 awaitEnvelope 会按超时收场）。 */
+    private fun reply(requestId: String, envelope: JSONObject) {
+        val cb = results ?: return
+        runCatching { cb.onResult(requestId, envelope.toString()) }
+            .onFailure { AppLog.w("ENGINE_NODE_REPLY failed id=${requestId.take(8)}: ${it.message}") }
+    }
+
     private val binder = object : IDshNodeEngine.Stub() {
 
         override fun setCallback(cb: IDshNodeEngineCallback?) {
@@ -122,29 +144,68 @@ class NodeEngineService : Service() {
             AppLog.i("ENGINE_NODE_CALLBACK ${if (cb == null) "cleared" else "registered"}")
         }
 
-        override fun ensureStarted(pluginDirs: Array<out String>?): Int {
+        override fun setResultCallback(cb: IDshNodeEngineResult?) {
+            results = cb
+            AppLog.i("ENGINE_NODE_RESULT_CALLBACK ${if (cb == null) "cleared" else "registered"}")
+        }
+
+        override fun ensureStarted(requestId: String?, pluginDirs: Array<out String>?) {
+            val id = requestId.orEmpty()
             val dirs = pluginDirs?.map { File(it) }.orEmpty()
-            val started = runBlocking { engine.ensureStarted(dirs) }
-            return started.getOrElse { t ->
-                val msg = t.message ?: "引擎启动失败"
-                AppLog.e("ENGINE_NODE_START failed pid=${Process.myPid()}: $msg", t)
-                throw RemoteException(msg)
-            }.also { port ->
-                AppLog.i("ENGINE_NODE_START ok port=$port pid=${Process.myPid()} plugins=${dirs.size}")
+            worker.execute {
+                val started = runBlocking { engine.ensureStarted(dirs) }
+                reply(
+                    id,
+                    started.fold(
+                        onSuccess = { port ->
+                            AppLog.i("ENGINE_NODE_START ok port=$port pid=${Process.myPid()} plugins=${dirs.size}")
+                            JSONObject().put("ok", true).put("result", JSONObject().put("port", port))
+                        },
+                        onFailure = { t ->
+                            val msg = t.message ?: "引擎启动失败"
+                            AppLog.e("ENGINE_NODE_START failed pid=${Process.myPid()}: $msg", t)
+                            errorEnvelope("start", msg, null)
+                        },
+                    ),
+                )
             }
         }
 
-        override fun call(method: String?, paramsJson: String?): String = runBlocking {
-            envelope { engine.call(method.orEmpty(), jsonOf(paramsJson)) }
+        override fun call(requestId: String?, method: String?, paramsJson: String?) {
+            val id = requestId.orEmpty()
+            worker.execute {
+                reply(id, JSONObject(runBlocking { envelope { engine.call(method.orEmpty(), jsonOf(paramsJson)) } }))
+            }
         }
 
-        override fun rpc(path: String?, endpoint: String?, payloadJson: String?): String = runBlocking {
-            envelope { engine.rpc(path.orEmpty(), endpoint.orEmpty(), jsonOf(payloadJson)) }
+        override fun rpc(requestId: String?, path: String?, endpoint: String?, payloadJson: String?) {
+            val id = requestId.orEmpty()
+            worker.execute {
+                reply(
+                    id,
+                    JSONObject(
+                        runBlocking {
+                            envelope { engine.rpc(path.orEmpty(), endpoint.orEmpty(), jsonOf(payloadJson)) }
+                        },
+                    ),
+                )
+            }
         }
 
-        override fun stop() {
-            runBlocking { engine.stop() }
-            AppLog.i("ENGINE_NODE_STOP socket closed, node thread kept alive pid=${Process.myPid()}")
+        override fun stop(requestId: String?) {
+            val id = requestId.orEmpty()
+            worker.execute {
+                val failure = runCatching { runBlocking { engine.stop() } }.exceptionOrNull()
+                AppLog.i("ENGINE_NODE_STOP socket closed, node thread kept alive pid=${Process.myPid()}")
+                reply(
+                    id,
+                    if (failure == null) {
+                        JSONObject().put("ok", true).put("result", JSONObject())
+                    } else {
+                        errorEnvelope("stop", failure.message ?: "引擎停止失败", null)
+                    },
+                )
+            }
         }
 
         /**

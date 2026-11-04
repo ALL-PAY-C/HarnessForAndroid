@@ -1,6 +1,7 @@
 package dev.dsh.mobile.core.data.context
 
 import dev.dsh.mobile.core.data.db.MessageEntity
+import dev.dsh.mobile.core.data.db.RecallRow
 import dev.dsh.mobile.core.data.db.WarmLayerDao
 import dev.dsh.mobile.core.data.db.WarmLayerEntity
 import dev.dsh.mobile.core.model.context.KeyFile
@@ -52,6 +53,15 @@ class RoomWarmLayerStoreTest {
             error("温层仓库不查原文")
 
         override suspend fun messageCount(sessionId: String): Int = messageRows
+
+        override suspend fun searchRecall(sessionId: String, like: String, limit: Int): List<RecallRow> =
+            error("回捞不经温层仓库")
+
+        override suspend fun recallInRange(sessionId: String, fromId: Long, toId: Long, limit: Int): List<RecallRow> =
+            error("回捞不经温层仓库")
+
+        override suspend fun recentRows(sessionId: String, limit: Int): List<RecallRow> =
+            error("回捞不经温层仓库")
     }
 
     private fun store(dao: FakeDao, now: Long = 1_700_000_000_000L) = RoomWarmLayerStore(dao) { now }

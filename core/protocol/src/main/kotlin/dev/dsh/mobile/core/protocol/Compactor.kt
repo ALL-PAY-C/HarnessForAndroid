@@ -52,3 +52,38 @@ interface WarmRefresher {
     /** 手动刷新一次温层。报告里的 layer 为 null = 没刷（已无新消息 / 解析空 / 模型失败）。 */
     suspend fun refreshWarm(sessionId: String): WarmRefreshReport
 }
+/**
+ * 一次手动回捞的结果（T9.8-S4）。
+ *
+ * [message] 是给人看的一句实话（≤120 字，UI 直接显示，不含原文）；
+ * [text] 是下一轮装配要插的块本身，null = 没命中，UI 与提示词两边都不变。
+ */
+data class RecallReport(
+    /** 命中条数。 */
+    val hits: Int = 0,
+    /** 命中里最旧的 rowid（0 = 没有）。 */
+    val fromRowId: Long = 0,
+    /** 命中里最新的 rowid（0 = 没有）。 */
+    val toRowId: Long = 0,
+    /** 命中清单（"rowid 120 · user"），给 UI 折叠面板用，不含正文。 */
+    val rows: List<String> = emptyList(),
+    /** 一句可展示的结论。 */
+    val message: String = "",
+    /** 可注入的回捞块；null = 没命中。 */
+    val text: String? = null,
+)
+
+/**
+ * 「从冷层回捞历史」的可选能力（T9.8-S4）。
+ *
+ * 与 [Compactor] / [WarmRefresher] 同一形态：不动 [DshTransport]，只有本地引擎能查 messages 表
+ * （要 rowid、要按会话 LIKE），调用方写 (transport as? RecallLookup)?.recall(sessionId, q)。
+ */
+interface RecallLookup {
+    /**
+     * 手动回捞：[query] 是词（`/recall 温层`）或轮次标记（`/recall R2` = 第 2 次压缩的区间）。
+     *
+     * 命中块会留给下一轮装配（作为提示词的一部分），原文不写回 messages、也不倒进 UI。
+     */
+    suspend fun recall(sessionId: String, query: String): RecallReport
+}

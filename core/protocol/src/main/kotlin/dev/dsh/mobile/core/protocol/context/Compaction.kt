@@ -64,6 +64,13 @@ internal class Compaction(
     /** 每会话已摘要掉的历史条数：超预算时别每轮重复压同一段（省一次 LLM 请求）。 */
     private val summarizedCount = java.util.concurrent.ConcurrentHashMap<String, Int>()
 
+    /**
+     * 每次压缩吃掉的 rowid 区间（下标 0 = 第 1 次压缩），给 /recall Rn 定位（T9.8 S4）。
+     *
+     * 只活在进程内：重启后区间没了就按最近 200 条兜底匹配，不为它加表 —— 回捞是线索，不是账本。
+     */
+    private val compactionMarks = java.util.concurrent.ConcurrentHashMap<String, MutableList<LongRange>>()
+
     internal suspend fun windowTokens(sessionId: String): Int = ContextBudget.windowOr(
         runCatching { contextWindowProvider(sessionId) }
             .getOrDefault(ContextBudget.DEFAULT_WINDOW_TOKENS),
@@ -110,7 +117,7 @@ internal class Compaction(
         }
         val text = summary.ifBlank { localDigest(plan) }.trim()
         if (text.isEmpty()) return null
-        applySummary(sessionId, text, plan.beforeChars)
+        applySummary(sessionId, text, plan.beforeChars, plan.dropped.size)
         summarizedCount[sessionId] = plan.dropped.size
         // 真压缩之后温层必须跟上（S3）：装配以温层为准，水位落后的旧温层会把刚写好的新摘要盖回去。
         // 与摘要用同一批历史（warmHistoryProvider 就是 messages 表）；失败只记日志，不挡本轮对话。
@@ -148,7 +155,12 @@ internal class Compaction(
     }
 
     /** 摘要三处落点：进程内（装配立即生效）、持久存储（重启后回灌）、会话投影（UI 可见）。 */
-    private suspend fun applySummary(sessionId: String, summary: String, beforeChars: Int) {
+    private suspend fun applySummary(
+        sessionId: String,
+        summary: String,
+        beforeChars: Int,
+        droppedCount: Int = 0,
+    ) {
         threads.setSummary(sessionId, summary)
         runCatching { summaryStore.write(sessionId, summary) }
             .onFailure { AppLog.w("摘要持久化失败：" + (it.message ?: it.javaClass.simpleName)) }
@@ -158,7 +170,31 @@ internal class Compaction(
         projections.noteSummaryChars(sessionId, summary.length)
         runCatching { onCompacted(sessionId) }
             .onFailure { AppLog.w("压缩回调失败：" + (it.message ?: it.javaClass.simpleName)) }
+        if (droppedCount > 0) markCompaction(sessionId, droppedCount)
     }
+
+    /**
+     * 记下「第 n 次压缩吃掉的 rowid 区间」：从上次水位之后到这次压掉的最后一条。
+     *
+     * 历史按 rowid 升序，压缩吃的是前缀，所以区间是增量、不重叠；拿不到历史就什么都不记
+     * （/recall Rn 会退回最近 200 条匹配）。
+     */
+    private suspend fun markCompaction(sessionId: String, droppedCount: Int) {
+        val history = runCatching { warmHistory(sessionId) }.getOrDefault(emptyList())
+        if (history.isEmpty()) return
+        val ordered = history.sortedBy { it.rowId }
+        val covered = droppedCount.coerceAtMost(ordered.size)
+        if (covered <= 0) return
+        val to = ordered[covered - 1].rowId
+        val marks = compactionMarks.getOrPut(sessionId) { mutableListOf() }
+        val from = marks.lastOrNull()?.last?.plus(1) ?: ordered.first().rowId
+        if (from > to) return
+        marks += from..to
+    }
+
+    /** 第 [index] 次压缩的 rowid 区间（1 起）；没记过就 null = 调用方走兜底窗口。 */
+    internal fun recallRange(sessionId: String, index: Int): LongRange? =
+        compactionMarks[sessionId]?.getOrNull(index - 1)
 
     /** LLM 不可用时的兜底摘要：只留最近若干条 80 字节选，比整段丢掉强。 */
     private fun localDigest(plan: CompactionPlan): String = buildString {
@@ -323,7 +359,7 @@ internal class Compaction(
                     .getOrDefault("").trim().ifBlank { localDigest(plan) }
             }
         }
-        applySummary(sessionId, summary, plan.beforeChars)
+        applySummary(sessionId, summary, plan.beforeChars, plan.dropped.size)
         summarizedCount[sessionId] = plan.dropped.size
         // 压缩后的上下文粗估：原文减掉被摘要掉的部分，加上摘要本身；与「已用」同一套 token 口径。
         val afterTok = ContextBudget.tokensOf((contentChars - plan.beforeChars).coerceAtLeast(0) + summary.length)

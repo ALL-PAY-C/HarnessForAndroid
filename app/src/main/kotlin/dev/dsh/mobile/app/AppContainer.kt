@@ -43,6 +43,7 @@ import dev.dsh.mobile.core.protocol.WebSocketChannel
 import dev.dsh.mobile.core.protocol.transport.LineCarrier
 import dev.dsh.mobile.core.data.backup.BackupManager
 import dev.dsh.mobile.core.data.context.RoomWarmLayerStore
+import dev.dsh.mobile.core.protocol.context.RecallHit
 import dev.dsh.mobile.core.protocol.context.WarmMessage
 import dev.dsh.mobile.core.data.backup.BackupScheduler
 import dev.dsh.mobile.plugin.html.HtmlPlugin
@@ -87,7 +88,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import java.io.File
 
 /**
@@ -549,9 +549,36 @@ class AppContainer(private val context: Context) {
     @Volatile
     private var activePluginSession: String? = null
 
+    /**
+     * 会话人设的内存副本。
+     *
+     * 插件槽位（[SlotAction.SetPersona]）在 UI 线程同步读一次人设来判定开关方向，这里不能为了
+     * 一个开关去 Room 上阻塞：读一律命中内存，写先在内存落地再交给 IO 线程落库。
+     * 会话切换时（[setActivePluginSession]）预热一次，冷启动首点也能拿到真实值。
+     */
+    private val personaCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     /** 导航层告知「用户现在看着哪个会话」；null / 空串表示离开了会话页。 */
     fun setActivePluginSession(sessionId: String?) {
         activePluginSession = sessionId?.takeIf { it.isNotBlank() }
+        activePluginSession?.let { refreshPersona(it) }
+    }
+
+    /** 后台把人设读进内存副本；读失败只记日志，不让插件拿到「读取中」这种状态。 */
+    private fun refreshPersona(sessionId: String) {
+        scope.launch(Dispatchers.IO) {
+            runCatching { db.sessionDao().byId(sessionId)?.persona.orEmpty() }
+                .onSuccess { personaCache[sessionId] = it }
+                .onFailure { AppLog.w("读会话人设失败 " + sessionId + "：" + it.message) }
+        }
+    }
+
+    /** 后台落库人设；失败照常记日志（插件侧已拿到受理结果，不能把异常咽掉）。 */
+    private fun persistPersona(sessionId: String, text: String) {
+        scope.launch(Dispatchers.IO) {
+            runCatching { repo.setPersona(sessionId, text) }
+                .onFailure { AppLog.w("写会话人设失败 " + sessionId + "：" + it.message) }
+        }
     }
 
     /**
@@ -578,12 +605,11 @@ class AppContainer(private val context: Context) {
      */
     private fun writeSessionPersona(text: String): Boolean {
         val sessionId = activePluginSession ?: return false
-        return runCatching {
-            runBlocking { repo.setPersona(sessionId, text.trim()) }
-            true
-        }.onFailure {
-            AppLog.w("写会话人设失败 " + sessionId + "：" + it.message)
-        }.getOrDefault(false)
+        val trimmed = text.trim()
+        // 先在内存副本上落地，UI 线程立刻返回；落库交给 IO 线程，失败进日志。
+        personaCache[sessionId] = trimmed
+        persistPersona(sessionId, trimmed)
+        return true
     }
 
     /**
@@ -594,19 +620,22 @@ class AppContainer(private val context: Context) {
         object : SessionPersonaBridge {
             override fun sessionId(): String? = activePluginSession
 
-            override fun readPersona(sessionId: String): String = runCatching {
-                runBlocking { db.sessionDao().byId(sessionId)?.persona.orEmpty() }
-            }.getOrDefault("")
+            override fun readPersona(sessionId: String): String {
+                // 命中内存副本直接返回；冷缓存只补一次后台读，本次如实返回空串。
+                return personaCache[sessionId] ?: run {
+                    refreshPersona(sessionId)
+                    ""
+                }
+            }
 
             override fun writePersona(sessionId: String, text: String): Boolean {
-                val before = readPersona(sessionId)
-                if (before == text) return true
-                return runCatching {
-                    runBlocking { repo.setPersona(sessionId, text.trim()) }
-                    true
-                }.onFailure {
-                    AppLog.w("写会话人设失败 " + sessionId + "：" + it.message)
-                }.getOrDefault(false)
+                val trimmed = text.trim()
+                val before = personaCache[sessionId]
+                if (before == trimmed) return true
+                if (before == null) refreshPersona(sessionId)
+                personaCache[sessionId] = trimmed
+                persistPersona(sessionId, trimmed)
+                return true
             }
         }
     }
@@ -775,6 +804,16 @@ class AppContainer(private val context: Context) {
                         warmStore = warmStore,
                         warmHistoryProvider = { sid ->
                             db.messageDao().warmRows(sid).map { WarmMessage(it.rowId, it.role, it.text) }
+                        },
+                        // T9.8-S4 冷层回捞：只读 messages 的 rowid/role/text 三列，命中块进下一轮提示词，
+                        // 绝不写回消息表（UI 条数不变）。不注入这两条通道 = 回捞整段关闭。
+                        recallSearch = { sid, like, limit ->
+                            db.warmLayerDao().searchRecall(sid, like, limit)
+                                .map { RecallHit(it.rowId, it.role, it.text) }
+                        },
+                        recallRows = { sid, from, to, limit ->
+                            db.warmLayerDao().recallInRange(sid, from, to, limit)
+                                .map { RecallHit(it.rowId, it.role, it.text) }
                         },
                     ).also { t ->
                         // 子代理嵌套深度跟着设置走（默认 2）：设置页改完下一次派发即生效，不用重连运行时。

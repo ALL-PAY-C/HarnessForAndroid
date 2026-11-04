@@ -21,6 +21,7 @@ import dev.dsh.mobile.core.protocol.Compactor
 import dev.dsh.mobile.core.protocol.DshEvent
 import dev.dsh.mobile.core.protocol.DshTransport
 import dev.dsh.mobile.core.protocol.LocalEngineTransport
+import dev.dsh.mobile.core.protocol.RecallReport
 import dev.dsh.mobile.core.protocol.SessionProjection
 import dev.dsh.mobile.core.protocol.SessionProjections
 import dev.dsh.mobile.core.protocol.context.WarmRefreshReport
@@ -201,6 +202,9 @@ class ChatRepository(
 
     /** T9.8-S2 /warm：返回 null = 当前引擎没有温层能力（AcpTransport 之类）。 */
     suspend fun refreshWarm(sessionId: String): WarmRefreshReport? = refreshWarmImpl(sessionId)
+
+    /** T9.8-S4 /recall：返回 null = 当前引擎不回捞；命中块只进下一轮提示词，不进消息表。 */
+    suspend fun recall(sessionId: String, query: String): RecallReport? = recallImpl(sessionId, query)
 
     fun projection(sessionId: String): StateFlow<SessionProjection> = projectionImpl(sessionId)
 }

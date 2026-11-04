@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import dev.dsh.mobile.core.model.AgentRunState
 import dev.dsh.mobile.core.model.ChatMessage
 import dev.dsh.mobile.core.model.PermissionRequest
+import dev.dsh.mobile.core.protocol.RecallReport
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.MessageBubble
 import dev.dsh.mobile.design.EmptyState
@@ -160,6 +161,43 @@ private fun SystemNoteRow(text: String) {
                 .background(p.card)
                 .padding(horizontal = 10.dp, vertical = 5.dp),
         )
+    }
+}
+
+/**
+ * /recall 回执（T9.8-S4）：一行结论 + 可折叠的命中清单（只有 rowid 与角色，没有正文）。
+ *
+ * 为什么可折叠：回捞是「我确实翻过冷层」的凭据，用户偶尔要看翻到了哪几条；
+ * 但把 400 字原文倒进聊天流会把真正的对话顶下去 —— 正文走的是下一轮提示词，不进 UI。
+ */
+@Composable
+private fun RecallNoteRow(report: RecallReport) {
+    val p = LocalQq.current
+    var open by remember(report) { mutableStateOf(false) }
+    val hasRows = report.rows.isNotEmpty()
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 3.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            if (hasRows) report.message + " · " + (if (open) "收起" else "展开") else report.message,
+            color = p.t2,
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .clip(RoundedCornerShape(9.dp))
+                .background(p.card)
+                .clickable(enabled = hasRows) { open = !open }
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+        )
+        if (open) {
+            Column(Modifier.padding(top = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                report.rows.forEach { row ->
+                    Text(row, color = p.t3, fontSize = 10.sp, lineHeight = 14.sp, textAlign = TextAlign.Center)
+                }
+            }
+        }
     }
 }
 
@@ -392,6 +430,8 @@ internal fun ChatMessageList(
     listState: LazyListState,
     compacting: Boolean,
     systemNotes: List<ChatMessage>,
+    /** /recall 回执（T9.8-S4）；null = 没查过，一个像素都不多。 */
+    recallNote: RecallReport? = null,
     messageSlot: @Composable (ChatMessage) -> Boolean,
     composerFocus: FocusRequester,
     onActionMessage: (ChatMessage) -> Unit,
@@ -548,5 +588,7 @@ internal fun ChatMessageList(
         if (compacting) item(key = "compact-running") { SystemNoteRow(COMPACT_RUNNING_TEXT) }
         // 系统回执（/compact 结果）：居中一条灰底小字，不占气泡位置、不带作者头像。
         items(systemNotes, key = { it.id }) { note -> SystemNoteRow(note.text) }
+        // /recall 回执：同样居中，但可展开看 rowid 清单（正文不进 UI）。
+        if (recallNote != null) item(key = "recall-note") { RecallNoteRow(recallNote) }
     }
 }
