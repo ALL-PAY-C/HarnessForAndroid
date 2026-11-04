@@ -424,6 +424,27 @@ internal object WarmParser {
         )
     }
 
+    /**
+     * 插件 checkpoint → 温层（S3 共存）：插件已经压过历史时不再花一次模型调用，
+     * 直接把插件给的内容按九段解析，来源标 [WarmSource.PLUGIN]。
+     *
+     * 解析不出任何段（[WarmLayer.isEmpty]）返回 null = 没有可用的温层内容，别写空层。
+     */
+    fun fromCheckpoint(raw: String, coveredUntil: Long, now: Long): WarmLayer? {
+        val body = raw.trim()
+            .removePrefix(WarmAssembly.WARM_OPEN)
+            .removeSuffix(WarmAssembly.WARM_CLOSE)
+            .trim()
+        val layer = parse(body)
+        if (layer.isEmpty()) return null
+        return layer.copy(
+            coveredUntilMessageId = coveredUntil,
+            warmVersion = 1,
+            source = WarmSource.PLUGIN,
+            updatedAt = now,
+        )
+    }
+
     /** 标题行 → (段, 行内内容)；不是标题给 null。 */
     private fun headingOf(line: String): Pair<Section, String>? {
         var s = clean(line)

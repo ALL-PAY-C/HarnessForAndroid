@@ -57,6 +57,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import dev.dsh.mobile.core.model.context.WarmLayerStore
 import dev.dsh.mobile.core.protocol.context.Compaction
+import dev.dsh.mobile.core.protocol.context.WarmAssembly
 import dev.dsh.mobile.core.protocol.context.WarmMessage
 import dev.dsh.mobile.core.protocol.context.WarmRefreshReport
 import dev.dsh.mobile.core.protocol.group.GroupRunner
@@ -408,7 +409,18 @@ class LocalEngineTransport(
         postOnce = { cfg, body -> stream.postOnce(cfg, body) },
         usedTokensOf = { sid -> lastUsageTokens[sid]?.toInt()?.takeIf { it > 0 } },
         // 压缩发生后历史里已经没有身份文本了：赶紧往事件流上喊一声，让注入侧重发。
-        onCompacted = { sid -> post(DshEvent.Compacted(sid)) },
+        onCompacted = { sid ->
+            // 压缩后把温层水位/版本一起带出去（S3）：消费者不必回读库就知道「记忆已经换过代」。
+            val layer = runCatching { warmStore?.layer(sid) }.getOrNull()
+            post(
+                DshEvent.Compacted(
+                    sessionId = sid,
+                    warmVersion = layer?.warmVersion ?: 0,
+                    coveredUntilMessageId = layer?.coveredUntilMessageId ?: 0L,
+                    source = layer?.source?.name?.lowercase().orEmpty(),
+                ),
+            )
+        },
         warmStore = warmStore,
         warmHistoryProvider = warmHistoryProvider,
     )
@@ -596,6 +608,7 @@ class LocalEngineTransport(
         val messages =
             if (presetMessages != null) presetMessages.toMutableList() else mutableListOf<JsonObject>()
         if (presetMessages == null) {
+        // [装配·system] 基础提示：模型配置里的 systemPrompt + 工具说明 + 网页工具说明。
         val system = buildString {
             append(cfg.systemPrompt)
             append("\n\n")
@@ -604,6 +617,7 @@ class LocalEngineTransport(
                 append("\n\n")
                 append(web.helpText())
             }
+            // [装配·身份卡] 人设与规则并进 system 尾部（本地路径不用 IdentityInjector）。
             if (extraSystem.isNotBlank()) {
                 append("\n\n")
                 append(extraSystem)
@@ -648,6 +662,7 @@ class LocalEngineTransport(
         // 否则群成员看到两遍同一个请求 → 重复作答、双倍 token。
         val presetEndsWithUser = presetMessages?.lastOrNull()
             ?.get("role")?.toString()?.contains("user") == true
+        // [装配·尾部user] 历史之后只剩这一条用户消息（群聊由 presetMessages 自带）。
         if (!presetEndsWithUser) {
             // 上一轮 tool 里截的图并进来（队列为空时 content 与改造前逐字节一致）。
             val withQueued = userImages + takeQueuedImages()
@@ -672,6 +687,15 @@ class LocalEngineTransport(
             )
             messages.clear()
             messages.addAll(assembly.messages)
+            // [装配·温层] 最终序列 system（含身份卡）→ 温层 → 历史 → 尾部 user：插在 index 1。
+            // 温层为空（null 或 isEmpty）时这里一条都不加，产出的消息序列与接入前逐字节相同。
+            val warmText = WarmAssembly.block(runCatching { warmStore?.layer(sessionId) }.getOrNull())
+            if (warmText != null) {
+                messages.add(1, buildJsonObject {
+                    put("role", "system")
+                    put("content", warmText)
+                })
+            }
             AppLog.w("single context usedChars=${assembly.usedChars} fullChars=${assembly.fullChars} overBudget=${assembly.overBudget} overflowChars=${assembly.overflowChars}")
             // P0-6：上下文用量进会话投影，UI 只读展示（不再只躺在 ChatScreen 内存里）。
             // 数值统一成 token：投影字段名沿用 usedChars/budgetChars，但里面装的是 token，

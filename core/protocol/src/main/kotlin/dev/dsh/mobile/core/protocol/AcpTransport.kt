@@ -319,6 +319,14 @@ class AcpTransport(
         identity.invalidate(sessionId)
     }
 
+    /**
+     * 事件流版本（T9.8 S3）：温层字段只是记账，重注入动作与 [onCompacted] 完全相同。
+     * 本地引擎走 [dev.dsh.mobile.core.protocol.LocalEngineTransport] 的温层存储，不经过这里。
+     */
+    fun onCompacted(event: DshEvent.Compacted) {
+        onCompacted(event.sessionId)
+    }
+
     override suspend fun cancel(sessionId: String) {
         // ACP cancel 是通知（服务端 .onNotification，无 id 无响应），发完即回；
         // 真正终态由 prompt 响应（settle 后 resolve "cancelled"）作为 barrier。

@@ -61,7 +61,15 @@ sealed interface DshEvent {
      * 远端 ACP 没有 system 字段，身份只能塞在某条 user 文本里；那条消息被压掉之后身份就永久消失，
      * 所以压缩是「必须重注入」的信号（见 IdentityInjector.invalidate）。
      */
-    data class Compacted(val sessionId: String) : DshEvent
+    data class Compacted(
+        val sessionId: String,
+        /** 压缩后温层的版本（0 = 该会话还没有温层，或宿主没接温层存储）。 */
+        val warmVersion: Int = 0,
+        /** 温层已覆盖到的 messages.rowid（0 = 未知）。 */
+        val coveredUntilMessageId: Long = 0L,
+        /** 温层来源："local" / "plugin" / ""（未知）。 */
+        val source: String = "",
+    ) : DshEvent
     /** Unknown notification, forwarded for plugin/extension consumers. */
     data class Raw(val method: String, val params: kotlinx.serialization.json.JsonObject) : DshEvent
 }

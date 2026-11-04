@@ -53,7 +53,7 @@ internal class Compaction(
      * 压缩真发生了（摘要已落盘并投影）时回调。远端 transport 靠它知道「历史已被替换，
      * 身份文本随之蒸发」，于是下一轮重注入。默认空实现 = 纯记账，不惊动任何人。
      */
-    private val onCompacted: (String) -> Unit = {},
+    private val onCompacted: suspend (String) -> Unit = {},
     /** 温层读写（T9.8 S2）：宿主不注入 = 不刷温层，行为与 S1 完全一致。 */
     private val warmStore: WarmLayerStore? = null,
     /** 温层输入历史（带 messages.rowid）；不注入就当宿主没有温层输入。 */
@@ -82,6 +82,13 @@ internal class Compaction(
         messages: List<JsonObject>,
     ): String? {
         if (messages.size < 2) return null
+        // 插件共存（S3）：插件已经把历史压成 checkpoint 时，本地不再花一次模型调用，也不另生成温层
+        // —— 装配以温层为准，两套内容会互相打架，插件那份才是插件侧的真实记忆。
+        val checkpoint = WarmAssembly.pluginCheckpoint(messages)
+        if (checkpoint != null) {
+            absorbCheckpoint(sessionId, checkpoint)
+            return null
+        }
         val system = messages.first()["content"]?.jsonPrimitive?.contentOrNullSafe().orEmpty()
         val userMsg = messages.takeLast(1)
         val history = messages.drop(1).dropLast(1)
@@ -105,6 +112,10 @@ internal class Compaction(
         if (text.isEmpty()) return null
         applySummary(sessionId, text, plan.beforeChars)
         summarizedCount[sessionId] = plan.dropped.size
+        // 真压缩之后温层必须跟上（S3）：装配以温层为准，水位落后的旧温层会把刚写好的新摘要盖回去。
+        // 与摘要用同一批历史（warmHistoryProvider 就是 messages 表）；失败只记日志，不挡本轮对话。
+        runCatching { refreshWarm(sessionId, budgetChars) }
+            .onFailure { AppLog.w("压缩后温层刷新失败，忽略：" + (it.message ?: it.javaClass.simpleName)) }
         return text
     }
 
@@ -137,7 +148,7 @@ internal class Compaction(
     }
 
     /** 摘要三处落点：进程内（装配立即生效）、持久存储（重启后回灌）、会话投影（UI 可见）。 */
-    private fun applySummary(sessionId: String, summary: String, beforeChars: Int) {
+    private suspend fun applySummary(sessionId: String, summary: String, beforeChars: Int) {
         threads.setSummary(sessionId, summary)
         runCatching { summaryStore.write(sessionId, summary) }
             .onFailure { AppLog.w("摘要持久化失败：" + (it.message ?: it.javaClass.simpleName)) }
@@ -200,6 +211,20 @@ internal class Compaction(
             if (WarmTrigger.decide(turns, used, budgetChars) != WarmDecision.WARM_ONLY) return@runCatching
             refreshWarm(sessionId, budgetChars)
         }.onFailure { AppLog.w("温层刷新失败，忽略：" + (it.message ?: it.javaClass.simpleName)) }
+    }
+
+    /**
+     * 插件已压（S3）：把插件给的 checkpoint 文本直接当温层内容落盘，水位取现有历史的最大 rowid。
+     *
+     * 不调模型、不改插件写好的摘要（摘要归插件管），失败只记日志 —— 插件在场时本地退成纯读者。
+     */
+    private suspend fun absorbCheckpoint(sessionId: String, checkpoint: String) {
+        val store = warmStore ?: return
+        runCatching {
+            val covered = warmHistory(sessionId).maxOfOrNull { it.rowId } ?: 0L
+            val layer = WarmParser.fromCheckpoint(checkpoint, covered, warmClock()) ?: return@runCatching
+            store.write(sessionId, layer)
+        }.onFailure { AppLog.w("插件 checkpoint 吸收失败，忽略：" + (it.message ?: it.javaClass.simpleName)) }
     }
 
     /** 温层生成的一次上游往返：与 [summarizeDropped] 同一条路径（不自建 HTTP、不发第二次请求）。 */
