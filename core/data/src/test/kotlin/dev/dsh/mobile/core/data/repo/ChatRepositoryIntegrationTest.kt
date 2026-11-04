@@ -223,6 +223,8 @@ class ChatRepositoryIntegrationTest {
         override fun sessionDao(): SessionDao = sessions
         override fun messageDao(): MessageDao = messages
         override fun endpointDao(): EndpointDao = endpoints
+        override fun warmLayerDao(): dev.dsh.mobile.core.data.db.WarmLayerDao =
+            throw UnsupportedOperationException("in-memory fixture: no warm layer dao")
 
         // RoomDatabase 抽象成员：ChatRepository 只走 DAO，不碰 Room 内部。
         // createInvalidationTracker 不是「从不调用」——RoomDatabase 构造函数（RoomDatabase.kt:108）

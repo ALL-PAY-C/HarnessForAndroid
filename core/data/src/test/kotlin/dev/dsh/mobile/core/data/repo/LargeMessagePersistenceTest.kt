@@ -159,6 +159,8 @@ class LargeMessagePersistenceTest {
         override fun sessionDao(): SessionDao = sessions
         override fun messageDao(): MessageDao = messages
         override fun endpointDao(): EndpointDao = endpoints
+        override fun warmLayerDao(): dev.dsh.mobile.core.data.db.WarmLayerDao =
+            throw UnsupportedOperationException("in-memory fixture: no warm layer dao")
         override fun clearAllTables() = Unit
         override fun createOpenHelper(configuration: DatabaseConfiguration): SupportSQLiteOpenHelper =
             throw UnsupportedOperationException("in-memory fixture: no Room open helper")

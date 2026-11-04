@@ -34,6 +34,7 @@ object DataModule {
                 DshDatabase.MIGRATION_8_9,
                 DshDatabase.MIGRATION_9_10,
                 DshDatabase.MIGRATION_10_11,
+                DshDatabase.MIGRATION_11_12,
             )
             .fallbackToDestructiveMigrationOnDowngrade()
             .build()

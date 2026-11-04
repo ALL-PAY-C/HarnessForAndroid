@@ -219,14 +219,15 @@ interface EndpointDao {
 }
 
 @Database(
-    entities = [SessionEntity::class, MessageEntity::class, EndpointEntity::class],
-    version = 11,
+    entities = [SessionEntity::class, MessageEntity::class, EndpointEntity::class, WarmLayerEntity::class],
+    version = 12,
     exportSchema = true,
 )
 abstract class DshDatabase : RoomDatabase() {
     abstract fun sessionDao(): SessionDao
     abstract fun messageDao(): MessageDao
     abstract fun endpointDao(): EndpointDao
+    abstract fun warmLayerDao(): WarmLayerDao
 
     companion object {
         const val NAME = "dsh-mobile.db"
@@ -269,6 +270,27 @@ abstract class DshDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE sessions ADD COLUMN cachedTokens INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE sessions ADD COLUMN lastPrompt INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /**
+         * v11 -> v12: 温层表（T9.8 S1）。只建表，不回填 —— 迁移必须 O(1)，不能扫全库；
+         * 老会话的温层由 WarmLayerStore.layer 懒回填（返回空层），真正的生成留给 S2。
+         * 全部语句都是 IF NOT EXISTS 的纯新增，sessions / messages 一行不动。
+         */
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `warm_layers` (" +
+                        "`sessionId` TEXT NOT NULL, " +
+                        "`payload` TEXT NOT NULL, " +
+                        "`updatedAt` INTEGER NOT NULL, " +
+                        "`coveredUntilMessageId` INTEGER NOT NULL, " +
+                        "`warmVersion` INTEGER NOT NULL, " +
+                        "`source` TEXT NOT NULL, " +
+                        "PRIMARY KEY(`sessionId`))",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_warm_layers_updatedAt` ON `warm_layers` (`updatedAt`)")
             }
         }
 
