@@ -23,6 +23,7 @@ import dev.dsh.mobile.core.protocol.DshTransport
 import dev.dsh.mobile.core.protocol.LocalEngineTransport
 import dev.dsh.mobile.core.protocol.SessionProjection
 import dev.dsh.mobile.core.protocol.SessionProjections
+import dev.dsh.mobile.core.protocol.context.WarmRefreshReport
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -197,6 +198,9 @@ class ChatRepository(
 
     suspend fun compact(sessionId: String, budgetTokens: Int = 0): CompactResult =
         compactImpl(sessionId, budgetTokens)
+
+    /** T9.8-S2 /warm：返回 null = 当前引擎没有温层能力（AcpTransport 之类）。 */
+    suspend fun refreshWarm(sessionId: String): WarmRefreshReport? = refreshWarmImpl(sessionId)
 
     fun projection(sessionId: String): StateFlow<SessionProjection> = projectionImpl(sessionId)
 }

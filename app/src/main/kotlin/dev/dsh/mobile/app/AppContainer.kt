@@ -42,6 +42,8 @@ import dev.dsh.mobile.core.protocol.DshTransport
 import dev.dsh.mobile.core.protocol.WebSocketChannel
 import dev.dsh.mobile.core.protocol.transport.LineCarrier
 import dev.dsh.mobile.core.data.backup.BackupManager
+import dev.dsh.mobile.core.data.context.RoomWarmLayerStore
+import dev.dsh.mobile.core.protocol.context.WarmMessage
 import dev.dsh.mobile.core.data.backup.BackupScheduler
 import dev.dsh.mobile.plugin.html.HtmlPlugin
 import dev.dsh.mobile.pluginhost.InstalledPlugins
@@ -107,6 +109,8 @@ class AppContainer(private val context: Context) {
     val summaryStore by lazy {
         dev.dsh.mobile.core.data.repo.SharedPrefsSummaryStore.from(context)
     }
+    /** 温层持久化（T9.8-S2）：直接用 S1 的 warm_layers 表，不另建存储。 */
+    val warmStore by lazy { RoomWarmLayerStore(db.warmLayerDao()) }
     /** 大工具输出落盘根目录（P0-4）：app 私有目录下的 tools-output/。 */
     val toolOutputSpill by lazy {
         dev.dsh.mobile.core.protocol.ToolOutputSpill(rootProvider = { File(context.filesDir, "tools-output") })
@@ -761,6 +765,12 @@ class AppContainer(private val context: Context) {
                         spill = toolOutputSpill,
                         projections = projections,
                         summaryStore = summaryStore,
+                        // T9.8-S2：温层读写 + 带 rowid 的历史。温层只读 messages 的 rowid/role/text 三列，
+                        // 不参与装配（S3 才接 prompt），刷失败也只是少一份备忘，不影响对话。
+                        warmStore = warmStore,
+                        warmHistoryProvider = { sid ->
+                            db.messageDao().warmRows(sid).map { WarmMessage(it.rowId, it.role, it.text) }
+                        },
                     ).also { t ->
                         // 子代理嵌套深度跟着设置走（默认 2）：设置页改完下一次派发即生效，不用重连运行时。
                         scope.launch { settings.settings.collect { t.setSubagentMaxDepth(it.subagentMaxDepth) } }

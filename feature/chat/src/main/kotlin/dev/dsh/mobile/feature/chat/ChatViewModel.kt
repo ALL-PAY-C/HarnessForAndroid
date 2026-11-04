@@ -392,6 +392,9 @@ class ChatViewModel(
     /** /compact 正在跑：面板显进行中，重复触发直接吞掉（压缩要调模型，不能并发两次）。 */
     val compacting: StateFlow<Boolean> = compactingState.asStateFlow()
 
+    /** /warm 正在跑（T9.8-S2）：和 /compact 一样要调模型，并发触发只跑一次。 */
+    private val warmingState = MutableStateFlow(false)
+
     private val notesState = MutableStateFlow<List<ChatMessage>>(emptyList())
 
     /**
@@ -452,6 +455,35 @@ class ChatViewModel(
                 pushNote(compactNote(result))
             } finally {
                 compactingState.value = false
+            }
+        }
+    }
+
+    /**
+     * T9.8-S2 /warm 真入口：温层在 transport 侧生成（历史 rowid + 一次模型调用），
+     * 这里只把回执变成一条系统消息。返回 null = 当前引擎没有温层能力（远端 ACP 之类）。
+     */
+    fun refreshWarmContext() {
+        if (warmingState.value) return
+        warmingState.value = true
+        viewModelScope.launch {
+            try {
+                val report = try {
+                    repo.refreshWarm(sessionId)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    null
+                }
+                pushNote(
+                    when {
+                        report == null -> "当前引擎不支持温层刷新。"
+                        report.refreshed -> report.message
+                        else -> report.message.ifBlank { "温层没有更新。" }
+                    },
+                )
+            } finally {
+                warmingState.value = false
             }
         }
     }

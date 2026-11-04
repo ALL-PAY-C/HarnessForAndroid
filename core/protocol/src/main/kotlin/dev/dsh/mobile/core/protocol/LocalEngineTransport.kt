@@ -55,7 +55,10 @@ import okhttp3.OkHttpClient
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import dev.dsh.mobile.core.model.context.WarmLayerStore
 import dev.dsh.mobile.core.protocol.context.Compaction
+import dev.dsh.mobile.core.protocol.context.WarmMessage
+import dev.dsh.mobile.core.protocol.context.WarmRefreshReport
 import dev.dsh.mobile.core.protocol.group.GroupRunner
 import dev.dsh.mobile.core.protocol.group.MemberTurn
 import dev.dsh.mobile.core.protocol.llm.ModelStream
@@ -266,7 +269,11 @@ class LocalEngineTransport(
      * 否则又会出现「回执写预算 6000、顶栏写 / 32k」的两套口径。
      */
     private val contextWindowProvider: suspend (String) -> Int = { ContextBudget.DEFAULT_WINDOW_TOKENS },
-) : DshTransport, Compactor {
+    /** 温层存储（T9.8 S2）：不注入 = 不刷温层，装配与压缩行为与 S1 完全一致。 */
+    private val warmStore: WarmLayerStore? = null,
+    /** 温层输入历史（带 messages.rowid）：不注入时温层拿不到输入，等于关闭。 */
+    private val warmHistoryProvider: (suspend (String) -> List<WarmMessage>)? = null,
+) : DshTransport, Compactor, WarmRefresher {
 
     /**
      * 事件出口（T96 P0-3）：无界缓冲的 SharedFlow。
@@ -402,6 +409,8 @@ class LocalEngineTransport(
         usedTokensOf = { sid -> lastUsageTokens[sid]?.toInt()?.takeIf { it > 0 } },
         // 压缩发生后历史里已经没有身份文本了：赶紧往事件流上喊一声，让注入侧重发。
         onCompacted = { sid -> post(DshEvent.Compacted(sid)) },
+        warmStore = warmStore,
+        warmHistoryProvider = warmHistoryProvider,
     )
 
     /**
@@ -1496,6 +1505,12 @@ class LocalEngineTransport(
     // 删除时机 = Compactor 接口改成由 Compaction 直接实现、且测试不再调 transport.compact() 那天。
     override suspend fun compact(sessionId: String, budgetTokens: Int): CompactResult =
         compaction.compact(sessionId, budgetTokens)
+
+    // T9.8-S2 shim #2：与上面的 compact 同款 —— 入口留在本类，实现与状态都在 Compaction。
+    // /warm 是「现在就刷一次」，所以这里不走触发判定（轮次/预算），只保证同一批消息不会被重复处理
+    // （去重水位在 Compaction.refreshWarm 里按 rowid 判断）。返回 null = 没可刷的东西。
+    override suspend fun refreshWarm(sessionId: String): WarmRefreshReport =
+        compaction.refreshWarm(sessionId)
 
     /**
      * 子代理嵌套上限（T5.3）：默认 2。深度口径 = 当前执行者层级，主代理第 0 层。

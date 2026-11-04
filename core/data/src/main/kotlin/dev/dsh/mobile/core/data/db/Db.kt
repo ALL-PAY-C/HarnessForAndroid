@@ -162,6 +162,17 @@ data class MessageSearchRow(
     val at: Long,
 )
 
+/**
+ * 温层输入行（T9.8-S2）：messages.rowid 是 SQLite 的隐式行号，实体里没有，只能投影读出来。
+ * 温层的去重水位 [dev.dsh.mobile.core.model.context.WarmLayer.coveredUntilMessageId] 记的就是它 ——
+ * 用 rowid 而不是 at：at 可重复、可回填，rowid 单调且随插入递增。
+ */
+data class WarmRow(
+    val rowId: Long,
+    val role: String,
+    val text: String,
+)
+
 @Dao
 interface MessageDao {
     @Query("SELECT $MESSAGE_COLUMNS FROM messages WHERE sessionId = :sessionId ORDER BY at ASC")
@@ -169,6 +180,10 @@ interface MessageDao {
 
     @Query("SELECT $MESSAGE_COLUMNS FROM messages WHERE sessionId = :sessionId ORDER BY at ASC")
     suspend fun bySession(sessionId: String): List<MessageEntity>
+
+    /** 温层输入：rowid 升序，正文截到 4000 字符（温层只读摘要，不需要全文）。 */
+    @Query("SELECT rowid AS rowId, role AS role, substr(text, 1, 4000) AS text FROM messages WHERE sessionId = :sessionId ORDER BY rowid ASC")
+    suspend fun warmRows(sessionId: String): List<WarmRow>
 
     /** 单条正文全文：列表只给前缀，展开 / 复制 / 导出时按 id 补读（一行远小于 2MB 窗口）。 */
     @Query("SELECT text FROM messages WHERE id = :id")

@@ -23,6 +23,8 @@ import dev.dsh.mobile.core.protocol.DshTransport
 import dev.dsh.mobile.core.protocol.LocalEngineTransport
 import dev.dsh.mobile.core.protocol.SessionProjection
 import dev.dsh.mobile.core.protocol.SessionProjections
+import dev.dsh.mobile.core.protocol.WarmRefresher
+import dev.dsh.mobile.core.protocol.context.WarmRefreshReport
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -147,6 +149,24 @@ internal suspend fun ChatRepository.compactImpl(sessionId: String, budgetTokens:
     } catch (e: Throwable) {
         AppLog.w("compact failed: " + (e.message ?: e.javaClass.simpleName))
         CompactResult(compacted = false, message = "压缩失败：" + (e.message ?: e.javaClass.simpleName))
+    }
+}
+
+/**
+ * T9.8-S2：/warm 真入口。温层生成要历史 rowid + 一次模型调用，落地在 transport 侧。
+ *
+ * 与 [compactImpl] 同形：不支持就返回一句实话，不让 UI 假装刷过。
+ */
+internal suspend fun ChatRepository.refreshWarmImpl(sessionId: String): WarmRefreshReport? {
+    val t = requireTransport()
+    val refresher = t as? WarmRefresher ?: return null
+    return try {
+        refresher.refreshWarm(sessionId)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        AppLog.w("refreshWarm failed: " + (e.message ?: e.javaClass.simpleName))
+        WarmRefreshReport(null, "温层刷新失败：" + (e.message ?: e.javaClass.simpleName))
     }
 }
 

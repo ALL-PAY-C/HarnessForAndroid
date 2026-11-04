@@ -9,6 +9,7 @@ import dev.dsh.mobile.core.data.db.EndpointEntity
 import dev.dsh.mobile.core.data.db.MessageDao
 import dev.dsh.mobile.core.data.db.MessageEntity
 import dev.dsh.mobile.core.data.db.MessageSearchRow
+import dev.dsh.mobile.core.data.db.WarmRow
 import dev.dsh.mobile.core.data.db.SessionDao
 import dev.dsh.mobile.core.data.db.SessionEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -75,6 +76,11 @@ class ChatSearchTest {
 
         override suspend fun bySession(sessionId: String): List<MessageEntity> =
             map.values.filter { it.sessionId == sessionId }.sortedBy { it.at }
+
+        /** 温层输入（T9.8-S2）：rowid 用顺序号冒充，这些用例不验证真实 rowid。 */
+        override suspend fun warmRows(sessionId: String): List<WarmRow> =
+            map.values.filter { it.sessionId == sessionId }.sortedBy { it.at }
+                .mapIndexed { i, m -> WarmRow(i + 1L, m.role, m.text) }
 
         override suspend fun textById(id: String): String? = map[id]?.text
 

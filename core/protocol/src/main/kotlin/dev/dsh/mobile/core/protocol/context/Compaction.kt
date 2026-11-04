@@ -2,6 +2,7 @@ package dev.dsh.mobile.core.protocol.context
 
 import dev.dsh.mobile.core.common.AppLog
 import dev.dsh.mobile.core.model.ChatMessage
+import dev.dsh.mobile.core.model.context.WarmLayerStore
 import dev.dsh.mobile.core.protocol.AgentThreads
 import dev.dsh.mobile.core.protocol.CompactResult
 import dev.dsh.mobile.core.protocol.CompactionPlan
@@ -53,6 +54,12 @@ internal class Compaction(
      * 身份文本随之蒸发」，于是下一轮重注入。默认空实现 = 纯记账，不惊动任何人。
      */
     private val onCompacted: (String) -> Unit = {},
+    /** 温层读写（T9.8 S2）：宿主不注入 = 不刷温层，行为与 S1 完全一致。 */
+    private val warmStore: WarmLayerStore? = null,
+    /** 温层输入历史（带 messages.rowid）；不注入就当宿主没有温层输入。 */
+    private val warmHistoryProvider: (suspend (String) -> List<WarmMessage>)? = null,
+    /** 温层时钟：updatedAt 盖章（单测固定值即可断言）。 */
+    private val warmClock: () -> Long = System::currentTimeMillis,
 ) {
     /** 每会话已摘要掉的历史条数：超预算时别每轮重复压同一段（省一次 LLM 请求）。 */
     private val summarizedCount = java.util.concurrent.ConcurrentHashMap<String, Int>()
@@ -78,7 +85,12 @@ internal class Compaction(
         val system = messages.first()["content"]?.jsonPrimitive?.contentOrNullSafe().orEmpty()
         val userMsg = messages.takeLast(1)
         val history = messages.drop(1).dropLast(1)
-        val plan = threads.planCompaction(sessionId, budgetChars, system, history, userMsg) ?: return null
+        val plan = threads.planCompaction(sessionId, budgetChars, system, history, userMsg)
+        if (plan == null) {
+            // 没到压缩线但轮次够了：只刷温层（S2），真压缩照下面的原逻辑走，这里不动摘要。
+            refreshWarmIfDue(sessionId, budgetChars)
+            return null
+        }
         // 预算按新旧消息的字符数判定，重跑一轮还会得到同一个计划；已经压过这一段就不再花一次 LLM 请求。
         if (threads.summary(sessionId).isNotEmpty() && plan.dropped.size <= (summarizedCount[sessionId] ?: 0)) return null
         val summary = if (cfg == null) {
@@ -146,6 +158,76 @@ internal class Compaction(
             append(role).append(": ").append(text).append("\n")
         }
     }.take(1_200)
+
+    // ------------------------------------------------------------------ 温层（T9.8 S2）
+
+    /**
+     * 温层刷新：水位之后的新消息 + 库里旧温层 → 新温层并落盘。
+     *
+     * 去重水位是 [dev.dsh.mobile.core.model.context.WarmLayer.coveredUntilMessageId]（messages.rowid），
+     * 与 dropped.size 无关：温层不会重复处理同一批消息，也不改动 [maybeSummarize] 的既有去重。
+     * 返回层的 layer 为 null = 本次跳过（没新消息 / 解析空 / 模型失败），旧温层原样留着。
+     */
+    internal suspend fun refreshWarm(sessionId: String, budgetChars: Int = 0): WarmRefreshReport {
+        val store = warmStore ?: return WarmRefreshReport(null, "当前宿主没有接入温层存储。")
+        val previous = runCatching { store.read(sessionId) }.getOrNull()
+        val covered = previous?.coveredUntilMessageId ?: 0L
+        val history = runCatching { warmHistory(sessionId) }.getOrDefault(emptyList())
+        val fresh = history.filter { it.rowId > covered && it.text.isNotBlank() }
+        if (fresh.isEmpty()) {
+            return WarmRefreshReport(null, "温层已覆盖到 rowid " + covered + "，没有新消息。")
+        }
+        val cfg = runCatching { configProvider(sessionId) }.getOrNull()
+            ?: return WarmRefreshReport(null, "没有可用的模型配置，温层跳过。")
+        val budget = if (budgetChars > 0) budgetChars else ContextBudget.budgetChars(windowTokens(sessionId))
+        val report = WarmLayerBuilder(callModel = { prompt -> askWarmModel(cfg, prompt) }, clock = warmClock)
+            .build(sessionId, fresh, previous, WarmTrigger.warmBudgetChars(budget))
+        val layer = report.layer ?: return report
+        runCatching { store.write(sessionId, layer) }
+            .onFailure { AppLog.w("温层落盘失败：" + (it.message ?: it.javaClass.simpleName)) }
+        return report
+    }
+
+    /** ≥40 条新消息、且没到压缩线时的温层刷新（判定是纯函数 [WarmTrigger]）。 */
+    private suspend fun refreshWarmIfDue(sessionId: String, budgetChars: Int) {
+        val store = warmStore ?: return
+        if (warmHistoryProvider == null) return
+        runCatching {
+            val history = warmHistory(sessionId)
+            val covered = runCatching { store.read(sessionId) }.getOrNull()?.coveredUntilMessageId ?: 0L
+            val turns = history.count { it.rowId > covered }
+            val used = history.sumOf { it.text.length }
+            if (WarmTrigger.decide(turns, used, budgetChars) != WarmDecision.WARM_ONLY) return@runCatching
+            refreshWarm(sessionId, budgetChars)
+        }.onFailure { AppLog.w("温层刷新失败，忽略：" + (it.message ?: it.javaClass.simpleName)) }
+    }
+
+    /** 温层生成的一次上游往返：与 [summarizeDropped] 同一条路径（不自建 HTTP、不发第二次请求）。 */
+    private suspend fun askWarmModel(cfg: LlmConfig, prompt: String): String {
+        val body = buildJsonObject {
+            put("model", cfg.model)
+            put("max_tokens", 1_200)
+            putJsonArray("messages") {
+                addJsonObject {
+                    put("role", "system")
+                    put("content", WARM_SYSTEM_PROMPT)
+                }
+                addJsonObject {
+                    put("role", "user")
+                    put("content", prompt)
+                }
+            }
+        }
+        val resp = postOnce(cfg, body)
+        val content = resp["choices"]?.jsonArray?.firstOrNull()?.jsonObject
+            ?.get("message")?.jsonObject?.get("content")
+            ?.jsonPrimitive?.contentOrNullSafe().orEmpty()
+        if (content.isBlank()) throw IOException("温层输出为空")
+        return content
+    }
+
+    private suspend fun warmHistory(sessionId: String): List<WarmMessage> =
+        warmHistoryProvider?.invoke(sessionId).orEmpty()
 
     /**
      * P0-2：/compact 的真入口（UI 的 /compact 命令走这里）。

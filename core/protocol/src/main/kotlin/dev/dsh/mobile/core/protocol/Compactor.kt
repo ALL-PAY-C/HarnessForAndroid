@@ -1,5 +1,7 @@
 package dev.dsh.mobile.core.protocol
 
+import dev.dsh.mobile.core.protocol.context.WarmRefreshReport
+
 /**
  * 一次压缩的结果：是否真的压了、摘要多长、前后 token 粗估（字符数 / 4）。
  *
@@ -37,4 +39,16 @@ interface Compactor {
      * 传 0 表示由传输层按模型窗口自己算（默认路径，见 [ContextBudget]）。
      */
     suspend fun compact(sessionId: String, budgetTokens: Int = 0): CompactResult
+}
+
+/**
+ * 「立即刷新温层」的可选能力（T9.8-S2）。
+ *
+ * 与 [Compactor] 同一形态：不动 [DshTransport]，只有本地引擎能生成温层（要历史 rowid、
+ * 要调模型、要写 warm_layers），调用方写 `(transport as? WarmRefresher)?.refreshWarm(sessionId)`。
+ * 自动触发（≥40 条新消息）在 Compaction.maybeSummarize 里，这里只服务 /warm 手动命令。
+ */
+interface WarmRefresher {
+    /** 手动刷新一次温层。报告里的 layer 为 null = 没刷（已无新消息 / 解析空 / 模型失败）。 */
+    suspend fun refreshWarm(sessionId: String): WarmRefreshReport
 }
