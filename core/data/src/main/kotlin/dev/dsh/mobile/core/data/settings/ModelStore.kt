@@ -10,8 +10,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
+import dev.dsh.mobile.core.common.net.HttpJson
 
 /** 一个可接入的模型后端（DeepSeek / OpenAI 兼容 / 自定义）。 */
 data class ModelProfile(
@@ -374,7 +373,7 @@ internal fun parseContextLengths(body: String): Map<String, Int> {
 /**
  * 从模型端点的 GET {baseUrl}/models 读一次窗口表；失败返回空表，从不抛。
  *
- * 与「测试连接」同一条请求路径、同样只用 HttpURLConnection，不引第三方网络库。
+ * 与「测试连接」同一条请求路径，都走 core/common 的 HttpJson 门面。
  * 界面拿到模型列表后再调它，把 [contextWindowOf] 的 discovered 填上。
  */
 suspend fun probeContextLengths(
@@ -385,18 +384,11 @@ suspend fun probeContextLengths(
     val root = baseUrl.trim().trimEnd('/')
     if (root.isEmpty()) return@withContext emptyMap()
     runCatching {
-        val conn = (URL(root + "/models").openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = timeoutMs
-            readTimeout = timeoutMs
-            setRequestProperty("Accept", "application/json")
-            if (apiKey.isNotBlank()) setRequestProperty("Authorization", "Bearer " + apiKey.trim())
+        val headers = buildMap {
+            put("Accept", "application/json")
+            if (apiKey.isNotBlank()) put("Authorization", "Bearer " + apiKey.trim())
         }
-        try {
-            if (conn.responseCode !in 200..299) return@runCatching emptyMap()
-            parseContextLengths(conn.inputStream.bufferedReader().use { it.readText() })
-        } finally {
-            conn.disconnect()
-        }
+        // 非 2xx 由门面抛 HttpJsonException，和以前 return emptyMap 一样落到 runCatching 的兜底。
+        parseContextLengths(HttpJson.getText(root + "/models", headers, timeoutMs))
     }.getOrDefault(emptyMap())
 }

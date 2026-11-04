@@ -4,9 +4,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.HttpURLConnection
+import dev.dsh.mobile.core.common.net.HttpJson
+import dev.dsh.mobile.core.common.net.HttpJsonException
 import java.net.SocketTimeoutException
-import java.net.URL
 
 /**
  * 「测试连接」的结果。纯数据，展示文案交给 [ModelProbe.formatResult]，这样格式化逻辑
@@ -29,7 +29,7 @@ data class ProbeResult(
  * 一键验证模型配置：先问 GET {baseUrl}/models（不打 token），拿不到再退化成
  * 一条 max_tokens=1 的 chat 请求，验证 key 与模型名真的能用。
  *
- * 只用 java.net.HttpURLConnection，不引第三方网络库。
+ * 请求走 core/common 的 HttpJson 门面，不引第三方网络库。
  */
 object ModelProbe {
 
@@ -69,7 +69,7 @@ object ModelProbe {
         val started = System.currentTimeMillis()
 
         // 1) GET {baseUrl}/models：带 Authorization: Bearer key
-        val listAttempt = runCatching { request("$root/models", "GET", apiKey, null, timeoutMs) }
+        val listAttempt = runCatching { request("$root/models", apiKey, null, timeoutMs) }
         val listOut = listAttempt.getOrNull()
         if (listOut != null && listOut.code in 200..299) {
             val ids = runCatching { parseModelIds(listOut.body) }.getOrDefault(emptyList())
@@ -93,7 +93,7 @@ object ModelProbe {
             .put("stream", false)
             .toString()
         val chatAttempt = runCatching {
-            request("$root/chat/completions", "POST", apiKey, payload, timeoutMs)
+            request("$root/chat/completions", apiKey, payload, timeoutMs)
         }
         val chatOut = chatAttempt.getOrNull()
         val elapsed = System.currentTimeMillis() - started
@@ -157,29 +157,24 @@ object ModelProbe {
 
     private fun request(
         url: String,
-        method: String,
         apiKey: String,
         body: String?,
         timeoutMs: Int,
     ): HttpOutcome {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = method
-            connectTimeout = timeoutMs
-            readTimeout = timeoutMs
-            setRequestProperty("Accept", "application/json")
-            if (apiKey.isNotBlank()) setRequestProperty("Authorization", "Bearer " + apiKey.trim())
-            if (body != null) {
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-            }
+        val headers = buildMap {
+            put("Accept", "application/json")
+            if (apiKey.isNotBlank()) put("Authorization", "Bearer " + apiKey.trim())
         }
-        try {
-            if (body != null) conn.outputStream.use { it.write(body.toByteArray()) }
-            val code = conn.responseCode
-            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-            return HttpOutcome(code, stream?.bufferedReader()?.use { it.readText() }.orEmpty())
-        } finally {
-            conn.disconnect()
+        return try {
+            // 门面把非 2xx 抛成 HttpJsonException；这里翻回原来「带 code 交调用方判断」的形状。
+            val text = if (body == null) {
+                HttpJson.getTextBlocking(url, headers, timeoutMs)
+            } else {
+                HttpJson.postJsonBlocking(url, body, headers, timeoutMs)
+            }
+            HttpOutcome(200, text)
+        } catch (e: HttpJsonException) {
+            HttpOutcome(e.status, e.body.orEmpty())
         }
     }
 

@@ -3,8 +3,7 @@ package dev.dsh.mobile.core.data.settings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
+import dev.dsh.mobile.core.common.net.HttpJson
 
 /**
  * Lists the models an endpoint actually serves.
@@ -66,23 +65,13 @@ object ModelCatalog {
             }
         }
 
-    private fun get(url: String, apiKey: String): String {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 8_000
-            readTimeout = 12_000
-            setRequestProperty("Accept", "application/json")
-            if (apiKey.isNotBlank()) setRequestProperty("Authorization", "Bearer $apiKey")
+    private suspend fun get(url: String, apiKey: String): String {
+        val headers = buildMap {
+            put("Accept", "application/json")
+            if (apiKey.isNotBlank()) put("Authorization", "Bearer $apiKey")
         }
-        try {
-            val code = conn.responseCode
-            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-            val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (code !in 200..299) error("HTTP $code: ${text.take(160)}")
-            return text
-        } finally {
-            conn.disconnect()
-        }
+        // 连接与读取分开给预算：慢网下服务端回包比建连慢，卡同一个值会误杀正常请求。
+        return HttpJson.getText(url, headers, timeoutMs = 8_000, readTimeoutMs = 12_000)
     }
 
     /**
