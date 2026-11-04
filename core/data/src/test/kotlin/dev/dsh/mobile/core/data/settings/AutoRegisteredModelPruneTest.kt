@@ -10,9 +10,9 @@ class AutoRegisteredModelPruneTest {
     private fun profile(id: String, model: String = id, isDefault: Boolean = false) = ModelProfile(
         id = id,
         name = model,
-        providerId = "cliproxy",
-        baseUrl = "http://127.0.0.1:8317/v1",
-        apiKey = "sk-cpa-local-dsh-android",
+        providerId = "custom",
+        baseUrl = "http://192.168.1.10:11434/v1",
+        apiKey = "local-key",
         model = model,
         isDefault = isDefault,
     )
@@ -21,8 +21,8 @@ class AutoRegisteredModelPruneTest {
     fun pruneDropsPluginPrefixOnly() {
         val list = listOf(
             profile("m-1700000000000", "手填"),
-            profile("plugin.dev.dsh.cliproxy.gpt-4o", "gpt-4o"),
-            profile("plugin.dev.dsh.cliproxy.gemini-2.5-pro", "gemini-2.5-pro"),
+            profile("plugin.dev.dsh.router.gpt-4o", "gpt-4o"),
+            profile("plugin.dev.dsh.router.gemini-2.5-pro", "gemini-2.5-pro"),
         )
         assertEquals(listOf("m-1700000000000"), pruneAutoRegistered(list).map { it.id })
     }

@@ -69,66 +69,19 @@ interface ModelProvider {
     val defaultModel: String
     val hint: String
 
-    /** 模板自带的 Key（本机网关这类不需要用户手填的端点用）；空串 = 留空由用户填。 */
+    /** 模板自带的 Key（端点不需要用户手填时用）；空串 = 留空由用户填。 */
     val defaultApiKey: String get() = ""
 
-    /** 表单「名称」默认值；默认与 label 一致，本地网关那种带后缀的显示名可以单独给。 */
+    /** 表单「名称」默认值；默认与 label 一致，需要区分显示名时单独覆盖。 */
     val defaultName: String get() = label
 }
 
 object ModelProviders {
     private val extra = mutableListOf<ModelProvider>()
 
+    // 纯净 App 只留两家官方模板 + 自定义：其余厂商模板由插件通过 register() 注入
+    // （见 plugin-api 的 ModelProvider 贡献与 PL1/PL2），宿主不再内置一堆用不到的端点。
     val builtin: List<ModelProvider> = listOf(
-        object : ModelProvider {
-            override val id = "deepseek"
-            override val label = "DeepSeek"
-            override val defaultBaseUrl = "https://api.deepseek.com/v1"
-            override val defaultModel = "deepseek-chat"
-            override val hint = "官方 API Key，sk- 开头"
-        },
-        object : ModelProvider {
-            override val id = "openai"
-            override val label = "OpenAI"
-            override val defaultBaseUrl = "https://api.openai.com/v1"
-            override val defaultModel = "gpt-4.1-mini"
-            override val hint = "官方 Key，sk- 开头；也支持 gpt-4.1 / o 系列"
-        },
-        object : ModelProvider {
-            override val id = "gemini"
-            override val label = "Gemini"
-            override val defaultBaseUrl = "https://generativelanguage.googleapis.com/v1beta/openai"
-            override val defaultModel = "gemini-2.5-flash"
-            override val hint = "Google AI Studio 的 Key，走 OpenAI 兼容层"
-        },
-        object : ModelProvider {
-            override val id = "qwen"
-            override val label = "通义千问"
-            override val defaultBaseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-            override val defaultModel = "qwen-max"
-            override val hint = "阿里云百炼 Key；兼容模式端点"
-        },
-        object : ModelProvider {
-            override val id = "zhipu"
-            override val label = "智谱 GLM"
-            override val defaultBaseUrl = "https://open.bigmodel.cn/api/paas/v4"
-            override val defaultModel = "glm-4-plus"
-            override val hint = "bigmodel.cn 的 Key"
-        },
-        object : ModelProvider {
-            override val id = "moonshot"
-            override val label = "Kimi"
-            override val defaultBaseUrl = "https://api.moonshot.cn/v1"
-            override val defaultModel = "moonshot-v1-8k"
-            override val hint = "Moonshot 开放平台 Key"
-        },
-        object : ModelProvider {
-            override val id = "openai-compatible"
-            override val label = "OpenAI 兼容"
-            override val defaultBaseUrl = "https://api.openai.com/v1"
-            override val defaultModel = "gpt-4o-mini"
-            override val hint = "任何兼容 /v1/chat/completions 的服务"
-        },
         object : ModelProvider {
             override val id = "anthropic"
             override val label = "Anthropic"
@@ -143,22 +96,11 @@ object ModelProviders {
             override val defaultModel = "qwen2.5:7b"
             override val hint = "本地 Ollama / vLLM / 第三方中转"
         },
-        // 本机 CLIProxyAPI 网关：模型不再由插件自动注册，用户在这里选模板后「拉取模型列表」自己挑。
-        object : ModelProvider {
-            override val id = "cliproxy"
-            override val label = "CLIProxy（本地网关）"
-            override val defaultBaseUrl = "http://127.0.0.1:8317/v1"
-            override val defaultModel = ""
-            override val defaultApiKey = "sk-cpa-local-dsh-android"
-            override val defaultName = "CLIProxy"
-            override val hint = "本机 CLIProxyAPI 网关；点「拉取模型列表」挑模型，可一次存多条"
-        },
     )
 
     fun all(): List<ModelProvider> = builtin + extra
 
-    // 未知 id 回落到「自定义」而不是列表最后一项：最后一项是 CLIProxy 模板，
-    // 拿它兜底会把别人的 baseUrl/apiKey 顶到未知配置上。
+    // 未知 id 回落到「自定义」：拿别的模板兜底会把它的 baseUrl/apiKey 顶到未知配置上。
     fun byId(id: String): ModelProvider = all().firstOrNull { it.id == id }
         ?: builtin.firstOrNull { it.id == "custom" }
         ?: builtin.last()

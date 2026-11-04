@@ -41,7 +41,8 @@ data class AppSettings(
     val sessionPresetSwitches: Map<String, String> = emptyMap(),
     val themeMode: ThemeMode = ThemeMode.System,
     /** 界面语言三态（T9.11 §2.1）：System 跟随系统首选语言。 */
-    val uiLanguage: UiLanguage = UiLanguage.System,
+    // 默认中文：本产品面向中文用户，英文只作为显式选择（含「跟随系统」）。
+    val uiLanguage: UiLanguage = UiLanguage.Zh,
     val accent: Long = 0xFF3B7CFF,
     val bubbleMine: Long = 0xFF3B7CFF,
     val bubbleOther: Long = 0xFFF1F2F5,

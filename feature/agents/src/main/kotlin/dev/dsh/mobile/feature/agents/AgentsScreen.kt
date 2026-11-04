@@ -721,7 +721,7 @@ private fun ModelDialog(
                                     val template = templateOf(prov)
                                     baseUrl = template.baseUrl
                                     model = template.model
-                                    // 模板自带 Key（本地网关）就填上；没有的话保留用户已经输入的。
+                                    // 模板自带 Key 就填上；没有的话保留用户已经输入的。
                                     if (template.apiKey.isNotBlank()) apiKey = template.apiKey
                                     picked = emptyList()
                                     if (name.isBlank()) name = template.name
@@ -737,8 +737,8 @@ private fun ModelDialog(
                     }
                 }
                 DialogField(stringResource(DesignR.string.agents_field_name), name) { name = it }
-                DialogField("Base URL", baseUrl) { baseUrl = it }
-                DialogField("API Key", apiKey, secret = true) { apiKey = it }
+                DialogField(stringResource(DesignR.string.agents_field_base_url), baseUrl) { baseUrl = it }
+                DialogField(stringResource(DesignR.string.agents_field_api_key), apiKey, secret = true) { apiKey = it }
                 DialogField(stringResource(DesignR.string.agents_field_model_name), model) { model = it }
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(QqSpace.s()),

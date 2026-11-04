@@ -79,7 +79,7 @@ class ProjectionUiTest {
 
     @Test fun usageLineFallsBackToTokenTextWithoutBudget() {
         val state = ChatUiState(sessionId = "s", tokensPerSecond = 12.0)
-        assertEquals(UiText.Raw(state.tokenText), usageLine(state, ContextUsage()))
+        assertEquals(state.tokenText, usageLine(state, ContextUsage()))
     }
 
     @Test fun usageLineUsesCharBudgetAndKeepsSpeed() {

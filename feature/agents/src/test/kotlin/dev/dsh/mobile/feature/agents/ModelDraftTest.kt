@@ -11,21 +11,6 @@ import org.junit.Test
 class ModelDraftTest {
 
     @Test
-    fun `cliproxy 模板给出三项默认值`() {
-        val template = templateOf(ModelProviders.byId("cliproxy"))
-        assertEquals("CLIProxy", template.name)
-        assertEquals("http://127.0.0.1:8317/v1", template.baseUrl)
-        assertEquals("sk-cpa-local-dsh-android", template.apiKey)
-    }
-
-    @Test
-    fun `模板出现在自定义之后`() {
-        val ids = ModelProviders.all().map { it.id }
-        // 相对位置而不是绝对下标：别的模块注册的 provider 会追加在后面。
-        assertEquals(ids.indexOf("custom") + 1, ids.indexOf("cliproxy"))
-    }
-
-    @Test
     fun `未知 providerId 回落到自定义`() {
         assertEquals("custom", ModelProviders.byId("nope-not-exist").id)
         assertEquals("custom", ModelProviders.byId("自定义").id)
@@ -47,17 +32,17 @@ class ModelDraftTest {
     fun `一次多选生成多条 profile 共用 baseUrl 与 key`() {
         val draft = ModelDraft(
             name = "",
-            providerId = "cliproxy",
-            baseUrl = " http://127.0.0.1:8317/v1 ",
-            apiKey = " sk-cpa-local-dsh-android ",
+            providerId = "custom",
+            baseUrl = " http://192.168.1.10:11434/v1 ",
+            apiKey = " local-key ",
             reasoningEffort = "",
             supportsTools = false,
         )
         val list = buildProfiles(draft, listOf("m1", " m2 ", "m1", " "), nowMs = 1_700_000_000_000L)
         assertEquals(listOf("m1", "m2"), list.map { it.model })
         assertEquals(list.size, list.map { it.id }.distinct().size)
-        assertTrue(list.all { it.baseUrl == "http://127.0.0.1:8317/v1" })
-        assertTrue(list.all { it.apiKey == "sk-cpa-local-dsh-android" })
+        assertTrue(list.all { it.baseUrl == "http://192.168.1.10:11434/v1" })
+        assertTrue(list.all { it.apiKey == "local-key" })
         // 名称留空时退回模型名，列表里不会出现一片空白条目。
         assertEquals(listOf("m1", "m2"), list.map { it.name })
         assertTrue(list.all { it.reasoningEffort == "high" })
@@ -65,7 +50,7 @@ class ModelDraftTest {
 
     @Test
     fun `编辑单条时沿用原 id`() {
-        val draft = ModelDraft(providerId = "cliproxy", baseUrl = "u", apiKey = "k")
+        val draft = ModelDraft(providerId = "custom", baseUrl = "u", apiKey = "k")
         val list = buildProfiles(draft, listOf("m1"), existingId = "m-42", nowMs = 9L)
         assertEquals(listOf("m-42"), list.map { it.id })
         // 编辑却勾了多条：id 必须分开，否则后一条会覆盖前一条。

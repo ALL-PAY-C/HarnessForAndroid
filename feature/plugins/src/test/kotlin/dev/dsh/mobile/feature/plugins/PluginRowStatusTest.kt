@@ -68,6 +68,35 @@ class PluginRowStatusTest {
         }
     }
 
+    /**
+     * T9.25 第三态：权限没授全时宿主不 register，enabled 恒为 false。只看 enabled 会写「已停用」，
+     * 用户以为是自己关的，于是去拨开关 —— 拨了也不会注册。
+     */
+    @Test
+    fun missingPermissionShowsNeedsPermissionNotDisabled() {
+        val row = pluginRowStatus(enabled = false, loadError = null, needsPermission = true)
+        assertEquals(UiText.Res(DesignR.string.plugins_perm_needs), row.text)
+        assertFalse("授权没给不是插件坏了", row.failed)
+        assertNull(row.detail)
+        assertTrue(row.needsPermission)
+    }
+
+    /** 两态互斥：真失败了就显示失败，别拿「需授权」盖住要查日志的原因。 */
+    @Test
+    fun loadErrorWinsOverNeedsPermission() {
+        val row = pluginRowStatus(enabled = false, loadError = "[exec] boom", needsPermission = true)
+        assertEquals(UiText.Res(DesignR.string.plugins_row_load_failed), row.text)
+        assertTrue(row.failed)
+        assertFalse("失败行不许同时挂「需授权」", row.needsPermission)
+        assertEquals("[exec] boom", row.detail)
+    }
+
+    @Test
+    fun plainRowsAreNotFlaggedAsNeedingPermission() {
+        assertFalse(pluginRowStatus(enabled = true, loadError = null).needsPermission)
+        assertFalse(pluginRowStatus(enabled = false, loadError = null).needsPermission)
+    }
+
     @Test
     fun longErrorIsClippedWithEllipsis() {
         val row = pluginRowStatus(enabled = true, loadError = "x".repeat(500))

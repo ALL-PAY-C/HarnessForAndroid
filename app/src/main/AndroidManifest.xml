@@ -10,7 +10,7 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <!-- 引擎/网关是常驻服务，不是会自然结束的同步任务：dataSync 型在 Android 15 有 6 小时上限，
+    <!-- 引擎是常驻服务，不是会自然结束的同步任务：dataSync 型在 Android 15 有 6 小时上限，
          到点会被系统判「未在超时前停止」并记为崩溃（实测诊断页里就有这条）。specialUse 没有这个钟。 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
@@ -96,21 +96,6 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="agent_runtime" />
-        </service>
-
-        <!--
-          内置 CLIProxyAPI 网关：子进程挂在 dataSync 型前台服务下，App 退到后台时不被系统回收。
-          网关二进制解压到 filesDir/gateway/ 后由 GatewayManager 用 ProcessBuilder 拉起。
-        -->
-        <service
-            android:name=".gateway.GatewayService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse"
-            android:stopWithTask="false">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="local_model_gateway" />
         </service>
 
         <!--

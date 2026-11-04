@@ -39,6 +39,7 @@ import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.SlotEditState
 import dev.dsh.mobile.design.SlotStrip
 import dev.dsh.mobile.design.UiEditSlotPlusRow
+import dev.dsh.mobile.design.UiText
 import dev.dsh.mobile.design.qqFontBody
 import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.ContextRing
@@ -301,7 +302,7 @@ internal fun ChatHeader(
 }
 
 @Composable
-internal fun ChatErrorBar(error: String?, onDismiss: () -> Unit) {
+internal fun ChatErrorBar(error: UiText?, onDismiss: () -> Unit) {
     val p = LocalQq.current
     // 发送失败 / 排队满 / 权限确认失败：标题红点只给一个状态，这里把可读原因铺出来。
     // state.error 是单条，成功或被 dismissError 清掉后即消失，不重复、不陈旧。
@@ -314,7 +315,7 @@ internal fun ChatErrorBar(error: String?, onDismiss: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                err,
+                err.text(),
                 color = p.red,
                 fontSize = 12.sp,
                 lineHeight = 16.sp,
@@ -383,6 +384,7 @@ internal fun ChatBusyStrip(state: ChatUiState) {
     val p = LocalQq.current
     val waitingText = stringResource(DesignR.string.common_waiting_confirm)
     val runningText = stringResource(DesignR.string.chat_running)
+    val genericAgentText = stringResource(DesignR.string.chat_agent_generic)
     // 执行状态条：谁在跑、谁在等确认。拿不到执行池（busyAgents 为空）就整条不渲染。
     if (state.busyAgents.isNotEmpty() && state.settings.showAgentStatus) {
         Row(
@@ -392,7 +394,7 @@ internal fun ChatBusyStrip(state: ChatUiState) {
             Text(
                 state.busyAgents.joinToString(" · ") { agent ->
                     val what = if (agent.state == AgentRunState.WaitingPermission) waitingText else runningText
-                    agent.agentName.ifBlank { "Agent" } + " " + what
+                    agent.agentName.ifBlank { genericAgentText } + " " + what
                 },
                 color = p.accent,
                 fontSize = 11.5.sp,

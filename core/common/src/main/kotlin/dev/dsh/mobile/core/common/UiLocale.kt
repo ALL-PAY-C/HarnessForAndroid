@@ -46,6 +46,17 @@ object UiLocale {
 
     fun resolveTag(saved: String?): String? = saved?.takeIf { it == "zh" || it == "en" }
 
+    /**
+     * 启动镜像里的显式「跟随系统」标记。必须与「键不存在」区分开：
+     * 键不存在 = 用户还没选过，默认中文（产品决定，2026-11-04）；
+     * 键 = "system" = 用户明确选了跟随系统。
+     */
+    const val SYSTEM_TAG: String = "system"
+
+    /** 镜像值 → 生效 tag；键缺失时回落到默认中文。 */
+    fun effectiveTag(saved: String?): String =
+        if (saved == SYSTEM_TAG) SYSTEM_TAG else resolveTag(saved) ?: "zh"
+
     fun languageOf(tag: String?): UiLanguage = when (resolveTag(tag)) {
         "zh" -> UiLanguage.Zh
         "en" -> UiLanguage.En
@@ -62,7 +73,8 @@ object UiLocale {
 
     fun latchTag(saved: String?) {
         if (systemLocale == null) systemLocale = Locale.getDefault()
-        tag = resolveTag(saved)
+        val effective = effectiveTag(saved)
+        tag = if (effective == SYSTEM_TAG) null else effective
     }
 
     fun latch(ctx: Context) = latchTag(
@@ -122,11 +134,10 @@ object UiLocale {
      */
     fun mirror(base: Context, language: UiLanguage) {
         val prefs = base.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val want = tagOf(language)
+        // 跟随系统也要落一个显式标记：删键会被当成「没选过」，下次启动又回默认中文。
+        val want = tagOf(language) ?: SYSTEM_TAG
         if (prefs.getString(KEY_LANG, null) == want) return
-        prefs.edit().apply {
-            if (want == null) remove(KEY_LANG) else putString(KEY_LANG, want)
-        }.apply()
+        prefs.edit().putString(KEY_LANG, want).apply()
         latchTag(want)
         refresh(base)
     }

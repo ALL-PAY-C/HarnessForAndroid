@@ -152,11 +152,6 @@ fun SettingsScreen(
     onOpenExtras: () -> Unit = {},
     onOpenTerminal: () -> Unit = {},
     extraSettings: List<@Composable () -> Unit> = emptyList(),
-    gatewayCard: (@Composable () -> Unit)? = null,
-    /** 内置网关行的入口；为 null 时该行不出现（没有网关就没有这一项）。 */
-    onOpenGateway: (() -> Unit)? = null,
-    /** 网关行的副标题（状态摘要），由宿主算好传进来，设置页不持有网关状态。 */
-    gatewaySummary: String? = null,
     /** 外观有独立页面（AppAppearanceScreen），走自己的路由。 */
     onOpenAppearance: () -> Unit = {},
     /** 手机能力授权（T4.5）也有独立页面（AppCapabilityScreen），走自己的路由。 */
@@ -1134,21 +1129,6 @@ fun SettingsScreen(
 
                             }
                         }
-                    }
-                }
-
-                // ---------- 宿主内置网关：靠下、默认收起（没有就不占位） ----------
-                // 以前这里直接贴一张 Material Card，裸文本 + 蓝色文字链接浮在页面底色上（O2）。
-                // 现在它和别的分类一样是一行：同样的圆角/内边距/字号，点进去才是详情。
-                if (section == null && onOpenGateway != null && (gatewayCard != null || gatewaySummary != null)) {
-                    item {
-                        SectionNavRow(
-                            title = stringResource(DesignR.string.settings_gateway),
-                            subtitle = gatewaySummary ?: stringResource(DesignR.string.settings_gateway_sub),
-                            icon = Icons.Filled.Link,
-                            tint = p.accent,
-                            onClick = { onOpenGateway?.invoke() },
-                        )
                     }
                 }
 

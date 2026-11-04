@@ -67,7 +67,7 @@ internal fun usagePercent(usage: ContextUsage): Int? {
  * tok/s 与流式文案一字不改。
  */
 internal fun usageLine(state: ChatUiState, usage: ContextUsage): UiText {
-    val pct = usagePercent(usage) ?: return UiText.Raw(state.tokenText)
+    val pct = usagePercent(usage) ?: return state.tokenText
     val speed = if (state.tokensPerSecond > 0.05) " · " + speedText(state.tokensPerSecond) else ""
     val used = if (usage.budgetChars > 0) compact(usage.usedChars.toLong()) else compact(state.contextUsed)
     return UiText.Res(

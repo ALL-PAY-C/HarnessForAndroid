@@ -23,7 +23,49 @@ data class PluginManifest(
     val apiVersion: Int = PLUGIN_API_VERSION,
     /** 插件要求的最低宿主 API 版本；缺省 0 = 不要求。高过 [PLUGIN_API_VERSION] 即拒载。 */
     val minHostApi: Int = 0,
+    /**
+     * 清单声明的权限：空集 = 不需要授权。
+     *
+     * 与 [capabilities] 正交 —— 那是「往哪个渲染插槽里塞东西」，这是「能对设备/宿主做什么」。
+     * 声明了却没全部授予的插件宿主不 register，列表显示「需授权」；老插件不写这一项，
+     * 空集走同一条加载路径，行为逐字不变。
+     */
+    val permissions: Set<PluginPermission> = emptySet(),
 )
+
+/**
+ * 插件权限：宿主在 register 之前就要判的那几类能力。
+ *
+ * 只列真会越界的三类 + 一类文件读写；新增一项必须同时加 design 资源与显示映射，
+ * 否则列表里的「需授权」只会说一个用户看不懂的英文单词。
+ */
+enum class PluginPermission {
+    /** 执行命令（shell）。 */
+    Shell,
+
+    /** 无障碍操控手机（点击/滑动/读屏）。 */
+    PhoneControl,
+
+    /** Shizuku / Root 特权通道。 */
+    Privileged,
+
+    /** 读写工作区文件。 */
+    Workspace,
+    ;
+
+    companion object {
+        /**
+         * plugin.json 里的写法 → 枚举；认不出返回 null（调用方忽略该条）。
+         *
+         * 大小写、下划线、连字符都不敏感：清单是人写的，"phone_control" 和 "PhoneControl"
+         * 指的是同一项。认不出就丢，不抛 —— 新宿主给老插件多写一项不该让整包加载失败。
+         */
+        fun ofName(raw: String): PluginPermission? {
+            val key = raw.filter { it.isLetterOrDigit() }.lowercase()
+            return entries.firstOrNull { it.name.lowercase() == key }
+        }
+    }
+}
 
 enum class PluginCapability {
     Theme, Layout, BubbleStyle, QuickCommand, SettingsItem, BottomTab,

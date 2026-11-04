@@ -52,6 +52,7 @@ class JsBackedPlugin(
         enabledByDefault = true,
         apiVersion = spec.apiVersion,
         minHostApi = spec.minHostApi,
+        permissions = spec.declaredPermissions(),
     )
 
     override fun register(registry: PluginRegistry) {
@@ -223,6 +224,7 @@ class JsBrokenPlugin(
         author = spec.author,
         capabilities = emptySet(),
         enabledByDefault = true,
+        permissions = spec.declaredPermissions(),
     )
 
     override fun register(registry: PluginRegistry) {

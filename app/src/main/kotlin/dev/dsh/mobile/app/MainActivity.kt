@@ -37,6 +37,15 @@ private const val REQ_NOTIFY = 1002
 
 class MainActivity : ComponentActivity() {
 
+    /**
+     * Activity 也要换语言上下文：Compose 的 AlertDialog 会为弹窗新开一个窗口，
+     * 那个窗口的配置取自 Activity 的 base，而不是 Theme 里 CompositionLocalProvider 包过的那份
+     * —— 只包 Compose 的话，主界面中文、弹窗英文（实测「添加模型」对话框就是这样）。
+     */
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(UiLocale.wrap(newBase))
+    }
+
     /** 首帧耗时诊断用：onCreate 起点（uptimeMillis）。 */
     private var tCreate: Long = 0L
 

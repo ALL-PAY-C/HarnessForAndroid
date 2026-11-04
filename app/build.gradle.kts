@@ -302,7 +302,6 @@ android {
     packaging {
         resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/DEPENDENCIES")
         // 部分原生件是可执行文件而不是共享库：必须解压到 nativeLibraryDir（files/ 是 noexec）。
-        // 内置网关的 libgateway.so 靠这个开关随安装解压出来（Android 10+ 禁止 exec filesDir）。
         jniLibs.useLegacyPackaging = true
     }
 }

@@ -26,7 +26,7 @@ data class ModelDraft(
 /** 模板选中后表单要填的默认值。 */
 data class ModelTemplate(val name: String, val baseUrl: String, val apiKey: String, val model: String)
 
-/** 纯函数：内置模板 → 表单默认值（CLIProxy 模板的 API Key 也是自带的）。 */
+/** 纯函数：内置模板 → 表单默认值（模板自带 Key 时表单直接预填）。 */
 fun templateOf(provider: ModelProvider): ModelTemplate = ModelTemplate(
     name = provider.defaultName,
     baseUrl = provider.defaultBaseUrl,

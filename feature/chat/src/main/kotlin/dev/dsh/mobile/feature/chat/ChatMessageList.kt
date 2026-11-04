@@ -564,7 +564,8 @@ internal fun ChatMessageList(
                 .forEach { agent ->
                     item(key = "typing-" + agent.agentId) {
                         SpeakingPlaceholder(
-                            name = agent.agentName.ifBlank { state.agentName },
+                            name = agent.agentName.ifBlank { state.agentName }
+                                .ifBlank { stringResource(DesignR.string.chat_agent_generic) },
                             seed = agent.agentId,
                         )
                     }

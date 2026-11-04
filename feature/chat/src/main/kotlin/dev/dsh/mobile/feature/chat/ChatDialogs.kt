@@ -57,6 +57,7 @@ import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.pluginapi.SlotContribution
 import dev.dsh.mobile.design.EmptyState
 import dev.dsh.mobile.design.QqShape
+import dev.dsh.mobile.design.UiText
 import dev.dsh.mobile.design.text
 import dev.dsh.mobile.core.protocol.SessionProjection
 import kotlinx.coroutines.launch
@@ -108,7 +109,7 @@ internal fun UsageDialog(
                     stringResource(DesignR.string.chat_tokens_out) to compact(state.usage.output),
                     stringResource(DesignR.string.chat_tokens_total) to compact(state.sessionTotalTokens),
                     stringResource(DesignR.string.chat_cache_hit_rate) to "${state.usage.cachePercent}%",
-                    stringResource(DesignR.string.chat_context_usage) to state.contextUsageText,
+                    stringResource(DesignR.string.chat_context_usage) to state.contextUsageText.text(),
                 ).forEach { (label, value) ->
                     Column {
                         Text(label, color = p.t2, fontSize = 12.sp)
@@ -123,7 +124,11 @@ internal fun UsageDialog(
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(DesignR.string.common_close), color = p.accent) } },
-        dismissButton = { TextButton(onClick = onOpenAgentSheet) { Text(state.agentName, color = p.accent) } },
+        dismissButton = {
+            TextButton(onClick = onOpenAgentSheet) {
+                Text(state.agentName.ifBlank { stringResource(DesignR.string.chat_no_agent_selected) }, color = p.accent)
+            }
+        },
     )
 }
 
@@ -288,13 +293,13 @@ internal fun AgentSheet(
     onPickSingle: (String) -> Unit,
     onAdd: (String) -> Unit,
     onRemove: (String) -> Unit,
-    onRename: suspend (String, String) -> String?,
+    onRename: suspend (String, String) -> UiText?,
     onRole: (String, GroupRole?) -> Unit,
 ) {
     val p = LocalQq.current
     val scope = rememberCoroutineScope()
     var editing by remember { mutableStateOf<Participant?>(null) }
-    var editError by remember { mutableStateOf<String?>(null) }
+    var editError by remember { mutableStateOf<UiText?>(null) }
     var roleEdit by remember { mutableStateOf<Participant?>(null) }
 
     editing?.let { part ->
@@ -464,7 +469,7 @@ internal fun AgentSheet(
 @Composable
 private fun RenameMemberDialog(
     initial: String,
-    error: String?,
+    error: UiText?,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
@@ -486,7 +491,7 @@ private fun RenameMemberDialog(
                 }
                 if (error != null) {
                     Spacer(Modifier.height(6.dp))
-                    Text(error, color = p.red, fontSize = 12.sp)
+                    Text(error.text(), color = p.red, fontSize = 12.sp)
                 }
             }
         },

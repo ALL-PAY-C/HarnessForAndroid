@@ -22,7 +22,7 @@ class PluginStore(
     context: Context,
     /** 包注册表：判「这是不是包插件」，并读写它那一份启用位。 */
     private val packages: InstalledPlugins = InstalledPlugins(context),
-) {
+) : PermissionGrants {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences("dsh.plugins", Context.MODE_PRIVATE)
@@ -48,6 +48,22 @@ class PluginStore(
             return
         }
         prefs.edit().putBoolean("enabled." + id, enabled).apply()
+    }
+
+    /**
+     * 已授予的权限名（[dev.dsh.mobile.pluginapi.PluginPermission.name]）。
+     *
+     * 每次返回副本：getStringSet 给的是 prefs 内部那个实例，直接漏出去会被调用方改掉，
+     * 而 SharedPreferences 只在 commit/apply 时落盘 —— 内存里「已授予」、重启后又没了。
+     */
+    override fun permissions(id: String): Set<String> =
+        prefs.getStringSet(KEY_PERM + id, emptySet())?.toSet() ?: emptySet()
+
+    /** 覆盖写：空集即撤销全部（键一起摘掉，别留一个空集合当「授过权」）。 */
+    override fun grant(id: String, permissions: Set<String>) {
+        val editor = prefs.edit()
+        if (permissions.isEmpty()) editor.remove(KEY_PERM + id) else editor.putStringSet(KEY_PERM + id, HashSet(permissions))
+        editor.apply()
     }
 
     fun rememberIds(ids: Collection<String>) {
@@ -80,5 +96,8 @@ class PluginStore(
 
         /** 与插件自己读的那个键同名，才谈得上同一份真相。 */
         const val KEY_ENABLED = "enabled"
+
+        /** 权限授予：一个插件一个键，值是一组权限名。 */
+        const val KEY_PERM = "perm."
     }
 }

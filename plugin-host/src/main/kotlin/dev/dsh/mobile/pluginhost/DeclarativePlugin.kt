@@ -40,6 +40,7 @@ class DeclarativePlugin(
         enabledByDefault = true,
         apiVersion = spec.apiVersion,
         minHostApi = spec.minHostApi,
+        permissions = spec.declaredPermissions(),
     )
 
     override fun register(registry: PluginRegistry) {

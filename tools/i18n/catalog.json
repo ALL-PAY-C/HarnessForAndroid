@@ -3380,7 +3380,7 @@
     "key": "chat_no_agent_selected",
     "en": "No agent selected",
     "zh": "未选择 Agent",
-    "where": "ChatSettingsScreen.kt"
+    "where": "ChatSettingsScreen.kt / ChatDialogs.kt"
   },
   {
     "key": "common_search",
@@ -6203,6 +6203,90 @@
     "where": "PluginHubRows.kt"
   },
   {
+    "key": "plugins_perm_needs",
+    "en": "Needs permission",
+    "zh": "需授权",
+    "where": "PluginHubRows.kt"
+  },
+  {
+    "key": "plugins_perm_missing",
+    "en": "Needs: %1$s",
+    "zh": "需要：%1$s",
+    "where": "PluginsScreen.kt"
+  },
+  {
+    "key": "plugins_perm_grant",
+    "en": "Grant",
+    "zh": "授予",
+    "where": "PluginsScreen.kt"
+  },
+  {
+    "key": "plugins_perm_dialog_title",
+    "en": "This plugin needs permission",
+    "zh": "该插件需要授权",
+    "where": "PluginsScreen.kt"
+  },
+  {
+    "key": "plugins_perm_dialog_body",
+    "en": "%1$s will be able to:",
+    "zh": "%1$s 将获得以下能力：",
+    "where": "PluginsScreen.kt"
+  },
+  {
+    "key": "plugins_perm_allow",
+    "en": "Allow",
+    "zh": "允许",
+    "where": "PluginsScreen.kt"
+  },
+  {
+    "key": "plugins_perm_shell_title",
+    "en": "Run shell commands",
+    "zh": "执行命令",
+    "where": "PluginPermissionLabels.kt"
+  },
+  {
+    "key": "plugins_perm_shell_hint",
+    "en": "Run shell commands on this device",
+    "zh": "在本机执行 shell 命令",
+    "where": "PluginPermissionLabels.kt"
+  },
+  {
+    "key": "plugins_perm_phone_control_title",
+    "en": "Control the phone",
+    "zh": "操控手机",
+    "where": "PluginPermissionLabels.kt"
+  },
+  {
+    "key": "plugins_perm_phone_control_hint",
+    "en": "Accessibility: tap, swipe and read the screen",
+    "zh": "无障碍服务：点击、滑动、读取屏幕内容",
+    "where": "PluginPermissionLabels.kt"
+  },
+  {
+    "key": "plugins_perm_privileged_title",
+    "en": "System privileges",
+    "zh": "系统特权",
+    "where": "PluginPermissionLabels.kt"
+  },
+  {
+    "key": "plugins_perm_privileged_hint",
+    "en": "Act with elevated rights through Shizuku or Root",
+    "zh": "通过 Shizuku 或 Root 执行高权限操作",
+    "where": "PluginPermissionLabels.kt"
+  },
+  {
+    "key": "plugins_perm_workspace_title",
+    "en": "Workspace files",
+    "zh": "读写工作区",
+    "where": "PluginPermissionLabels.kt"
+  },
+  {
+    "key": "plugins_perm_workspace_hint",
+    "en": "Read and write files in the plugin workspace",
+    "zh": "读写插件工作区里的文件",
+    "where": "PluginPermissionLabels.kt"
+  },
+  {
     "key": "plugins_row_load_failed",
     "en": "Load failed",
     "zh": "加载失败",
@@ -7418,7 +7502,49 @@
     "key": "chat_usage_line",
     "en": "Context %1$d%% · %2$s / %3$s%4$s",
     "zh": "上下文 %1$d%% · %2$s / %3$s%4$s",
-    "where": "ProjectionUi.kt"
+    "where": "ChatViewModel.kt / ProjectionUi.kt"
+  },
+  {
+    "key": "chat_context_usage_value",
+    "en": "%1$s / %2$s (%3$d%%)",
+    "zh": "%1$s / %2$s（%3$d%%）",
+    "where": "ChatViewModel.kt"
+  },
+  {
+    "key": "chat_queue_full",
+    "en": "Queue is full (%1$d)",
+    "zh": "队列已满（%1$d）",
+    "where": "ChatViewModel.kt"
+  },
+  {
+    "key": "chat_compact_failed",
+    "en": "Compaction failed: %1$s",
+    "zh": "压缩失败：%1$s",
+    "where": "ChatViewModel.kt"
+  },
+  {
+    "key": "chat_rename_err_empty",
+    "en": "Name cannot be empty",
+    "zh": "名字不能为空",
+    "where": "ChatViewModel.kt"
+  },
+  {
+    "key": "chat_rename_err_no_session",
+    "en": "Session does not exist",
+    "zh": "会话不存在",
+    "where": "ChatViewModel.kt"
+  },
+  {
+    "key": "chat_rename_err_duplicate",
+    "en": "A member named '%1$s' already exists",
+    "zh": "已存在同名成员「%1$s」",
+    "where": "ChatViewModel.kt"
+  },
+  {
+    "key": "chat_agent_generic",
+    "en": "Agent",
+    "zh": "Agent",
+    "where": "ChatHeader.kt / ChatMessageList.kt"
   },
   {
     "key": "chat_todo_doing",
@@ -7905,5 +8031,17 @@
     "en": "Record a clip into the app cache",
     "zh": "录一段音频到应用缓存目录",
     "where": "PhoneActionLabels.kt"
+  },
+  {
+    "key": "agents_field_base_url",
+    "en": "Base URL",
+    "zh": "Base URL",
+    "where": "AgentsScreen.kt"
+  },
+  {
+    "key": "agents_field_api_key",
+    "en": "API key",
+    "zh": "API Key",
+    "where": "AgentsScreen.kt"
   }
 ]

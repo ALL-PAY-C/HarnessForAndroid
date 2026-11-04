@@ -1,6 +1,7 @@
 package dev.dsh.mobile.feature.plugins
 
 import androidx.lifecycle.ViewModel
+import dev.dsh.mobile.pluginapi.PluginPermission
 import dev.dsh.mobile.pluginapi.SlotContribution
 import dev.dsh.mobile.pluginhost.ExternalPluginStore
 import dev.dsh.mobile.pluginhost.LoadedPlugin
@@ -22,6 +23,9 @@ class PluginsViewModel(
     val revision: StateFlow<Int> = host.revision
 
     fun setEnabled(id: String, enabled: Boolean) = host.setEnabled(id, enabled)
+
+    /** 授予插件权限：宿主立刻重算并按需 register，行内从「需授权」变「已启用」。 */
+    fun grant(id: String, permissions: Set<PluginPermission>) = host.grantPermissions(id, permissions)
 
     /** 退出安全模式：插件页顶部的横幅点一下就走这里，否则被挡的插件没有恢复路径。 */
     fun clearSafeMode() = host.clearSafeMode()

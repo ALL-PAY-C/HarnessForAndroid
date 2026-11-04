@@ -3,7 +3,6 @@ package dev.dsh.mobile.app
 import android.content.Context
 import dev.dsh.mobile.app.diag.AppBootGuard
 import dev.dsh.mobile.app.diag.CrashReporter
-import dev.dsh.mobile.app.gateway.GatewayManager
 import dev.dsh.mobile.core.common.AppLog
 import dev.dsh.mobile.core.common.RestartReason
 import dev.dsh.mobile.core.common.ProxyEnv
@@ -137,8 +136,6 @@ class AppContainer(
     val endpoints: EndpointRepository by lazy { EndpointRepository(db, settings, secretStore) }
     val models by lazy { ModelStore(context) }
 
-    /** 内置 CLIProxyAPI 网关：解压二进制、生成 config.yaml、起子进程都在这里，插件只认 baseUrl。 */
-    val gateway by lazy { GatewayManager(context) }
     val presetStore by lazy { dev.dsh.mobile.core.data.preset.AgentPresetStore(context) }
 
     /** 群聊规划书（T9.7a）：一个会话一本，DataStore 单条 JSON，不建表不迁移。 */
@@ -444,6 +441,14 @@ class AppContainer(
      */
     val externalPlugins: ExternalPluginStore by lazy { ExternalPluginStore(context, pluginInstaller) }
 
+    /**
+     * 必须声明在 init 之前：Kotlin 按声明顺序初始化属性，而 init 里那个
+     * models.models.collect 会在构造过程中就收到第一次发射（DataStore 立刻吐空表）。
+     * 声明在后面时它读到的是 null → 冷启动 NPE（实测 AppContainer.kt:464，DefaultDispatcher-worker）。
+     */
+    private val _runtime = MutableStateFlow<RuntimeState>(RuntimeState.NotConfigured)
+    val runtime: StateFlow<RuntimeState> = _runtime.asStateFlow()
+
     init {
         watchWorkspace()
         // endpoint token 迁移先行：把 Room 遗留明文 token 搬进 noBackupFilesDir 并清空 Room 字段，
@@ -453,12 +458,6 @@ class AppContainer(
         scope.launch(Dispatchers.IO) { runCatching { repo.resetStaleStatuses() } }
         // 模型自愈：老版本插件自动注册的 plugin.* 条目升级后清掉，列表里只剩用户自己填的。
         scope.launch(Dispatchers.IO) { runCatching { models.purgeAutoRegistered() } }
-        // 内置网关：协议层（LocalEngineTransport）连 127.0.0.1 失败时会调 LoopbackGateway.ensure()，
-        // 把启动器注册上去，模型请求自带「按需拉起」；冷启动再主动起一次，省得首条消息等解压 66MB。
-        dev.dsh.mobile.core.common.LoopbackGateway.install { gateway.ensureRunning() }
-        scope.launch(Dispatchers.IO) {
-            if (gateway.autoStart) runCatching { gateway.ensureRunning() }
-        }
         // The app is not a daemon: a missed 05:00 backup is caught up here.
         runCatching { BackupScheduler.schedule(context, backupManager) }
         scope.launch(Dispatchers.IO) {
@@ -561,7 +560,7 @@ class AppContainer(
      *
      * 为什么不重建 AppContainer 本身，逐条：
      *  · scope 是 AppScope 的进程级单例（AppContainer.kt:111），新容器会多出一整套后台循环
-     *    （models 自动重连、gateway 自启、备份补跑），旧容器的循环还活着，两套一起写同一份磁盘；
+     *    （models 自动重连、备份补跑），旧容器的循环还活着，两套一起写同一份磁盘；
      *  · PluginHostHolder.instance 是进程级槽位，换实例会让已经上屏的插件 UI 指向死宿主；
      *  · db / settings 都是按文件单例（DataModule），再建一份只是多一条连接，读不到「更干净」的数据。
      * 真正需要重建的只有三样：插件注册表、引擎连接、界面（界面由 RestartController 调 recreate）。
@@ -738,9 +737,6 @@ class AppContainer(
     val ongoingCenter: OngoingCenter by lazy {
         OngoingCenter(context, scope, settings.settings, repo) { notificationCenter }
     }
-
-    private val _runtime = MutableStateFlow<RuntimeState>(RuntimeState.NotConfigured)
-    val runtime: StateFlow<RuntimeState> = _runtime.asStateFlow()
 
     private var connectJob: Job? = null
     private var stateJob: Job? = null

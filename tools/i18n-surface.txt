@@ -11,7 +11,6 @@ app/src/main/kotlin/dev/dsh/mobile/app/nav/AppDrawer.kt
 feature/settings/src/main/kotlin/dev/dsh/mobile/feature/settings/AppAppearanceScreen.kt
 feature/plugins/src/main/kotlin/dev/dsh/mobile/feature/plugins/PluginHubScreen.kt
 feature/settings/src/main/kotlin/dev/dsh/mobile/feature/settings/AppCapabilityScreen.kt
-feature/settings/src/main/kotlin/dev/dsh/mobile/feature/settings/AppGatewayScreen.kt
 feature/settings/src/main/kotlin/dev/dsh/mobile/feature/settings/ExtrasScreen.kt
 feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/ChatDialogs.kt
 feature/chat/src/main/kotlin/dev/dsh/mobile/feature/chat/ChatSettingsScreen.kt
@@ -32,7 +31,6 @@ design/src/main/kotlin/dev/dsh/mobile/design/UiText.kt
 app/src/main/kotlin/dev/dsh/mobile/app/LinuxSettingsController.kt
 app/src/main/kotlin/dev/dsh/mobile/app/diag/DiagnosticsScreen.kt
 app/src/main/kotlin/dev/dsh/mobile/app/diag/SafeModeBanner.kt
-app/src/main/kotlin/dev/dsh/mobile/app/gateway/GatewayCard.kt
 app/src/main/kotlin/dev/dsh/mobile/app/notify/OngoingCenter.kt
 app/src/main/kotlin/dev/dsh/mobile/app/phone/PhoneControlScreen.kt
 design/src/main/kotlin/dev/dsh/mobile/design/CollapsibleSection.kt

@@ -1040,6 +1040,20 @@
     <string name="plugins_has_own_ui">插件自带设置界面</string>
     <string name="plugins_row_enabled">已启用</string>
     <string name="plugins_row_disabled">已停用</string>
+    <string name="plugins_perm_needs">需授权</string>
+    <string name="plugins_perm_missing">需要：%1$s</string>
+    <string name="plugins_perm_grant">授予</string>
+    <string name="plugins_perm_dialog_title">该插件需要授权</string>
+    <string name="plugins_perm_dialog_body">%1$s 将获得以下能力：</string>
+    <string name="plugins_perm_allow">允许</string>
+    <string name="plugins_perm_shell_title">执行命令</string>
+    <string name="plugins_perm_shell_hint">在本机执行 shell 命令</string>
+    <string name="plugins_perm_phone_control_title">操控手机</string>
+    <string name="plugins_perm_phone_control_hint">无障碍服务：点击、滑动、读取屏幕内容</string>
+    <string name="plugins_perm_privileged_title">系统特权</string>
+    <string name="plugins_perm_privileged_hint">通过 Shizuku 或 Root 执行高权限操作</string>
+    <string name="plugins_perm_workspace_title">读写工作区</string>
+    <string name="plugins_perm_workspace_hint">读写插件工作区里的文件</string>
     <string name="plugins_row_load_failed">加载失败</string>
     <string name="plugins_reason_safe_mode">被安全模式挡住：先退出安全模式，再重新启用</string>
     <string name="plugins_safe_mode_block">安全模式：连续启动失败后第三方插件已暂停</string>
@@ -1245,6 +1259,13 @@
     <string name="chat_compact_badge">已压缩 %1$d 次 · 省 %2$s</string>
     <string name="chat_compact_detail">%1$d 次 · 最近省 %2$s tokens · 摘要 %3$s 字</string>
     <string name="chat_usage_line">上下文 %1$d%% · %2$s / %3$s%4$s</string>
+    <string name="chat_context_usage_value">%1$s / %2$s（%3$d%%）</string>
+    <string name="chat_queue_full">队列已满（%1$d）</string>
+    <string name="chat_compact_failed">压缩失败：%1$s</string>
+    <string name="chat_rename_err_empty">名字不能为空</string>
+    <string name="chat_rename_err_no_session">会话不存在</string>
+    <string name="chat_rename_err_duplicate">已存在同名成员「%1$s」</string>
+    <string name="chat_agent_generic">Agent</string>
     <string name="chat_todo_doing">进行中</string>
     <string name="chat_todo_pending">待办</string>
     <string name="chat_todo_done">已完成</string>
@@ -1326,4 +1347,6 @@
     <string name="act_location_hint">读最近一次已知位置</string>
     <string name="act_audio_record_title">录音</string>
     <string name="act_audio_record_hint">录一段音频到应用缓存目录</string>
+    <string name="agents_field_base_url">Base URL</string>
+    <string name="agents_field_api_key">API Key</string>
 </resources>

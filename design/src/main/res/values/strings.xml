@@ -1040,6 +1040,20 @@ Write unit tests</string>
     <string name="plugins_has_own_ui">Plugin provides its own settings UI</string>
     <string name="plugins_row_enabled">Enabled</string>
     <string name="plugins_row_disabled">Disabled</string>
+    <string name="plugins_perm_needs">Needs permission</string>
+    <string name="plugins_perm_missing">Needs: %1$s</string>
+    <string name="plugins_perm_grant">Grant</string>
+    <string name="plugins_perm_dialog_title">This plugin needs permission</string>
+    <string name="plugins_perm_dialog_body">%1$s will be able to:</string>
+    <string name="plugins_perm_allow">Allow</string>
+    <string name="plugins_perm_shell_title">Run shell commands</string>
+    <string name="plugins_perm_shell_hint">Run shell commands on this device</string>
+    <string name="plugins_perm_phone_control_title">Control the phone</string>
+    <string name="plugins_perm_phone_control_hint">Accessibility: tap, swipe and read the screen</string>
+    <string name="plugins_perm_privileged_title">System privileges</string>
+    <string name="plugins_perm_privileged_hint">Act with elevated rights through Shizuku or Root</string>
+    <string name="plugins_perm_workspace_title">Workspace files</string>
+    <string name="plugins_perm_workspace_hint">Read and write files in the plugin workspace</string>
     <string name="plugins_row_load_failed">Load failed</string>
     <string name="plugins_reason_safe_mode">blocked by safe mode — exit it above, then re-enable</string>
     <string name="plugins_safe_mode_block">Safe mode: third-party plugins are paused after repeated boot failures</string>
@@ -1245,6 +1259,13 @@ Supports https://github.com/owner/repo, owner/repo, github.com/owner/repo/tree/b
     <string name="chat_compact_badge">%1$d compactions · saved %2$s</string>
     <string name="chat_compact_detail">%1$d compactions · last saved %2$s tokens · summary %3$s chars</string>
     <string name="chat_usage_line">Context %1$d%% · %2$s / %3$s%4$s</string>
+    <string name="chat_context_usage_value">%1$s / %2$s (%3$d%%)</string>
+    <string name="chat_queue_full">Queue is full (%1$d)</string>
+    <string name="chat_compact_failed">Compaction failed: %1$s</string>
+    <string name="chat_rename_err_empty">Name cannot be empty</string>
+    <string name="chat_rename_err_no_session">Session does not exist</string>
+    <string name="chat_rename_err_duplicate">A member named \'%1$s\' already exists</string>
+    <string name="chat_agent_generic">Agent</string>
     <string name="chat_todo_doing">In progress</string>
     <string name="chat_todo_pending">Pending</string>
     <string name="chat_todo_done">Done</string>
@@ -1326,4 +1347,6 @@ Supports https://github.com/owner/repo, owner/repo, github.com/owner/repo/tree/b
     <string name="act_location_hint">Read the last known location</string>
     <string name="act_audio_record_title">Record audio</string>
     <string name="act_audio_record_hint">Record a clip into the app cache</string>
+    <string name="agents_field_base_url">Base URL</string>
+    <string name="agents_field_api_key">API key</string>
 </resources>

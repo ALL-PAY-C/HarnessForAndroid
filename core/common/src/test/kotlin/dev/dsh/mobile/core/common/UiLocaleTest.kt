@@ -47,7 +47,22 @@ class UiLocaleTest {
         UiLocale.latchTag("en")
         assertEquals(UiLanguage.En, UiLocale.language())
         assertEquals(Locale.ENGLISH, UiLocale.locale())
+        UiLocale.latchTag("zh")
+        assertEquals(UiLanguage.Zh, UiLocale.language())
+    }
+
+    @Test
+    fun missingTagMeansDefaultChinese() {
+        // 键不存在 = 用户没选过 → 默认中文（与「显式跟随系统」是两件事）。
+        assertEquals("zh", UiLocale.effectiveTag(null))
         UiLocale.latchTag(null)
+        assertEquals(UiLanguage.Zh, UiLocale.language())
+    }
+
+    @Test
+    fun explicitSystemTagStillFollowsTheSystem() {
+        assertEquals(UiLocale.SYSTEM_TAG, UiLocale.effectiveTag(UiLocale.SYSTEM_TAG))
+        UiLocale.latchTag(UiLocale.SYSTEM_TAG)
         assertEquals(UiLanguage.System, UiLocale.language())
     }
 }

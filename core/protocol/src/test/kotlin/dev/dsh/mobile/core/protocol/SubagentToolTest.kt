@@ -43,8 +43,8 @@ class SubagentToolTest {
         assertTrue(props.toString(), props.containsAll(listOf("prompt", "name", "model")))
         // 说明里必须点明「看不到当前对话」和嵌套深度上限，否则模型会写「上面那个文件」或盲目递归。
         val help = fn["description"]!!.jsonPrimitive.content
-        assertTrue(help, help.contains("看不到当前对话"))
-        assertTrue(help, help.contains("子代理最多嵌套 2 层"))
+        assertTrue(help, help.contains("cannot see the current conversation"))
+        assertTrue(help, help.contains("nest at most 2 levels"))
     }
 
     @Test

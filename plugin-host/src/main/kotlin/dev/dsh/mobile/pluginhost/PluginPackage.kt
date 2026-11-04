@@ -46,6 +46,13 @@ data class PluginManifestFile(
     val apiVersion: Int = PLUGIN_API_VERSION,
     /** 插件要求的最低宿主 API 版本；缺省 0 = 不要求，高过宿主即拒载。 */
     val minHostApi: Int = 0,
+    /**
+     * 清单里声明的权限名（plugin.json 的 `permissions` 数组）。
+     *
+     * 存字符串而不是枚举：解析在 plugin-host，枚举在 plugin-api，认不出的名字要能原样
+     * 留着给诊断看，而不是在解析阶段就炸掉整个插件包。
+     */
+    val permissions: Set<String> = emptySet(),
 ) {
     companion object {
         fun parse(text: String): Result<PluginManifestFile> = runCatching {
@@ -62,6 +69,10 @@ data class PluginManifestFile(
                 homepage = root.optString("homepage").ifBlank { root.optString("url") },
                 apiVersion = root.optInt("apiVersion", PLUGIN_API_VERSION),
                 minHostApi = root.optInt("minHostApi", 0),
+                permissions = root.optJSONArray("permissions")?.let { arr ->
+                    (0 until arr.length()).map { arr.optString(it) }
+                        .filterTo(LinkedHashSet()) { it.isNotBlank() }
+                }.orEmpty(),
             )
         }
     }

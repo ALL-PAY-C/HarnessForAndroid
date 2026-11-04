@@ -11,6 +11,7 @@ import dev.dsh.mobile.pluginapi.DshPlugin
 import dev.dsh.mobile.pluginapi.PluginCompat
 import dev.dsh.mobile.pluginapi.PluginDeclaration
 import dev.dsh.mobile.pluginapi.PluginManifest
+import dev.dsh.mobile.pluginapi.PluginPermission
 import dev.dsh.mobile.pluginapi.PluginRegistry
 import dev.dsh.mobile.pluginapi.SlotAction
 import dev.dsh.mobile.pluginapi.SlotContribution
@@ -41,6 +42,14 @@ data class LoadedPlugin(
      * （退出安全模式），而不是把策略原因伪装成插件加载失败。
      */
     val blockedBySafeMode: Boolean = false,
+    /**
+     * 清单声明了权限、但用户还没全部授予（T9.25）。
+     *
+     * 与 [blockedBySafeMode] 并列而不是塞进 [error]：这不是插件坏了，是授权没给，
+     * 界面据此显示第三态「需授权」并给出唯一可行的动作（授予），而不是「加载失败」。
+     * 被它挡住时 register() 一次都不跑 —— 未授权的插件连贡献都不该出现。
+     */
+    val blockedByPermission: Boolean = false,
     /**
      * 版本/能力协商结果：全量兼容、降级（[Compat.Degraded]，列出没生效的槽位/动作/超配额项）、
      * 拒载（[Compat.Rejected]，apiVersion 比宿主新）。插件管理页直接显示 [Compat.summary]。
@@ -143,7 +152,14 @@ class PluginHost(
      * 与 [PluginStore.safeMode]（插件自己数的连续失败）取或，两套来源共用同一条放行规则。
      */
     private val extraSafeMode: () -> Boolean = { false },
+    /**
+     * 权限授予存储（T9.25）。缺省回落到 [store]（PluginStore 自己实现了 PermissionGrants），
+     * 所以 app 侧接线零改动；单测注入内存实现，不需要 Context。
+     */
+    grantsStore: PermissionGrants? = null,
 ) {
+
+    private val grants: PermissionGrants? = grantsStore ?: store
 
     private val registry = PluginRegistry()
     private val instances = LinkedHashMap<String, DshPlugin>()
@@ -206,7 +222,9 @@ class PluginHost(
         // 启用意图与安全模式放行分开算：注册受安全模式约束，但行内要说得清「是你想开、
         // 被安全模式挡住了」，所以回执按意图算，不用 isEnabled 的合取结果。
         val intent = store?.isEnabled(m.id, m.enabledByDefault) ?: m.enabledByDefault
-        val wanted = safeModeAllows(m.id) && intent
+        // 声明了权限但没全部授予：与安全模式一样「不 register」，但行内说的是「需授权」而不是
+        // 「被挡住」—— 前者用户点一下就能解决，后者要退出安全模式。
+        val wanted = safeModeAllows(m.id) && permissionAllows(m) && intent
         // 版本协商先于注册：清单声明的 apiVersion 比宿主新就拒载，register() 一次都不调，
         // 免得插件按新版契约写的槽位在旧宿主上跑出半个界面。
         val rejected = versionReject(m)
@@ -234,10 +252,83 @@ class PluginHost(
      * Node 编排在真正执行 JS 前用它判断要不要 plugins.load（禁用插件不能跑 JS）。
      */
     fun isEnabled(id: String, enabledByDefault: Boolean): Boolean =
-        safeModeAllows(id) && (store?.isEnabled(id, enabledByDefault) ?: enabledByDefault)
+        safeModeAllows(id) &&
+            permissionAllows(instances[id]?.manifest) &&
+            (store?.isEnabled(id, enabledByDefault) ?: enabledByDefault)
 
     /** 安全模式只放行内置（dsh. 前缀）。放行规则只有这一处，isEnabled 与行状态共用。 */
     private fun safeModeAllows(id: String): Boolean = !safeMode || id.startsWith("dsh.")
+
+    // ------------------------------------------------------------ 权限（T9.25）
+
+    /**
+     * 权限放行：没声明 = 不需要授权（老插件走这条），声明了就要求逐项授予。
+     *
+     * 与 [safeModeAllows] 并列放在这里，[load] / [setEnabled] / [isEnabled] / [recompute] 共用
+     * 同一个判定 —— 四处各写一遍必然有一天「开关说启用、贡献却不在」。
+     */
+    private fun permissionAllows(manifest: PluginManifest?): Boolean {
+        if (manifest == null || manifest.permissions.isEmpty()) return true
+        val stored = grants?.permissions(manifest.id) ?: return false
+        return manifest.permissions.all { it.name in stored }
+    }
+
+    /** 该插件已授予的权限（只算清单里声明过的：删掉声明等于撤销，不用另写清理逻辑）。 */
+    fun permissionGrants(id: String): Set<PluginPermission> {
+        val declared = instances[id]?.manifest?.permissions ?: return emptySet()
+        val stored = grants?.permissions(id) ?: return emptySet()
+        return declared.filterTo(LinkedHashSet()) { it.name in stored }
+    }
+
+    /** 声明了但还没授予的权限；非空即「需授权」，宿主不 register。 */
+    fun missingPermissions(id: String): Set<PluginPermission> {
+        val declared = instances[id]?.manifest?.permissions ?: return emptySet()
+        // 没有授予存储时不能提前返回空集：那等于把「声明了但没处记授权」说成「不缺权限」，
+        // 行内会显示已启用，而 permissionAllows 实际拦着不注册。
+        val stored = grants?.permissions(id).orEmpty()
+        return declared.filterNotTo(LinkedHashSet()) { it.name in stored }
+    }
+
+    /**
+     * 授予权限并立刻生效。
+     *
+     * 授予后必须重算并按需注册（与 [clearSafeMode] 同一路子）：只写存储不重算，行内会一直挂着
+     * 「需授权」，用户点了「允许」却什么都没发生。
+     */
+    fun grantPermissions(id: String, permissions: Set<PluginPermission>) {
+        if (permissions.isEmpty()) return
+        val plugin = instances[id] ?: return
+        val store = grants ?: return
+        store.grant(id, (permissionGrants(id) + permissions).mapTo(HashSet()) { it.name })
+        if (missingPermissions(id).isEmpty() && isEnabled(id, plugin.manifest.enabledByDefault)) {
+            val err = registerNow(plugin)
+            _plugins.update { list -> list.map { if (it.manifest.id == id) recompute(it, null, err) else it } }
+        } else {
+            _plugins.update { list -> list.map { if (it.manifest.id == id) recompute(it, null, it.error) else it } }
+        }
+        bump()
+    }
+
+    /** 撤销权限：贡献立刻下架，行回到「需授权」。 */
+    fun revokePermissions(id: String, permissions: Set<PluginPermission>) {
+        if (permissions.isEmpty()) return
+        val store = grants ?: return
+        store.grant(id, (permissionGrants(id) - permissions).mapTo(HashSet()) { it.name })
+        registry.clearPlugin(id)
+        _plugins.update { list -> list.map { if (it.manifest.id == id) recompute(it, null, it.error) else it } }
+        bump()
+    }
+
+    /** 清旧注册后重跑 register()，返回注册期错误（null = 成功）。与 [setEnabled] 的启用分支同一条路。 */
+    private fun registerNow(plugin: DshPlugin): String? {
+        val id = plugin.manifest.id
+        registry.clearPlugin(id)
+        versionReject(plugin.manifest)?.let { return it }
+        val failure = runCatching { plugin.register(registry) }.exceptionOrNull() ?: return null
+        registry.clearPlugin(id)
+        runCatching { AppLog.w("plugin " + id + " register failed: " + failure.message) }
+        return failure.message?.takeIf { it.isNotBlank() } ?: failure::class.simpleName ?: "插件注册失败"
+    }
 
     /**
      * 仅当 [plugin] 仍是当前已装实例（未被卸载/替换）时才强制重注册。
@@ -286,11 +377,13 @@ class PluginHost(
         // 「被安全模式挡住」，否则开关弹回去、状态写「已停用」，用户看不出发生了什么。
         val on = wanted ?: (store?.isEnabled(id, row.manifest.enabledByDefault) ?: row.manifest.enabledByDefault)
         val blocked = on && !safeModeAllows(id)
+        val blockedByPermission = on && !permissionAllows(row.manifest)
         return row.copy(
-            enabled = on && registerError == null && loadError == null && !blocked,
+            enabled = on && registerError == null && loadError == null && !blocked && !blockedByPermission,
             error = registerError,
             loadError = loadError,
             blockedBySafeMode = blocked,
+            blockedByPermission = blockedByPermission,
             compat = compatOf(id),
         )
     }
@@ -362,22 +455,15 @@ class PluginHost(
         }
         store?.setEnabled(id, enabled)
         if (enabled) {
-            // 安全模式挡着就不注册贡献：注册了会留下「开关关着却有槽位」的幽灵界面，
+            // 安全模式挡着 / 权限没授全就不注册贡献：注册了会留下「开关关着却有槽位」的幽灵界面，
             // 只把意图写进存储并让这一行显示被挡的原因。
-            if (!safeModeAllows(id)) {
+            if (!safeModeAllows(id) || !permissionAllows(plugin.manifest)) {
                 _plugins.update { list -> list.map { if (it.manifest.id == id) recompute(it, null, it.error) else it } }
                 bump()
                 return
             }
-            registry.clearPlugin(id)
-            val rejected = versionReject(plugin.manifest)
-            val err = if (rejected != null) {
-                rejected
-            } else {
-                runCatching { plugin.register(registry) }
-                    .onFailure { registry.clearPlugin(id) }
-                    .exceptionOrNull()?.message
-            }
+            // 与 [grantPermissions] 共用同一条注册路径：两处各写一遍，迟早有一处漏掉版本协商。
+            val err = registerNow(plugin)
             _plugins.update { list ->
                 list.map { if (it.manifest.id == id) recompute(it, null, err) else it }
             }

@@ -28,7 +28,6 @@ import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.Session
 import dev.dsh.mobile.core.model.SessionKind
 import dev.dsh.mobile.core.model.TokenUsage
-import dev.dsh.mobile.core.protocol.CompactResult
 import dev.dsh.mobile.core.protocol.RecallReport
 import dev.dsh.mobile.core.protocol.group.LedgerSnapshot
 import dev.dsh.mobile.core.protocol.group.RoomLedgers
@@ -61,7 +60,8 @@ data class ChatUiState(
     val plan: List<String> = emptyList(),
     val settings: AppSettings = AppSettings.DEFAULT,
     val runtime: RuntimeState = RuntimeState.NotConfigured,
-    val error: String? = null,
+    /** 状态层错误：资源 id 或引擎原样串，语言留给 UI 层定。 */
+    val error: UiText? = null,
     val kind: SessionKind = SessionKind.Single,
     val participants: List<Participant> = emptyList(),
     val agentId: String? = null,
@@ -116,24 +116,36 @@ data class ChatUiState(
      */
     val contextUsed: Long get() = usage.lastPrompt + completionTokens
     val contextPercent: Long get() = if (contextWindow > 0) contextUsed * 100 / contextWindow else 0
-    val contextUsageText: String
-        get() = "${compact(contextUsed)} / ${compact(contextWindow.toLong())} ($contextPercent%)"
+    /** 用量弹窗里的「当前占用」：只给结构，千分位/百分号/括号由 UI 侧按语言格式化。 */
+    val contextUsageText: UiText
+        get() = UiText.Res(
+            DesignR.string.chat_context_usage_value,
+            listOf(compact(contextUsed), compact(contextWindow.toLong()), contextPercent.toInt()),
+        )
 
     /** 累计消耗放右侧，标题下只显示最近请求的实际上下文。 */
-    val tokenText: String
+    /** 顶栏那行「上下文 X% · used / window · 速度」；单位后缀是运行时数据，语言无关。 */
+    val tokenText: UiText
         get() {
-            val used = contextUsed
             val pct = contextPercent
             val speed = if (tokensPerSecond > 0.05) " · " + speedText(tokensPerSecond) else ""
-            return "Context $pct% · ${compact(used)} / ${compact(contextWindow.toLong())}$speed"
+            return UiText.Res(
+                DesignR.string.chat_usage_line,
+                listOf(pct.toInt(), compact(contextUsed), compact(contextWindow.toLong()), speed),
+            )
         }
     val isGroup: Boolean get() = kind == SessionKind.Group
-    /** Name of the agent bound to a single chat (falls back to the default model). */
+    /**
+     * Name of the agent bound to a single chat (falls back to the default model).
+     *
+     * 这是数据不是文案：没有可绑的 Agent 时返回空串，界面自己决定显示什么
+     * （[DesignR.string.chat_no_agent_selected] / [DesignR.string.chat_agent_generic]）。
+     */
     val agentName: String
         get() = models.firstOrNull { it.id == agentId }?.name
             ?: models.firstOrNull { it.isDefault }?.name
             ?: models.firstOrNull()?.name
-            ?: "No agent selected"
+            ?: ""
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -155,7 +167,7 @@ class ChatViewModel(
 ) : ViewModel() {
 
 
-    private val error = MutableStateFlow<String?>(null)
+    private val error = MutableStateFlow<UiText?>(null)
 
     /**
      * 群聊规划书（T9.7a）：人写的项目清单，跟引擎写的房间账本 [LedgerSnapshot] 是两件事——
@@ -198,11 +210,13 @@ class ChatViewModel(
         // 来源追踪：只清「上一帧是自己写的」那一条，null 不覆盖 cancel/answerPermission 刚写入的错误。
         // 收在 viewModelScope：VM 销毁即取消 collector，不残留对旧会话队列错误的订阅。
         viewModelScope.launch {
-            var mirrored: String? = null
+            var mirrored: UiText? = null
             sendQueue.sendError(sessionId).collect { err ->
                 if (err != null) {
-                    mirrored = err
-                    error.value = err
+                    // 队列错误是仓库/引擎原样串：包 Raw，比较靠 data class 相等性。
+                    val next = UiText.Raw(err)
+                    mirrored = next
+                    error.value = next
                 } else if (mirrored != null && error.value == mirrored) {
                     mirrored = null
                     error.value = null
@@ -230,7 +244,7 @@ class ChatViewModel(
 
     private data class Meta(
         val session: Session?,
-        val error: String?,
+        val error: UiText?,
         val models: List<ModelProfile>,
         val groups: List<String>,
         val queue: List<SendQueue.Item> = emptyList(),
@@ -448,17 +462,14 @@ class ChatViewModel(
         compactingState.value = true
         viewModelScope.launch {
             try {
-                val result = try {
-                    repo.compact(sessionId)
+                val note = try {
+                    compactNote(repo.compact(sessionId))
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
-                    CompactResult(
-                        compacted = false,
-                        message = "Compaction failed: " + (e.message ?: e.javaClass.simpleName),
-                    )
+                    UiText.Res(DesignR.string.chat_compact_failed, listOf(e.message ?: e.javaClass.simpleName))
                 }
-                pushNote(compactNote(result))
+                pushNote(note)
             } finally {
                 compactingState.value = false
             }
@@ -652,7 +663,9 @@ class ChatViewModel(
                 }
                 SendMode.Queue -> {
                     val ok = sendQueue.enqueue(sessionId, outgoing, images, uiState.value.settings.queueLimit)
-                    if (!ok) error.value = "Queue is full (" + uiState.value.settings.queueLimit + ")"
+                    if (!ok) {
+                        error.value = UiText.Res(DesignR.string.chat_queue_full, listOf(uiState.value.settings.queueLimit))
+                    }
                     return
                 }
             }
@@ -699,7 +712,7 @@ class ChatViewModel(
         // 取消也走 error 通道：远端取消失败（ACP 15s 超时）时，本地 finalize/Idle 由 core:data 兜底，
         // 这里把失败原因写进 error，让标题下的可读横幅呈现出来，而不是静默吞掉。
         when (val r = repo.cancel(sessionId)) {
-            is DshResult.Err -> error.value = r.message
+            is DshResult.Err -> error.value = UiText.Raw(r.message)
             is DshResult.Ok -> error.value = null
         }
     }
@@ -714,7 +727,7 @@ class ChatViewModel(
         ownerAgentId: String? = null,
     ) = viewModelScope.launch {
         when (val r = repo.answerPermission(sessionId, requestId, optionId, ownerAgentId)) {
-            is DshResult.Err -> error.value = r.message
+            is DshResult.Err -> error.value = UiText.Raw(r.message)
             is DshResult.Ok -> error.value = null
         }
     }
@@ -773,14 +786,14 @@ class ChatViewModel(
      * 区分谁在说话（历史消息里也存的是名字），两个同名成员会让 @ 提及和回溯
      * 都指向不明，所以宁可不改。
      */
-    suspend fun renameParticipant(participantId: String, newName: String): String? {
+    suspend fun renameParticipant(participantId: String, newName: String): UiText? {
         val trimmed = newName.trim()
-        if (trimmed.isEmpty()) return "Name cannot be empty"
-        val session = repo.session(sessionId) ?: return "Session does not exist"
+        if (trimmed.isEmpty()) return UiText.Res(DesignR.string.chat_rename_err_empty)
+        val session = repo.session(sessionId) ?: return UiText.Res(DesignR.string.chat_rename_err_no_session)
         val clash = session.participants.any {
             it.id != participantId && it.name.trim().equals(trimmed, ignoreCase = true)
         }
-        if (clash) return "A member named '$trimmed' already exists"
+        if (clash) return UiText.Res(DesignR.string.chat_rename_err_duplicate, listOf(trimmed))
         val updated = session.participants.map {
             if (it.id == participantId) it.copy(name = trimmed) else it
         }

@@ -55,6 +55,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.GroupHeader
 import dev.dsh.mobile.design.GroupFrame
+import dev.dsh.mobile.pluginapi.PluginPermission
 import dev.dsh.mobile.pluginapi.SlotAction
 import dev.dsh.mobile.pluginapi.SlotContribution
 import dev.dsh.mobile.pluginhost.LoadedPlugin
@@ -212,9 +213,14 @@ fun PluginsScreen(
                     slots = remember(revision, plugin.manifest.id) {
                         viewModel.contributionsOf(plugin.manifest.id)
                     },
+                    // 缺哪些权限由宿主判定（清单声明 - 已授予），界面只负责显示，不自己算一份。
+                    missing = remember(revision, plugin.manifest.id) {
+                        viewModel.host.missingPermissions(plugin.manifest.id)
+                    },
                     tokens = tokens,
                     onSlotAction = onSlotAction,
                     onToggle = { viewModel.setEnabled(plugin.manifest.id, it) },
+                    onGrant = { viewModel.grant(plugin.manifest.id, it) },
                     onUninstall = { pending = plugin },
                 )
             }
@@ -321,20 +327,26 @@ private fun AddRowCard(label: String, onClick: () -> Unit) {
 private fun PluginCard(
     plugin: LoadedPlugin,
     slots: List<SlotContribution>,
+    /** 清单声明了但还没授予的权限；非空 = 这一行处于「需授权」第三态。 */
+    missing: Set<PluginPermission>,
     tokens: dev.dsh.mobile.pluginapi.HostThemeTokens,
     onSlotAction: (SlotAction) -> Unit,
     onToggle: (Boolean) -> Unit,
+    onGrant: (Set<PluginPermission>) -> Unit,
     onUninstall: () -> Unit,
 ) {
     val p = LocalQq.current
     var expanded by rememberSaveable(plugin.manifest.id) { mutableStateOf(false) }
+    var granting by rememberSaveable(plugin.manifest.id) { mutableStateOf(false) }
     // 运行期回执优先于启用意图：装上了但加载失败，这一行必须是失败态而不是「已启用」。
     // 安全模式挡住的行没有插件自己的错误，原因换成宿主策略文案 —— 否则用户只看到
     // 开关自己弹回去、状态写「已停用」，页面上一个字的原因都没有。
     val status = pluginRowStatus(
-        plugin.enabled,
-        plugin.loadError ?: plugin.error
+        enabled = plugin.enabled,
+        loadError = plugin.loadError ?: plugin.error
             ?: if (plugin.blockedBySafeMode) stringResource(DesignR.string.plugins_reason_safe_mode) else null,
+        // 第三态由宿主回执决定：权限没给全时 enabled 恒为 false，只看 enabled 会显示「已停用」。
+        needsPermission = plugin.blockedByPermission || (missing.isNotEmpty() && !plugin.blockedBySafeMode),
     )
     GroupFrame(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
         GroupHeader(
@@ -346,6 +358,7 @@ private fun PluginCard(
                     status.text.text(),
                     color = when {
                         status.failed -> MaterialTheme.colorScheme.error
+                        status.needsPermission -> p.accent
                         plugin.enabled -> p.accent
                         else -> p.t3
                     },
@@ -387,6 +400,26 @@ private fun PluginCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
             )
+        }
+        if (status.needsPermission) {
+            // 第三态的唯一出口：说清缺哪几项 + 一个「授予」。没有这个按钮，用户只能看着
+            // 「需授权」发呆 —— 开关拨上去也不会注册。
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(DesignR.string.plugins_perm_missing, missing.map { it.title() }.joinToString(" · ")),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = p.t3,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { granting = true }) {
+                    Text(stringResource(DesignR.string.plugins_perm_grant), style = MaterialTheme.typography.labelMedium)
+                }
+            }
         }
         if (expanded) {
             Column(Modifier.padding(12.dp)) {
@@ -448,6 +481,39 @@ private fun PluginCard(
                 }
             }
         }
+    }
+
+    // 授予前把「要拿什么」逐条摊开：只写权限名，用户没法判断该不该点允许。
+    if (granting) {
+        AlertDialog(
+            onDismissRequest = { granting = false },
+            title = { Text(stringResource(DesignR.string.plugins_perm_dialog_title)) },
+            text = {
+                Column {
+                    Text(
+                        stringResource(DesignR.string.plugins_perm_dialog_body, plugin.manifest.name),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = p.t1,
+                    )
+                    missing.forEach { perm ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(perm.title(), style = MaterialTheme.typography.bodyMedium, color = p.t1)
+                        Text(perm.hint(), style = MaterialTheme.typography.labelSmall, color = p.t3)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        granting = false
+                        onGrant(missing)
+                    },
+                ) { Text(stringResource(DesignR.string.plugins_perm_allow)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { granting = false }) { Text(stringResource(DesignR.string.common_cancel)) }
+            },
+        )
     }
 }
 

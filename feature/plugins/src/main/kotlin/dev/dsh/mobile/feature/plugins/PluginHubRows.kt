@@ -47,18 +47,37 @@ internal const val LOAD_ERROR_MAX_CHARS = 120
  * 真实的加载回执塞进 [loadError]（register() 抛的异常或 Node 引擎 plugins.load 的失败），
  * 不能拿「安装目录在不在」来推断状态 —— 那正是「装上了但报错」被显示成「已启用」的根源。
  */
-internal data class PluginRowStatus(val text: UiText, val failed: Boolean, val detail: String?)
+internal data class PluginRowStatus(
+    val text: UiText,
+    val failed: Boolean,
+    val detail: String?,
+    /**
+     * 第三态（T9.25）：清单声明了权限但没全授予，宿主不 register。
+     *
+     * 与 [failed] 互斥：授权没给不是插件坏了，把它画成「加载失败」用户会去查日志而不是点「授予」。
+     */
+    val needsPermission: Boolean = false,
+)
 
-/** 失败优先于启用态：装上了但跑不起来，就不许显示「已启用」。 */
+/**
+ * 三态优先级：加载失败 > 需授权 > 启用/停用。
+ *
+ * 失败压过一切：装上了但跑不起来，就不许显示「已启用」；而「需授权」压过 enabled=false，
+ * 因为权限没给的插件 enabled 恒为 false，写「已停用」等于把「缺授权」说成「你关了它」。
+ */
 internal fun pluginRowStatus(
     enabled: Boolean,
     loadError: String?,
     limit: Int = LOAD_ERROR_MAX_CHARS,
+    needsPermission: Boolean = false,
 ): PluginRowStatus {
     val error = loadError?.trim()?.takeIf { it.isNotEmpty() }
-    if (error == null) return PluginRowStatus(if (enabled) UiText.Res(R.string.plugins_row_enabled) else UiText.Res(R.string.plugins_row_disabled), false, null)
-    val clipped = if (error.length <= limit) error else error.take(limit) + "…"
-    return PluginRowStatus(UiText.Res(R.string.plugins_row_load_failed), true, clipped)
+    if (error != null) {
+        val clipped = if (error.length <= limit) error else error.take(limit) + "…"
+        return PluginRowStatus(UiText.Res(R.string.plugins_row_load_failed), true, clipped)
+    }
+    if (needsPermission) return PluginRowStatus(UiText.Res(R.string.plugins_perm_needs), false, null, needsPermission = true)
+    return PluginRowStatus(if (enabled) UiText.Res(R.string.plugins_row_enabled) else UiText.Res(R.string.plugins_row_disabled), false, null)
 }
 
 /**

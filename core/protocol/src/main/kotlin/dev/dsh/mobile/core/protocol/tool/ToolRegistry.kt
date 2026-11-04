@@ -60,13 +60,13 @@ object ToolCatalog {
             name = "todo_write",
             sensitivity = ReversibleWrite,
             declaration = { decl_todo_write() },
-            execution = ToolExecution.TurnLoop("要写会话投影 + 引擎 /tool-state，按 sessionId 落状态，见 LocalEngineTransport.todoWriteTool"),
+            execution = ToolExecution.TurnLoop("Writes the session projection + engine /tool-state, keyed by sessionId; see LocalEngineTransport.todoWriteTool"),
         ),
         ToolSpec(
             name = "goal",
             sensitivity = ReversibleWrite,
             declaration = { decl_goal() },
-            execution = ToolExecution.TurnLoop("要读写会话投影的 goal（revision 乐观锁），见 LocalEngineTransport.goalTool"),
+            execution = ToolExecution.TurnLoop("Reads/writes the session projection goal (revision optimistic lock); see LocalEngineTransport.goalTool"),
         ),
         ToolSpec(
             name = "read_output",
@@ -154,7 +154,7 @@ object ToolCatalog {
             name = "subagent",
             sensitivity = Irreversible,
             declaration = { decl_subagent() },
-            execution = ToolExecution.TurnLoop("要跑满 8 轮工具往返、总预算 180s，30s 超时 + 重试对它就是错的，见 LocalEngineTransport.runSubagent"),
+            execution = ToolExecution.TurnLoop("Needs up to 8 tool round-trips with a 180s total budget; a 30s timeout plus retry is wrong for it; see LocalEngineTransport.runSubagent"),
         ),
     ) + webSpecs()
 
@@ -181,11 +181,11 @@ object ToolCatalog {
         sensitivity = sensitivity,
         declaration = { c ->
             c.web.functionSpecs().firstOrNull { functionNameOf(it) == name }
-                ?: throw IllegalStateException("WebToolkit 没有声明工具 " + name)
+                ?: throw IllegalStateException("WebToolkit has no declaration for " + name)
         },
         execution = ToolExecution.Runner { args, c ->
             val handler = c.web.toolHandlers()[name]
-            if (handler != null) handler(args) else throw IllegalStateException("WebToolkit 没有执行工具 " + name)
+            if (handler != null) handler(args) else throw IllegalStateException("WebToolkit has no handler for " + name)
         },
     )
 
@@ -203,16 +203,16 @@ private fun decl_shell(c: ToolCtx): JsonObject = buildJsonObject {
                         putJsonObject("properties") {
                             putJsonObject("command") {
                                 put("type", "string")
-                                put("description", "要执行的命令，例如 ls /sdcard、dumpsys battery、pm list packages")
+                                put("description", "Command to run, e.g. ls /sdcard, dumpsys battery, pm list packages")
                             }
                             putJsonObject("channel") {
                                 put("type", "string")
-                                put("description", "默认 proot；读 /sdcard 用 app 通道")
+                                put("description", "Defaults to proot; use the app channel to read /sdcard")
                                 putJsonArray("enum") { add("proot"); add("app"); add("shizuku"); add("root") }
                             }
                             putJsonObject("reason") {
                                 put("type", "string")
-                                put("description", "为什么要执行这条命令，一句话说明")
+                                put("description", "Why this command is needed, in one sentence")
                             }
                         }
                         putJsonArray("required") { add("command") }
@@ -224,18 +224,18 @@ private fun decl_todo_write(): JsonObject = buildJsonObject {
             put("type", "function")
             putJsonObject("function") {
                 put("name", "todo_write")
-                put("description", "更新本轮待办清单：整表替换（不是追加）。每条含 content 与 status，" +
-                    "status 只能是 pending / in_progress / completed。同一时刻最多一条 in_progress。")
+                put("description", "Update this turn's todo list: full replacement, not append. Each item has content and status," +
+                    "status must be pending / in_progress / completed. At most one item is in_progress at a time.")
                 putJsonObject("parameters") {
                     put("type", "object")
                     putJsonObject("properties") {
                         putJsonObject("todos") {
                             put("type", "array")
-                            put("description", "完整待办列表；空数组表示清空")
+                            put("description", "The complete todo list; an empty array clears it")
                             putJsonObject("items") {
                                 put("type", "object")
                                 putJsonObject("properties") {
-                                    putJsonObject("content") { put("type", "string"); put("description", "一句话待办") }
+                                    putJsonObject("content") { put("type", "string"); put("description", "One-line todo") }
                                     putJsonObject("status") {
                                         put("type", "string")
                                         putJsonArray("enum") { add("pending"); add("in_progress"); add("completed") }
@@ -254,8 +254,8 @@ private fun decl_goal(): JsonObject = buildJsonObject {
             put("type", "function")
             putJsonObject("function") {
                 put("name", "goal")
-                put("description", "跨轮次的长期目标：get 读当前目标，create 新建，update 改状态。" +
-                    "update 必须带 revision（get 会返回），不匹配说明状态已被别处改过。")
+                put("description", "Long-running goal across turns: get reads the current goal, create starts one, update changes its state." +
+                    "update must carry revision (get returns it); a mismatch means the state was changed elsewhere.")
                 putJsonObject("parameters") {
                     put("type", "object")
                     putJsonObject("properties") {
@@ -263,15 +263,15 @@ private fun decl_goal(): JsonObject = buildJsonObject {
                             put("type", "string")
                             putJsonArray("enum") { add("get"); add("create"); add("update") }
                         }
-                        putJsonObject("objective") { put("type", "string"); put("description", "目标正文（create 必填）") }
+                        putJsonObject("objective") { put("type", "string"); put("description", "Goal text (required for create)") }
                         putJsonObject("phase") {
                             put("type", "string")
-                            put("description", "update 用")
+                            put("description", "Goal phase (used by update)")
                             putJsonArray("enum") { add("active"); add("paused"); add("blocked"); add("complete") }
                         }
-                        putJsonObject("max_rounds") { put("type", "integer"); put("description", "最多自动续跑轮数") }
-                        putJsonObject("revision") { put("type", "integer"); put("description", "期望的版本号（update 用）") }
-                        putJsonObject("blocked_reason") { put("type", "string"); put("description", "phase=blocked 时说明卡在哪") }
+                        putJsonObject("max_rounds") { put("type", "integer"); put("description", "Maximum automatic continuation rounds") }
+                        putJsonObject("revision") { put("type", "integer"); put("description", "Expected revision (used by update)") }
+                        putJsonObject("blocked_reason") { put("type", "string"); put("description", "When phase=blocked, explain what is blocking") }
                     }
                     putJsonArray("required") { add("action") }
                 }
@@ -282,13 +282,13 @@ private fun decl_read_output(): JsonObject = buildJsonObject {
             put("type", "function")
             putJsonObject("function") {
                 put("name", "read_output")
-                put("description", "读回被落盘的大工具输出。path 用工具结果里 locator 给的路径，按行 offset/limit 分段读。")
+                put("description", "Read back a large tool output that was spilled to disk. Use the path from the locator in the tool result; read it in offset/limit line ranges.")
                 putJsonObject("parameters") {
                     put("type", "object")
                     putJsonObject("properties") {
-                        putJsonObject("path") { put("type", "string"); put("description", "locator 里的 path") }
-                        putJsonObject("offset") { put("type", "integer"); put("description", "起始行（0 起）") }
-                        putJsonObject("limit") { put("type", "integer"); put("description", "最多返回行数，默认 200") }
+                        putJsonObject("path") { put("type", "string"); put("description", "path from the locator in the tool result") }
+                        putJsonObject("offset") { put("type", "integer"); put("description", "Start line (0-based)") }
+                        putJsonObject("limit") { put("type", "integer"); put("description", "Maximum lines returned, default 200") }
                     }
                     putJsonArray("required") { add("path") }
                 }
@@ -316,80 +316,80 @@ private fun decl_phone(): JsonObject = buildJsonObject {
                                 }
                                 put(
                                     "description",
-                                    "动作：tap 点击 / swipe 滑动 / type 输入 / back 返回 / home 主页 / recents 最近任务 / " +
-                                        "readscreen 读屏 / openapp 开应用 / screenshot 截图 / " +
-                                        "scroll 滚可滚容器 / pinch 双指缩放 / drag 拖拽 / wait_for 等条件成立 / " +
-                                        "currentapp 当前应用 / apps 已装可启动应用 / sequence 批量步骤 / key 系统键或输入框键 / " +
-                                        "contacts 联系人 / sms_list 读短信 / sms_send 发短信 / dial 拨号 / location 定位 / audio_record 录音",
+                                    "action: tap = click / swipe = swipe / type = type text / back = back / home = home / recents = recent tasks / " +
+                                        "readscreen = read screen / openapp = open app / screenshot = screenshot / " +
+                                        "scroll = scroll a container / pinch = two-finger zoom / drag = drag / wait_for = wait for a condition / " +
+                                        "currentapp = current app / apps = installed launchable apps / sequence = batched steps / key = system or input keys / " +
+                                        "contacts = contacts / sms_list = read SMS / sms_send = send SMS / dial = place call / location = locate / audio_record = record audio",
                                 )
                             }
-                            putJsonObject("fx") { put("type", "number"); put("description", "起点横坐标（分数 0-1，相对屏幕宽，优先于 x）") }
-                            putJsonObject("fy") { put("type", "number"); put("description", "起点纵坐标（分数 0-1，相对屏幕高，优先于 y）") }
-                            putJsonObject("x") { put("type", "number"); put("description", "起点横坐标（绝对像素）") }
-                            putJsonObject("y") { put("type", "number"); put("description", "起点纵坐标（绝对像素）") }
-                            putJsonObject("fx2") { put("type", "number"); put("description", "终点横坐标（分数 0-1，swipe 用）") }
-                            putJsonObject("fy2") { put("type", "number"); put("description", "终点纵坐标（分数 0-1，swipe 用）") }
-                            putJsonObject("x2") { put("type", "number"); put("description", "终点横坐标（绝对像素，swipe 用）") }
-                            putJsonObject("y2") { put("type", "number"); put("description", "终点纵坐标（绝对像素，swipe 用）") }
-                            putJsonObject("text") { put("type", "string"); put("description", "要输入的文本（type 用）") }
-                            putJsonObject("package") { put("type", "string"); put("description", "应用包名（openapp 用）") }
-                            putJsonObject("query") { put("type", "string"); put("description", "按文本/描述查找节点并点击（tap 用，可选）") }
-                            putJsonObject("durationMs") { put("type", "number"); put("description", "手势时长毫秒（tap 长按 / swipe 滑动时长）") }
-                            putJsonObject("maxItems") { put("type", "number"); put("description", "读屏最多返回条目数（readscreen 用，默认 120）") }
+                            putJsonObject("fx") { put("type", "number"); put("description", "Start X (fraction 0-1 relative to screen width, takes precedence over x)") }
+                            putJsonObject("fy") { put("type", "number"); put("description", "Start Y (fraction 0-1 relative to screen height, takes precedence over y)") }
+                            putJsonObject("x") { put("type", "number"); put("description", "Start X (absolute pixels)") }
+                            putJsonObject("y") { put("type", "number"); put("description", "Start Y (absolute pixels)") }
+                            putJsonObject("fx2") { put("type", "number"); put("description", "End X (fraction 0-1, swipe)") }
+                            putJsonObject("fy2") { put("type", "number"); put("description", "End Y (fraction 0-1, swipe)") }
+                            putJsonObject("x2") { put("type", "number"); put("description", "End X (absolute pixels, swipe)") }
+                            putJsonObject("y2") { put("type", "number"); put("description", "End Y (absolute pixels, swipe)") }
+                            putJsonObject("text") { put("type", "string"); put("description", "Text to type (type only)") }
+                            putJsonObject("package") { put("type", "string"); put("description", "App package name (openapp)") }
+                            putJsonObject("query") { put("type", "string"); put("description", "Find a node by text/description and click it (tap only, optional)") }
+                            putJsonObject("durationMs") { put("type", "number"); put("description", "Gesture duration in milliseconds (long press for tap / swipe duration)") }
+                            putJsonObject("maxItems") { put("type", "number"); put("description", "Maximum entries returned by readscreen (default 120)") }
                             putJsonObject("nodeId") {
                                 put("type", "string")
-                                put("description", "节点身份 \"<snapshotId>:<seq>\"（来自 phone_tree）。跨代失效回 E_STALE_SNAPSHOT 且不执行")
+                                put("description", "Node identity \"<snapshotId>:<seq>\" (from phone_tree). A stale-generation id returns E_STALE_SNAPSHOT and no action is dispatched")
                             }
                             putJsonObject("target") {
                                 put("type", "object")
-                                put("description", "选择器对象：text/textContains/desc/viewId/viewIdSuffix/className/package/index/clickable/editable/scrollable（字段间 AND）。多命中回 E_NODE_AMBIGUOUS，加 index 或换更精确条件")
+                                put("description", "Selector object: text/textContains/desc/viewId/viewIdSuffix/className/package/index/clickable/editable/scrollable (fields ANDed). Multiple hits return E_NODE_AMBIGUOUS; add index or use a more precise condition")
                             }
                             putJsonObject("index") {
                                 put("type", "number")
-                                put("description", "选择器多命中时取第几个（0 起）")
+                                put("description", "Which match to take when the selector hits several (0-based)")
                             }
-                            putJsonObject("mode") { put("type", "string"); put("description", "type 的模式：set 覆盖 / append 追加 / clear 清空（默认 set）") }
-                            putJsonObject("perChar") { put("type", "boolean"); put("description", "type 逐字写入（默认 false）") }
-                            putJsonObject("intervalMs") { put("type", "number"); put("description", "逐字间隔毫秒（perChar 用，20-1000，默认 80）") }
-                            putJsonObject("key") { put("type", "string"); put("description", "back/home/recents/enter/delete/tab（key 动作）") }
-                            putJsonObject("times") { put("type", "number"); put("description", "重复次数（key/scroll 用，1-20，默认 1）") }
-                            putJsonObject("direction") { put("type", "string"); put("description", "scroll 方向：forward 往下 / backward 往上") }
-                            putJsonObject("verify") { put("type", "boolean"); put("description", "scroll 是否用界面指纹校验真的滚了（默认 true）") }
-                            putJsonObject("until") { put("type", "object"); put("description", "scroll 的目标选择器：命中即停（stoppedReason=until）") }
+                            putJsonObject("mode") { put("type", "string"); put("description", "type mode: set replaces / append appends / clear empties (default set)") }
+                            putJsonObject("perChar") { put("type", "boolean"); put("description", "type character by character (default false)") }
+                            putJsonObject("intervalMs") { put("type", "number"); put("description", "Per-character interval in milliseconds (perChar, 20-1000, default 80)") }
+                            putJsonObject("key") { put("type", "string"); put("description", "back/home/recents/enter/delete/tab (key action)") }
+                            putJsonObject("times") { put("type", "number"); put("description", "Repeat count (key/scroll, 1-20, default 1)") }
+                            putJsonObject("direction") { put("type", "string"); put("description", "scroll direction: forward scrolls down / backward scrolls up") }
+                            putJsonObject("verify") { put("type", "boolean"); put("description", "scroll: verify with a UI fingerprint that the content actually moved (default true)") }
+                            putJsonObject("until") { put("type", "object"); put("description", "scroll target selector: stop once it matches (stoppedReason=until)") }
                             putJsonObject("cond") {
                                 put("type", "object")
-                                put("description", "wait_for 条件：type=node_present/node_absent（带 selector）、text_present（带 textContains）、package_is（带 package）、generation_changed")
+                                put("description", "wait_for condition: type=node_present/node_absent (with selector), text_present (with textContains), package_is (with package), generation_changed")
                             }
-                            putJsonObject("timeoutMs") { put("type", "number"); put("description", "wait_for 超时毫秒（100-15000，默认 3000），超时回 E_WAIT_TIMEOUT") }
-                            putJsonObject("pollMs") { put("type", "number"); put("description", "wait_for 轮询间隔毫秒（100-2000，默认 250）") }
-                            putJsonObject("scale") { put("type", "number"); put("description", "pinch 比例：<1 缩小、>1 放大（也可直接给 fromRadius/toRadius）") }
-                            putJsonObject("fromRadius") { put("type", "number"); put("description", "pinch 起始半径像素（≥20）") }
-                            putJsonObject("toRadius") { put("type", "number"); put("description", "pinch 结束半径像素（≥20）") }
-                            putJsonObject("cx") { put("type", "number"); put("description", "pinch 中心横坐标（绝对像素，默认屏幕中心）") }
-                            putJsonObject("cy") { put("type", "number"); put("description", "pinch 中心纵坐标（绝对像素，默认屏幕中心）") }
-                            putJsonObject("startTarget") { put("type", "object"); put("description", "swipe 起点选择器或 nodeId 串") }
-                            putJsonObject("endTarget") { put("type", "object"); put("description", "swipe 终点选择器或 nodeId 串") }
-                            putJsonObject("fromX") { put("type", "number"); put("description", "drag 起点横坐标（或 x）") }
-                            putJsonObject("fromY") { put("type", "number"); put("description", "drag 起点纵坐标（或 y）") }
-                            putJsonObject("toX") { put("type", "number"); put("description", "drag 终点横坐标（或给 dx 位移）") }
-                            putJsonObject("toY") { put("type", "number"); put("description", "drag 终点纵坐标（或给 dy 位移）") }
-                            putJsonObject("dx") { put("type", "number"); put("description", "drag 横向位移（toX 缺省时用）") }
-                            putJsonObject("dy") { put("type", "number"); put("description", "drag 纵向位移（toY 缺省时用）") }
-                            putJsonObject("holdMs") { put("type", "number"); put("description", "drag 按下保持毫秒（0-2000，默认 500）") }
+                            putJsonObject("timeoutMs") { put("type", "number"); put("description", "wait_for timeout in milliseconds (100-15000, default 3000); on timeout returns E_WAIT_TIMEOUT") }
+                            putJsonObject("pollMs") { put("type", "number"); put("description", "wait_for poll interval in milliseconds (100-2000, default 250)") }
+                            putJsonObject("scale") { put("type", "number"); put("description", "pinch scale: <1 zooms out, >1 zooms in (or pass fromRadius/toRadius directly)") }
+                            putJsonObject("fromRadius") { put("type", "number"); put("description", "pinch start radius in pixels (>=20)") }
+                            putJsonObject("toRadius") { put("type", "number"); put("description", "pinch end radius in pixels (>=20)") }
+                            putJsonObject("cx") { put("type", "number"); put("description", "pinch center X (absolute pixels, defaults to screen center)") }
+                            putJsonObject("cy") { put("type", "number"); put("description", "pinch center Y (absolute pixels, defaults to screen center)") }
+                            putJsonObject("startTarget") { put("type", "object"); put("description", "swipe start selector or nodeId string") }
+                            putJsonObject("endTarget") { put("type", "object"); put("description", "swipe end selector or nodeId string") }
+                            putJsonObject("fromX") { put("type", "number"); put("description", "drag start X (or x)") }
+                            putJsonObject("fromY") { put("type", "number"); put("description", "drag start Y (or y)") }
+                            putJsonObject("toX") { put("type", "number"); put("description", "drag end X (or give a dx delta)") }
+                            putJsonObject("toY") { put("type", "number"); put("description", "drag end Y (or give a dy delta)") }
+                            putJsonObject("dx") { put("type", "number"); put("description", "drag horizontal delta (used when toX is omitted)") }
+                            putJsonObject("dy") { put("type", "number"); put("description", "drag vertical delta (used when toY is omitted)") }
+                            putJsonObject("holdMs") { put("type", "number"); put("description", "drag press-and-hold milliseconds (0-2000, default 500)") }
                             putJsonObject("steps") {
                                 put("type", "array")
-                                put("description", "sequence 的步骤数组（≤20 步）：{action, args?, waitAfterMs?}。可用 tap/swipe/scroll/type/key/pinch/drag/wait_for/openapp/back/home/recents；动作参数也可直接写在步骤里（不必包一层 args）")
+                                put("description", "sequence step array (<=20 steps): {action, args?, waitAfterMs?}. Actions: tap/swipe/scroll/type/key/pinch/drag/wait_for/openapp/back/home/recents; action parameters may also be written directly on the step (no need to wrap them in args)")
                             }
-                            putJsonObject("stopOnError") { put("type", "boolean"); put("description", "sequence 单步失败是否立即停（默认 true，不回滚）") }
-                            putJsonObject("dryRun") { put("type", "boolean"); put("description", "sequence 只校验参数不执行（默认 false）") }
-                            putJsonObject("limit") { put("type", "number"); put("description", "apps 每页条数（1-500，默认 120）") }
-                            putJsonObject("offset") { put("type", "number"); put("description", "apps 分页起始下标（默认 0）") }
-                            putJsonObject("includeSystem") { put("type", "boolean"); put("description", "apps 是否包含系统应用（默认 false）") }
-                            putJsonObject("maxDepth") { put("type", "number"); put("description", "动作侧读树的深度上限（默认 6，与 phone_tree 同义）") }
-                            putJsonObject("maxNodes") { put("type", "number"); put("description", "动作侧读树的节点上限（默认 400，与 phone_tree 同义）") }
-                            putJsonObject("includeInvisible") { put("type", "boolean"); put("description", "动作侧是否包含不可见节点（默认 false）") }
-                            putJsonObject("onlyClickable") { put("type", "boolean"); put("description", "动作侧只保留可点节点（默认 false）") }
-                            putJsonObject("filter") { put("type", "object"); put("description", "动作侧读树的过滤选择器（与 phone_tree 的 filter 同义，保证 seq 一致）") }
+                            putJsonObject("stopOnError") { put("type", "boolean"); put("description", "sequence: stop at the first failed step (default true, no rollback)") }
+                            putJsonObject("dryRun") { put("type", "boolean"); put("description", "sequence: validate parameters only, do not execute (default false)") }
+                            putJsonObject("limit") { put("type", "number"); put("description", "apps page size (1-500, default 120)") }
+                            putJsonObject("offset") { put("type", "number"); put("description", "apps page start offset (default 0)") }
+                            putJsonObject("includeSystem") { put("type", "boolean"); put("description", "apps: include system apps (default false)") }
+                            putJsonObject("maxDepth") { put("type", "number"); put("description", "action side tree depth limit (default 6, same meaning as phone_tree)") }
+                            putJsonObject("maxNodes") { put("type", "number"); put("description", "action side node limit (default 400, same meaning as phone_tree)") }
+                            putJsonObject("includeInvisible") { put("type", "boolean"); put("description", "action side: include invisible nodes (default false)") }
+                            putJsonObject("onlyClickable") { put("type", "boolean"); put("description", "action side: keep only clickable nodes (default false)") }
+                            putJsonObject("filter") { put("type", "object"); put("description", "action side tree filter selector (same meaning as phone_tree filter, keeps seq consistent)") }
                         }
                         putJsonArray("required") { add("action") }
                     }
@@ -404,27 +404,27 @@ private fun decl_phone_tree(): JsonObject = buildJsonObject {
                     putJsonObject("parameters") {
                         put("type", "object")
                         putJsonObject("properties") {
-                            putJsonObject("maxDepth") { put("type", "integer"); put("description", "最大深度，默认 6（越界夹到 1..64）") }
-                            putJsonObject("maxNodes") { put("type", "integer"); put("description", "最多返回节点数，默认 400（越界夹到 1..2000）") }
-                            putJsonObject("includeInvisible") { put("type", "boolean"); put("description", "是否包含不可见节点，默认 false") }
-                            putJsonObject("excludeOwnPackage") { put("type", "boolean"); put("description", "是否剔除手机控制自身的浮层/窗口，默认 true") }
-                            putJsonObject("package") { put("type", "string"); put("description", "只看该包名的窗口（可选）") }
-                            putJsonObject("onlyClickable") { put("type", "boolean"); put("description", "只返回可点击节点，默认 false") }
+                            putJsonObject("maxDepth") { put("type", "integer"); put("description", "Maximum depth, default 6 (clamped to 1..64)") }
+                            putJsonObject("maxNodes") { put("type", "integer"); put("description", "Maximum nodes returned, default 400 (clamped to 1..2000)") }
+                            putJsonObject("includeInvisible") { put("type", "boolean"); put("description", "Include invisible nodes, default false") }
+                            putJsonObject("excludeOwnPackage") { put("type", "boolean"); put("description", "Exclude the phone-control overlay/windows themselves, default true") }
+                            putJsonObject("package") { put("type", "string"); put("description", "Only windows of that package (optional)") }
+                            putJsonObject("onlyClickable") { put("type", "boolean"); put("description", "Return only clickable nodes, default false") }
                             putJsonObject("filter") {
                                 put("type", "object")
-                                put("description", "节点过滤选择器，字段之间是 AND，缺省字段不参与匹配")
+                                put("description", "Node filter selector; fields are ANDed and omitted fields do not participate")
                                 putJsonObject("properties") {
-                                    putJsonObject("text") { put("type", "string"); put("description", "text 全等") }
-                                    putJsonObject("textContains") { put("type", "string"); put("description", "text 包含（忽略大小写）") }
-                                    putJsonObject("desc") { put("type", "string"); put("description", "contentDescription 全等") }
-                                    putJsonObject("viewId") { put("type", "string"); put("description", "完整 resource-id，如 com.android.settings:id/search") }
-                                    putJsonObject("viewIdSuffix") { put("type", "string"); put("description", "只写 id 段（冒号后那截）") }
-                                    putJsonObject("className") { put("type", "string"); put("description", "控件类名全等") }
-                                    putJsonObject("package") { put("type", "string"); put("description", "节点所属包名") }
-                                    putJsonObject("index") { put("type", "integer"); put("description", "命中集合里的第几个（0 起）") }
-                                    putJsonObject("clickable") { put("type", "boolean"); put("description", "要求可点击") }
-                                    putJsonObject("editable") { put("type", "boolean"); put("description", "要求可输入") }
-                                    putJsonObject("scrollable") { put("type", "boolean"); put("description", "要求可滚动") }
+                                    putJsonObject("text") { put("type", "string"); put("description", "text exact match") }
+                                    putJsonObject("textContains") { put("type", "string"); put("description", "text contains (case-insensitive)") }
+                                    putJsonObject("desc") { put("type", "string"); put("description", "contentDescription exact match") }
+                                    putJsonObject("viewId") { put("type", "string"); put("description", "Full resource-id, e.g. com.android.settings:id/search") }
+                                    putJsonObject("viewIdSuffix") { put("type", "string"); put("description", "id segment only (the part after the colon)") }
+                                    putJsonObject("className") { put("type", "string"); put("description", "Widget class name exact match") }
+                                    putJsonObject("package") { put("type", "string"); put("description", "Package the node belongs to") }
+                                    putJsonObject("index") { put("type", "integer"); put("description", "Which match to take (0-based)") }
+                                    putJsonObject("clickable") { put("type", "boolean"); put("description", "Must be clickable") }
+                                    putJsonObject("editable") { put("type", "boolean"); put("description", "Must be editable") }
+                                    putJsonObject("scrollable") { put("type", "boolean"); put("description", "Must be scrollable") }
                                 }
                             }
                         }
@@ -436,7 +436,7 @@ private fun decl_fs_read(): JsonObject = buildJsonObject {
             put("type", "function")
             putJsonObject("function") {
                 put("name", "fs_read")
-                put("description", "读取原生文件")
+                put("description", "Read a native file")
                 putJsonObject("parameters") {
                     put("type", "object")
                     putJsonObject("properties") {
@@ -453,7 +453,7 @@ private fun decl_fs_write(): JsonObject = buildJsonObject {
             put("type", "function")
             putJsonObject("function") {
                 put("name", "fs_write")
-                put("description", "写入原生文件")
+                put("description", "Write a native file")
                 putJsonObject("parameters") {
                     put("type", "object")
                     putJsonObject("properties") {
@@ -470,7 +470,7 @@ private fun decl_fs_list(): JsonObject = buildJsonObject {
             put("type", "function")
             putJsonObject("function") {
                 put("name", "fs_list")
-                put("description", "列出原生目录")
+                put("description", "List a native directory")
                 putJsonObject("parameters") {
                     put("type", "object")
                     putJsonObject("properties") {
@@ -486,7 +486,7 @@ private fun decl_fs_op(): JsonObject = buildJsonObject {
             put("type", "function")
             putJsonObject("function") {
                 put("name", "fs_op")
-                put("description", "操作原生文件")
+                put("description", "Operate on native files")
                 putJsonObject("parameters") {
                     put("type", "object")
                     putJsonObject("properties") {
@@ -503,7 +503,7 @@ private fun decl_channel_list(): JsonObject = buildJsonObject {
             put("type", "function")
             putJsonObject("function") {
                 put("name", "channel_list")
-                put("description", "列出 shell 通道与可用状态")
+                put("description", "List shell channels and their availability")
                 putJsonObject("parameters") {
                     put("type", "object")
                     putJsonObject("properties") {
@@ -518,7 +518,7 @@ private fun decl_run_bg(): JsonObject = buildJsonObject {
             put("type", "function")
             putJsonObject("function") {
                 put("name", "run_bg")
-                put("description", "启动后台命令")
+                put("description", "Start a background command")
                 putJsonObject("parameters") {
                     put("type", "object")
                     putJsonObject("properties") {
@@ -534,7 +534,7 @@ private fun decl_bg_status(): JsonObject = buildJsonObject {
             put("type", "function")
             putJsonObject("function") {
                 put("name", "bg_status")
-                put("description", "查询后台进程和日志")
+                put("description", "Query a background process and its log")
                 putJsonObject("parameters") {
                     put("type", "object")
                     putJsonObject("properties") {
@@ -550,7 +550,7 @@ private fun decl_bg_kill(): JsonObject = buildJsonObject {
             put("type", "function")
             putJsonObject("function") {
                 put("name", "bg_kill")
-                put("description", "终止后台进程")
+                put("description", "Terminate a background process")
                 putJsonObject("parameters") {
                     put("type", "object")
                     putJsonObject("properties") {
@@ -565,11 +565,11 @@ private fun decl_skill(): JsonObject = buildJsonObject {
             put("type", "function")
             putJsonObject("function") {
                 put("name", "skill")
-                put("description", "读取一个已安装技能的完整说明（SKILL.md）。当任务与某个技能描述匹配时，先调用本工具读取再按技能执行。")
+                put("description", "Read the full instructions (SKILL.md) of an installed skill. When a task matches a skill description, call this tool first and then follow the skill.")
                 putJsonObject("parameters") {
                     put("type", "object")
                     putJsonObject("properties") {
-                        putJsonObject("name") { put("type", "string"); put("description", "技能名") }
+                        putJsonObject("name") { put("type", "string"); put("description", "Skill name") }
                     }
                     putJsonArray("required") { add("name") }
                 }
@@ -588,21 +588,21 @@ private fun decl_subagent(): JsonObject = buildJsonObject {
                             put("type", "string")
                             put(
                                 "description",
-                                "要委派的完整任务：目标、要看的东西、期望的输出形态。子代理看不到当前对话，别写「上面那个文件」。",
+                                "The full task to delegate: goal, what to look at, expected output shape. The subagent cannot see the current conversation; do not write \"the file above\".",
                             )
                         }
                         putJsonObject("name") {
                             put("type", "string")
-                            put("description", "短标签（2-6 字），只用于进度显示，例如「查日志」")
+                            put("description", "Short label (2-6 chars) used only for progress display, e.g. \"check logs\"")
                         }
                         putJsonObject("model") {
                             put("type", "string")
-                            put("description", "可选：换一个模型跑这个子任务；留空继承当前模型")
+                            put("description", "Optional: run this subtask on another model; leave empty to inherit the current model")
                         }
                         putJsonObject("depth") {
                             put("type", "integer")
-                            put("description", "当前调用者所在层级（主代理 0，第一层子代理 1）；省略按运行时深度算，" +
-                                "超过嵌套上限的派发会被拒并回「子代理最多嵌套 N 层」")
+                            put("description", "The caller's level (main agent 0, first-level subagent 1); omit to use the runtime depth," +
+                                "a dispatch beyond the nesting limit is rejected with \"subagents nest at most N levels\"")
                         }
                     }
                     putJsonArray("required") { add("prompt") }
@@ -611,28 +611,28 @@ private fun decl_subagent(): JsonObject = buildJsonObject {
 }
 
     private fun phoneHelp(): String = buildString {
-        append("phone 工具：直接操控手机（无需 root/ADB，需先在 设置→无障碍 开启「DSH Mobile 手机控制」）。")
-        append("动作 action：tap（点击，用 fx/fy 分数坐标最稳，或 x/y 像素；带 query 按文本点；带 durationMs 变长按）")
-        append("、swipe（滑动，起点 fx/fy 或 x/y，终点 fx2/fy2 或 x2/y2，durationMs 控制快慢）")
-        append("、type（往聚焦输入框写字，参数 text）、back/home/recents（系统键）")
-        append("、readscreen（读当前屏幕文本，紧凑列表，maxItems 限条目）")
-        append("、openapp（package 包名或 query 应用名模糊匹配）、screenshot（Android 11+ 存本地文件）。")
-        append("坐标优先用 fx/fy（0-1 相对屏幕），模型看的是缩放截图，绝对像素容易点偏。")
-        append("读屏输出每行 text|desc|cx,cy|clickable|class。")
-        append("结构化读屏（viewId/bounds/节点身份/快照代次）用 phone_tree 工具。")
-        append("定位统一用 target（选择器对象）或 nodeId（\"<snapshotId>:<seq>\"，来自 phone_tree）：")
-        append("nodeId 跨代回 E_STALE_SNAPSHOT、选择器多命中回 E_NODE_AMBIGUOUS，两者都不派发任何动作。")
-        append("命中节点自身不可点会自动上溯最近可点祖先（列表行靠这个才点得动）。")
-        append("新动作：scroll（滚 scrollable=true 容器，direction/times/until/verify，advanced 用界面指纹判）")
-        append("、wait_for（cond.type=node_present/node_absent/text_present/package_is/generation_changed，timeoutMs 默认 3000，超时回 E_WAIT_TIMEOUT）")
-        append("、pinch（center 或 cx/cy + scale 或 fromRadius/toRadius）、drag（fromX/fromY→toX/toY 或 dx/dy，holdMs）")
-        append("、key（enter/delete/tab 打在聚焦输入框；back/home/recents 走系统键）、currentapp（当前前台应用）")
-        append("、apps（已装可启动应用，query/limit/offset 分页）、sequence（steps 一次下发，单步失败带步骤号即停）")
-        append("、type 另支持 target + mode=set/append/clear + perChar 逐字（intervalMs）。")
-        append("六类系统能力动作（不依赖无障碍，需运行时权限，缺权限回 E_PERMISSION_DENIED + needsPermission）：")
-        append("contacts（query 查联系人）、sms_list（读收件箱）、sms_send（number+text）、dial（number 直接拨出）、")
-        append("location（最近已知位置）、audio_record（durationMs 录音）。这三档授权在 设置→手机能力授权 里配。")
-        append("新动作外层恒 ok=true，真实成败与错误码在内层 {ok,code,message,retryable,effectLanded}；手机动作不重试。")
+        append("phone tool: control the device directly (no root/ADB needed; first enable \"DSH Mobile phone control\" under Settings -> Accessibility).")
+        append("action: tap (click; fx/fy fractional coordinates are most reliable, or x/y pixels; add query to click by text; add durationMs for a long press)")
+        append(", swipe (start fx/fy or x/y, end fx2/fy2 or x2/y2, durationMs controls speed)")
+        append(", type (write into the focused input, parameter text), back/home/recents (system keys)")
+        append(", readscreen (read current screen text as a compact list, maxItems caps entries)")
+        append(", openapp (package name, or query to fuzzy-match the app name), screenshot (Android 11+ writes a local file).")
+        append("Prefer fx/fy coordinates (0-1 relative to the screen): the model sees a scaled screenshot, so absolute pixels tend to miss.")
+        append("Each readscreen line is text|desc|cx,cy|clickable|class.")
+        append("For structured screen reads (viewId/bounds/node identity/snapshot generation) use the phone_tree tool.")
+        append("Address nodes with target (selector object) or nodeId (\"<snapshotId>:<seq>\", from phone_tree):")
+        append("a stale-generation nodeId returns E_STALE_SNAPSHOT and an ambiguous selector returns E_NODE_AMBIGUOUS; neither dispatches any action.")
+        append("If the matched node is not clickable it walks up to the nearest clickable ancestor (list rows only work through this).")
+        append("New actions: scroll (scroll a scrollable=true container, direction/times/until/verify; the advanced path uses a UI fingerprint check)")
+        append(", wait_for (cond.type=node_present/node_absent/text_present/package_is/generation_changed, timeoutMs default 3000, returns E_WAIT_TIMEOUT on timeout)")
+        append(", pinch (center or cx/cy plus scale or fromRadius/toRadius), drag (fromX/fromY -> toX/toY or dx/dy, holdMs)")
+        append(", key (enter/delete/tab go to the focused input; back/home/recents are system keys), currentapp (current foreground app)")
+        append(", apps (installed launchable apps, query/limit/offset paging), sequence (send steps at once; stops at the first failed step and reports its number)")
+        append(", type also supports target + mode=set/append/clear + perChar typing (intervalMs).")
+        append("Six system capability actions (independent of accessibility, need runtime permissions; a missing grant returns E_PERMISSION_DENIED + needsPermission):")
+        append("contacts (query looks up contacts), sms_list (reads inbox), sms_send (number+text), dial (number to call directly),")
+        append("location (last known position), audio_record (durationMs recording). These three grants are configured under Settings -> Phone capability grants.")
+        append("New actions always return ok=true at the outer level; the real outcome and error code are in the inner {ok,code,message,retryable,effectLanded}; phone actions are never retried.")
     }
 
     /**
@@ -642,27 +642,27 @@ private fun decl_subagent(): JsonObject = buildJsonObject {
      * PhoneBridge.describeForModel() 合并成单一真源，届时一起搬。
      */
     private fun phoneTreeHelp(): String = buildString {
-        append("phone_tree：把当前界面读成结构化节点树（需先在 设置→无障碍 开启「DSH Mobile 手机控制」）。")
-        append("返回 snapshotId 与扁平 nodes[]，每个节点带 nodeId（\"<snapshotId>:<seq>\"）、parentId、depth、")
+        append("phone_tree: read the current screen as a structured node tree (first enable \"DSH Mobile phone control\" under Settings -> Accessibility).")
+        append("Returns snapshotId and a flat nodes[], each node carrying nodeId (\"<snapshotId>:<seq>\"), parentId, depth,")
         append("className/package/text/desc/viewId/bounds{left,top,right,bottom}/clickable/editable/scrollable/")
-        append("checkable/checked/selected/enabled/focused/visible，外加 screen{width,height,density}、")
-        append("foreground{package,activity,sinceMs}、nodeCount、truncated + truncatedReason、changedDuringRead、elapsedMs。")
-        append("参数：maxDepth 默认 6、maxNodes 默认 400、includeInvisible 默认 false、onlyClickable 默认 false、")
-        append("package 只看该包名；filter 是选择器对象（text/textContains/desc/viewId/viewIdSuffix/className/package/")
-        append("index/clickable/editable/scrollable，字段间 AND），filter 无命中返回 E_NODE_NOT_FOUND。")
-        append("节点身份带代次：界面变了以后旧 nodeId 作废，重读一次拿新 snapshotId；changedDuringRead=true 表示遍历期间界面又变了。")
-        append("只读，不改变界面；要点击/输入用 phone 工具。")
+        append("checkable/checked/selected/enabled/focused/visible, plus screen{width,height,density},")
+        append("foreground{package,activity,sinceMs}, nodeCount, truncated + truncatedReason, changedDuringRead, elapsedMs.")
+        append("Parameters: maxDepth default 6, maxNodes default 400, includeInvisible default false, onlyClickable default false,")
+        append("package restricts to that package; filter is a selector object (text/textContains/desc/viewId/viewIdSuffix/className/package/")
+        append("index/clickable/editable/scrollable, ANDed together); a filter with no match returns E_NODE_NOT_FOUND.")
+        append("Node identity is generation-scoped: after the screen changes an old nodeId is void, read again for a new snapshotId; changedDuringRead=true means the screen changed during the walk.")
+        append("Read-only, does not change the screen; use the phone tool to click or type.")
     }
 
     private fun subagentHelp(): String = buildString {
-        append("subagent 工具：把独立、可并行的子任务交给子代理。")
-        append("子代理有自己的上下文和工具（shell / 文件 / phone），只把结论回给你，")
-        append("不占用也不污染主对话历史——适合「同时查三件事」「先读完一大堆代码再给我结论」。")
-        append("它看不到当前对话，prompt 必须自带全部背景，别写「上面那个文件」。")
-        append("嵌套有深度上限（默认 2 层，主代理算第 0 层）：第 2 层还能再派，第 3 层会被拒并回「子代理最多嵌套 2 层」。")
-        append("互不相关的子任务就同一轮里发多个 subagent：依次执行、各自回结论。")
-        append("要把活拆给执行池：在结论里显式列出来——\"- 任务：<标题>｜<说明>\" 每行一条，")
-        append("或一段 [{\"title\":\"..\",\"detail\":\"..\"}] JSON 数组；父会话会把它投进执行池并记下父任务 id。")
+        append("subagent tool: hand independent, parallelizable subtasks to a subagent.")
+        append("The subagent has its own context and tools (shell / files / phone) and returns only its conclusion,")
+        append("so it neither occupies nor pollutes the main conversation history - good for \"check three things at once\" or \"read a big pile of code, then give me the conclusion\".")
+        append("It cannot see the current conversation, so the prompt must carry all the background; do not write \"the file above\".")
+        append("Nesting is depth-limited (default 2 levels, the main agent counts as level 0): level 2 may still dispatch, level 3 is rejected with \"subagents nest at most 2 levels\".")
+        append("For unrelated subtasks dispatch several subagent calls in the same turn: they run in order and each returns its own conclusion.")
+        append("To hand work to the execution pool, list it explicitly in your result - \"- task: <title> | <detail>\", one per line,")
+        append("or a JSON array [{\"title\":\"..\",\"detail\":\"..\"}]; the parent session adds it to the execution pool and records the parent task id.")
     }
 
 /**

@@ -93,7 +93,6 @@ import dev.dsh.mobile.feature.sessions.SessionsViewModel
 import dev.dsh.mobile.feature.settings.AppAppearanceScreen
 import dev.dsh.mobile.feature.settings.BackupRestoreScreen
 import dev.dsh.mobile.feature.settings.AppCapabilityScreen
-import dev.dsh.mobile.feature.settings.AppGatewayScreen
 import dev.dsh.mobile.feature.settings.ExtrasScreen
 import dev.dsh.mobile.feature.settings.McpServersScreen
 import dev.dsh.mobile.feature.settings.SettingsScreen
@@ -115,7 +114,6 @@ private object Routes {
     const val EXTRAS = "settings/extras"
     const val SETTINGS_SECTION = "settings/section/{section}"
     const val SETTINGS_APPEARANCE = "settings/appearance"
-    const val SETTINGS_GATEWAY = "settings/gateway"
     const val SETTINGS_CAPABILITY = "settings/capability"
     const val SETTINGS_MCP = "settings/mcp"
     const val SETTINGS_BACKUP = "settings/backup"
@@ -702,9 +700,7 @@ fun AppNav(container: AppContainer) {
                             extraSettings = container.pluginHost.slots.settingsItems.map { item ->
                                 { item.content() }
                             },
-                            // 根列表只有两种点击结果：进子页。网关详情、外观各有自己的路由。
-                            gatewayCard = { dev.dsh.mobile.app.gateway.GatewayCard(container) },
-                            onOpenGateway = { nav.navigate(Routes.SETTINGS_GATEWAY) { launchSingleTop = true } },
+                            // 根列表只有两种点击结果：进子页。外观、能力各有自己的路由。
                             onOpenAppearance = { nav.navigate(Routes.SETTINGS_APPEARANCE) { launchSingleTop = true } },
                             onOpenCapability = { nav.navigate(Routes.SETTINGS_CAPABILITY) { launchSingleTop = true } },
                             onOpenMcp = { nav.navigate(Routes.SETTINGS_MCP) { launchSingleTop = true } },
@@ -743,13 +739,6 @@ fun AppNav(container: AppContainer) {
                         AppAppearanceScreen(
                             viewModel = settingsSubViewModel(container, "settings-appearance"),
                             onBack = { nav.popBackStack() },
-                        )
-                    }
-
-                    composable(Routes.SETTINGS_GATEWAY) {
-                        AppGatewayScreen(
-                            onBack = { nav.popBackStack() },
-                            gatewayCard = { dev.dsh.mobile.app.gateway.GatewayCard(container) },
                         )
                     }
 

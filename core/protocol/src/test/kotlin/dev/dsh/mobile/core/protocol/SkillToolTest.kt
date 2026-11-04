@@ -34,7 +34,7 @@ class SkillToolTest {
         // 说明里必须点出「先读再按技能执行」，否则模型会凭技能名瞎猜做法。
         val help = fn["description"]!!.jsonPrimitive.content
         assertTrue(help, help.contains("SKILL.md"))
-        assertTrue(help, help.contains("先调用本工具"))
+        assertTrue(help, help.contains("call this tool first"))
     }
 
     @Test
