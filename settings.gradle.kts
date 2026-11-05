@@ -23,6 +23,7 @@ include(
     ":core:platform",
     ":core:download",
     ":core:model",
+    ":core:contract",
     ":core:protocol",
     ":core:transport",
     ":core:data",
