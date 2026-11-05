@@ -27,6 +27,9 @@ class PluginsViewModel(
     /** 授予插件权限：宿主立刻重算并按需 register，行内从「需授权」变「已启用」。 */
     fun grant(id: String, permissions: Set<PluginPermission>) = host.grantPermissions(id, permissions)
 
+    /** 撤销授权：贡献立刻下架，行回到「需授权」；用户不必卸载重装才能收回权限。 */
+    fun revoke(id: String, permissions: Set<PluginPermission>) = host.revokePermissions(id, permissions)
+
     /** 退出安全模式：插件页顶部的横幅点一下就走这里，否则被挡的插件没有恢复路径。 */
     fun clearSafeMode() = host.clearSafeMode()
 

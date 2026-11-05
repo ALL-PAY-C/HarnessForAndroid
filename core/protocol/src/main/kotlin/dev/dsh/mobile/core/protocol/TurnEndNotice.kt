@@ -30,23 +30,23 @@ internal fun turnEndNotice(
     // 收尾再塞一行会把模型的正文劈成两半，比不说更难看。
     if (visibleChars > 0) return null
     if (reason == "tool_loop") {
-        val why = loopDetail?.trim()?.takeIf { it.isNotEmpty() }?.let { "：" + it.take(120) }.orEmpty()
-        return "[已中止] 检测到重复工具调用" + why + "。本轮已停止，避免继续空转。"
+        val why = loopDetail?.trim()?.takeIf { it.isNotEmpty() }?.let { ": " + it.take(120) }.orEmpty()
+        return "[Stopped] Repeated tool call detected" + why + ". This turn was stopped to avoid spinning."
     }
     if (roundsExhausted) {
-        return "[本轮未完成] 工具轮次已用尽（上限 " + maxRounds +
-            "），最后一步没有产出正文。可以让我继续，或缩小任务范围重试。"
+        return "[Turn incomplete] Tool rounds exhausted (limit " + maxRounds +
+            "), and the last step produced no text. Ask me to continue, or narrow the task and retry."
     }
     if (!lastToolError.isNullOrBlank()) {
-        return "[工具失败] " + lastToolError.trim().take(200) + "。已把错误回灌模型，但没有得到后续正文。"
+        return "[Tool failed] " + lastToolError.trim().take(200) + ". The error was fed back to the model, but no follow-up text came out."
     }
     // 走到这里说明上游这一轮既没有正文、也没有工具调用，就是纯空回复。
-    return "[空回复] 上游返回了空内容（没有正文也没有工具调用）。可以重发一次，或换个模型试试。"
+    return "[Empty reply] Upstream returned empty content (no text and no tool call). Send it again, or try another model."
 }
 
 /** 工具失败的一行摘要：命令前 60 字 + 错误，换行压平，免得把正文撑成多段。 */
 internal fun toolFailureTrace(command: String, error: String?): String {
-    val cmd = command.trim().replace('\n', ' ').take(60).ifBlank { "（空命令）" }
-    val err = (error ?: "未知错误").trim().replace('\n', ' ').take(120)
-    return cmd + "：" + err
+    val cmd = command.trim().replace('\n', ' ').take(60).ifBlank { "(empty command)" }
+    val err = (error ?: "unknown error").trim().replace('\n', ' ').take(120)
+    return cmd + ": " + err
 }

@@ -1046,6 +1046,11 @@
     <string name="plugins_perm_dialog_title">该插件需要授权</string>
     <string name="plugins_perm_dialog_body">%1$s 将获得以下能力：</string>
     <string name="plugins_perm_allow">允许</string>
+    <string name="plugins_perm_granted_list">已授权：%1$s</string>
+    <string name="plugins_perm_revoke">撤销授权</string>
+    <string name="plugins_perm_revoke_title">撤销授权？</string>
+    <string name="plugins_perm_revoke_body">%1$s 会立刻停止运行，在你重新授予之前这些能力保持关闭：</string>
+    <string name="plugins_perm_revoke_confirm">撤销</string>
     <string name="plugins_perm_shell_title">执行命令</string>
     <string name="plugins_perm_shell_hint">在本机执行 shell 命令</string>
     <string name="plugins_perm_phone_control_title">操控手机</string>
@@ -1055,6 +1060,10 @@
     <string name="plugins_perm_workspace_title">读写工作区</string>
     <string name="plugins_perm_workspace_hint">读写插件工作区里的文件</string>
     <string name="plugins_row_load_failed">加载失败</string>
+    <string name="plugins_row_not_loaded">未加载 · %1$s</string>
+    <string name="plugins_reason_safe_mode_short">被安全模式挡住</string>
+    <string name="plugins_reason_engine_unavailable">Node 引擎不可用</string>
+    <string name="plugins_reason_not_started">尚未启动</string>
     <string name="plugins_reason_safe_mode">被安全模式挡住：先退出安全模式，再重新启用</string>
     <string name="plugins_safe_mode_block">安全模式：连续启动失败后第三方插件已暂停</string>
     <string name="plugins_safe_mode_exit">退出安全模式</string>

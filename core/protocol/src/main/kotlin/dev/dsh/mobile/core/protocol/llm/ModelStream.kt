@@ -422,7 +422,7 @@ internal class ModelStream(
     companion object {
         /** 引擎路由前缀：baseUrl="engine://<provider-model-id>"。 */
         const val ENGINE_SCHEME = "engine://"
-        const val ENGINE_NOT_READY = "引擎未就绪：先在插件页打开一次，让 :node 进程起来"
+        const val ENGINE_NOT_READY = "Engine not ready: open the plugin page once so the :node process starts"
 
         /** 多久没有任何实质帧就判定上游卡死（每解析出一帧就重置）。 */
         const val IDLE_TIMEOUT_MS = 300_000L

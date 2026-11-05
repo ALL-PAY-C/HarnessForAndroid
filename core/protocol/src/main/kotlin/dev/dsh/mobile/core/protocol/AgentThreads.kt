@@ -15,10 +15,10 @@ data class ContextAssembly(
 )
 
 /** 本地节选摘要（没有 LLM 摘要时的退路）。 */
-private const val LOCAL_PREFIX = "历史摘要（本地节选，仅作历史资料）：\n"
+private const val LOCAL_PREFIX = "History summary (local excerpt):\n"
 
 /** LLM 结构化摘要的前缀。 */
-private const val SUMMARY_PREFIX = "上下文摘要（早期轮次已压缩，原文不再回放）：\n"
+private const val SUMMARY_PREFIX = "Context summary (earlier turns compacted):\n"
 
 /** 一次压缩的输入：哪些消息该被摘要掉，以及压缩前后的体量。 */
 data class CompactionPlan(
@@ -105,7 +105,7 @@ class AgentThreads(private val publicLimit: Int = 30) {
     fun markFinished(sessionId: String, agentId: String, name: String, text: String) {
         if (text.isBlank()) return
         synchronized(lock) {
-            finished.getOrPut(sessionId) { LinkedHashMap() }[agentId] = name + "：" + text.take(400)
+            finished.getOrPut(sessionId) { LinkedHashMap() }[agentId] = name + ": " + text.take(400)
         }
     }
 

@@ -33,7 +33,7 @@ class ToolOutputSpill(
         if (!dir.isDirectory && !dir.mkdirs()) return null
         dir
     }.getOrElse {
-        AppLog.w("tools-output 目录不可用：" + it.message)
+        AppLog.w("tools-output directory unavailable: " + it.message)
         null
     }
 
@@ -50,7 +50,7 @@ class ToolOutputSpill(
         val droppedHead = if (tail.isEmpty()) lines.size - head.size else lines.size - head.size - tail.size
         return buildString {
             append(head.joinToString("\n"))
-            if (droppedHead > 0) append("\n…（中间省略 " + droppedHead + " 行）")
+            if (droppedHead > 0) append("\n…(" + droppedHead + " lines omitted in the middle)")
             if (tail.isNotEmpty()) append("\n").append(tail.joinToString("\n"))
             append("\n")
             append(locatorLine(locator))
@@ -68,7 +68,7 @@ class ToolOutputSpill(
             file.writeText(body, Charsets.UTF_8)
             SpillLocator(file.absolutePath, body.count { it == '\n' } + 1, file.length())
         }.getOrElse {
-            AppLog.w("工具输出落盘失败：" + it.message)
+            AppLog.w("failed to spill tool output to disk: " + it.message)
             null
         }
     }
@@ -78,15 +78,15 @@ class ToolOutputSpill(
      * 只允许读 [rootDir] 之下的文件——locator 是模型给的，不能变成任意文件读取。
      */
     fun read(path: String, offset: Int = 0, limit: Int = 200, withHeader: Boolean = true): String {
-        val root = rootDir() ?: return "工具输出落盘目录不可用，无法回读：" + path
+        val root = rootDir() ?: return "Tool output spill directory unavailable, cannot read back: " + path
         val file = File(path)
         val target = runCatching { file.canonicalFile }.getOrElse { file.absoluteFile }
         val base = runCatching { root.canonicalFile }.getOrElse { root.absoluteFile }
         if (!target.path.startsWith(base.path + File.separator) && target.path != base.path) {
-            return "拒绝回读：「" + path + "」不在工具输出目录内"
+            return "Refusing read-back: '" + path + "' is outside the tool output directory"
         }
-        if (!file.isFile) return "文件不存在：" + path
-        val all = runCatching { file.readLines() }.getOrElse { return "读取失败：" + it.message }
+        if (!file.isFile) return "File not found: " + path
+        val all = runCatching { file.readLines() }.getOrElse { return "Read failed: " + it.message }
         val start = offset.coerceIn(0, all.size)
         val take = limit.coerceIn(1, 5_000)
         val slice = all.drop(start).take(take)
@@ -94,15 +94,15 @@ class ToolOutputSpill(
             // 越界（offset 超过总行数）报 0-0，而不是把 offset 当成已返回区间。
             val from = if (slice.isEmpty()) 0 else start + 1
             val to = if (slice.isEmpty()) 0 else start + slice.size
-            "（" + file.absolutePath + " 共 " + all.size + " 行 / " + file.length() + " 字节，本次返回第 " + from + "-" + to + " 行）\n"
+            "(" + file.absolutePath + ", " + all.size + " lines / " + file.length() + " bytes; returning lines " + from + "-" + to + ")\n"
         } else ""
         return header + slice.joinToString("\n")
     }
 
     private fun locatorLine(locator: SpillLocator): String =
-        "[工具输出已落盘] path=" + locator.path + " totalLines=" + locator.totalLines +
+        "[Tool output spilled] path=" + locator.path + " totalLines=" + locator.totalLines +
             " totalBytes=" + locator.totalBytes +
-            " —— 读回：read_output {\"path\":\"" + locator.path + "\",\"offset\":0,\"limit\":200}"
+            " — read back: read_output {\"path\":\"" + locator.path + "\",\"offset\":0,\"limit\":200}"
 
     private fun sanitize(raw: String): String =
         raw.replace(Regex("[^A-Za-z0-9_.-]"), "_").take(64).ifBlank { "_" }

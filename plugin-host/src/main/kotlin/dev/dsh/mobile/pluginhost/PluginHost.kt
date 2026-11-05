@@ -52,6 +52,14 @@ data class LoadedPlugin(
      */
     val blockedByPermission: Boolean = false,
     /**
+     * 没在跑的原因（T9.27）。null = 这一行在跑，或已在跑的过程中失败（看 [loadError]）。
+     *
+     * 与 [loadError] 互补而不是并列：[loadError] 是「引擎跑过、炸了」，本字段是「压根没跑」。
+     * 界面据此把「未加载（原因）」与「加载失败（可展开看原文）」分成两种行，未加载行不标红、
+     * 不禁用开关 —— 用户要能直接点开关把插件开起来。
+     */
+    val notLoadedReason: NotLoadedReason? = null,
+    /**
      * 版本/能力协商结果：全量兼容、降级（[Compat.Degraded]，列出没生效的槽位/动作/超配额项）、
      * 拒载（[Compat.Rejected]，apiVersion 比宿主新）。插件管理页直接显示 [Compat.summary]。
      */
@@ -171,6 +179,13 @@ class PluginHost(
     /** 运行期加载失败回执：插件 id → 原因。来自引擎真实加载结果，不来自目录探测。 */
     private val runtimeFailures = LinkedHashMap<String, String>()
 
+    /**
+     * 宿主侧的「没跑」回执：插件 id → 原因。只由 [noteNotLoaded] 写，引擎给出真实结果
+     * （[noteLoadResult]）时立刻清掉。与 [runtimeFailures] 同生同灭：一个插件不可能同时
+     * 「没跑因为引擎没起来」和「跑了但失败」。
+     */
+    private val runtimeNotLoaded = LinkedHashMap<String, NotLoadedReason>()
+
     /** 版本拒载回执：插件 id → 原因。协商不过的插件不进注册表，register() 一次都不跑。 */
     private val versionRejections = LinkedHashMap<String, String>()
 
@@ -218,7 +233,10 @@ class PluginHost(
             // 装配期失败自带原因（JsBrokenPlugin 这类）：先落回执再算行，
             // 列表才不会把一个跑不起来的插件显示成「已停用」。
             plugin is PluginLoadFailure -> runtimeFailures[m.id] = plugin.loadFailure
-            previous != null && previous !== plugin -> runtimeFailures.remove(m.id)
+            previous != null && previous !== plugin -> {
+                runtimeFailures.remove(m.id)
+                runtimeNotLoaded.remove(m.id)
+            }
         }
         // 启用意图与安全模式放行分开算：注册受安全模式约束，但行内要说得清「是你想开、
         // 被安全模式挡住了」，所以回执按意图算，不用 isEnabled 的合取结果。
@@ -357,7 +375,30 @@ class PluginHost(
         } else {
             runtimeFailures[id] = message
         }
-        if (previous == message) return
+        // 引擎既然给出了真实结果，「没跑」的原因就过期了（成功也算：引擎这次起来了）。
+        val stale = runtimeNotLoaded.remove(id) != null
+        if (previous == message && !stale) return
+        _plugins.update { list ->
+            list.map { if (it.manifest.id == id) recompute(it, null, it.error) else it }
+        }
+        bump()
+    }
+
+    /**
+     * 记录一次「宿主决定不加载」（T9.27）：引擎没起来这类不属于插件自身的阻塞。
+     *
+     * 与 [noteLoadResult] 分开：传进来的是原因枚举而不是错误原文，界面因此能把它渲染成
+     * 「未加载 · 引擎不可用」这种可操作提示，而不是一条会被当成插件 bug 的失败原文。
+     * 真跑起来之后 [noteLoadResult] 会把它清掉，不需要调用方再手动清。
+     */
+    fun noteNotLoaded(id: String, reason: NotLoadedReason?) {
+        val previous = runtimeNotLoaded[id]
+        if (reason == null) {
+            runtimeNotLoaded.remove(id)
+        } else {
+            runtimeNotLoaded[id] = reason
+        }
+        if (previous == reason) return
         _plugins.update { list ->
             list.map { if (it.manifest.id == id) recompute(it, null, it.error) else it }
         }
@@ -382,12 +423,27 @@ class PluginHost(
         val on = wanted ?: (store?.isEnabled(id, row.manifest.enabledByDefault) ?: enabledFallback[id] ?: row.manifest.enabledByDefault)
         val blocked = on && !safeModeAllows(id)
         val blockedByPermission = on && !permissionAllows(row.manifest)
+        // 宿主侧「没跑」回执（引擎不可用等）也算阻塞：它没跑，开关就不能显示成「已启用」。
+        val reported = runtimeNotLoaded[id]
+        val running = on && registerError == null && loadError == null && !blocked &&
+            !blockedByPermission && reported == null
+        // 优先级按「用户最该做什么」排：开关关着 → 先开；安全模式 → 先退；缺权限 → 先授；
+        // 引擎不可用 → 先修引擎。真失败（loadError）不占本字段，走 loadError 那条路径。
+        val notLoaded = when {
+            running || loadError != null || registerError != null -> null
+            !on -> NotLoadedReason.Disabled
+            blocked -> NotLoadedReason.SafeMode
+            blockedByPermission -> NotLoadedReason.Permission
+            reported != null -> reported
+            else -> NotLoadedReason.NotStarted
+        }
         return row.copy(
-            enabled = on && registerError == null && loadError == null && !blocked && !blockedByPermission,
+            enabled = running,
             error = registerError,
             loadError = loadError,
             blockedBySafeMode = blocked,
             blockedByPermission = blockedByPermission,
+            notLoadedReason = notLoaded,
             compat = compatOf(id),
         )
     }
@@ -431,15 +487,35 @@ class PluginHost(
      *
      * 前缀是必须的：两个插件各自声明 id="local" 是常态，裸 id 会在模型列表里撞车。
      * 同插件内重复的 source id 追加 `__2`/`__3` 后缀，先到先得、顺序稳定。
+     *
+     * baseUrl 覆盖：插件清单把「自定义地址」约定成 config 键 `baseUrl`（插件自己的设置项
+     * 声明的同名键），用户在插件设置里填了就覆盖该插件声明的**全部** modelSources ——
+     * 一个插件可以声明多个源，但用户填的是一个网关地址，不该只改到第一条。
+     * 收益是插件换镜像/自建网关不用重打包。空值（或缺键）表示「用清单默认」，即不改动。
      */
     fun modelSources(): List<PluginModelSource> {
         val used = HashSet<String>()
         return activeRows().flatMap { row ->
+            val override = pluginBaseUrl(row.manifest.id)
             row.manifest.modelSources.map { src ->
-                src.copy(id = uniqueSourceId("plugin." + row.manifest.id + "." + src.id, used))
+                src.copy(
+                    id = uniqueSourceId("plugin." + row.manifest.id + "." + src.id, used),
+                    baseUrl = override ?: src.baseUrl,
+                )
             }
         }
     }
+
+    /**
+     * 插件配置里的 `baseUrl`，trim 后非空才算「用户填了」。
+     *
+     * 读配置失败按没填处理：一个坏掉的 config bridge（文件损坏 / 插件被删）只该让这一插件
+     * 退回清单默认值，不能把整张模型列表连坐抛空。
+     */
+    private fun pluginBaseUrl(pluginId: String): String? =
+        runCatching { configBridge?.read(pluginId)?.get("baseUrl")?.trim() }
+            .getOrNull()
+            ?.takeIf { it.isNotEmpty() }
 
     private fun uniqueSourceId(base: String, used: MutableSet<String>): String {
         var candidate = base
@@ -544,6 +620,7 @@ class PluginHost(
         instances.remove(id)
         // 卸载后旧回执必须一起丢掉：同名重装时不能继承上一份的「加载失败」/「拒载」。
         runtimeFailures.remove(id)
+        runtimeNotLoaded.remove(id)
         versionRejections.remove(id)
         _plugins.update { list -> list.filterNot { it.manifest.id == id } }
         bump()
@@ -562,6 +639,7 @@ class PluginHost(
             registry.clearPlugin(it)
             instances.remove(it)
             runtimeFailures.remove(it)
+            runtimeNotLoaded.remove(it)
             versionRejections.remove(it)
         }
         _plugins.update { list -> list.filter { it.manifest.id in keep } }

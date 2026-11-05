@@ -83,13 +83,13 @@ class ToolExecutor(
                     ?: return ToolExecResult(
                         ok = false,
                         output = "",
-                        error = "未知工具：" + name + "（已注册：" + table.keys.joinToString() + "）",
+                        error = "Unknown tool: " + name + " (registered: " + table.keys.joinToString() + ")",
                         elapsedMs = System.currentTimeMillis() - started,
                         attempts = attempts,
                     )
                 val budget = timeoutOf(name)?.coerceAtLeast(1_000L) ?: timeoutMs
                 val out = withTimeoutOrNull(budget) { exec(args) }
-                    ?: throw java.util.concurrent.TimeoutException("执行超时（" + budget + "ms）")
+                    ?: throw java.util.concurrent.TimeoutException("Execution timed out (" + budget + "ms)")
                 return ToolExecResult(
                     ok = true,
                     output = spill?.present(out, turnId, callId ?: name) ?: out.truncateForTool(maxOutputChars),
@@ -100,9 +100,9 @@ class ToolExecutor(
             } catch (e: CancellationException) {
                 // 真正的取消要往上抛；重试循环里的取消不算失败。
                 if (!currentCoroutineContext().isActive) throw e
-                last = "执行被取消"
+                last = "execution cancelled"
             } catch (t: Throwable) {
-                last = t.javaClass.simpleName + ": " + (t.message ?: "执行失败")
+                last = t.javaClass.simpleName + ": " + (t.message ?: "execution failed")
                 AppLog.w("tool exec failed (attempt " + attempts + "): " + last)
             }
             if (i < maxRetries) delay(retryDelayMs)
@@ -110,7 +110,7 @@ class ToolExecutor(
         return ToolExecResult(
             ok = false,
             output = "",
-            error = last ?: "执行失败",
+            error = last ?: "execution failed",
             elapsedMs = System.currentTimeMillis() - started,
             attempts = attempts,
         )
@@ -118,4 +118,4 @@ class ToolExecutor(
 }
 
 internal fun String.truncateForTool(limit: Int = 6_000): String =
-    if (length <= limit) this else take(limit) + "\n…（已截断，共 " + length + " 字符）"
+    if (length <= limit) this else take(limit) + "\n…(truncated, " + length + " chars total)"

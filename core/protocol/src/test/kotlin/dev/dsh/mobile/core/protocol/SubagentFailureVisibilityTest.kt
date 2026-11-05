@@ -86,7 +86,7 @@ class SubagentFailureVisibilityTest {
             assertTrue("子代理没有结算成 Failed，卡片会一直转圈：" + calls.map { it.status }, failed != null)
             assertTrue(
                 "失败原因不可读：" + failed!!.detail,
-                failed.detail.contains("工具执行失败"),
+                failed.detail.contains("Tool execution failed"),
             )
 
             // 3）恰好一个 TurnEnd —— 仓库据此结算并落 ASSISTANT 行。

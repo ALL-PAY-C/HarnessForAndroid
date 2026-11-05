@@ -91,10 +91,10 @@ object ToolPolicy {
         val sensitivity = sensitivity(name, args, resolve)
         if (sensitivity != ToolSensitivity.Irreversible) return ToolAuth.Allow
         val title = when (name) {
-            "phone" -> "确认执行手机动作：" + (toolArg(args, "action") ?: "?")
-            "fs_op" -> "确认删除：" + (toolArg(args, "src") ?: "?")
-            "subagent" -> "确认派发子代理"
-            else -> "确认执行：" + name
+            "phone" -> "Confirm phone action: " + (toolArg(args, "action") ?: "?")
+            "fs_op" -> "Confirm delete: " + (toolArg(args, "src") ?: "?")
+            "subagent" -> "Confirm subagent dispatch"
+            else -> "Confirm run: " + name
         }
         return ToolAuth.Ask(title)
     }
@@ -115,7 +115,7 @@ object ToolPolicy {
         val action = toolArg(args, "action") ?: return null
         val capability = CapabilityActions.capabilityOf(action) ?: return null
         // 调用点的确认卡会自己加「确认执行：」前缀，这里不再重复写「确认」。
-        val ask = ToolAuth.Ask("使用「" + capability.id + "」能力：" + action, capability)
+        val ask = ToolAuth.Ask("Use capability '" + capability.id + "': " + action, capability)
         return when (CapabilityTiers.tierOf(capabilityTiers, capability)) {
             CapabilityTier.Always -> ToolAuth.Allow
             CapabilityTier.Session -> if (capability in sessionGranted) ToolAuth.Allow else ask

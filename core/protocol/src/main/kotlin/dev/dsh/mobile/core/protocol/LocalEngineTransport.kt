@@ -97,17 +97,17 @@ data class LlmConfig(
 ) {
     companion object {
         val DEFAULT_SYSTEM = """
-            你是运行在用户 Android 手机上的 DSH Agent。
-            - 需要操作手机时调用 shell 工具（命令在手机本机执行，返回 stdout）。
-            - 常用能力：am/pm/settings/dumpsys、文件读写、curl、python（若装有 Termux）。
-            - 不要臆造命令输出；命令失败时根据 stderr 调整。
-            - 回答使用中文，简洁直接。
-            - 需要用户在几个方案里挑一个时，正文照常写；末尾单独追加一段选项块，格式：
+            You are a DSH agent running on the user's Android phone.
+            - Call the shell tool when you need to operate the phone (commands run on the device itself and return stdout).
+            - Common capabilities: am/pm/settings/dumpsys, file read/write, curl, python (if Termux is installed).
+            - Never invent command output; when a command fails, adjust based on stderr.
+            - Reply in Chinese, concise and direct.
+            - When the user must pick one of several options, write the body as usual and append a separate options block at the end, in this format:
               [[OPTIONS]]
-              A: 选项一
-              B: 选项二
+              A: first option
+              B: second option
               [[/OPTIONS]]
-              客户端会把它渲染成可以点的按钮，点了就等于用户选了那一条。
+              The client renders it as tappable buttons; tapping one means the user picked that line.
         """.trimIndent()
     }
 }
@@ -228,9 +228,9 @@ class LocalEngineTransport(
     private val groupProvider: suspend (String) -> GroupPlan? = { null },
     private val historyProvider: suspend (String) -> List<ChatMessage>,
     private val shellExec: suspend (String) -> String,
-    private val toolHelp: () -> String = { "shell 工具：在手机上执行 shell 命令并返回输出。" },
+    private val toolHelp: () -> String = { "shell tool: runs shell commands on the phone and returns their output." },
     /** phone 工具：通过无障碍服务模拟点击/滑动/输入/读屏/开应用/截屏（参数为 JSON 对象）。 */
-    private val phoneExec: suspend (JsonObject) -> String = { "phone 工具未接入" },
+    private val phoneExec: suspend (JsonObject) -> String = { "phone tool is not wired up" },
     /** 会话人设 / 预设（普通会话生效；群聊各自带 persona）。 */
     private val personaProvider: suspend (String) -> String = { "" },
     /** 设置里的「自动确认工具」：为真时不再弹确认卡，直接放行。 */
@@ -238,18 +238,18 @@ class LocalEngineTransport(
     /** 网络工具（web_search / web_fetch / download）；网络层与工作区都可注入，默认不含工作区。 */
     private val web: WebToolkit = WebToolkit(),
     /** 原生文件工具：保留 JSON 参数和结果，避免 shell 转义损失。 */
-    private val fsExec: suspend (String, JsonObject) -> String = { _, _ -> "文件工具未接入" },
+    private val fsExec: suspend (String, JsonObject) -> String = { _, _ -> "file tool is not wired up" },
     /** 通道缺省时保留旧 shell 接线。 */
     private val shellExecChannel: suspend (String, String?) -> String = { cmd, _ -> shellExec(cmd) },
     private val channelListExec: suspend () -> String = { "[]" },
-    private val bgExec: suspend (String, JsonObject) -> String = { _, _ -> "后台任务未接入" },
+    private val bgExec: suspend (String, JsonObject) -> String = { _, _ -> "background job tool is not wired up" },
     /**
      * 宿主注入的技能读取通道（skill 工具的落地实现）。
      *
      * 这里只认「参数对象 -> 文本」，不碰文件：技能库在 :node 引擎的 DSH_HOME 下，本类连路径都不该知道；
      * 失败也由注入方转成可读文本，工具结果要能让模型看到原因。
      */
-    private val skillExec: suspend (JsonObject) -> String = { "技能未接入" },
+    private val skillExec: suspend (JsonObject) -> String = { "skills are not wired up" },
     /** 与群聊相同，预算直接以字符计，默认复用群聊预算。 */
     private val contextBudgetProvider: suspend (String) -> Int = { GroupPlan(emptyList()).contextBudget },
     /**
@@ -453,14 +453,14 @@ class LocalEngineTransport(
     )
 
     override suspend fun connect() {
-        _state.value = RuntimeState.Starting("读取模型配置")
+        _state.value = RuntimeState.Starting("Loading model config")
         val cfg = configProvider("")
         // 没配模型不是「运行时坏了」：留 NotConfigured，抽屉别把首次安装写成「运行时异常」。
         // AppContainer 的模型监听对 Failed/NotConfigured 一视同仁，配上 Key 会自动重连。
         _state.value = if (cfg == null) {
             RuntimeState.NotConfigured
         } else {
-            RuntimeState.Ready(dev.dsh.mobile.core.model.TransportKind.InProcess, "本地引擎 · ${cfg.model}")
+            RuntimeState.Ready(dev.dsh.mobile.core.model.TransportKind.InProcess, "Local engine · ${cfg.model}")
         }
     }
 
@@ -531,14 +531,14 @@ class LocalEngineTransport(
         val group = runCatching { groupProvider(sessionId) }.getOrNull()
         val cfg = if (group.isNullOrEmpty()) configProvider(sessionId) else null
         if (group.isNullOrEmpty() && cfg == null) {
-            throw IllegalStateException("未接入模型，请到 Agent 页添加 API Key")
+            throw IllegalStateException("No model connected — add an API key on the Agents page")
         }
         val history = historyProvider(sessionId)
         // P0-1：上次压缩出的摘要要能跨进程续用，否则重启后等于没压过。
         runCatching {
             val stored = summaryStore.read(sessionId)
             if (stored.isNotBlank() && threads.summary(sessionId).isBlank()) threads.setSummary(sessionId, stored)
-        }.onFailure { AppLog.w("读取已存摘要失败：" + (it.message ?: it.javaClass.simpleName)) }
+        }.onFailure { AppLog.w("Failed to read the stored summary: " + (it.message ?: it.javaClass.simpleName)) }
         val persona = if (group.isNullOrEmpty()) {
             runCatching { personaProvider(sessionId) }.getOrNull().orEmpty().trim()
         } else {
@@ -554,7 +554,7 @@ class LocalEngineTransport(
                         history = history,
                         userText = text,
                         userImages = images,
-                        extraSystem = if (persona.isBlank()) "" else "用户为这个会话设定的人设与规则，请始终遵守：\n$persona",
+                        extraSystem = if (persona.isBlank()) "" else "Persona and rules the user set for this session — always follow them:\n$persona",
                         turnId = turnId,
                     )
                 } else {
@@ -575,7 +575,7 @@ class LocalEngineTransport(
         if (idleTimeout) {
             AppLog.w("turn idle timeout (" + TURN_IDLE_TIMEOUT_MS + "ms): " + sessionId)
             job.cancel()
-            post(DshEvent.MessageChunk(sessionId, "（本轮超时：超过 " + TURN_IDLE_TIMEOUT_MS / 1000 + " 秒没有任何输出，已中止）", turnId = turnId))
+            post(DshEvent.MessageChunk(sessionId, "(Turn timed out: no output for " + TURN_IDLE_TIMEOUT_MS / 1000 + "s, aborted)", turnId = turnId))
             postCritical(DshEvent.TurnEnd(sessionId, "error", turnId = turnId))
         }
         jobs.remove(sessionId)
@@ -592,7 +592,7 @@ class LocalEngineTransport(
     private fun takeQueuedImages(): List<String> {
         val queued = PendingImageQueue.drainForNextTurn(PendingImageQueue.MAX_ITEMS)
         if (queued.isEmpty()) return emptyList()
-        AppLog.i("queued screenshots: inject=" + queued.size + " paths=" + queued.joinToString("、") { it.path })
+        AppLog.i("queued screenshots: inject=" + queued.size + " paths=" + queued.joinToString(", ") { it.path })
         return queued.map { it.path }
     }
 
@@ -690,7 +690,7 @@ class LocalEngineTransport(
             // P0-1：超预算先把被丢弃的最老若干轮压成结构化摘要（摘要本身也是 system 风格消息，
             // 排在保留段之前），再按预算装配 —— 不再只是「丢最老的 + 80 字截断」。
             runCatching { compaction.maybeSummarize(sessionId, cfg, budgetChars, messages) }
-                .onFailure { AppLog.w("上下文压缩失败：" + (it.message ?: it.javaClass.simpleName)) }
+                .onFailure { AppLog.w("Context compaction failed: " + (it.message ?: it.javaClass.simpleName)) }
             val assembly = threads.assembleForSingleChat(
                 sessionId = sessionId,
                 budgetChars = budgetChars,
@@ -874,13 +874,13 @@ class LocalEngineTransport(
                         if (second is kotlinx.coroutines.CancellationException) throw second
                         kotlinx.coroutines.currentCoroutineContext().ensureActive()
                         AppLog.w("llm retry failed: ${second.message}")
-                        post(DshEvent.MessageChunk(sessionId, "\n\n[请求失败] " + stream.friendlyRequestError(second, cfg.baseUrl, userImages.isNotEmpty()), authorId, authorName, turnId))
+                        post(DshEvent.MessageChunk(sessionId, "\n\n[Request failed] " + stream.friendlyRequestError(second, cfg.baseUrl, userImages.isNotEmpty()), authorId, authorName, turnId))
                         postCritical(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
                         return
                     }
                 } else {
                     AppLog.w("llm call failed: ${e.message}")
-                    post(DshEvent.MessageChunk(sessionId, "\n\n[请求失败] " + stream.friendlyRequestError(e, cfg.baseUrl, userImages.isNotEmpty()), authorId, authorName, turnId))
+                    post(DshEvent.MessageChunk(sessionId, "\n\n[Request failed] " + stream.friendlyRequestError(e, cfg.baseUrl, userImages.isNotEmpty()), authorId, authorName, turnId))
                     postCritical(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
                     return
                 }
@@ -981,9 +981,9 @@ class LocalEngineTransport(
             }
             // 重试用尽仍是拒答：正文照常上屏，再补一句为什么 —— 不能静默成「空回复」。
             refusalExhausted?.let { out ->
-                val why = out.refusalHit?.let { "命中「" + it + "」" } ?: "几次都是空回复"
+                val why = out.refusalHit?.let { "matched \"" + it + "\"" } ?: "several empty replies in a row"
                 AppLog.w("persona retry: gave up after " + out.attempts + " attempts, reason=" + why)
-                val note = "（人设已带上，但模型连续 " + out.attempts + " 次拒答：" + why + "）"
+                val note = "(persona was included, but the model refused " + out.attempts + " times in a row: " + why + ")"
                 post(
                     DshEvent.MessageChunk(
                         sessionId,
@@ -998,7 +998,7 @@ class LocalEngineTransport(
 
             // 断流：上游在 [DONE] 之前就关了连接。正文已流式发出，补一句标注并落到终态（不再 Running）。
             if (resp.bool("dsh_eof_without_done") == true) {
-                post(DshEvent.MessageChunk(sessionId, "（回复中断 · 连接意外断开，请重试）", authorId, authorName, turnId))
+                post(DshEvent.MessageChunk(sessionId, "(Reply interrupted · the connection dropped unexpectedly, please retry)", authorId, authorName, turnId))
                 postCritical(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
                 return
             }
@@ -1018,7 +1018,7 @@ class LocalEngineTransport(
             if (toolCalls.isNullOrEmpty()) {
                 // 唯一能识别的「调用」是个没闭合的块：一个工具都没执行，绝不能按 "stop" 正常收尾。
                 if (truncatedToolCall) {
-                    val note = "（本轮工具调用被截断：上游在闭合标签前断了流，这个调用没有执行。可以让我重试一次。）"
+                    val note = "(This turn's tool call was truncated: upstream dropped the stream before the closing tag, so the call never ran. Ask me to retry.)"
                     post(DshEvent.MessageChunk(sessionId, if (visibleChars > 0) "\n\n" + note else note, authorId, authorName, turnId))
                     visibleChars += note.length
                     postCritical(DshEvent.TurnEnd(sessionId, "truncated", authorId, turnId, truncatedToolCall = true))
@@ -1028,13 +1028,13 @@ class LocalEngineTransport(
                 // 以前直接 TurnEnd("stop")：界面一片空白，用户只能猜是不是网断了。
                 if (visibleChars == 0) {
                     val cause = upstreamEmptyReason(resp, finishReason)
-                        .ifBlank { lastToolError?.let { "工具失败后没有后续正文（" + it.trim() + "）" }.orEmpty() }
-                        .ifBlank { "上游返回了空内容（没有正文也没有工具调用）" }
+                        .ifBlank { lastToolError?.let { "No follow-up text after the tool failure (" + it.trim() + ")" }.orEmpty() }
+                        .ifBlank { "Upstream returned empty content (no text and no tool call)" }
                     // 群聊成员的零输出由 runMemberTask 统一写「（该成员本轮无输出）」，
                     // 这里再发一条会变成两条说明。
                     if (authorId == null) {
                         post(
-                            DshEvent.MessageChunk(sessionId, "（本轮没有任何输出：" + cause + "）", authorId, authorName, turnId),
+                            DshEvent.MessageChunk(sessionId, "(No output this turn: " + cause + ")", authorId, authorName, turnId),
                         )
                     }
                     postCritical(DshEvent.TurnEnd(sessionId, "error", authorId, turnId))
@@ -1057,7 +1057,7 @@ class LocalEngineTransport(
 
             if (truncatedToolCall) {
                 // 末尾还有一个没闭合的调用块：已解析出来的照常执行，但要让用户知道少了一个。
-                val note = "（本轮末尾的工具调用被截断，最后那个调用没有执行）"
+                val note = "(The tool call at the end of this turn was truncated; the last call never ran)"
                 post(DshEvent.MessageChunk(sessionId, if (visibleChars > 0) "\n\n" + note else note, authorId, authorName, turnId))
                 visibleChars += note.length
             }
@@ -1177,10 +1177,10 @@ class LocalEngineTransport(
                     // 仓库那边只能走 failTurn，于是 DB 里只有 USER 行、界面上没有助手气泡。
                     val result = runCatching {
                         when {
-                        name == "shell" && command.isBlank() -> ToolExecResult(ok = false, output = "", error = "参数缺失")
+                        name == "shell" && command.isBlank() -> ToolExecResult(ok = false, output = "", error = "missing parameter")
                         // G：不可逆 shell 命令先问用户；没确认就当被拒，错误照常回灌模型。phone 参数非 shell 命令，不确认。
                         name == "shell" && needsConfirmation(command) && confirm(task, sessionId, command) != "allow" ->
-                            ToolExecResult(ok = false, output = "", error = "用户未确认，已跳过该命令")
+                            ToolExecResult(ok = false, output = "", error = "user did not confirm; command skipped")
                         // 子代理不能走 toolRunner：那里是 30 秒单次超时 + 1 次重试，
                         // 而一个子代理要跑满 8 轮工具往返、总预算 180 秒。
                         name == "subagent" -> runSubagent(
@@ -1244,7 +1244,7 @@ class LocalEngineTransport(
                                         verdict.capability?.let { rememberGrant(sessionId, it) }
                                         toolRunner.run(name, args, turnId, id)
                                     } else {
-                                        ToolExecResult(ok = false, output = "", error = "用户未确认，已跳过该动作")
+                                        ToolExecResult(ok = false, output = "", error = "user did not confirm; action skipped")
                                     }
                             }
                         }
@@ -1256,7 +1256,7 @@ class LocalEngineTransport(
                         ToolExecResult(
                             ok = false,
                             output = "",
-                            error = "工具执行失败：" + stream.friendlyRequestError(e, cfg.baseUrl),
+                            error = "Tool execution failed: " + stream.friendlyRequestError(e, cfg.baseUrl),
                         )
                     }
                     loopGuard.recordResult(signature, result.output)
@@ -1270,7 +1270,7 @@ class LocalEngineTransport(
                     val body = if (result.ok) {
                         result.output
                     } else {
-                        "[执行失败] " + (result.error ?: "未知错误") + "\n" + result.output
+                        "[Execution failed] " + (result.error ?: "unknown error") + "\n" + result.output
                     }
                     postCritical(
                         DshEvent.ToolCallEvent(
@@ -1311,7 +1311,7 @@ class LocalEngineTransport(
             post(
                 DshEvent.MessageChunk(
                     sessionId,
-                    "（本轮异常结束：" + stream.friendlyRequestError(e, cfg.baseUrl) + "）",
+                    "(Turn ended with an error: " + stream.friendlyRequestError(e, cfg.baseUrl) + ")",
                     authorId,
                     authorName,
                     turnId,
@@ -1339,8 +1339,8 @@ class LocalEngineTransport(
             // 前半句已经上屏了，整段重发就是「半句 + 整段」的双份正文，所以只补公共前缀之后的部分。
             val shared = commonPrefixLength(previous, current)
             AppLog.w(
-                "正文前缀失配：已上屏 " + previous.length + " 字符，本轮 " + current.length +
-                    " 字符，公共前缀 " + shared + " —— 只补差异部分，不回吐已上屏内容",
+                "Text prefix mismatch: " + previous.length + " chars already on screen, this turn " + current.length +
+                    " chars, common prefix " + shared + " — only append the delta, never re-emit what is already shown",
             )
             if (shared == 0) "" else current.substring(shared)
         }
@@ -1364,7 +1364,7 @@ class LocalEngineTransport(
         val capped = if (raw.length <= JSON_VIEW_LIMIT) {
             raw
         } else {
-            raw.take(JSON_VIEW_LIMIT) + "…（已截断，原文 ${raw.length} 字符）"
+            raw.take(JSON_VIEW_LIMIT) + "…(truncated, original ${raw.length} chars)"
         }
         return buildJsonObject {
             put("round", round + 1)
@@ -1434,7 +1434,7 @@ class LocalEngineTransport(
         val todos = parseTodos(args) ?: return ToolExecResult(
             ok = false,
             output = "",
-            error = "参数错误：todos 必须是数组，每项含 content（非空字符串）与 status（pending / in_progress / completed）。",
+            error = "Invalid parameter: todos must be an array of items with content (non-empty string) and status (pending / in_progress / completed).",
             elapsedMs = System.currentTimeMillis() - started,
         )
         projections.writeTodos(sessionId, todos)
@@ -1443,14 +1443,14 @@ class LocalEngineTransport(
             val list = org.json.JSONArray()
             todos.forEach { list.put(JSONObject().put("content", it.content).put("status", it.status)) }
             rpc("/tool-state", "todo-write", JSONObject().put("sessionId", sessionId).put("todos", list))
-        }.onFailure { AppLog.w("todo_write 同步引擎失败：" + (it.message ?: it.javaClass.simpleName)) }
+        }.onFailure { AppLog.w("todo_write sync to engine failed: " + (it.message ?: it.javaClass.simpleName)) }
         val done = todos.count { it.status == ProjectedTodo.STATUS_DONE }
         val text = buildString {
             if (todos.isEmpty()) {
-                append("待办已清空。")
+                append("Todo list cleared.")
             } else {
-                append("已更新待办（").append(todos.size).append(" 条，").append(done)
-                append("/").append(todos.size).append(" 完成）")
+                append("Todos updated (").append(todos.size).append(" items, ").append(done)
+                append("/").append(todos.size).append(" done)")
                 todos.forEach { t ->
                     append("\n").append(
                         when (t.status) {
@@ -1476,10 +1476,10 @@ class LocalEngineTransport(
         val action = args["action"]?.jsonPrimitive?.contentOrNullSafe()?.trim().orEmpty()
         val current = projections.snapshot(sessionId).goal
         return when (action) {
-            "get" -> ok(current?.let { describeGoal(it) } ?: "当前会话还没有目标。")
+            "get" -> ok(current?.let { describeGoal(it) } ?: "This session has no goal yet.")
             "create" -> {
                 val objective = args["objective"]?.jsonPrimitive?.contentOrNullSafe()?.trim().orEmpty()
-                if (objective.isEmpty()) return fail("参数错误：create 必须带 objective。")
+                if (objective.isEmpty()) return fail("Invalid parameter: create requires objective.")
                 val maxRounds = args["max_rounds"]?.jsonPrimitive?.contentOrNullSafe()?.toIntOrNull() ?: 0
                 val goal = ProjectedGoal(objective = objective, revision = 1, maxRounds = maxRounds)
                 projections.writeGoal(sessionId, goal)
@@ -1489,19 +1489,19 @@ class LocalEngineTransport(
                         "/tool-state", "goal-create",
                         JSONObject().put("sessionId", sessionId).put("objective", objective).put("maxRounds", maxRounds),
                     )
-                }.onFailure { AppLog.w("goal 同步引擎失败：" + (it.message ?: it.javaClass.simpleName)) }
-                ok("已创建目标（revision 1）：" + objective)
+                }.onFailure { AppLog.w("goal sync to engine failed: " + (it.message ?: it.javaClass.simpleName)) }
+                ok("Goal created (revision 1): " + objective)
             }
             "update" -> {
-                if (current == null) return fail("还没有目标，先 action=create。")
+                if (current == null) return fail("No goal yet — run action=create first.")
                 val expect = args["revision"]?.jsonPrimitive?.contentOrNullSafe()?.toIntOrNull()
-                    ?: return fail("参数错误：update 必须带 revision（先 action=get 取当前值）。")
+                    ?: return fail("Invalid parameter: update requires revision (run action=get first to read the current one).")
                 if (expect != current.revision) {
-                    return fail("版本冲突：当前 revision=" + current.revision + "，你手里的 " + expect + " 已过期，先 action=get 再改。")
+                    return fail("Version conflict: current revision=" + current.revision + ", yours " + expect + " is stale; run action=get and retry.")
                 }
                 val phase = args["phase"]?.jsonPrimitive?.contentOrNullSafe()?.trim()?.takeIf { it.isNotEmpty() }
                 if (phase != null && phase !in ProjectedGoal.PHASES) {
-                    return fail("参数错误：phase 只能是 " + ProjectedGoal.PHASES.joinToString(" / ") + "。")
+                    return fail("Invalid parameter: phase must be one of " + ProjectedGoal.PHASES.joinToString(" / ") + ".")
                 }
                 val objective = args["objective"]?.jsonPrimitive?.contentOrNullSafe()?.trim()?.takeIf { it.isNotEmpty() }
                     ?: current.objective
@@ -1531,10 +1531,10 @@ class LocalEngineTransport(
                             .put("maxRounds", maxRounds)
                             .put("blockedReason", next.blockedReason.orEmpty()),
                     )
-                }.onFailure { AppLog.w("goal 同步引擎失败：" + (it.message ?: it.javaClass.simpleName)) }
+                }.onFailure { AppLog.w("goal sync to engine failed: " + (it.message ?: it.javaClass.simpleName)) }
                 ok(describeGoal(next))
             }
-            else -> fail("参数错误：action 只能是 get / create / update。")
+            else -> fail("Invalid parameter: action must be get / create / update.")
         }
     }
 
@@ -1543,10 +1543,10 @@ class LocalEngineTransport(
         (phase ?: current) == ProjectedGoal.PHASE_BLOCKED
 
     private fun describeGoal(goal: ProjectedGoal): String = buildString {
-        append("目标（").append(goal.phase).append("，revision ").append(goal.revision)
-        if (goal.maxRounds > 0) append("，最多 ").append(goal.maxRounds).append(" 轮")
-        append("）：").append(goal.objective)
-        goal.blockedReason?.takeIf { it.isNotBlank() }?.let { append("\n卡点：").append(it) }
+        append("Goal (").append(goal.phase).append(", revision ").append(goal.revision)
+        if (goal.maxRounds > 0) append(", at most ").append(goal.maxRounds).append(" rounds")
+        append("): ").append(goal.objective)
+        goal.blockedReason?.takeIf { it.isNotBlank() }?.let { append("\nBlocker: ").append(it) }
     }
 
     // T7.1b shim #1：Compactor 的覆写必须留在本类（接口 + 十几个测试直接构造 transport），
@@ -1591,7 +1591,7 @@ class LocalEngineTransport(
         val hits = java.util.LinkedHashMap<Long, RecallHit>()
         for (term in terms) {
             val rows = runCatching { search(sessionId, RecallPlanner.escapeLike(term), RecallPlanner.PER_TERM_LIMIT) }
-                .onFailure { AppLog.w("回捞查询失败，忽略：" + (it.message ?: it.javaClass.simpleName)) }
+                .onFailure { AppLog.w("Recall query failed, ignored: " + (it.message ?: it.javaClass.simpleName)) }
                 .getOrDefault(emptyList())
             rows.forEach { hits.putIfAbsent(it.rowId, it) }
         }
@@ -1605,11 +1605,11 @@ class LocalEngineTransport(
      */
     override suspend fun recall(sessionId: String, query: String): RecallReport {
         val q = query.trim()
-        if (q.isEmpty()) return RecallReport(message = "用法：/recall <词> 或 /recall R<序号>。")
+        if (q.isEmpty()) return RecallReport(message = "Usage: /recall <word> or /recall R<number>.")
         val round = RecallPlanner.roundOf(q)
         val hits = if (round != null) recallByRound(sessionId, round) else recallByTerm(sessionId, q)
         if (hits.isEmpty()) {
-            return RecallReport(message = "没有回捞到匹配「" + q.take(40) + "」的历史。")
+            return RecallReport(message = "No history matched \"" + q.take(40) + "\".")
         }
         manualRecall[sessionId] = hits
         val from = hits.minOf { it.rowId }
@@ -1619,7 +1619,7 @@ class LocalEngineTransport(
             fromRowId = from,
             toRowId = to,
             rows = hits.map { "rowid " + it.rowId + " · " + it.role },
-            message = "已回捞 " + hits.size + " 条历史（rowid " + from + "-" + to + "），下一条消息带上。",
+            message = "Recalled " + hits.size + " history rows (rowid " + from + "-" + to + "); they will ride with the next message.",
             text = RecallPlanner.format(hits, RecallPlanner.CAP_CHARS),
         )
     }
@@ -1710,7 +1710,7 @@ class LocalEngineTransport(
 
     /** 子代理显示名：参数给了 name 就用，否则「子代理」。 */
     internal fun subagentLabel(args: JsonObject): String =
-        args["name"]?.jsonPrimitive?.contentOrNullSafe()?.trim()?.takeIf { it.isNotEmpty() } ?: "子代理"
+        args["name"]?.jsonPrimitive?.contentOrNullSafe()?.trim()?.takeIf { it.isNotEmpty() } ?: "Subagent"
 
     /**
      * 子代理的工具表：从默认表里按白名单过滤。
@@ -1751,7 +1751,7 @@ class LocalEngineTransport(
             return ToolExecResult(
                 ok = false,
                 output = "",
-                error = "prompt 参数缺失：写清要委派什么，子代理看不到当前对话",
+                error = "Missing prompt parameter: state exactly what to delegate — the subagent cannot see this conversation",
             )
         }
         // 深度闸门：模型自报的 depth 只能把层级抬高（更严），压不低运行时的真实层级。
@@ -1765,9 +1765,9 @@ class LocalEngineTransport(
             post(
                 DshEvent.MessageChunk(
                     sessionId,
-                    "[预算告急] 已用 " + verdict.percent + "%，后续子任务可能被拒",
+                    "[Budget low] " + verdict.percent + "% used; further subtasks may be rejected",
                     "system",
-                    "系统",
+                    "System",
                     turnId,
                 ),
             )
@@ -1808,15 +1808,15 @@ class LocalEngineTransport(
                 sessionId = sessionId,
                 parentTaskId = parentTaskId,
                 agentId = agentId ?: "main",
-                agentName = agentName ?: "主代理",
+                agentName = agentName ?: "Main agent",
                 specs = specs,
             )
             val tasksNote = when {
                 specs.isEmpty() -> ""
-                taskIds.isEmpty() -> "\n\n[子任务未进池] 结论里有 " + specs.size +
-                    " 条任务，但当前会话没有可用的执行池（只有群聊房间里能派活）。"
-                else -> "\n\n[已进池] " + taskIds.size + " 条子任务：" +
-                    specs.joinToString("；") { it.title } + "（父任务 " + (parentTaskId ?: "-") + "）"
+                taskIds.isEmpty() -> "\n\n[Subtasks not queued] The conclusion lists " + specs.size +
+                    " tasks, but this session has no execution pool (only group rooms can dispatch work)."
+                else -> "\n\n[Queued] " + taskIds.size + " subtasks: " +
+                    specs.joinToString("; ") { it.title } + " (parent " + (parentTaskId ?: "-") + ")"
             }
             return ToolExecResult(
                 ok = outcome.ok,
@@ -1867,12 +1867,12 @@ internal fun upstreamEmptyReason(resp: JsonObject, finishReason: String?): Strin
     val errorText = error?.get("message").strOrEmpty()
         .ifBlank { error?.get("code").strOrEmpty() }
         .ifBlank { (resp["error"] as? JsonPrimitive)?.contentOrNull.orEmpty() }
-    if (errorText.isNotBlank()) return "上游报错：" + errorText.take(160)
+    if (errorText.isNotBlank()) return "Upstream error: " + errorText.take(160)
     val choices = resp["choices"] as? JsonArray
-    if (choices == null || choices.isEmpty()) return "上游没有返回任何 choices"
+    if (choices == null || choices.isEmpty()) return "Upstream returned no choices"
     return when (finishReason) {
-        "length" -> "上游 finish_reason=length（输出撞上长度上限被截断）"
-        "content_filter" -> "上游 finish_reason=content_filter（内容被过滤）"
+        "length" -> "Upstream finish_reason=length (output hit the length cap and was truncated)"
+        "content_filter" -> "Upstream finish_reason=content_filter (content was filtered)"
         else -> ""
     }
 }

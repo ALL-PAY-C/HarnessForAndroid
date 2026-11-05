@@ -78,7 +78,7 @@ class PermissionLifecycleTest {
         pool.submitOne("two", AgentTask(id = "r2", sessionId = "two", agentId = "a", agentName = "A", prompt = "x"))
         runCurrent()
         assertEquals(setOf("r1", "r2"), events.filterIsInstance<DshEvent.Permission>().map { it.request.requestId }.toSet())
-        assertEquals(ExecutionPool.PermissionOutcome.Rejected("不是你的提问，忽略"), pool.resolvePermission("r2", "allow", "wrong"))
+        assertEquals(ExecutionPool.PermissionOutcome.Rejected("Not your request; ignored"), pool.resolvePermission("r2", "allow", "wrong"))
         pool.cancel("one")
         runCurrent()
         assertEquals(ExecutionPool.PermissionOutcome.Accepted, pool.resolvePermission("r2", "allow", "a"))

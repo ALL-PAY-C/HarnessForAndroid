@@ -28,7 +28,7 @@ class AgentThreadsSingleChatTest {
         assertTrue(result.usedChars < result.fullChars / 2)
         assertEquals(3 + history.sumOf { text(it).length } + 4, result.fullChars)
         assertEquals(history.takeLast(2) + user, result.messages.takeLast(3))
-        assertTrue(result.messages.any { text(it).startsWith("历史摘要") })
+        assertTrue(result.messages.any { text(it).startsWith("History summary") })
         assertEquals(result.usedChars, result.messages.sumOf { text(it).length })
         assertEquals(result, AgentThreads().assembleForSingleChat("s", 500, "sys", history, user, 2))
     }

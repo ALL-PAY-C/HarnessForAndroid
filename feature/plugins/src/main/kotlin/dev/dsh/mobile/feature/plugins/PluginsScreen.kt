@@ -221,6 +221,7 @@ fun PluginsScreen(
                     onSlotAction = onSlotAction,
                     onToggle = { viewModel.setEnabled(plugin.manifest.id, it) },
                     onGrant = { viewModel.grant(plugin.manifest.id, it) },
+                    onRevoke = { viewModel.revoke(plugin.manifest.id, it) },
                     onUninstall = { pending = plugin },
                 )
             }
@@ -333,20 +334,25 @@ private fun PluginCard(
     onSlotAction: (SlotAction) -> Unit,
     onToggle: (Boolean) -> Unit,
     onGrant: (Set<PluginPermission>) -> Unit,
+    onRevoke: (Set<PluginPermission>) -> Unit,
     onUninstall: () -> Unit,
 ) {
     val p = LocalQq.current
     var expanded by rememberSaveable(plugin.manifest.id) { mutableStateOf(false) }
     var granting by rememberSaveable(plugin.manifest.id) { mutableStateOf(false) }
+    // 待撤销的权限；非空即弹确认框。保存在 remember 而不是 saveable：重建进程后不该自动弹。
+    var revoking by remember(plugin.manifest.id) { mutableStateOf<List<PluginPermission>>(emptyList()) }
+    // 已在跑的插件，其已授权 = 清单声明 - 缺的（宿主是唯一事实来源，界面不另算一份）。
+    val granted = remember(plugin.manifest.id, missing) { plugin.manifest.permissions - missing }
     // 运行期回执优先于启用意图：装上了但加载失败，这一行必须是失败态而不是「已启用」。
-    // 安全模式挡住的行没有插件自己的错误，原因换成宿主策略文案 —— 否则用户只看到
-    // 开关自己弹回去、状态写「已停用」，页面上一个字的原因都没有。
+    // 「没跑」的原因由宿主给出（T9.27）：安全模式/权限/引擎不可用各有各的文案，
+    // 不再把宿主策略塞进 loadError —— 那会把「未加载」画成「加载失败」。
     val status = pluginRowStatus(
         enabled = plugin.enabled,
-        loadError = plugin.loadError ?: plugin.error
-            ?: if (plugin.blockedBySafeMode) stringResource(DesignR.string.plugins_reason_safe_mode) else null,
+        loadError = plugin.loadError ?: plugin.error,
         // 第三态由宿主回执决定：权限没给全时 enabled 恒为 false，只看 enabled 会显示「已停用」。
         needsPermission = plugin.blockedByPermission || (missing.isNotEmpty() && !plugin.blockedBySafeMode),
+        notLoaded = plugin.notLoadedReason,
     )
     GroupFrame(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
         GroupHeader(
@@ -356,22 +362,25 @@ private fun PluginCard(
             trailing = {
                 Text(
                     status.text.text(),
-                    color = when {
-                        status.failed -> MaterialTheme.colorScheme.error
-                        status.needsPermission -> p.accent
-                        plugin.enabled -> p.accent
-                        else -> p.t3
+                    // 配色只看 tone：未加载（NotLoaded）走灰，绝不与失败同色。
+                    color = when (status.tone) {
+                        RowTone.Failed -> MaterialTheme.colorScheme.error
+                        RowTone.NeedsPermission -> p.accent
+                        RowTone.Enabled -> p.accent
+                        RowTone.NotLoaded -> p.t3
+                        RowTone.Disabled -> p.t3
                     },
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     modifier = Modifier.padding(start = 8.dp, end = 4.dp),
                 )
                 // 开关是唯一的启停入口：它和上面这行文字读同一个 enabled，写同一个 values.<id>.enabled。
-                // 失败行不给开关：启用意图已经写进存储，失败来自加载，可点只会给假的可操作感。
+                // 只有失败行不给开关：启用意图已经写进存储，失败来自加载，可点只会给假的可操作感。
+                // 未加载行必须留着开关 —— 「未加载」的出路就是把它开起来（T9.27）。
                 Switch(
                     checked = plugin.enabled,
                     onCheckedChange = onToggle,
-                    enabled = !status.failed,
+                    enabled = status.tone != RowTone.Failed,
                 )
                 // 图钉 18dp、命中区 48dp：行内危险操作不能靠手指祈祷。
                 Box(
@@ -452,6 +461,32 @@ private fun PluginCard(
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
+                // 撤销入口只在展开区（T9.27/T9.25 补）：折叠行高度不变，破坏性动作也不会被误触。
+                if (plugin.enabled && granted.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(
+                                DesignR.string.plugins_perm_granted_list,
+                                granted.map { it.title() }.joinToString(" · "),
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = p.t3,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { revoking = granted.toList() }) {
+                            Text(
+                                stringResource(DesignR.string.plugins_perm_revoke),
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                    }
+                }
                 if (plugin.enabled) {
                     Spacer(Modifier.height(6.dp))
                     PluginBoundary(plugin.manifest.id) {
@@ -512,6 +547,40 @@ private fun PluginCard(
             },
             dismissButton = {
                 TextButton(onClick = { granting = false }) { Text(stringResource(DesignR.string.common_cancel)) }
+            },
+        )
+    }
+
+    // 撤销也要摊开：用户得看清这一下会拿走哪几项能力，而不是点完才发现插件瘫了。
+    if (revoking.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { revoking = emptyList() },
+            title = { Text(stringResource(DesignR.string.plugins_perm_revoke_title)) },
+            text = {
+                Column {
+                    Text(
+                        stringResource(DesignR.string.plugins_perm_revoke_body, plugin.manifest.name),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = p.t1,
+                    )
+                    revoking.forEach { perm ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(perm.title(), style = MaterialTheme.typography.bodyMedium, color = p.t1)
+                        Text(perm.hint(), style = MaterialTheme.typography.labelSmall, color = p.t3)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val take = revoking.toSet()
+                        revoking = emptyList()
+                        onRevoke(take)
+                    },
+                ) { Text(stringResource(DesignR.string.plugins_perm_revoke_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { revoking = emptyList() }) { Text(stringResource(DesignR.string.common_cancel)) }
             },
         )
     }

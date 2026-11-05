@@ -7,6 +7,7 @@ import dev.dsh.mobile.core.data.repo.ChatRepository
 import dev.dsh.mobile.core.data.settings.AppSettings
 import dev.dsh.mobile.core.data.settings.ModelProfile
 import dev.dsh.mobile.core.data.settings.ModelProbe
+import dev.dsh.mobile.core.data.settings.ModelProvider
 import dev.dsh.mobile.core.data.settings.probeContextLengths
 import dev.dsh.mobile.core.data.settings.ModelProviders
 import dev.dsh.mobile.core.data.settings.ModelStore
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -140,7 +142,15 @@ class AgentsViewModel(
         message.value = UiText.Res(DesignR.string.agents_default_set)
     }
 
-    fun providers() = ModelProviders.all()
+    /**
+     * 模型模板（内置 + 插件注册）。
+     *
+     * 插件模型源是运行期异步注册的，必须走 StateFlow 订阅：直接读 [ModelProviders.all] 只会拿到
+     * 组合那一刻的快照，插件晚一步注册就永远不出现在「添加模型」里（实测 CLIProxy 缺 chip）。
+     */
+    val providers: StateFlow<List<ModelProvider>> = ModelProviders.extraFlow
+        .map { ModelProviders.builtin + it }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ModelProviders.all())
 
     /**
      * 引擎插件上报的模型 id。宿主那边已经把「引擎没起来 / 插件没装」吞成空表，

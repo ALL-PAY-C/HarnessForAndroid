@@ -153,9 +153,9 @@ class RoomLedgerTest {
         ledger.mergeTasks(listOf(task("把导出功能加上去")), 1)
         ledger.addFact("结论：改用流式写文件", 1)
         val line = ledger.digest()
-        assertTrue(line.contains("未完成 1 条"))
+        assertTrue(line.contains("Unfinished 1 items"))
         assertTrue(line.contains("把导出功能加上去"))
-        assertTrue(line.contains("已记事实 1 条"))
+        assertTrue(line.contains("recorded facts 1 items"))
         assertTrue(line.length <= LEDGER_DIGEST_CHARS)
     }
 

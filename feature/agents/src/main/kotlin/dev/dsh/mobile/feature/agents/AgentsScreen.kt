@@ -101,6 +101,8 @@ fun AgentsScreen(
     onReconnect: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // 插件模型源可能晚于首帧注册，订阅后新注册的模板会立刻出现在「添加模型」横滑行里。
+    val providers by viewModel.providers.collectAsStateWithLifecycle()
     val p = LocalQq.current
     var editing by remember { mutableStateOf<ModelProfile?>(null) }
     var adding by remember { mutableStateOf(false) }
@@ -365,7 +367,7 @@ fun AgentsScreen(
     if (adding || editing != null) {
         ModelDialog(
             existing = editing,
-            providers = viewModel.providers(),
+            providers = providers,
             loadEngineModels = viewModel::loadEngineModelIds,
             onDismiss = {
                 adding = false

@@ -49,9 +49,9 @@ class EngineRouteTransportTest {
     @Test fun engineRouteWithoutBridgeFailsWithNotReadyHint() = runBlocking {
         val result = harness(baseUrl = "engine://deepseek-v4.1-flash", engineChat = null)
         assertNotNull(result.failure())
-        assertTrue(result.failure()!!, result.failure()!!.contains("引擎未就绪"))
+        assertTrue(result.failure()!!, result.failure()!!.contains("Engine not ready"))
         // 只有那一行失败提示：引擎没就绪时不能编出正文。
-        assertEquals("\n\n[请求失败] 引擎未就绪：先在插件页打开一次，让 :node 进程起来", result.text())
+        assertEquals("\n\n[Request failed] Engine not ready: open the plugin page once so the :node process starts", result.text())
     }
 
     @Test fun plainHttpBaseUrlNeverTouchesTheEngine() = runBlocking {
@@ -63,7 +63,7 @@ class EngineRouteTransportTest {
         )
         assertEquals(0, calls.size)
         assertNotNull(result.failure())
-        assertTrue(result.text(), result.text().contains("[请求失败]"))
+        assertTrue(result.text(), result.text().contains("[Request failed]"))
         assertFalse(result.text(), result.text().contains("不该出现"))
     }
 
@@ -83,7 +83,7 @@ class EngineRouteTransportTest {
         // 没有 engineRpc 时给同一句「引擎未就绪」，别抛别的错。
         val noRpc = transport(baseUrl = "engine://x", configuredModel = "m", engineChat = null, engineRpc = null)
         val e = runCatching { noRpc.engineModels() }.exceptionOrNull()
-        assertTrue(e?.message.orEmpty(), e?.message.orEmpty().contains("引擎未就绪"))
+        assertTrue(e?.message.orEmpty(), e?.message.orEmpty().contains("Engine not ready"))
     }
 
     // ---- 夹具 ----
@@ -91,7 +91,7 @@ class EngineRouteTransportTest {
     private class Outcome(val events: List<DshEvent>) {
         fun text() = events.filterIsInstance<DshEvent.MessageChunk>().joinToString("") { it.text }
         /** chat 侧把请求异常翻成「[请求失败] ...」正文，这里取出那一行做断言。 */
-        fun failure(): String? = text().takeIf { it.contains("[请求失败]") }?.removePrefix("\n\n")
+        fun failure(): String? = text().takeIf { it.contains("[Request failed]") }?.removePrefix("\n\n")
     }
 
     private fun transport(

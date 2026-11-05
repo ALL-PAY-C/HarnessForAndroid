@@ -54,7 +54,7 @@ class AgentThreadsCompactionTest {
         threads.setSummary("s", "任务：压缩上下文\n未完成：跑测试")
         val result = threads.assembleForSingleChat("s", 500, "sys", history, user, keepRecent = 2)
         // 摘要作为 system 消息排在保留尾部之前，而不是被当成普通历史丢掉。
-        val summaryIdx = result.messages.indexOfFirst { text(it).startsWith("上下文摘要") }
+        val summaryIdx = result.messages.indexOfFirst { text(it).startsWith("Context summary") }
         assertTrue(summaryIdx > 0)
         assertTrue(text(result.messages[summaryIdx]).contains("未完成：跑测试"))
         assertTrue(summaryIdx < result.messages.size - 2)

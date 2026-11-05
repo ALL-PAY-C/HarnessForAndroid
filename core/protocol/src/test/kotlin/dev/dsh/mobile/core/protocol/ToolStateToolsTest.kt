@@ -30,7 +30,7 @@ class ToolStateToolsTest {
         assertEquals(1, snap.doneCount)
         assertEquals("改装配", snap.runningTodo?.content)
         val detail = run.toolDetail("todo_write")
-        assertTrue(detail, detail.contains("已更新待办（2 条，1/2 完成）"))
+        assertTrue(detail, detail.contains("Todos updated (2 items, 1/2 done)"))
         assertTrue(detail, detail.contains("[x] 读上下文"))
         assertTrue(detail, detail.contains("[~] 改装配"))
     }
@@ -42,7 +42,7 @@ class ToolStateToolsTest {
         )
         assertFalse(run.transport.projections.snapshot("session").hasTodos)
         val detail = run.toolDetail("todo_write")
-        assertTrue(detail, detail.contains("[执行失败]"))
+        assertTrue(detail, detail.contains("[Execution failed]"))
     }
 
     @Test fun goalLifecycleLandsInProjection() = runBlocking {
@@ -69,7 +69,7 @@ class ToolStateToolsTest {
         val goal = run.transport.projections.snapshot("session").goal!!
         assertEquals("先建一个", goal.objective)
         assertEquals(ProjectedGoal.PHASE_ACTIVE, goal.phase)
-        assertTrue(run.toolDetail("goal"), run.toolDetail("goal").contains("版本冲突"))
+        assertTrue(run.toolDetail("goal"), run.toolDetail("goal").contains("Version conflict"))
     }
 
     @Test fun readOutputRefusesPathsOutsideSpillRoot() = runBlocking {
@@ -80,7 +80,7 @@ class ToolStateToolsTest {
             spill = ToolOutputSpill(rootProvider = { root }),
         )
         val detail = run.toolDetail("read_output")
-        assertTrue(detail, detail.contains("拒绝回读"))
+        assertTrue(detail, detail.contains("Refusing read-back"))
     }
 
     @Test fun hugeShellOutputGoesToDiskAndComesBackByOffset() = runBlocking {
@@ -96,7 +96,7 @@ class ToolStateToolsTest {
         )
         // 卡片和回灌模型的正文字段都是「头 + 尾 + locator」，不是 6000 字硬截断。
         val detail = run.toolDetail("shell")
-        assertTrue(detail, detail.contains("[工具输出已落盘]"))
+        assertTrue(detail, detail.contains("[Tool output spilled]"))
         assertTrue(detail, detail.contains("row-1"))
         assertTrue(detail, detail.contains("row-4000"))
         // 落盘文件按 400 行写全，read_output 能从中间接着读。
@@ -104,7 +104,7 @@ class ToolStateToolsTest {
         assertEquals(4000, spilled.readLines().size)
         // offset 是 0 起的行下标，header 里换算成真实的第几行。
         val mid = spill.read(spilled.absolutePath, offset = 99, limit = 2)
-        assertTrue(mid, mid.contains("本次返回第 100-101 行"))
+        assertTrue(mid, mid.contains("returning lines 100-101"))
         assertTrue(mid, mid.contains("row-100"))
         assertTrue(mid, mid.contains("row-101"))
     }

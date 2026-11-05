@@ -615,18 +615,25 @@ internal fun planGroupRound(
     val ordered = withPriority(orderForTurn(plan.members, userText, lastSpeakerId), priorityIds)
     val speakers = if (ordered.size <= MAX_GROUP_SPEAKERS) ordered else ordered.take(MAX_GROUP_SPEAKERS)
     val deferred = ordered.drop(speakers.size)
-    val notice = if (deferred.isEmpty()) {
-        null
-    } else {
-        "本轮 " + speakers.size + "/" + ordered.size + " 位发言，其余 " + deferred.size +
-            " 位下一轮优先（成员：" + deferred.joinToString("、") { it.name } + "）"
-    }
+    val notice = groupRoundNotice(speakers.size, ordered.size, deferred.map { it.name })
     return GroupRound(
         tasks = chainTasks(sessionId, speakers.map { it to "" }, shared, now),
         deferred = deferred.map { it.id },
         notice = notice,
     )
 }
+
+/**
+ * 本轮顺延提示：planGroupRound 与 [dev.dsh.mobile.core.protocol.group.LegacyScheduler] 共用同一份文案，
+ * 保证同一个现象不会有两种说法（两处实现各自拼串会漂）。
+ */
+internal fun groupRoundNotice(spoken: Int, candidates: Int, deferredNames: List<String>): String? =
+    if (deferredNames.isEmpty()) {
+        null
+    } else {
+        "This round " + spoken + "/" + candidates + " spoke; the other " + deferredNames.size +
+            " go first next round (members: " + deferredNames.joinToString(", ") + ")"
+    }
 
 /** 只要任务列表的老入口（点名单包 / 测试用）。 */
 internal fun planGroupTasks(

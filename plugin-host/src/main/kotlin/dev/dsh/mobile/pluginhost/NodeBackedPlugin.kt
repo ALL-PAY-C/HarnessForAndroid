@@ -127,10 +127,10 @@ open class NodeBackedPlugin(
             val candidates = plugins.filterNot { it is PluginLoadFailure }
             val runnable = candidates.filter(isEnabled)
             candidates.filterNot { it in runnable }.forEach { p ->
-                // T9.22 现状（本轮不区分）：「用户禁用 / 安全模式挡住」与「引擎真的加载失败」在
-                // 状态卡上都是同一张 Failed 卡片，只靠 stage 文案（disabled vs load/engine）区分，
-                // 插件管理行更是只看 loadError 有没有值 —— 禁用行没回执，失败行有回执，
-                // 但两者都没有「这是策略还是故障」的显式标记。要分开得加状态位，超出本次边界。
+                // 策略挡着（用户禁用 / 安全模式 / 权限没授全）不写宿主回执：Host 在 recompute 里
+                // 由启用意图自己推出 NotLoadedReason（Disabled / SafeMode / Permission），比这里
+                // 只看到 isEnabled=false 的盲猜更准。卡片仍给一张 Failed(stage=disabled)，
+                // 让人在插件自己的设置页也能看见「没跑」，但不污染插件管理行的失败态（T9.27）。
                 p.status.value = NodePluginStatus.Failed(stage = "disabled", message = "插件已禁用或处于安全模式", retryable = false)
             }
             if (runnable.isEmpty()) return
@@ -144,8 +144,10 @@ open class NodeBackedPlugin(
                 val msg = started.exceptionOrNull()?.message ?: "Node 引擎启动失败"
                 runnable.forEach { p ->
                     p.status.value = NodePluginStatus.Failed(stage = "engine", message = msg)
-                    // 引擎起不来也是真实的运行期失败：列表行要显示它，别继续挂「已启用」。
-                    host.noteLoadResult(p.spec.id, msg)
+                    // 引擎起不来不是插件的错，别记成 loadError（那会让行显示「加载失败」+ 把
+                    // 开关灰掉，用户无从下手）。记成「未加载 · 引擎不可用」：提示可操作，
+                    // 开关照旧可点 —— 引擎修好后一次重载/重试就会把它清掉（T9.27）。
+                    host.noteNotLoaded(p.spec.id, NotLoadedReason.EngineUnavailable)
                     host.refresh(p)
                 }
                 return

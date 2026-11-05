@@ -86,18 +86,21 @@ P0–P8 主体已落地并在模拟器上跑通：debug/release 均可构建出�
 取自规划书 §四 未归档行、§五 决策、§十一 已知坑。每条写现象、现在怎么绕、影响面。
 
 - **（已关闭）T7.6 / T7.7 归档回填**：2026-11-03 21:00 已写回规划书 §四。T7.6 产物 `D:\DSH\HFA-WORK\research\T76-topbar-audit.md`（68 行）逐页含判定与 file:line；T7.7 两处改动经核对仍在位——`feature/settings/src/main/kotlin/dev/dsh/mobile/feature/settings/SettingsScreen.kt:1195` 的 `SectionFrame(title = null, …)`，与 `feature/plugins/src/main/kotlin/dev/dsh/mobile/feature/plugins/PluginMarketScreen.kt:249` 注释「页级标题只由宿主顶栏给（PluginHubScreen 的 QqScreenTopBar『插件安装』）」；对应实机核对由 T7.9 的 5/5 PASS 承担。
-- **release 关闭 minify/shrink（Q1）**：`app/build.gradle.kts` 的 release 块 `isMinifyEnabled=false`、`isShrinkResources=false`。
-  - 现象：release 包约 110 MB。
-  - 绕法：不开混淆，理由写在 `app/proguard-rules.pro` 顶部——插件宿主反射装载、资源按字符串名查找，改名即崩。
-  - 影响面：分发体积大；要开混淆必须先解决反射与资源名依赖。
+- **release 已开 R8 与资源收缩（Q1 已执行，2026-11-05）**：`app/build.gradle.kts` release 块 `isMinifyEnabled = true`、`isShrinkResources = true`，keep 规则写在 `app/proguard-rules.pro` 八段（pluginapi/pluginhost 反射面、`**$Stub`、`@JavascriptInterface`、Rhino、kotlinx.serialization、Room、`**$WhenMappings` 等）。
+  - 实测：`assembleRelease` BUILD SUCCESSFUL 2m58s，产物 105,344,356 B（压缩前 116,897,440 B，−9.9%）；装机冷启 3896 ms。
+  - 实测：R8 包内模型保存、引擎 `ENGINE_REMOTE_READY`、流式回复、思考链折叠、工具调用、MCP `initialize/tools/list/tools/call`（回复「工具返回：echo:ping」）全部正常。
+  - 实测：内置插件 `HTML 渲染 / 示例 Hello / 示例 Whoami` 自检全 OK（`dsh.html selfcheck: OK 入口类可反射无参构造`），声明式 zip 插件 `pl.purge` 与市场 npm 插件 `dsh-auto-model-routing` 均装上并显示「已启用」。
+  - 影响面：新增对外部插件 dex 的命名约束——插件侧不得依赖被 R8 改名的宿主类名，宿主侧 keep 规则改动后必须重跑上述三条实测。
+
 - **签名双轨（Q2）**：默认 legacy 证书，新正式证书在仓库外。
   - 现象：不带参数构建得到的是 legacy 包，与已装旧包同证书。
   - 绕法：发布用 `-PdshSigning=release`；换证书的包在已装旧包设备上必须卸载或换 applicationId（构建期会打印这条 WARNING）。
   - 影响面：发布流程多一个必须记住的参数。
-- **不做 Root/Shizuku（Q4）**：只留接口。
-  - 现象：系统级操作只能走无障碍与运行时权限。
-  - 绕法：`phone` 动作面加三档授权弹窗覆盖可及范围。
-  - 影响面：无障碍能力之外的场景（系统级注入、越过权限模型的点击）做不到。
+- **Root / Shizuku（Q4 已执行）**：`toolbridge` 依赖 `dev.rikka.shizuku:api` 与 `:provider` 13.1.5，合并清单含 `rikka.shizuku.ShizukuProvider` 与 `moe.shizuku.manager.permission.API_V23`；`Channels.kt` 负责 binder 授予与 `requestPermission`，设置页展示三态并给授权入口；无 Shizuku 时回退 Root(su)，无 su 时回退 App shell。
+  - 现象：模拟器无 root、未装 Shizuku，只能验证到第三档「App shell 当前」。
+  - 绕法：真机装 Shizuku 后走同一套 `requestPermission` 流程。
+  - 影响面：系统级注入与跨应用点击在没有 Shizuku/Root 的设备上仍受限于无障碍与运行时权限。
+
 - **截图回图的轮内限制（T4.4）**：`role=tool` 的消息放不进 image part。
   - 现象：同一轮工具循环内看不到刚截的图，裁剪也未做。
   - 绕法：降采样加 `PendingImageQueue` 注入下一轮 user part。

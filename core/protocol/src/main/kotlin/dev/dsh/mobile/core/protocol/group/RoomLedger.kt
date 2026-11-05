@@ -250,14 +250,14 @@ internal class RoomLedger(private val sessionId: String) {
         val open = openItems()
         if (open.isEmpty() && questions.isEmpty() && facts.isEmpty()) return ""
         val sb = StringBuilder()
-        sb.append("未完成 ").append(open.size).append(" 条")
-        if (open.isNotEmpty()) sb.append("：").append(open.take(3).joinToString("；") { it.title })
-        sb.append("；未解问题 ").append(questions.size).append(" 条")
+        sb.append("Unfinished ").append(open.size).append(" items")
+        if (open.isNotEmpty()) sb.append(": ").append(open.take(3).joinToString("; ") { it.title })
+        sb.append("; open questions ").append(questions.size).append(" items")
         if (questions.isNotEmpty()) {
-            sb.append("：").append(questions.values.take(2).joinToString("；") { it.title })
+            sb.append(": ").append(questions.values.take(2).joinToString("; ") { it.title })
         }
-        sb.append("；已记事实 ").append(facts.size).append(" 条")
-        sb.append("；完成 ").append(doneTotal).append(" 条；打回 ").append(reworks).append(" 次")
+        sb.append("; recorded facts ").append(facts.size).append(" items")
+        sb.append("; done ").append(doneTotal).append(" items; sent back ").append(reworks).append(" times")
         return if (sb.length <= LEDGER_DIGEST_CHARS) sb.toString()
         else sb.substring(0, LEDGER_DIGEST_CHARS - 1) + "…"
     }

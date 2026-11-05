@@ -53,7 +53,7 @@ class ProcessLineChannel(
     }
 
     override suspend fun send(line: String) {
-        val w = writer ?: throw IllegalStateException("运行时未启动")
+        val w = writer ?: throw IllegalStateException("runtime not started")
         w.write(line)
         w.write("\n")
         w.flush()

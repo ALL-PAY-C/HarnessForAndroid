@@ -62,8 +62,8 @@ class SubagentToolTest {
     fun labelFallsBackToDefault() {
         val transport = transport()
         assertEquals("查日志", transport.subagentLabel(buildJsonObject { put("name", "查日志") }))
-        assertEquals("子代理", transport.subagentLabel(JsonObject(emptyMap())))
-        assertEquals("子代理", transport.subagentLabel(buildJsonObject { put("name", "   ") }))
+        assertEquals("Subagent", transport.subagentLabel(JsonObject(emptyMap())))
+        assertEquals("Subagent", transport.subagentLabel(buildJsonObject { put("name", "   ") }))
     }
 
     @Test

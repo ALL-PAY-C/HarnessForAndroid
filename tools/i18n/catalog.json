@@ -6239,6 +6239,36 @@
     "where": "PluginsScreen.kt"
   },
   {
+    "key": "plugins_perm_granted_list",
+    "en": "Granted: %1$s",
+    "zh": "已授权：%1$s",
+    "where": "PluginsScreen.kt"
+  },
+  {
+    "key": "plugins_perm_revoke",
+    "en": "Revoke",
+    "zh": "撤销授权",
+    "where": "PluginsScreen.kt"
+  },
+  {
+    "key": "plugins_perm_revoke_title",
+    "en": "Revoke permissions?",
+    "zh": "撤销授权？",
+    "where": "PluginsScreen.kt"
+  },
+  {
+    "key": "plugins_perm_revoke_body",
+    "en": "%1$s stops running right away and keeps these abilities off until you grant again:",
+    "zh": "%1$s 会立刻停止运行，在你重新授予之前这些能力保持关闭：",
+    "where": "PluginsScreen.kt"
+  },
+  {
+    "key": "plugins_perm_revoke_confirm",
+    "en": "Revoke",
+    "zh": "撤销",
+    "where": "PluginsScreen.kt"
+  },
+  {
     "key": "plugins_perm_shell_title",
     "en": "Run shell commands",
     "zh": "执行命令",
@@ -6290,6 +6320,30 @@
     "key": "plugins_row_load_failed",
     "en": "Load failed",
     "zh": "加载失败",
+    "where": "PluginHubRows.kt"
+  },
+  {
+    "key": "plugins_row_not_loaded",
+    "en": "Not loaded · %1$s",
+    "zh": "未加载 · %1$s",
+    "where": "PluginHubRows.kt"
+  },
+  {
+    "key": "plugins_reason_safe_mode_short",
+    "en": "blocked by safe mode",
+    "zh": "被安全模式挡住",
+    "where": "PluginHubRows.kt"
+  },
+  {
+    "key": "plugins_reason_engine_unavailable",
+    "en": "Node engine unavailable",
+    "zh": "Node 引擎不可用",
+    "where": "PluginHubRows.kt"
+  },
+  {
+    "key": "plugins_reason_not_started",
+    "en": "not started yet",
+    "zh": "尚未启动",
     "where": "PluginHubRows.kt"
   },
   {

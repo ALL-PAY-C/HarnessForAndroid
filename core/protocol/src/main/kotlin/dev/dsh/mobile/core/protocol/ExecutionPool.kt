@@ -159,7 +159,7 @@ class ExecutionPool(
         }
         val toCancel = synchronized(lock) { targets.mapNotNull { jobs[it.id] } }
         // 先同步改状态：cancel() 返回后就不该再有 Running（协程收尾是异步的）。
-        targets.forEach { finish(it, TaskState.Cancelled, null, "已取消") }
+        targets.forEach { finish(it, TaskState.Cancelled, null, "Cancelled") }
         toCancel.forEach { it.cancel() }
         releaseWaiting(sessionId)
     }
@@ -184,14 +184,14 @@ class ExecutionPool(
             owners[request.requestId] = task
         }
         current(task)?.let { updateTask(it.copy(state = TaskState.WaitingPermission)) }
-        setAgent(task, AgentRunState.WaitingPermission, "等待用户确认")
+        setAgent(task, AgentRunState.WaitingPermission, "Waiting for your confirmation")
         return try {
             emit(AgentEvent.PermissionRequested(task.id, owned))
             permissionEvent(DshEvent.Permission(task.sessionId, owned))
             withTimeoutOrNull(180_000L) { deferred.await() }.also {
                 current(task)?.takeIf { it.state == TaskState.WaitingPermission }?.let { current ->
                     updateTask(current.copy(state = TaskState.Running))
-                    setAgent(task, AgentRunState.Thinking, "权限等待结束，继续执行")
+                    setAgent(task, AgentRunState.Thinking, "Permission wait over, resuming")
                 }
             }
         } finally {
@@ -218,13 +218,13 @@ class ExecutionPool(
         val task = synchronized(lock) { owners[requestId] } ?: return PermissionOutcome.Unknown
         if (sessionId != null && sessionId != task.sessionId) return PermissionOutcome.Unknown
         if (agentId != null && agentId != task.agentId) {
-            return PermissionOutcome.Rejected("不是你的提问，忽略")
+            return PermissionOutcome.Rejected("Not your request; ignored")
         }
         val deferred = synchronized(lock) { waiting.remove(requestId) } ?: return PermissionOutcome.Unknown
         if (!deferred.complete(optionId)) return PermissionOutcome.Unknown
         current(task)?.takeUnless { isTerminalTaskState(it.state) }?.let {
             updateTask(it.copy(state = TaskState.Running))
-            setAgent(task, AgentRunState.Thinking, "权限已确认，继续执行")
+            setAgent(task, AgentRunState.Thinking, "Permission granted, resuming")
             emit(AgentEvent.PermissionResolved(task.id, requestId, optionId))
         }
         return PermissionOutcome.Accepted
@@ -263,7 +263,7 @@ class ExecutionPool(
                 _tasks.value.filter { it.state == TaskState.Queued && hasDeadDependency(it) }
             }
             if (dead.isEmpty()) break
-            dead.forEach { finish(it, TaskState.Skipped, "上游任务失败或已取消，跳过", null) }
+            dead.forEach { finish(it, TaskState.Skipped, "Upstream task failed or was cancelled; skipped", null) }
         }
         // 2) 在并行上限内启动依赖已满足的任务。
         val batch = synchronized(lock) { pickRunnable() }
@@ -313,7 +313,7 @@ class ExecutionPool(
         if (cur.state != TaskState.Queued) return
         val started = cur.copy(state = TaskState.Running, startedAt = System.currentTimeMillis())
         updateTask(started)
-        setAgent(started, AgentRunState.Thinking, "开始执行")
+        setAgent(started, AgentRunState.Thinking, "Started")
         emit(AgentEvent.TaskStarted(started))
         // LAZY + 先登记 job 再 start：避免协程同步跑完时 jobs 里还留着一个已结束的句柄。
         val job = scope.launch(start = CoroutineStart.LAZY) {
@@ -321,16 +321,16 @@ class ExecutionPool(
                 val output = runner(started)
                 val done = started.copy(state = TaskState.Done, finishedAt = System.currentTimeMillis())
                 updateTask(done)
-                setAgent(started, AgentRunState.Done, "已完成")
+                setAgent(started, AgentRunState.Done, "Done")
                 emit(AgentEvent.TaskFinished(done, output))
             } catch (c: CancellationException) {
-                finish(started, TaskState.Cancelled, null, "已取消")
+                finish(started, TaskState.Cancelled, null, "Cancelled")
                 if (!currentCoroutineContext().isActive) throw c
             } catch (t: Throwable) {
                 // 失败文本同时进 task.error 与 TaskFailed 事件，UI 能直接看到；
                 // 这里只补一行进程日志（不引 android.util.Log，纯 JVM 单测可跑）。
                 System.err.println("[ExecutionPool] task " + started.id + " failed: " + t.message)
-                finish(started, TaskState.Failed, t.message ?: "执行失败", null)
+                finish(started, TaskState.Failed, t.message ?: "Execution failed", null)
             } finally {
                 synchronized(lock) { jobs.remove(started.id) }
                 complete(started.id)
@@ -355,7 +355,7 @@ class ExecutionPool(
             note ?: error.orEmpty(),
         )
         when (state) {
-            TaskState.Failed -> emit(AgentEvent.TaskFailed(done, error ?: "执行失败"))
+            TaskState.Failed -> emit(AgentEvent.TaskFailed(done, error ?: "Execution failed"))
             TaskState.Cancelled, TaskState.Skipped -> emit(AgentEvent.TaskFailed(done, error ?: state.name))
             else -> emit(AgentEvent.TaskFinished(done, ""))
         }

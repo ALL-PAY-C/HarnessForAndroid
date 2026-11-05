@@ -1046,6 +1046,11 @@ Write unit tests</string>
     <string name="plugins_perm_dialog_title">This plugin needs permission</string>
     <string name="plugins_perm_dialog_body">%1$s will be able to:</string>
     <string name="plugins_perm_allow">Allow</string>
+    <string name="plugins_perm_granted_list">Granted: %1$s</string>
+    <string name="plugins_perm_revoke">Revoke</string>
+    <string name="plugins_perm_revoke_title">Revoke permissions?</string>
+    <string name="plugins_perm_revoke_body">%1$s stops running right away and keeps these abilities off until you grant again:</string>
+    <string name="plugins_perm_revoke_confirm">Revoke</string>
     <string name="plugins_perm_shell_title">Run shell commands</string>
     <string name="plugins_perm_shell_hint">Run shell commands on this device</string>
     <string name="plugins_perm_phone_control_title">Control the phone</string>
@@ -1055,6 +1060,10 @@ Write unit tests</string>
     <string name="plugins_perm_workspace_title">Workspace files</string>
     <string name="plugins_perm_workspace_hint">Read and write files in the plugin workspace</string>
     <string name="plugins_row_load_failed">Load failed</string>
+    <string name="plugins_row_not_loaded">Not loaded · %1$s</string>
+    <string name="plugins_reason_safe_mode_short">blocked by safe mode</string>
+    <string name="plugins_reason_engine_unavailable">Node engine unavailable</string>
+    <string name="plugins_reason_not_started">not started yet</string>
     <string name="plugins_reason_safe_mode">blocked by safe mode — exit it above, then re-enable</string>
     <string name="plugins_safe_mode_block">Safe mode: third-party plugins are paused after repeated boot failures</string>
     <string name="plugins_safe_mode_exit">Exit safe mode</string>

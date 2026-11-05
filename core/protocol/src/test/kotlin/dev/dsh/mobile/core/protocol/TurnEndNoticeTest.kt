@@ -20,7 +20,7 @@ class TurnEndNoticeTest {
     fun `exhaustion notice uses the supplied limit`() {
         for (maxRounds in listOf(12, 64)) {
             val notice = turnEndNotice("stop", 0, null, true, maxRounds)
-            assertTrue(notice!!.contains("上限 $maxRounds"))
+            assertTrue(notice!!.contains("limit $maxRounds"))
         }
     }
 
@@ -54,8 +54,8 @@ class TurnEndNoticeTest {
             roundsExhausted = true,
             maxRounds = 64,
         )
-        assertTrue(notice!!.startsWith("[本轮未完成]"))
-        assertTrue(notice.contains("上限 64"))
+        assertTrue(notice!!.startsWith("[Turn incomplete]"))
+        assertTrue(notice.contains("limit 64"))
     }
 
     @Test
@@ -68,7 +68,7 @@ class TurnEndNoticeTest {
             maxRounds = 64,
             loopDetail = "同一命令连续执行 3 次",
         )
-        assertTrue(notice!!.startsWith("[已中止]"))
+        assertTrue(notice!!.startsWith("[Stopped]"))
         assertTrue(notice.contains("同一命令连续执行 3 次"))
     }
 
@@ -81,7 +81,7 @@ class TurnEndNoticeTest {
             roundsExhausted = false,
             maxRounds = 64,
         )
-        assertTrue(notice!!.startsWith("[工具失败]"))
+        assertTrue(notice!!.startsWith("[Tool failed]"))
         assertTrue(notice.contains("gradle assembleDebug"))
         assertTrue(notice.contains("执行超时"))
     }
@@ -95,15 +95,15 @@ class TurnEndNoticeTest {
             roundsExhausted = false,
             maxRounds = 64,
         )
-        assertTrue(notice!!.contains("上游返回了空内容"))
+        assertTrue(notice!!.contains("Upstream returned empty content"))
     }
 
     @Test
     fun `failure trace flattens newlines and truncates`() {
         val trace = toolFailureTrace("a".repeat(80) + "\nsecond", "boom\nboom")
-        assertEquals(60 + 1 + "boom boom".length, trace.length)
+        assertEquals(60 + 2 + "boom boom".length, trace.length)
         assertTrue(trace.startsWith("a".repeat(60)))
-        assertTrue(trace.endsWith("：boom boom"))
-        assertEquals("（空命令）：未知错误", toolFailureTrace("   ", null))
+        assertTrue(trace.endsWith(": boom boom"))
+        assertEquals("(empty command): unknown error", toolFailureTrace("   ", null))
     }
 }

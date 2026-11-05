@@ -74,8 +74,8 @@ class WebSocketChannel(
     }
 
     override suspend fun send(line: String) {
-        val socket = ws ?: throw IllegalStateException("WebSocket 未连接")
-        if (!socket.send(line)) throw IllegalStateException("发送失败")
+        val socket = ws ?: throw IllegalStateException("WebSocket is not connected")
+        if (!socket.send(line)) throw IllegalStateException("send failed")
     }
 
     override suspend fun close() {

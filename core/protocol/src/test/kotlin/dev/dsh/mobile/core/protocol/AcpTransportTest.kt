@@ -230,7 +230,7 @@ class AcpTransportTest {
 
         val thrown = err.await()
         assertTrue("expected IllegalStateException but got $thrown", thrown is IllegalStateException)
-        assertTrue("message 应含终态消费超时", thrown?.message?.contains("终态消费超时") == true)
+        assertTrue("message 应含终态消费超时", thrown?.message?.contains("Timed out consuming the terminal state") == true)
         transport.disconnect()
     }
 

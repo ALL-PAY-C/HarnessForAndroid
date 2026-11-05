@@ -261,7 +261,7 @@ class McpToolSourceTest {
         val executors: Map<String, suspend (JsonObject) -> String> = mapOf("shell" to { _ -> "ok" })
         val result = ToolExecutor(executors).run("brand_new_tool", JsonObject(emptyMap()))
 
-        assertEquals("未知工具：brand_new_tool（已注册：shell）", result.error)
+        assertEquals("Unknown tool: brand_new_tool (registered: shell)", result.error)
     }
 
     // ── 空闲回收：只断连接，工具声明不能消失（静默失效回归） ─────────────────────

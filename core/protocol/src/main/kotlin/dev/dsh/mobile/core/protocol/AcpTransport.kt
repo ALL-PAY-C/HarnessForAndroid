@@ -118,10 +118,10 @@ class AcpTransport(
     }
 
     override suspend fun disconnect() {
-        mux.stop("已断开")
+        mux.stop("Disconnected")
         // N-2/Q5：唤醒所有在 ack.await() 上等待的 prompt，避免断线期 30s 空等 + turnAcks 泄漏。
         // 注意：这只释放等待，不代表远端旧任务 settled —— 阻塞标记(quarantine)由 repo 层保留。
-        turnAcks.values.forEach { it.completeExceptionally(IllegalStateException("已断开")) }
+        turnAcks.values.forEach { it.completeExceptionally(IllegalStateException("Disconnected")) }
         turnAcks.clear()
         _state.value = RuntimeState.NotConfigured
     }
@@ -133,11 +133,11 @@ class AcpTransport(
     private fun MuxPhase.toRuntimeState(): RuntimeState = when (this) {
         MuxPhase.Idle -> RuntimeState.NotConfigured
         is MuxPhase.Connecting ->
-            if (attempt == 1) RuntimeState.Starting("连接中") else RuntimeState.Reconnecting(attempt, "重连中")
+            if (attempt == 1) RuntimeState.Starting("Connecting") else RuntimeState.Reconnecting(attempt, "Reconnecting")
         is MuxPhase.Reconnecting -> RuntimeState.Reconnecting(attempt, reason)
         is MuxPhase.Ready -> RuntimeState.Ready(kind, "${generation.hostName} ${generation.hostVersion}".trim())
         is MuxPhase.Failed ->
-            RuntimeState.Failed(if (attemptsExhausted) "重连失败：$reason" else reason, retryable = true)
+            RuntimeState.Failed(if (attemptsExhausted) "Reconnect failed: $reason" else reason, retryable = true)
     }
 
     // ------------------------------------------------------------------ inbound
@@ -184,7 +184,7 @@ class AcpTransport(
     private fun parseToolCall(sid: String, up: JsonObject) {
         val call = ToolCall(
             id = up.str("toolCallId") ?: up.str("id") ?: return,
-            title = up.str("title") ?: up.str("kind") ?: "工具调用",
+            title = up.str("title") ?: up.str("kind") ?: "Tool call",
             kind = up.str("kind") ?: "",
             status = when (up.str("status")) {
                 "completed" -> ToolCall.ToolStatus.Completed
@@ -236,7 +236,7 @@ class AcpTransport(
         } ?: emptyList()
         val reqId = rpcId?.toString() ?: mux.nextRequestId().toString()
         if (rpcId != null) mux.registerApproval(reqId, rpcId)
-        val title = params.obj("toolCall")?.str("title") ?: "请求权限"
+        val title = params.obj("toolCall")?.str("title") ?: "Permission request"
         sink.emit(DshEvent.Permission(sid, PermissionRequest(sid, reqId, title, options)))
     }
 
@@ -369,7 +369,7 @@ class AcpTransport(
                     ack.await()
                 }
             } catch (e: TimeoutCancellationException) {
-                throw IllegalStateException("终态消费超时（collector 未 ACK）", e)
+                throw IllegalStateException("Timed out consuming the terminal state (collector did not ACK)", e)
             } finally {
                 turnAcks.remove(turnId)
             }
@@ -419,12 +419,12 @@ class AcpTransport(
     override suspend fun replyPermission(sessionId: String, requestId: String, optionId: String?) {
         val rpcId = mux.takeApproval(requestId)
             ?: run {
-                AppLog.w("未知 permission requestId=$requestId：已答复或连接重建后 requestId 失效")
-                throw IllegalStateException("未知 permission requestId=$requestId")
+                AppLog.w("Unknown permission requestId=$requestId: already answered, or invalidated by a connection rebuild")
+                throw IllegalStateException("Unknown permission requestId=$requestId")
             }
         if (!mux.isAttached) {
-            AppLog.w("未连接，无法答复 permission requestId=$requestId")
-            throw IllegalStateException("未连接，无法答复 permission requestId=$requestId")
+            AppLog.w("Not connected; cannot answer permission requestId=$requestId")
+            throw IllegalStateException("Not connected; cannot answer permission requestId=$requestId")
         }
         mux.sendResult(
             rpcId,

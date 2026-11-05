@@ -27,7 +27,7 @@ class GroupOrchestrationTest {
         assertEquals("其余 3 位必须被记下来", 3, round.deferred.size)
         val notice = round.notice.orEmpty()
         assertTrue("说明要有 4/7：<" + notice + ">", notice.contains("4/7"))
-        assertTrue("说明要点出 3 位：<" + notice + ">", notice.contains("其余 3 位"))
+        assertTrue("说明要点出 3 位：<" + notice + ">", notice.contains("the other 3"))
         val deferredNames = plan.members.filter { it.id in round.deferred }.map { it.name }
         assertTrue("说明要点名：<" + notice + ">", deferredNames.all { notice.contains(it) })
     }

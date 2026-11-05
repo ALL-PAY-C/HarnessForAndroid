@@ -69,7 +69,7 @@ class SkillToolTest {
         val result = transportNoSkill().toolRunner.run("skill", buildJsonObject { put("name", "alpha") })
 
         // 没接线时给一句人话，而不是空串或异常堆栈。
-        assertTrue(result.output, result.output.contains("技能未接入"))
+        assertTrue(result.output, result.output.contains("skills are not wired up"))
     }
 
     private fun nameOf(element: JsonElement): String? =

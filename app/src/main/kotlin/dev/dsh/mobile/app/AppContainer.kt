@@ -688,7 +688,9 @@ class AppContainer(
      * 那是共享模型层，不是插件层。
      */
     private fun syncPluginModelSources(host: PluginHost) {
-        host.modelSources().forEach { src ->
+        val sources = host.modelSources()
+        AppLog.i("MODEL_SOURCES " + sources.joinToString(",") { it.id + "=" + it.baseUrl })
+        sources.forEach { src ->
             ModelProviders.register(object : ModelProvider {
                 override val id: String = src.id
                 override val label: String = src.label

@@ -157,7 +157,7 @@ class DshMux(
         connect(attempt = 1)
     }
 
-    suspend fun stop(reason: String = "已断开") {
+    suspend fun stop(reason: String = "Disconnected") {
         stopped = true
         reconnectJob?.cancel()
         frameJob?.cancel()
@@ -177,7 +177,7 @@ class DshMux(
             throw c
         } catch (t: Throwable) {
             AppLog.w("channel open failed: ${t.message}")
-            scheduleReconnect(attempt, t.message ?: "连接失败")
+            scheduleReconnect(attempt, t.message ?: "Connection failed")
             return
         }
         attached = true
@@ -187,7 +187,7 @@ class DshMux(
             throw c
         } catch (t: Throwable) {
             AppLog.w("initialize failed: ${t.message}")
-            scheduleReconnect(attempt, t.message ?: "初始化失败")
+            scheduleReconnect(attempt, t.message ?: "Initialization failed")
             return
         }
         val g = MuxGeneration(

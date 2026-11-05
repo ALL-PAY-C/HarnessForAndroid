@@ -3,6 +3,7 @@ package dev.dsh.mobile.feature.plugins
 import dev.dsh.mobile.pluginapi.SlotContribution
 import dev.dsh.mobile.design.UiText
 import dev.dsh.mobile.design.R
+import dev.dsh.mobile.pluginhost.NotLoadedReason
 
 /**
  * 插件中心列表的拼装逻辑。刻意放在独立文件、且不 import 任何 Compose 类型：
@@ -57,7 +58,35 @@ internal data class PluginRowStatus(
      * 与 [failed] 互斥：授权没给不是插件坏了，把它画成「加载失败」用户会去查日志而不是点「授予」。
      */
     val needsPermission: Boolean = false,
+    /**
+     * 第四态（T9.27）：宿主没让它跑，原因见 [NotLoadedReason]。
+     *
+     * 与 [failed] 互斥且优先级低于它：真跑过又失败的（[loadError] 非空）仍是失败态；
+     * 压根没跑的只是「未加载」，行不标红、开关不禁用 —— 用户要做的是开开关/退安全模式，
+     * 而不是去翻一份不存在的错误原文。
+     */
+    val notLoadedReason: NotLoadedReason? = null,
+    /** 配色（按 [RowTone] 分组），与文案分开判定，UI 不再自己拼 if-else。 */
+    val tone: RowTone = RowTone.Enabled,
 )
+
+/** 一行的视觉分组。文案说「发生什么」，本枚举说「画成什么颜色」。 */
+internal enum class RowTone {
+    /** 真跑过又失败：红。 */
+    Failed,
+
+    /** 缺授权：主题强调色（可操作，不是错误）。 */
+    NeedsPermission,
+
+    /** 正常在跑。 */
+    Enabled,
+
+    /** 未加载（原因明确、可恢复）：灰。绝不与 [Failed] 同色。 */
+    NotLoaded,
+
+    /** 用户自己关的。 */
+    Disabled,
+}
 
 /**
  * 三态优先级：加载失败 > 需授权 > 启用/停用。
@@ -70,14 +99,46 @@ internal fun pluginRowStatus(
     loadError: String?,
     limit: Int = LOAD_ERROR_MAX_CHARS,
     needsPermission: Boolean = false,
+    /** 宿主给出的「没在跑」原因（[dev.dsh.mobile.pluginhost.LoadedPlugin.notLoadedReason]）。 */
+    notLoaded: NotLoadedReason? = null,
 ): PluginRowStatus {
     val error = loadError?.trim()?.takeIf { it.isNotEmpty() }
     if (error != null) {
         val clipped = if (error.length <= limit) error else error.take(limit) + "…"
-        return PluginRowStatus(UiText.Res(R.string.plugins_row_load_failed), true, clipped)
+        return PluginRowStatus(UiText.Res(R.string.plugins_row_load_failed), true, clipped, tone = RowTone.Failed)
     }
-    if (needsPermission) return PluginRowStatus(UiText.Res(R.string.plugins_perm_needs), false, null, needsPermission = true)
-    return PluginRowStatus(if (enabled) UiText.Res(R.string.plugins_row_enabled) else UiText.Res(R.string.plugins_row_disabled), false, null)
+    if (needsPermission) {
+        return PluginRowStatus(
+            UiText.Res(R.string.plugins_perm_needs), false, null,
+            needsPermission = true, tone = RowTone.NeedsPermission,
+        )
+    }
+    // Disabled 不单独走一条：它本来就是「没在跑」的默认态，文案沿用「已停用」。
+    if (notLoaded != null && notLoaded != NotLoadedReason.Disabled) {
+        return PluginRowStatus(
+            notLoadedText(notLoaded), false, null,
+            notLoadedReason = notLoaded, tone = RowTone.NotLoaded,
+        )
+    }
+    return PluginRowStatus(
+        if (enabled) UiText.Res(R.string.plugins_row_enabled) else UiText.Res(R.string.plugins_row_disabled),
+        false, null, tone = if (enabled) RowTone.Enabled else RowTone.Disabled,
+    )
+}
+
+/**
+ * 「未加载 · <原因>」的文案。原因走资源而不是错误原文：这是宿主策略/环境状态，
+ * 不是插件自己的报错，用户看的是「下一步做什么」。
+ */
+internal fun notLoadedText(reason: NotLoadedReason): UiText = when (reason) {
+    NotLoadedReason.SafeMode ->
+        UiText.Res(R.string.plugins_row_not_loaded, listOf(UiText.Res(R.string.plugins_reason_safe_mode_short)))
+    NotLoadedReason.EngineUnavailable ->
+        UiText.Res(R.string.plugins_row_not_loaded, listOf(UiText.Res(R.string.plugins_reason_engine_unavailable)))
+    NotLoadedReason.NotStarted ->
+        UiText.Res(R.string.plugins_row_not_loaded, listOf(UiText.Res(R.string.plugins_reason_not_started)))
+    NotLoadedReason.Permission -> UiText.Res(R.string.plugins_perm_needs)
+    NotLoadedReason.Disabled -> UiText.Res(R.string.plugins_row_disabled)
 }
 
 /**

@@ -77,7 +77,7 @@ class StreamInterruptionTest {
             val body = text(events)
             assertFalse("正文不能带未闭合标记: " + body, body.contains("tool_call"))
             assertTrue("正文保留可见部分: " + body, body.contains("正在搜索"))
-            assertTrue("要能看见截断提示: " + body, body.contains("截断"))
+            assertTrue("要能看见截断提示: " + body, body.contains("truncated"))
             val turnEnd = end(events)
             assertEquals("truncated", turnEnd.reason)
             assertTrue(turnEnd.truncatedToolCall)

@@ -189,7 +189,7 @@ class PersonaGuardTest {
                 engineChat = { JSONObject("""{"ok":false}""") },
             )
             val text = outcome.text()
-            assertTrue(text, text.contains("HTTP 401 鉴权失败（API Key 无效"))
+            assertTrue(text, text.contains("HTTP 401 — authentication failed"))
             assertTrue(text, text.contains("authentication_error"))
             assertFalse(text, text.contains("本轮没有产生任何回复"))
         } finally {

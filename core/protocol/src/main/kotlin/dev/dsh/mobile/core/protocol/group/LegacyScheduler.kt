@@ -3,6 +3,7 @@ package dev.dsh.mobile.core.protocol.group
 import dev.dsh.mobile.core.protocol.GroupMember
 import dev.dsh.mobile.core.protocol.GroupPlan
 import dev.dsh.mobile.core.protocol.MAX_GROUP_SPEAKERS
+import dev.dsh.mobile.core.protocol.groupRoundNotice
 import dev.dsh.mobile.core.protocol.orderForTurn
 import dev.dsh.mobile.core.protocol.withPriority
 
@@ -32,21 +33,16 @@ class LegacyScheduler(
     override suspend fun next(room: RoomView): SchedulerDecision {
         val ordered = speakerOrder(room)
         if (ordered.isEmpty()) {
-            return SchedulerDecision.Done("旧调度：房间里没有可发言的成员")
+            return SchedulerDecision.Done("Legacy scheduler: no member in the room can speak")
         }
         val speakers = ordered.take(MAX_GROUP_SPEAKERS)
         val deferred = ordered.drop(speakers.size)
         // 文案与 planGroupRound 的 notice 逐字一致：同一个现象不能有两种说法。
-        val notice = if (deferred.isEmpty()) {
-            null
-        } else {
-            "本轮 " + speakers.size + "/" + ordered.size + " 位发言，其余 " + deferred.size +
-                " 位下一轮优先（成员：" + deferred.joinToString("、") { it.name } + "）"
-        }
+        val notice = groupRoundNotice(speakers.size, ordered.size, deferred.map { it.name })
         return if (speakers.size == 1) {
-            SchedulerDecision.NextSpeaker(speakers.first().id, notice ?: "旧调度：本轮只有一位候选")
+            SchedulerDecision.NextSpeaker(speakers.first().id, notice ?: "Legacy scheduler: only one candidate this round")
         } else {
-            SchedulerDecision.Roundtable(notice ?: "旧调度：全员按现有轮转顺序发言")
+            SchedulerDecision.Roundtable(notice ?: "Legacy scheduler: everyone speaks in the existing rotation order")
         }
     }
 }

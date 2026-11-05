@@ -278,8 +278,10 @@ android {
             signingConfig = activeSigning
         }
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // T9.28：R8 + 资源收缩开启。keep 规则见 proguard-rules.pro 顶部说明
+            // （插件契约 / AIDL / Rhino / 序列化 / Room 五处动态查找面）。
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = activeSigning
         }

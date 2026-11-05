@@ -59,7 +59,7 @@ class ToolLoopGuard(
             return ToolVerdict.Loop(
                 signature = signature,
                 count = count,
-                detail = "检测到重复调用：${signature.name} ${signature.args.take(160)} 在 ${windowMs / 1000} 秒内出现 $count 次，已结束本轮",
+                detail = "Repeated call detected: ${signature.name} ${signature.args.take(160)} appeared $count times within ${windowMs / 1000}s; this turn was stopped",
             )
         }
         window.addLast(key to now)
@@ -70,7 +70,7 @@ class ToolLoopGuard(
             return ToolVerdict.Reuse(
                 occurrence = occurrence,
                 cachedOutput = cached,
-                detail = "复用第 $occurrence 次结果：${signature.name} ${signature.args.take(120)}",
+                detail = "Reused the result from occurrence $occurrence: ${signature.name} ${signature.args.take(120)}",
             )
         }
         return ToolVerdict.Execute(occurrence)

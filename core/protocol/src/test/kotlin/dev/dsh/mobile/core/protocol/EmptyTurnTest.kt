@@ -30,14 +30,14 @@ class EmptyTurnTest {
     @Test
     fun upstreamErrorFieldIsTheReason() {
         val reason = upstreamEmptyReason(json("""{"error":{"message":"rate limit exceeded"}}"""), null)
-        assertTrue(reason, reason.contains("上游报错"))
+        assertTrue(reason, reason.contains("Upstream error"))
         assertTrue(reason, reason.contains("rate limit exceeded"))
     }
 
     @Test
     fun missingChoicesIsTheReason() {
-        assertTrue(upstreamEmptyReason(json("""{"id":"x"}"""), null).contains("上游没有返回任何 choices"))
-        assertTrue(upstreamEmptyReason(json("""{"choices":[]}"""), null).contains("上游没有返回任何 choices"))
+        assertTrue(upstreamEmptyReason(json("""{"id":"x"}"""), null).contains("Upstream returned no choices"))
+        assertTrue(upstreamEmptyReason(json("""{"choices":[]}"""), null).contains("Upstream returned no choices"))
     }
 
     @Test
@@ -57,8 +57,8 @@ class EmptyTurnTest {
         val outcome = harness { JSONObject("""{"ok":true,"value":{"content":""}}""") }
 
         val text = outcome.text()
-        assertTrue(text, text.contains("本轮没有任何输出"))
-        assertTrue(text, text.contains("上游返回了空内容（没有正文也没有工具调用）"))
+        assertTrue(text, text.contains("No output this turn"))
+        assertTrue(text, text.contains("Upstream returned empty content (no text and no tool call)"))
         val end = outcome.events.filterIsInstance<DshEvent.TurnEnd>().single()
         assertEquals("error", end.reason)
     }

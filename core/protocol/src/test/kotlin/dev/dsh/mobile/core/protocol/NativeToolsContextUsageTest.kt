@@ -52,7 +52,7 @@ class NativeToolsContextUsageTest {
             assertTrue(used < history.sumOf { it.text.length })
             assertTrue(used <= 2400)
             // 有 LLM 摘要时插的是「上下文摘要」段，不再是旧的本地节选「历史摘要」。
-            assertTrue(messages.any { it.jsonObject["content"]!!.jsonPrimitive.content.startsWith("上下文摘要") })
+            assertTrue(messages.any { it.jsonObject["content"]!!.jsonPrimitive.content.startsWith("Context summary") })
             assertEquals("question", messages.last().jsonObject["content"]!!.jsonPrimitive.content)
         }
     }
