@@ -24,7 +24,7 @@ include(
     ":core:download",
     ":core:model",
     ":core:contract",
-    ":core:protocol",
+    ":core:agent",
     ":core:transport",
     ":core:data",
     ":design",

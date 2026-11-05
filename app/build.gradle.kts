@@ -359,7 +359,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:platform"))
     implementation(project(":core:download"))
-    implementation(project(":core:protocol"))
+    implementation(project(":core:agent"))
     implementation(project(":core:data"))
     implementation(project(":design"))
     implementation(project(":render"))

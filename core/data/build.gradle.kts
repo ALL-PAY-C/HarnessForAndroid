@@ -20,7 +20,7 @@ dependencies {
     api(project(":core:model"))
     api(project(":core:platform"))
     implementation(project(":core:download"))
-    implementation(project(":core:protocol"))
+    implementation(project(":core:agent"))
 
     api(libs.androidx.room.runtime)
     api(libs.androidx.room.ktx)

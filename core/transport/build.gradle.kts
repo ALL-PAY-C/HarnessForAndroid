@@ -11,7 +11,7 @@ android {
 }
 dependencies {
     // 包名沿用 dev.dsh.mobile.core.protocol.*：本模块只是 gradle 层面的传输层，
-    // 上层（core:protocol 及其消费方）的 import 一行都不用改。
+    // 上层（core:agent 及其消费方）的 import 一行都不用改。
     // 契约层（DshTransport / LineChannel / LlmConfig / DshJson）独立成 :core:contract，
     // 它们的类型出现在本模块公共签名里（AcpTransport : DshTransport 等）→ api。
     api(project(":core:contract"))

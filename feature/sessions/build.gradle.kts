@@ -11,9 +11,9 @@ android {
 dependencies {
     implementation(project(":design"))
     implementation(project(":core:data"))
-    // SessionsViewModel.kt:111 以 DshTransport（core:protocol）作为类型出现。
+    // SessionsViewModel.kt:111 以 DshTransport（core:agent）作为类型出现。
     // 以前靠 plugin-host / terminal 的 api() 泄漏拿到，T1.2 降级为 implementation 后必须显式声明。
-    implementation(project(":core:protocol"))
+    implementation(project(":core:agent"))
     implementation(project(":core:model"))
     implementation(project(":core:platform"))
     implementation(project(":plugin-api"))
