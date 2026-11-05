@@ -1,6 +1,6 @@
 package dev.dsh.mobile.core.data.update
 
-import dev.dsh.mobile.core.protocol.web.HttpRequest
+import dev.dsh.mobile.core.model.web.HttpRequest
 import dev.dsh.mobile.core.protocol.web.HttpTransport
 import dev.dsh.mobile.core.protocol.web.defaultHttpTransport
 

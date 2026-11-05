@@ -1,5 +1,8 @@
 package dev.dsh.mobile.core.protocol.web
 
+import dev.dsh.mobile.core.model.web.WebErrorCode
+import dev.dsh.mobile.core.model.web.WebSettings
+import dev.dsh.mobile.core.model.web.WebToolException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add

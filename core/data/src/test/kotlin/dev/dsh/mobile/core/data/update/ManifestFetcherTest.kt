@@ -1,7 +1,7 @@
 package dev.dsh.mobile.core.data.update
 
-import dev.dsh.mobile.core.protocol.web.WebErrorCode
-import dev.dsh.mobile.core.protocol.web.WebToolException
+import dev.dsh.mobile.core.model.web.WebErrorCode
+import dev.dsh.mobile.core.model.web.WebToolException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

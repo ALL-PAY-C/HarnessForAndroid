@@ -1,5 +1,7 @@
 package dev.dsh.mobile.core.protocol.web
 
+import dev.dsh.mobile.core.model.web.WebErrorCode
+import dev.dsh.mobile.core.model.web.WebToolException
 import java.io.File
 import java.io.IOException
 

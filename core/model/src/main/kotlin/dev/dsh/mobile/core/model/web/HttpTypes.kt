@@ -1,4 +1,4 @@
-package dev.dsh.mobile.core.protocol.web
+package dev.dsh.mobile.core.model.web
 
 /**
  * 网络层失败分类。任何失败都必须以 [WebToolException] 冒泡到工具层，

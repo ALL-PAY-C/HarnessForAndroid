@@ -1,7 +1,7 @@
 package dev.dsh.mobile.core.protocol
 
 import dev.dsh.mobile.core.protocol.web.FakeTransport
-import dev.dsh.mobile.core.protocol.web.WebSettings
+import dev.dsh.mobile.core.model.web.WebSettings
 import dev.dsh.mobile.core.protocol.web.WebToolkit
 import dev.dsh.mobile.core.protocol.web.respond
 import dev.dsh.mobile.core.protocol.web.respondBytes

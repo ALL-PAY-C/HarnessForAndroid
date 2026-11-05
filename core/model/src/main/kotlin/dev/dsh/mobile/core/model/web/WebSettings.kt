@@ -1,4 +1,4 @@
-package dev.dsh.mobile.core.protocol.web
+package dev.dsh.mobile.core.model.web
 
 /**
  * 网络工具的全部可调项。由宿主（core/data 的设置 + 密钥）组装后注入，

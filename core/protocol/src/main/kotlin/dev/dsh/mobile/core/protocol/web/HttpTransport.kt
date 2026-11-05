@@ -1,5 +1,9 @@
 package dev.dsh.mobile.core.protocol.web
 
+import dev.dsh.mobile.core.model.web.HttpRequest
+import dev.dsh.mobile.core.model.web.HttpResponse
+import dev.dsh.mobile.core.model.web.WebErrorCode
+import dev.dsh.mobile.core.model.web.WebToolException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull

@@ -1,5 +1,8 @@
 package dev.dsh.mobile.core.protocol.web
 
+
+import dev.dsh.mobile.core.model.web.HttpRequest
+import dev.dsh.mobile.core.model.web.HttpResponse
 /**
  * 可编程的传输层替身：记录每次请求，按 handler 决定响应。
  * 全部 JVM 测试都用它或本地 fake server，不依赖公网。

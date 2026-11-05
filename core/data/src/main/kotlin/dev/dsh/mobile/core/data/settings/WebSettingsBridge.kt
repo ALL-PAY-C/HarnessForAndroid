@@ -1,7 +1,7 @@
 package dev.dsh.mobile.core.data.settings
 
 import dev.dsh.mobile.core.data.secret.EndpointSecretStore
-import dev.dsh.mobile.core.protocol.web.WebSettings
+import dev.dsh.mobile.core.model.web.WebSettings
 
 /**
  * web 工具用到的密钥 id；值落在 [EndpointSecretStore]
