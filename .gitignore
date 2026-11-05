@@ -78,3 +78,4 @@ dist/
 
 # 回归截图（verify.ps1 默认输出，不入库）
 baseline/
+.local/
