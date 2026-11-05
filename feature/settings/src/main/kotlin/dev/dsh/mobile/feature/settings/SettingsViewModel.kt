@@ -21,7 +21,7 @@ import dev.dsh.mobile.core.data.settings.SendMode
 import dev.dsh.mobile.core.data.settings.SettingsStore
 import dev.dsh.mobile.core.data.settings.ThemeMode
 import dev.dsh.mobile.core.data.update.ShaMismatchException
-import dev.dsh.mobile.core.data.update.ShaStatus
+import dev.dsh.mobile.core.model.update.ShaStatus
 import dev.dsh.mobile.core.data.update.UpdateInfo
 import dev.dsh.mobile.core.data.update.Updater
 import java.io.File

@@ -121,4 +121,5 @@ interface GroupLedgerSink {
     suspend fun upsert(sessionId: String, entry: LedgerEntry): GroupLedger
     suspend fun updateStatus(sessionId: String, id: String, status: LedgerStatus): GroupLedger
     suspend fun appendNote(sessionId: String, id: String, note: String): GroupLedger
+    suspend fun remove(sessionId: String, id: String): GroupLedger
 }

@@ -1,5 +1,6 @@
 package dev.dsh.mobile.core.data.repo
 
+import dev.dsh.mobile.core.model.port.ChatApi
 import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.platform.DshResult
 import dev.dsh.mobile.core.platform.runCatchingDsh
@@ -64,12 +65,12 @@ class ChatRepository(
      * 默认空投影：只做持久化、不接模型的场景（部分单测）也能构造。
      */
     internal val projections: SessionProjections = SessionProjections(),
-) {
+) : ChatApi {
     internal val _transport = MutableStateFlow<DshTransport?>(null)
-    val transport: StateFlow<DshTransport?> = _transport.asStateFlow()
+    override val transport: StateFlow<DshTransport?> = _transport.asStateFlow()
 
     internal val ledger = TurnLedger()
-    val turns: StateFlow<Map<String, TurnState>> = ledger.turns
+    override val turns: StateFlow<Map<String, TurnState>> = ledger.turns
 
     /**
      * 每会话短临界区锁：persistAssistant 与 clearMessages/delete 共用。
@@ -85,7 +86,7 @@ class ChatRepository(
     internal val sessionIds = SessionIdMapper()
 
     internal val _commands = MutableStateFlow<List<String>>(emptyList())
-    val commands: StateFlow<List<String>> = _commands.asStateFlow()
+    override val commands: StateFlow<List<String>> = _commands.asStateFlow()
 
     internal var eventJob: Job? = null
 
@@ -128,11 +129,11 @@ class ChatRepository(
 
     suspend fun attach(t: DshTransport?, endpointId: String? = null) = attachImpl(t, endpointId)
 
-    fun observeSessions(): Flow<List<Session>> = observeSessionsImpl()
+    override fun observeSessions(): Flow<List<Session>> = observeSessionsImpl()
 
-    fun observeMessages(sessionId: String): Flow<List<ChatMessage>> = observeMessagesImpl(sessionId)
+    override fun observeMessages(sessionId: String): Flow<List<ChatMessage>> = observeMessagesImpl(sessionId)
 
-    suspend fun session(id: String): Session? = sessionImpl(id)
+    override suspend fun session(id: String): Session? = sessionImpl(id)
 
     suspend fun messageText(messageId: String): String? = messageTextImpl(messageId)
 
@@ -144,23 +145,23 @@ class ChatRepository(
 
     suspend fun resetStaleStatuses() = resetStaleStatusesImpl()
 
-    suspend fun refreshSessions(cwd: String?): DshResult<Int> = refreshSessionsImpl(cwd)
+    override suspend fun refreshSessions(cwd: String?): DshResult<Int> = refreshSessionsImpl(cwd)
 
-    suspend fun createSession(
+    override suspend fun createSession(
         cwd: String,
-        agentId: String? = null,
-        title: String = "",
+        agentId: String?,
+        title: String,
     ): DshResult<Session> = createSessionImpl(cwd, agentId, title)
 
-    suspend fun createGroup(
+    override suspend fun createGroup(
         cwd: String,
         title: String,
         participants: List<Participant>,
     ): DshResult<Session> = createGroupImpl(cwd, title, participants)
 
-    suspend fun setAgent(id: String, agentId: String?) = setAgentImpl(id, agentId)
+    override suspend fun setAgent(id: String, agentId: String?) = setAgentImpl(id, agentId)
 
-    suspend fun setParticipants(id: String, participants: List<Participant>) =
+    override suspend fun setParticipants(id: String, participants: List<Participant>) =
         setParticipantsImpl(id, participants)
 
     suspend fun sendMessage(
@@ -170,44 +171,44 @@ class ChatRepository(
         messageId: String? = null,
     ): DshResult<Unit> = sendMessageImpl(sessionId, text, images, messageId)
 
-    suspend fun cancel(sessionId: String): DshResult<Unit> = cancelImpl(sessionId)
+    override suspend fun cancel(sessionId: String): DshResult<Unit> = cancelImpl(sessionId)
 
-    suspend fun interject(sessionId: String, text: String): DshResult<Unit> = interjectImpl(sessionId, text)
+    override suspend fun interject(sessionId: String, text: String): DshResult<Unit> = interjectImpl(sessionId, text)
 
-    suspend fun answerPermission(
+    override suspend fun answerPermission(
         sessionId: String,
         requestId: String,
         optionId: String?,
-        ownerAgentId: String? = null,
+        ownerAgentId: String?,
     ): DshResult<Unit> = answerPermissionImpl(sessionId, requestId, optionId, ownerAgentId)
 
     suspend fun setConfigOption(sessionId: String, id: String, value: String): DshResult<Unit> =
         setConfigOptionImpl(sessionId, id, value)
 
-    suspend fun setPinned(id: String, pinned: Boolean) = setPinnedImpl(id, pinned)
+    override suspend fun setPinned(id: String, pinned: Boolean) = setPinnedImpl(id, pinned)
 
-    suspend fun setPersona(id: String, persona: String) = setPersonaImpl(id, persona)
+    override suspend fun setPersona(id: String, persona: String) = setPersonaImpl(id, persona)
 
-    suspend fun setArchived(id: String, archived: Boolean) = setArchivedImpl(id, archived)
+    override suspend fun setArchived(id: String, archived: Boolean) = setArchivedImpl(id, archived)
 
-    suspend fun setCwd(id: String, cwd: String) = setCwdImpl(id, cwd)
+    override suspend fun setCwd(id: String, cwd: String) = setCwdImpl(id, cwd)
 
-    suspend fun setGroup(id: String, group: String) = setGroupImpl(id, group)
+    override suspend fun setGroup(id: String, group: String) = setGroupImpl(id, group)
 
-    suspend fun rename(id: String, title: String) = renameImpl(id, title)
+    override suspend fun rename(id: String, title: String) = renameImpl(id, title)
 
-    suspend fun delete(id: String) = deleteImpl(id)
+    override suspend fun delete(id: String) = deleteImpl(id)
 
-    suspend fun clearMessages(id: String) = clearMessagesImpl(id)
+    override suspend fun clearMessages(id: String) = clearMessagesImpl(id)
 
-    suspend fun compact(sessionId: String, budgetTokens: Int = 0): CompactResult =
+    override suspend fun compact(sessionId: String, budgetTokens: Int): CompactResult =
         compactImpl(sessionId, budgetTokens)
 
     /** T9.8-S2 /warm：返回 null = 当前引擎没有温层能力（AcpTransport 之类）。 */
-    suspend fun refreshWarm(sessionId: String): WarmRefreshReport? = refreshWarmImpl(sessionId)
+    override suspend fun refreshWarm(sessionId: String): WarmRefreshReport? = refreshWarmImpl(sessionId)
 
     /** T9.8-S4 /recall：返回 null = 当前引擎不回捞；命中块只进下一轮提示词，不进消息表。 */
-    suspend fun recall(sessionId: String, query: String): RecallReport? = recallImpl(sessionId, query)
+    override suspend fun recall(sessionId: String, query: String): RecallReport? = recallImpl(sessionId, query)
 
-    fun projection(sessionId: String): StateFlow<SessionProjection> = projectionImpl(sessionId)
+    override fun projection(sessionId: String): StateFlow<SessionProjection> = projectionImpl(sessionId)
 }

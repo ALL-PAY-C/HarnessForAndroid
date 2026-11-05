@@ -2,6 +2,7 @@ package dev.dsh.mobile.core.data.mcp
 
 import android.content.Context
 import dev.dsh.mobile.core.model.mcp.ToolSensitivity
+import dev.dsh.mobile.core.model.port.McpServerStoreApi
 import dev.dsh.mobile.core.protocol.mcp.HttpMcpClient
 import dev.dsh.mobile.core.protocol.mcp.McpClient
 import dev.dsh.mobile.core.model.mcp.McpError
@@ -110,11 +111,11 @@ fun decodeServers(raw: String): List<McpServerRecord> {
     }
 }
 
-class McpServerStore(context: Context) {
+class McpServerStore(context: Context) : McpServerStoreApi {
 
     private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun load(): List<McpServerRecord> = decodeServers(prefs.getString(KEY_SERVERS, null).orEmpty())
+    override fun load(): List<McpServerRecord> = decodeServers(prefs.getString(KEY_SERVERS, null).orEmpty())
 
     fun save(servers: List<McpServerRecord>): List<McpServerRecord> {
         prefs.edit().putString(KEY_SERVERS, encodeServers(servers)).apply()
@@ -122,16 +123,16 @@ class McpServerStore(context: Context) {
     }
 
     /** 同 id 覆盖，否则追加。返回新列表，UI 直接拿去渲染。 */
-    fun upsert(record: McpServerRecord): List<McpServerRecord> {
+    override fun upsert(record: McpServerRecord): List<McpServerRecord> {
         val current = load()
         val index = current.indexOfFirst { it.id == record.id }
         val next = if (index >= 0) current.toMutableList().also { it[index] = record } else current + record
         return save(next)
     }
 
-    fun delete(id: String): List<McpServerRecord> = save(load().filterNot { it.id == id })
+    override fun delete(id: String): List<McpServerRecord> = save(load().filterNot { it.id == id })
 
-    fun setEnabled(id: String, enabled: Boolean): List<McpServerRecord> =
+    override fun setEnabled(id: String, enabled: Boolean): List<McpServerRecord> =
         save(load().map { if (it.id == id) it.copy(enabled = enabled) else it })
 }
 

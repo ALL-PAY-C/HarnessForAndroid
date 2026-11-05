@@ -1,5 +1,6 @@
 package dev.dsh.mobile.core.data.preset
 
+import dev.dsh.mobile.core.model.port.AgentPresetImportApi
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
@@ -15,10 +16,10 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * @param cacheDir 预设包的下载缓存目录；null 时不缓存（[importPreset] 的调用方多数没有 Context）。
  */
-class AgentPresetImporter(private val cacheDir: File? = null) {
+class AgentPresetImporter(private val cacheDir: File? = null) : AgentPresetImportApi {
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun importPreset(input: String): AgentPreset {
+    override fun importPreset(input: String): AgentPreset {
         val value = input.trim()
         require(value.isNotEmpty()) { "请输入 GitHub 链接、ZIP 路径或 JSON 预设" }
         return try {

@@ -10,6 +10,7 @@ import dev.dsh.mobile.core.data.secret.mergeToken
 import dev.dsh.mobile.core.data.secret.shouldMigrate
 import dev.dsh.mobile.core.data.settings.SettingsStore
 import dev.dsh.mobile.core.model.Endpoint
+import dev.dsh.mobile.core.model.port.EndpointApi
 import dev.dsh.mobile.core.model.TransportKind
 import dev.dsh.mobile.core.protocol.SessionProjections
 import kotlinx.coroutines.CoroutineScope
@@ -56,14 +57,14 @@ class EndpointRepository(
     private val db: DshDatabase,
     private val settings: SettingsStore,
     private val secretStore: EndpointSecretStore,
-) {
+) : EndpointApi {
 
-    fun observeEndpoints(): Flow<List<Endpoint>> =
+    override fun observeEndpoints(): Flow<List<Endpoint>> =
         db.endpointDao().observeAll().map { list -> list.map { it.toModel(secretStore) } }
 
     suspend fun all(): List<Endpoint> = db.endpointDao().all().map { it.toModel(secretStore) }
 
-    suspend fun save(endpoint: Endpoint) {
+    override suspend fun save(endpoint: Endpoint) {
         // 先持久化密钥到 noBackupFilesDir，成功后才写 Room（Room 行永远落空 token）。
         // 密钥写入失败抛异常 → Room 不更新，旧 token 仍可从 secretStore 读回。
         if (endpoint.token.isBlank()) secretStore.remove(endpoint.id)
@@ -83,12 +84,12 @@ class EndpointRepository(
         )
     }
 
-    suspend fun delete(id: String) {
+    override suspend fun delete(id: String) {
         db.endpointDao().delete(id)
         secretStore.remove(id)
     }
 
-    suspend fun setActive(id: String) = settings.setActiveEndpoint(id)
+    override suspend fun setActive(id: String) = settings.setActiveEndpoint(id)
 
     /** 幂等迁移遗留 token：失败保留旧 token 且可重试。 */
     suspend fun migrateLegacyTokens() = EndpointTokenMigration.run(db, secretStore)

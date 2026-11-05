@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import dev.dsh.mobile.core.model.port.ModelStoreApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -123,15 +124,15 @@ fun pruneAutoRegistered(list: List<ModelProfile>): List<ModelProfile> =
     list.filterNot { it.id.startsWith(AUTO_REGISTERED_MODEL_PREFIX) }
 
 /** 模型配置持久化：重启后仍在，Key 只落在应用私有目录。 */
-class ModelStore(private val context: Context) {
+class ModelStore(private val context: Context) : ModelStoreApi {
 
     private val key = stringPreferencesKey("models")
 
-    val models: Flow<List<ModelProfile>> = context.modelStore.data.map { prefs ->
+    override val models: Flow<List<ModelProfile>> = context.modelStore.data.map { prefs ->
         decode(prefs[key].orEmpty())
     }
 
-    suspend fun save(profile: ModelProfile) {
+    override suspend fun save(profile: ModelProfile) {
         context.modelStore.edit { prefs ->
             val list = decode(prefs[key].orEmpty()).toMutableList()
             val existing = list.indexOfFirst { it.id == profile.id }
@@ -165,13 +166,13 @@ class ModelStore(private val context: Context) {
         }
     }
 
-    suspend fun delete(id: String) {
+    override suspend fun delete(id: String) {
         context.modelStore.edit { prefs ->
             prefs[key] = encode(decode(prefs[key].orEmpty()).filterNot { it.id == id })
         }
     }
 
-    suspend fun setDefault(id: String) {
+    override suspend fun setDefault(id: String) {
         context.modelStore.edit { prefs ->
             prefs[key] = encode(decode(prefs[key].orEmpty()).map { it.copy(isDefault = it.id == id) })
         }

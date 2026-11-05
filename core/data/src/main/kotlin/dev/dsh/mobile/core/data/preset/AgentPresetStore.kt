@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import dev.dsh.mobile.core.model.port.AgentPresetStoreApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -25,7 +26,7 @@ private val Context.presetDataStore by preferencesDataStore(
  * 预设仓库：内置预设写死在 [AgentPresets.builtins]（跟着版本走），
  * DataStore 里只存用户导入的预设，因此升级 App 时内置文本自动更新、导入的不动。
  */
-class AgentPresetStore(private val dataStore: DataStore<Preferences>) {
+class AgentPresetStore(private val dataStore: DataStore<Preferences>) : AgentPresetStoreApi {
     constructor(context: Context) : this(context.applicationContext.presetDataStore)
     private val key = stringPreferencesKey("presets")
     /** 身份卡覆盖表：presetId -> IdentityCard。单独一条 key 是为了让内置预设也能挂卡（本体不可覆盖）。 */
@@ -38,13 +39,13 @@ class AgentPresetStore(private val dataStore: DataStore<Preferences>) {
     private val json = Json { ignoreUnknownKeys = true }
 
     /** 标准预设 + 导入的预设；内置预设不在这个列表里（用 [AgentPresets.builtins]）。 */
-    val presets = dataStore.data.map { decode(it[key].orEmpty()) }
+    override val presets = dataStore.data.map { decode(it[key].orEmpty()) }
 
     /** 覆盖表（presetId -> 身份卡），UI 直接 collect 做编辑区回显。 */
-    val cards = dataStore.data.map { decodeCards(it[cardsKey].orEmpty()) }
+    override val cards = dataStore.data.map { decodeCards(it[cardsKey].orEmpty()) }
 
     /** 内置优先，其次导入的；老版本存的 "default" 归一成标准模式。 */
-    suspend fun get(id: String): AgentPreset? {
+    override suspend fun get(id: String): AgentPreset? {
         val resolved = AgentPresets.resolveId(id)
         AgentPresets.builtinOf(resolved)?.let { return it }
         return presets.first().firstOrNull { it.id == resolved }
@@ -61,7 +62,7 @@ class AgentPresetStore(private val dataStore: DataStore<Preferences>) {
     }
 
     /** 写 / 清空一张卡（null 或空卡 = 清空，读侧回落到预设自带卡）。内置预设也允许。 */
-    suspend fun setCard(id: String, card: IdentityCard?) {
+    override suspend fun setCard(id: String, card: IdentityCard?) {
         val resolved = AgentPresets.resolveId(id)
         require(resolved.isNotBlank()) { "预设 id 不能为空" }
         dataStore.edit { prefs ->
@@ -72,14 +73,14 @@ class AgentPresetStore(private val dataStore: DataStore<Preferences>) {
     }
 
     /** 角色卡覆盖表（roleId -> 卡），设置页直接 collect 回显。 */
-    val roleCards: Flow<Map<String, IdentityCard>> =
+    override val roleCards: Flow<Map<String, IdentityCard>> =
         dataStore.data.map { decodeCards(it[roleCardsKey].orEmpty()) }
 
     /** 角色当前生效的卡：覆盖表优先，没有就回落到 [GroupRole.defaultCard]。 */
     suspend fun roleCard(role: GroupRole): IdentityCard = roleCards.first()[role.id] ?: role.defaultCard()
 
     /** 写 / 清空一张角色卡（null 或空卡 = 清空覆盖，读侧回到默认卡）。 */
-    suspend fun setRoleCard(role: GroupRole, card: IdentityCard?) {
+    override suspend fun setRoleCard(role: GroupRole, card: IdentityCard?) {
         dataStore.edit { prefs ->
             val map = decodeCards(prefs[roleCardsKey].orEmpty()).toMutableMap()
             if (card == null || !card.hasContent()) map.remove(role.id) else map[role.id] = card
@@ -87,7 +88,7 @@ class AgentPresetStore(private val dataStore: DataStore<Preferences>) {
         }
     }
 
-    suspend fun upsert(preset: AgentPreset) {
+    override suspend fun upsert(preset: AgentPreset) {
         requireEditable(preset.id, "标准预设不可覆盖", "内置预设不可覆盖")
         require(preset.id.isNotBlank() && preset.name.isNotBlank()) { "预设 id 和名称不能为空" }
         dataStore.edit { prefs ->
@@ -102,7 +103,7 @@ class AgentPresetStore(private val dataStore: DataStore<Preferences>) {
      * 批量写入（身份卡导入用）：一次 DataStore 编辑落 N 条，避免逐条 upsert 触发 N 次重写与 N 次刷新。
      * id 由调用方保证不撞（见 [IdentityCardTransfer.toPresets]），这里仍按 upsert 的口径拒绝内置 id。
      */
-    suspend fun upsertAll(presets: List<AgentPreset>) {
+    override suspend fun upsertAll(presets: List<AgentPreset>) {
         if (presets.isEmpty()) return
         presets.forEach { requireEditable(it.id, "标准预设不可覆盖", "内置预设不可覆盖") }
         val ids = presets.mapTo(HashSet()) { it.id }
@@ -114,7 +115,7 @@ class AgentPresetStore(private val dataStore: DataStore<Preferences>) {
         }
     }
 
-    suspend fun remove(id: String) {
+    override suspend fun remove(id: String) {
         requireEditable(id, "标准预设不可删除", "内置预设不可删除")
         dataStore.edit { prefs ->
             prefs[key] = json.encodeToString(

@@ -1,6 +1,7 @@
 package dev.dsh.mobile.core.data.secret
 
 import android.content.Context
+import dev.dsh.mobile.core.model.port.EndpointSecretApi
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -19,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap
  * 线程安全：同一 canonical 文件跨实例共享一把锁（[lockFor]），杜绝多实例并发读改写丢更新；
  * 写采用「唯一临时文件 + Files.move(ATOMIC_MOVE, REPLACE_EXISTING)」原子替换，移动失败抛异常且保留原件（不直接覆盖）。
  */
-class EndpointSecretStore(private val dir: File) {
+class EndpointSecretStore(private val dir: File) : EndpointSecretApi {
 
     constructor(context: Context) : this(context.noBackupFilesDir)
 
@@ -27,11 +28,11 @@ class EndpointSecretStore(private val dir: File) {
     private val file: File get() = File(dir, FILE_NAME)
     private val lock: Any get() = lockFor(file)
 
-    fun get(id: String): String? = synchronized(lock) {
+    override fun get(id: String): String? = synchronized(lock) {
         runCatching { read()[id] }.getOrNull()
     }
 
-    fun set(id: String, token: String) {
+    override fun set(id: String, token: String) {
         synchronized(lock) {
             val map = read() // 读坏文件会抛异常 → 不覆盖，异常上抛让调用方保留旧值/可重试
             map[id] = token
@@ -39,7 +40,7 @@ class EndpointSecretStore(private val dir: File) {
         }
     }
 
-    fun remove(id: String) {
+    override fun remove(id: String) {
         synchronized(lock) {
             val map = read()
             map.remove(id)

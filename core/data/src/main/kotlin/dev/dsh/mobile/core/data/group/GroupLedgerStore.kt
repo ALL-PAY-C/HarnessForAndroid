@@ -60,7 +60,7 @@ class GroupLedgerStore(
     override suspend fun appendNote(sessionId: String, id: String, note: String): GroupLedger =
         write(sessionId) { it.appendNote(id, note, clock()) }
 
-    suspend fun remove(sessionId: String, id: String): GroupLedger = write(sessionId) { it.remove(id) }
+    override suspend fun remove(sessionId: String, id: String): GroupLedger = write(sessionId) { it.remove(id) }
 
     /** 读改写一次完成，返回写后的那一本（UI 拿到就能直接渲染，不必再 first() 一次）。 */
     private suspend fun write(sessionId: String, block: (GroupLedger) -> GroupLedger): GroupLedger {

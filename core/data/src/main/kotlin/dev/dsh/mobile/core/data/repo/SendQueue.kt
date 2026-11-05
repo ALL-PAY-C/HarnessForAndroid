@@ -1,5 +1,6 @@
 package dev.dsh.mobile.core.data.repo
 
+import dev.dsh.mobile.core.model.port.SendQueueApi
 import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.platform.DshResult
 import kotlinx.coroutines.CancellationException
@@ -31,7 +32,7 @@ class SendQueue(
     private val repo: ChatRepository,
     /** 应用级作用域（AppContainer 的 AppScope）：本轮执行活过页面销毁，见 [submit]。 */
     private val scope: CoroutineScope,
-) {
+) : SendQueueApi {
 
     /**
      * 每会话「排队/插队发送」失败的错误出口。
@@ -52,10 +53,10 @@ class SendQueue(
         sendErrors.computeIfAbsent(sessionId) { MutableStateFlow(null) }
 
     /** 每会话「排队/插队发送」最近一次失败文案；null = 无错。dismiss 时调 [clearSendError]。 */
-    fun sendError(sessionId: String): StateFlow<String?> = errorFlow(sessionId)
+    override fun sendError(sessionId: String): StateFlow<String?> = errorFlow(sessionId)
 
     /** 撤掉某会话的错误（横幅 dismiss / 新尝试开始时用）。清除后 StateFlow 不重放旧错误。 */
-    fun clearSendError(sessionId: String) {
+    override fun clearSendError(sessionId: String) {
         errorFlow(sessionId).value = null
     }
 
@@ -75,7 +76,7 @@ class SendQueue(
 
     private val _items = MutableStateFlow<Map<String, List<SendQueueItem>>>(emptyMap())
     /** 全量快照（按会话分组），界面只取自己那一段。 */
-    val items: StateFlow<Map<String, List<SendQueueItem>>> = _items.asStateFlow()
+    override val items: StateFlow<Map<String, List<SendQueueItem>>> = _items.asStateFlow()
 
     init {
         scope.launch {
@@ -96,19 +97,19 @@ class SendQueue(
         }
     }
 
-    fun of(sessionId: String): List<SendQueueItem> = engine.of(sessionId)
+    override fun of(sessionId: String): List<SendQueueItem> = engine.of(sessionId)
 
     /** 入队；返回 false 表示已到上限。 */
-    fun enqueue(sessionId: String, text: String, images: List<String>, limit: Int): Boolean =
+    override fun enqueue(sessionId: String, text: String, images: List<String>, limit: Int): Boolean =
         engine.enqueue(sessionId, text, images, limit)
 
-    fun drop(sessionId: String, id: String) = engine.drop(sessionId, id)
+    override fun drop(sessionId: String, id: String) = engine.drop(sessionId, id)
 
     /** 插到队首：这一轮结束后第一条就发它。 */
-    fun promote(sessionId: String, id: String) = engine.promote(sessionId, id)
+    override fun promote(sessionId: String, id: String) = engine.promote(sessionId, id)
 
     /** 清空会话队列（保留代际：已摘出未发的条目因代际失效被跳过）。 */
-    fun clear(sessionId: String) = engine.clear(sessionId)
+    override fun clear(sessionId: String) = engine.clear(sessionId)
 
     /** 删除会话队列条目（会话被删时用）。 */
     private fun remove(sessionId: String) {
@@ -127,9 +128,9 @@ class SendQueue(
      * false（它们本来就要打断当前轮，不参与闸门）。块内 Err / 异常一律写进 [sendError]：
      * VM 可能已经销毁，绝不回写它的 error。
      */
-    fun submit(
+    override fun submit(
         sessionId: String,
-        exclusive: Boolean = true,
+        exclusive: Boolean,
         block: suspend () -> DshResult<Unit>,
     ): Boolean {
         if (exclusive && !inFlight.add(sessionId)) return false
@@ -152,17 +153,17 @@ class SendQueue(
     }
 
     /** 打断当前这轮并立刻把这一条发出去（其余仍留在队列里）。 */
-    suspend fun sendNow(sessionId: String, id: String) = engine.sendNow(sessionId, id)
+    override suspend fun sendNow(sessionId: String, id: String) = engine.sendNow(sessionId, id)
 
     /** 排空一个会话的队列。重入安全：同一会话同时只有一个排空循环。 */
     suspend fun drain(sessionId: String) = engine.drain(sessionId)
 
     /** 直接发一条新消息（不打断）：供 ChatViewModel 空闲发送用，结果交给 error UI 展示。 */
-    suspend fun sendText(sessionId: String, text: String, images: List<String> = emptyList()): DshResult<Unit> =
+    override suspend fun sendText(sessionId: String, text: String, images: List<String>): DshResult<Unit> =
         engine.sendText(sessionId, text, images)
 
     /** 打断当前这轮并立刻发一条新消息（Steer）：cancel 锁外 + send 锁内，串行不靠 delay。 */
-    suspend fun cancelAndSend(sessionId: String, text: String, images: List<String> = emptyList()): DshResult<Unit> =
+    override suspend fun cancelAndSend(sessionId: String, text: String, images: List<String>): DshResult<Unit> =
         engine.cancelAndSend(sessionId, text, images)
 
     private fun publish() {

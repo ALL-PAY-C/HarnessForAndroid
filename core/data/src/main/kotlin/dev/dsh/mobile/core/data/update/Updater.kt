@@ -3,6 +3,7 @@ package dev.dsh.mobile.core.data.update
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
+import dev.dsh.mobile.core.model.port.UpdaterApi
 import dev.dsh.mobile.core.platform.RuntimeMirrors
 import dev.dsh.mobile.core.download.DownloadCache
 import dev.dsh.mobile.core.download.Downloads
@@ -37,7 +38,7 @@ class Updater(
     private val context: Context,
     /** 清单出网口：默认走仓库既有 HTTP 能力（core:protocol 的 HttpTransport），测试注入 fake / 本地服务器。 */
     private val fetcher: ManifestFetcher = DefaultManifestFetcher(),
-) {
+) : UpdaterApi {
 
     private val prefs by lazy { context.getSharedPreferences("dsh.update", Context.MODE_PRIVATE) }
 
@@ -92,7 +93,7 @@ class Updater(
     }
 
     /** 更新源（清单 URL）。没手动配就走内置默认源（GitHub 仓库里的 update.json）。 */
-    fun sourceUrl(): String = prefs.getString(KEY_SOURCE, "").orEmpty().ifBlank { DEFAULT_SOURCES.first() }
+    override fun sourceUrl(): String = prefs.getString(KEY_SOURCE, "").orEmpty().ifBlank { DEFAULT_SOURCES.first() }
 
     /** 实际要尝试的清单地址：手动配了只用它；否则按内置候选顺序逐个试（国内网络 raw 常被拦，走镜像）。 */
     fun sourceCandidates(): List<String> {
@@ -103,12 +104,12 @@ class Updater(
     /** 用户手动填的源；空串表示跟随默认源。 */
     fun customSourceUrl(): String = prefs.getString(KEY_SOURCE, "").orEmpty()
 
-    fun setSourceUrl(url: String) {
+    override fun setSourceUrl(url: String) {
         prefs.edit().putString(KEY_SOURCE, url.trim()).apply()
     }
 
     /** 当前安装的版本号 / 版本名，直接读系统，不依赖 BuildConfig（debug/release 都对）。 */
-    fun installedVersion(): Pair<Long, String> = runCatching {
+    override fun installedVersion(): Pair<Long, String> = runCatching {
         val pm = context.packageManager
         @Suppress("DEPRECATION")
         val info = pm.getPackageInfo(context.packageName, 0)
@@ -133,7 +134,7 @@ class Updater(
      *
      * 这些都是本轮竞速已经拿到的数据，不为可观测性多发任何请求。
      */
-    suspend fun checkDetailed(): Result<UpdateCheck> = withContext(Dispatchers.IO) {
+    override suspend fun checkDetailed(): Result<UpdateCheck> = withContext(Dispatchers.IO) {
         runCatching {
             val sources = sourceCandidates()
             require(sources.isNotEmpty()) { "还没配置更新源" }
@@ -184,9 +185,9 @@ class Updater(
      * sha256 对不上时抛 [ShaMismatchException] 并删掉文件：调用方拿不到 File，装不成。
      * 「校验失败禁止安装」靠类型保证，不靠每个界面都记得判断。
      */
-    suspend fun downloadChecked(
+    override suspend fun downloadChecked(
         info: UpdateInfo,
-        onProgress: (Int) -> Unit = {},
+        onProgress: (Int) -> Unit,
     ): Result<DownloadReport> =
         withContext(Dispatchers.IO) {
             runCatching {
@@ -231,7 +232,7 @@ class Updater(
         }
 
     /** 交给系统安装器。首次会弹「允许安装未知应用」。 */
-    fun installIntent(file: File): Intent {
+    override fun installIntent(file: File): Intent {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         return Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")

@@ -3,9 +3,9 @@ package dev.dsh.mobile.feature.settings
 import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.core.data.backup.BackupManifest
 import dev.dsh.mobile.core.data.backup.BackupSections
-import dev.dsh.mobile.core.data.backup.RestoreEngine
 import java.util.Locale
 import dev.dsh.mobile.core.model.backup.RestoreReport
+import dev.dsh.mobile.core.model.backup.RestoreMode
 
 /**
  * 备份页的纯文案逻辑：分节中文名、包摘要、体积、恢复结果摘要。

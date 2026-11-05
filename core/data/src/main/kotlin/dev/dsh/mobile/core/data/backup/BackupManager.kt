@@ -3,6 +3,7 @@ package dev.dsh.mobile.core.data.backup
 import android.content.Context
 import dev.dsh.mobile.core.download.archive.ZipExtract
 import dev.dsh.mobile.core.data.EndpointTokenMigration
+import dev.dsh.mobile.core.model.port.BackupApi
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -53,12 +54,10 @@ fun isLegacyPackage(file: File): Boolean = runCatching {
  *  - [catchUpIfDue] — scheduled backups. The app is not a daemon, so a missed
  *    05:00 is simply performed on the next launch.
  */
-class BackupManager(private val context: Context) {
+class BackupManager(private val context: Context) : BackupApi {
 
     private val dir: File get() = File(context.filesDir, "backups").apply { mkdirs() }
     private val prefs by lazy { context.getSharedPreferences("dsh.backup", Context.MODE_PRIVATE) }
-
-    data class BackupEntry(val file: File, val reason: String, val createdAt: Long)
 
     private fun rawFiles(): List<File> = dir.listFiles { f -> f.name.endsWith(".zip") }
         ?.sortedByDescending { it.lastModified() }
@@ -68,7 +67,7 @@ class BackupManager(private val context: Context) {
      * 存档按队列管理：只留最近 [MAX_BACKUPS] 个，多出来的最旧的直接删。
      * 读列表时顺手清一次，老版本留下的 20 个也会在这一刻收敿到 8 个。
      */
-    fun list(): List<BackupEntry> {
+    override fun list(): List<BackupEntry> {
         val files = rawFiles()
         if (files.size > MAX_BACKUPS) {
             files.drop(MAX_BACKUPS).forEach { runCatching { it.delete() } }
@@ -78,22 +77,22 @@ class BackupManager(private val context: Context) {
         }
     }
 
-    fun lastBackupAt(): Long = prefs.getLong(KEY_LAST, 0L)
+    override fun lastBackupAt(): Long = prefs.getLong(KEY_LAST, 0L)
 
     /** Times of day to back up at, "HH:mm", at least one. */
-    fun times(): List<String> {
+    override fun times(): List<String> {
         val raw = prefs.getString(KEY_TIMES, "")?.takeIf { it.isNotBlank() } ?: return DEFAULT_TIMES
         return raw.split(",").map { it.trim() }.filter { it.matches(Regex("\\d{1,2}:\\d{2}")) }
             .ifEmpty { DEFAULT_TIMES }
     }
 
-    fun setTimes(times: List<String>) {
+    override fun setTimes(times: List<String>) {
         prefs.edit().putString(KEY_TIMES, times.joinToString(",")).apply()
     }
 
-    fun setAutoEnabled(enabled: Boolean) = prefs.edit().putBoolean(KEY_AUTO, enabled).apply()
+    override fun setAutoEnabled(enabled: Boolean) = prefs.edit().putBoolean(KEY_AUTO, enabled).apply()
 
-    fun autoEnabled(): Boolean = prefs.getBoolean(KEY_AUTO, true)
+    override fun autoEnabled(): Boolean = prefs.getBoolean(KEY_AUTO, true)
 
     /**
      * Called before an install. Returns the file created, or null when the open
@@ -109,7 +108,7 @@ class BackupManager(private val context: Context) {
     }
 
     /** Closes the current install batch so the next install starts a new one. */
-    fun closeBatch() = prefs.edit().putLong(KEY_BATCH, 0L).apply()
+    override fun closeBatch() = prefs.edit().putLong(KEY_BATCH, 0L).apply()
 
     /** Performs a scheduled backup if any configured time has passed since the last one. */
     fun catchUpIfDue(): File? {
@@ -126,7 +125,7 @@ class BackupManager(private val context: Context) {
      * 存档是运维手段，不导出凭证（secrets=false）、不带工作区（太大），
      * 只保证「会话 + 设置 + 插件 + 附件」这四样能回到安装前的状态。
      */
-    fun snapshot(reason: String): File? = runCatching<File> {
+    override fun snapshot(reason: String): File? = runCatching<File> {
         // 迁移屏障：读 DB 前先把遗留 endpoint token 迁走，否则首次迁移前的快照会导出明文 token。
         EndpointTokenMigration.ensureMigrated(context)
         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
@@ -157,10 +156,10 @@ class BackupManager(private val context: Context) {
      * 老包（本类历史版本产出的三前缀 zip）仍走 [legacyRestore]，否则用户手里
      * 上一版 App 拍的存档会突然打不开。
      */
-    fun restorePackage(
+    override fun restorePackage(
         file: File,
-        mode: RestoreMode = RestoreMode.Merge,
-        passphrase: String = "",
+        mode: RestoreMode,
+        passphrase: String,
     ): Result<RestoreReport> = runCatching {
         val engine = engine()
         val manifest = runCatching { engine.preview(file) }.getOrNull()
@@ -176,7 +175,7 @@ class BackupManager(private val context: Context) {
     }
 
     /** Restore a snapshot. The caller is expected to restart the app afterwards. */
-    fun restore(file: File): Result<Unit> = restorePackage(file).map { }
+    override fun restore(file: File): Result<Unit> = restorePackage(file).map { }
 
     private fun legacyRestore(file: File): Result<Unit> = runCatching {
         val dbDir = context.getDatabasePath(dev.dsh.mobile.core.data.db.DshDatabase.NAME).parentFile
@@ -208,7 +207,7 @@ class BackupManager(private val context: Context) {
      * 与 [snapshot] 的区别只有一个：勾选范围由用户给，而不是固定的四节。
      * 文件名走 [backupFileName]，带版本名，用户在不同版本拍的包之间能区分。
      */
-    fun export(selection: BackupSelection): Result<Pair<File, BackupManifest>> = runCatching {
+    override fun export(selection: BackupSelection): Result<Pair<File, BackupManifest>> = runCatching {
         EndpointTokenMigration.ensureMigrated(context)
         val out = File(
             dir,
@@ -227,10 +226,10 @@ class BackupManager(private val context: Context) {
     }
 
     /** 只读包内 manifest（不动磁盘）：给「已有备份」列表与 SAF 选中后的预览用。 */
-    fun previewPackage(file: File): Result<BackupManifest> = runCatching { engine().preview(file) }
+    override fun previewPackage(file: File): Result<BackupManifest> = runCatching { engine().preview(file) }
 
     /** 手动删掉一个存档（界面上要能删，否则只能等它自己滚出去）。 */
-    fun delete(file: File): Boolean = runCatching { file.exists() && file.delete() }.getOrDefault(false)
+    override fun delete(file: File): Boolean = runCatching { file.exists() && file.delete() }.getOrDefault(false)
 
     /**
      * 双重配额：最多 [MAX_BACKUPS] 个，且总量不超过 [MAX_BYTES]。
