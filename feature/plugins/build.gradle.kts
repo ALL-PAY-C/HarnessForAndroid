@@ -14,8 +14,9 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":plugin-api"))
     implementation(project(":plugin-host"))
-    // 解包统一走 core:common 的 ZipExtract（不再各模块自带 zip-slip 守卫）。
-    implementation(project(":core:common"))
+    // 解包统一走 core:download 的 ZipExtract（不再各模块自带 zip-slip 守卫）。
+    implementation(project(":core:platform"))
+    implementation(project(":core:download"))
     implementation(project(":runtime-host"))
     implementation(libs.androidx.navigation.compose)
     testImplementation(libs.junit)

@@ -146,7 +146,7 @@ class AgentsViewModel(
      * 模型模板（内置 + 插件注册）。
      *
      * 插件模型源是运行期异步注册的，必须走 StateFlow 订阅：直接读 [ModelProviders.all] 只会拿到
-     * 组合那一刻的快照，插件晚一步注册就永远不出现在「添加模型」里（实测 CLIProxy 缺 chip）。
+     * 组合那一刻的快照，插件晚一步注册就永远不出现在「添加模型」里（实测上游网关插件晚注册时缺 chip）。
      */
     val providers: StateFlow<List<ModelProvider>> = ModelProviders.extraFlow
         .map { ModelProviders.builtin + it }

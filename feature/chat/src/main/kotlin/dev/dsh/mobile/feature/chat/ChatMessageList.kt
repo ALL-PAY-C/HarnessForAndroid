@@ -39,7 +39,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import dev.dsh.mobile.core.common.TimeFmt
+import dev.dsh.mobile.core.platform.TimeFmt
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.dsh.mobile.core.model.AgentRunState
@@ -67,14 +67,14 @@ private const val TIME_DIVIDER_GAP_MS = 5 * 60 * 1000L
 internal const val HTML_RENDERER_ID: String = "html.web"
 
 /**
- * 选项解析器搬到了 core:common —— 通知栏也要把同一批选项挂成按钮，
+ * 选项解析器搬到了 core:platform —— 通知栏也要把同一批选项挂成按钮，
  * 两处必须用同一套规则（否则界面有卡片、通知里没按钮）。这里只留兼容别名，
  * 别在本文件重新实现一遍解析。
  */
-internal typealias Option = dev.dsh.mobile.core.common.DshOption
+internal typealias Option = dev.dsh.mobile.core.platform.DshOption
 
 internal fun splitOptions(text: String): Pair<String, List<Option>> =
-    dev.dsh.mobile.core.common.splitOptions(text)
+    dev.dsh.mobile.core.platform.splitOptions(text)
 
 /**
  * 判断这段正文是不是一整块 HTML 文档（该交给 HTML 渲染插件用 WebView 画）。

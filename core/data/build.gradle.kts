@@ -18,7 +18,8 @@ ksp {
 
 dependencies {
     api(project(":core:model"))
-    api(project(":core:common"))
+    api(project(":core:platform"))
+    implementation(project(":core:download"))
     implementation(project(":core:protocol"))
 
     api(libs.androidx.room.runtime)

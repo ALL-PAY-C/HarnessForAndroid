@@ -1,6 +1,6 @@
 package dev.dsh.mobile.plugin.html
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 
 /**
  * [RenderScript] 已直接读 classpath 里的 render.js；这里保留一层薄封装，

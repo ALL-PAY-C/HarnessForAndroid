@@ -596,7 +596,7 @@
     <string name="chat_preset_apply_hint">选中的预设从下一轮请求开始生效</string>
     <string name="chat_current_preset">当前预设</string>
     <string name="chat_manage_members">管理成员</string>
-    <string name="chat_injection_default">破甲注入（本会话）</string>
+    <string name="chat_injection_default">提示词注入（本会话）</string>
     <string name="chat_queued_head">已排队 %1$d 条 · 等这一轮结束自动发</string>
     <string name="chat_pending_head">待发送 %1$d 条</string>
     <string name="common_collapse">收起</string>
@@ -756,11 +756,11 @@
     <string name="common_loading">加载中…</string>
     <string name="common_preview">预览</string>
     <string name="design_activity_thinking_live">正在思考…</string>
-    <string name="design_activity_thought_steps">思考过程 · %1$d 步</string>
+    <string name="design_activity_thought_steps">思考过程 · %1$d 段</string>
     <string name="design_activity_thought_collapse">收起思考</string>
     <string name="design_activity_thought_expand">展开思考</string>
     <string name="design_activity_phrase_sep">，</string>
-    <string name="design_activity_tool_count">%1$d 项</string>
+    <string name="design_activity_tool_count">%1$d 个工具</string>
     <string name="design_activity_copy_thought">复制思考</string>
     <string name="design_activity_no_reasoning">这一轮没有返回推理内容。换用带 reasoning 的模型（如 deepseek-reasoner）就能在这里看到完整思维链。</string>
     <string name="design_tool_phrase_shell">执行了命令</string>
@@ -1377,4 +1377,14 @@
     <string name="card_skip_too_many">卡数量超限</string>
     <string name="card_skip_empty">空卡</string>
     <string name="card_skip_bad_json">JSON 读不出来</string>
+    <string name="plugins_purge_confirm_title">启用提示词注入</string>
+    <string name="plugins_purge_confirm_body">%1$s 开关打开期间，模型不再按默认策略拒答；随时关掉开关即可停止注入。</string>
+    <string name="plugins_purge_confirm_ok">确认启用</string>
+    <string name="agents_supports_images">支持图片输入</string>
+    <string name="agents_supports_images_hint">关闭时输入区的图片附件按钮不可用</string>
+    <string name="agents_supports_ocr">支持图片内文字识别（OCR）</string>
+    <string name="agents_supports_ocr_hint">仅在支持图片输入时可开</string>
+    <string name="agents_reasoning_map">推理档位映射（每行 档位=参数名:值，留空用默认）</string>
+    <string name="agents_reasoning_map_hint">示例：high=thinking_budget:8192</string>
+    <string name="chat_image_needs_model">当前模型未开启图片输入，可在模型设置里打开</string>
 </resources>

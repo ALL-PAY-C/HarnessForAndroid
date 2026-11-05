@@ -1,6 +1,6 @@
 package dev.dsh.mobile.core.protocol
 
-import dev.dsh.mobile.core.common.PendingImageQueue
+import dev.dsh.mobile.core.download.PendingImageQueue
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -14,7 +14,7 @@ import org.junit.Test
 
 /**
  * T4.4 回图像：截图登记队列的限额/过期语义，以及「队列为空时 user content 逐字节不变」。
- * 队列走真实现（core:common），parts 断言走 request 装配用的同一个 buildUserContent。
+ * 队列走真实现（core:download），parts 断言走 request 装配用的同一个 buildUserContent。
  */
 class QueuedScreenshotTest {
 

@@ -15,7 +15,7 @@ dependencies {
     // 以前靠 plugin-host / terminal 的 api() 泄漏拿到，T1.2 降级为 implementation 后必须显式声明。
     implementation(project(":core:protocol"))
     implementation(project(":core:model"))
-    implementation(project(":core:common"))
+    implementation(project(":core:platform"))
     implementation(project(":plugin-api"))
     // 会话列表页要画已放置的插件组件：PluginSlotItem / rememberHostThemeTokens 在 plugin-host。
     // plugin-host 只依赖 plugin-api/runtime-host，不反向依赖 feature/*，不成环。

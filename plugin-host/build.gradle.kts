@@ -18,8 +18,10 @@ android {
 
 dependencies {
     api(project(":plugin-api"))
-    // 解包统一走 core:common 的 ZipExtract（不再各模块自带 zip-slip 守卫）。
-    implementation(project(":core:common"))
+    // platform（AppLog / RuntimeMirrors / PassphraseCipher）与 download（ZipExtract / Downloads）
+    // 都只在实现里用 → implementation。
+    implementation(project(":core:platform"))
+    implementation(project(":core:download"))
     // 富内容（markdown / html）走 plugin-api 的 RichContentRenderers 槽位：宿主只持接口，
     // 实现由 :render 在 app 启动时注入。宿主编译期不再依赖任何 UI 渲染层（T1.2）。
     // PluginUiNode 的公共签名里出现 core.model 的枚举/数据类，显式声明，不靠上游泄漏。

@@ -235,8 +235,12 @@ private fun callFromObject(obj: JsonObject): List<DsmlToolCall> {
     val name = (obj["name"] as? JsonPrimitive)?.takeIf { it.isString }?.content
         ?: (fn?.get("name") as? JsonPrimitive)?.takeIf { it.isString }?.content
         ?: return emptyList()
-    val args = obj["arguments"] ?: obj["parameters"] ?: obj["args"]
+    val raw = obj["arguments"] ?: obj["parameters"] ?: obj["args"]
         ?: fn?.get("arguments") ?: fn?.get("parameters")
+    // 只有 name 的残片不是工具调用：模型常把提示词里的小标题当结构化输出吐出来
+    // （实测 {"name":"成人内容条件门控"} 被显示成一个工具）。必须同时给出 arguments，
+    // 且它是对象或字符串，才收编；否则原样留在正文里，也不删文本。
+    val args = raw?.takeIf { it is JsonObject || (it is JsonPrimitive && it.isString) } ?: return emptyList()
     return listOf(DsmlToolCall(name.trim(), argsJson(args)))
 }
 

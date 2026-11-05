@@ -3,6 +3,7 @@ package dev.dsh.mobile.feature.agents
 import dev.dsh.mobile.core.data.settings.ModelProfile
 import dev.dsh.mobile.core.data.settings.ModelProvider
 import dev.dsh.mobile.core.data.settings.sanitizeReasoningEffort
+import dev.dsh.mobile.core.model.ReasoningStyle
 
 /**
  * 「添加模型」对话框里用户填的东西；多选保存时每条 profile 共用这一份。
@@ -21,6 +22,17 @@ data class ModelDraft(
     val topP: Float = -1f,
     val supportsTools: Boolean = true,
     val isDefault: Boolean = false,
+    /**
+     * 思考参数的发送形状。表单没有选择器（默认 auto = 按 provider/模型推断），
+     * 编辑已有条目时由调用方把原 profile 的值透传进来，保存一次不会把它打回 auto。
+     */
+    val reasoningStyle: ReasoningStyle = ReasoningStyle.auto,
+    /** 支持图片输入（M4）；表单默认关，打开后输入区才允许挂图片。 */
+    val supportsImages: Boolean = false,
+    /** 支持图片内文字识别（M4）；只在 supportsImages 打开时可改。 */
+    val supportsOcr: Boolean = false,
+    /** 推理档位映射（M5），原样落进 profile。 */
+    val reasoningMap: String = "",
 )
 
 /** 模板选中后表单要填的默认值。 */
@@ -62,6 +74,10 @@ fun buildProfiles(
             temperature = draft.temperature,
             topP = draft.topP,
             supportsTools = draft.supportsTools,
+            reasoningStyle = draft.reasoningStyle,
+            supportsImages = draft.supportsImages,
+            supportsOcr = draft.supportsOcr,
+            reasoningMap = draft.reasoningMap,
         )
     }
 }

@@ -32,7 +32,7 @@ class PluginSettingsExtraValuesTest {
     fun declaredConfigHidesLegacyKeys() {
         val entry = entryOf(
             config = listOf(
-                ConfigSpec(key = "entryText", label = "破甲注入词", type = "text", default = "默认"),
+                ConfigSpec(key = "entryText", label = "提示词注入词", type = "text", default = "默认"),
                 ConfigSpec(key = "entryReset", label = "重置注入词为默认", type = "action", target = "entryText"),
             ),
             stored = mapOf(
@@ -65,7 +65,7 @@ class PluginSettingsExtraValuesTest {
     @Test
     fun declaredFieldStillReadsStoredValue() {
         val entry = entryOf(
-            config = listOf(ConfigSpec(key = "entryText", label = "破甲注入词", type = "text", default = "默认")),
+            config = listOf(ConfigSpec(key = "entryText", label = "提示词注入词", type = "text", default = "默认")),
             stored = mapOf("entryText" to "用户改过的词", "rewrite" to "3"),
         )
         assertEquals("用户改过的词", entry.values["entryText"])

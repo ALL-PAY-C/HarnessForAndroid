@@ -20,7 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

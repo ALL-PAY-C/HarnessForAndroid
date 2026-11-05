@@ -276,7 +276,7 @@ fun MessageBubble(
             ) {
                 if (message.at > 0L) {
                     Text(
-                        dev.dsh.mobile.core.common.TimeFmt.clock(message.at),
+                        dev.dsh.mobile.core.platform.TimeFmt.clock(message.at),
                         color = p.t3,
                         fontSize = qqFontBody(11.sp),
                         modifier = Modifier.padding(end = 4.dp, bottom = 3.dp),
@@ -426,7 +426,7 @@ private fun MessageTimer(startAt: Long, streaming: Boolean, durationMs: Long) {
     val text = when {
         streaming -> shortDuration(elapsed).ifEmpty { "0.0s" }
         durationMs > 0L -> shortDuration(durationMs)
-        else -> dev.dsh.mobile.core.common.TimeFmt.clock(startAt)
+        else -> dev.dsh.mobile.core.platform.TimeFmt.clock(startAt)
     }
     Text(text, color = p.t3, fontSize = 11.5.sp)
 }

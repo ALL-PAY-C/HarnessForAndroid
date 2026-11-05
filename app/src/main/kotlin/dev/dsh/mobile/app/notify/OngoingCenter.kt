@@ -9,9 +9,9 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import dev.dsh.mobile.app.MainActivity
-import dev.dsh.mobile.core.common.AppLog
-import dev.dsh.mobile.core.common.DshOption
-import dev.dsh.mobile.core.common.splitOptions
+import dev.dsh.mobile.core.platform.AppLog
+import dev.dsh.mobile.core.platform.DshOption
+import dev.dsh.mobile.core.platform.splitOptions
 import dev.dsh.mobile.core.data.repo.ChatRepository
 import dev.dsh.mobile.core.data.repo.TurnState
 import dev.dsh.mobile.core.data.settings.AppSettings
@@ -295,7 +295,7 @@ class OngoingCenter(
     /**
      * 这条回复尾巴上的可选动作。
      *
-     * 解析放在 core:common（[splitOptions]）里，和聊天页的选项气泡用同一套规则；
+     * 解析放在 core:platform（[splitOptions]）里，和聊天页的选项气泡用同一套规则；
      * 群聊里取最后一个开口的成员，因为「选项是谁给的」在群组里必须是那个人。
      */
     /** 回复正文的最后一句（选项块已经切掉），最多 80 字。 */

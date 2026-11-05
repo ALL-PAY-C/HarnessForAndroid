@@ -1,6 +1,6 @@
 package dev.dsh.mobile.core.protocol.context
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.model.context.KeyFile
 import dev.dsh.mobile.core.model.context.Pitfall
 import dev.dsh.mobile.core.model.context.WarmLayer

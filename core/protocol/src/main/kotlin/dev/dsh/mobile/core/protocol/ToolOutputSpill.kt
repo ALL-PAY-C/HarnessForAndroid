@@ -1,6 +1,6 @@
 package dev.dsh.mobile.core.protocol
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import java.io.File
 
 /** 一份落盘输出：路径、总行数、总字节——三者构成回读 locator。 */

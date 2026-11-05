@@ -33,7 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.dsh.mobile.core.common.UiLanguage
+import dev.dsh.mobile.core.platform.UiLanguage
 import dev.dsh.mobile.core.data.settings.ThemeMode
 import dev.dsh.mobile.core.model.BackMaterial
 import dev.dsh.mobile.design.AppIconBadge

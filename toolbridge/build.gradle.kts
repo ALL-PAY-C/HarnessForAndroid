@@ -6,9 +6,10 @@ android {
     namespace = "dev.dsh.mobile.toolbridge"
 }
 dependencies {
-    // 公共签名全是本模块自己的 BridgeResult / Channel 类型；core:common 只用 AppLog/ProxyEnv
-    //（都只在 Channels.kt 内部）→ implementation。core:model 零引用，去掉。
-    implementation(project(":core:common"))
+    // 公共签名全是本模块自己的 BridgeResult / Channel 类型；platform 只用 AppLog/ProxyEnv，
+    // download 只用 PendingImageQueue（都只在实现内部）→ implementation。core:model 零引用，去掉。
+    implementation(project(":core:platform"))
+    implementation(project(":core:download"))
     api(libs.kotlinx.coroutines.core)
     implementation(libs.androidx.core.ktx)
     // Shizuku：可选运行时依赖，未安装 Shizuku 时相关通道自动不可用

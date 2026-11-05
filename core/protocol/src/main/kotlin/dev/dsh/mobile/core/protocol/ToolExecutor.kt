@@ -1,6 +1,6 @@
 package dev.dsh.mobile.core.protocol
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay

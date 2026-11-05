@@ -4,8 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.ParcelFileDescriptor
-import dev.dsh.mobile.core.common.AppLog
-import dev.dsh.mobile.core.common.ProxyEnv
+import dev.dsh.mobile.core.platform.AppLog
+import dev.dsh.mobile.core.platform.ProxyEnv
 import dev.dsh.mobile.toolbridge.phone.ShizukuStatus
 import dev.dsh.mobile.toolbridge.privilege.PrivilegedExecutor
 import dev.dsh.mobile.toolbridge.privilege.RootProbe

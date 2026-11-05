@@ -1,6 +1,6 @@
 package dev.dsh.mobile.core.protocol
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.model.AgentRunState
 import dev.dsh.mobile.core.model.AgentRuntimeState
 import dev.dsh.mobile.core.model.AgentTask

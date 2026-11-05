@@ -44,8 +44,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.dsh.mobile.core.common.UiLanguage
-import dev.dsh.mobile.core.common.UiLocale
+import dev.dsh.mobile.core.platform.UiLanguage
+import dev.dsh.mobile.core.platform.UiLocale
 import dev.dsh.mobile.core.model.BackMaterial
 import java.io.File
 import java.io.InputStream

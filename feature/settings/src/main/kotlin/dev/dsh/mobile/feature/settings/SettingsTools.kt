@@ -1,6 +1,6 @@
 package dev.dsh.mobile.feature.settings
 
-import dev.dsh.mobile.core.common.ProxyEnv
+import dev.dsh.mobile.core.platform.ProxyEnv
 import dev.dsh.mobile.design.UiText
 
 internal fun downloadLimitBytes(text: String): Long? =

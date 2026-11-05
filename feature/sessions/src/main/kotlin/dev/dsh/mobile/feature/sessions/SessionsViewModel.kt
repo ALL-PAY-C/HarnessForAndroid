@@ -2,7 +2,7 @@ package dev.dsh.mobile.feature.sessions
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.dsh.mobile.core.common.DshResult
+import dev.dsh.mobile.core.platform.DshResult
 import dev.dsh.mobile.core.data.repo.ChatRepository
 import dev.dsh.mobile.core.data.settings.ModelProfile
 import dev.dsh.mobile.core.data.settings.ModelStore

@@ -1,6 +1,6 @@
 package dev.dsh.mobile.core.protocol
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.model.PermissionOption
 import dev.dsh.mobile.core.model.PermissionRequest
 import dev.dsh.mobile.core.model.RuntimeState

@@ -51,3 +51,24 @@ subprojects {
         }
     }
 }
+
+// ── 发布隔离门禁（§17.7 R-5）：release 构建前先扫敏感关键词，命中即失败 ────────────
+// 只接 assembleRelease：debug 是本机测试包，不设门禁。脚本零依赖、自己解析 git 路径；
+// 找不到 node 时任务直接失败（exit 127），宁可构建不通过也不静默放行。
+val dshLeakCheck = tasks.register<Exec>("dshLeakCheck") {
+    group = "verification"
+    description = "扫描仓库内跟踪文件里的敏感关键词，命中即让 release 构建失败。"
+    // git 仓库根就是 app/；脚本放在仓库外的 scripts/ 下，所以走绝对路径。
+    val repoRoot = rootProject.projectDir
+    workingDir = repoRoot
+    commandLine(
+        providers.environmentVariable("NODE").getOrElse("node"),
+        File(repoRoot.parentFile, "scripts/release/leak-check.mjs").absolutePath,
+        "--root", repoRoot.absolutePath,
+    )
+    outputs.upToDateWhen { false }
+}
+
+subprojects {
+    tasks.matching { it.name == "assembleRelease" }.configureEach { dependsOn(dshLeakCheck) }
+}

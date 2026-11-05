@@ -20,7 +20,8 @@ rootProject.name = "dsh-mobile"
 include(
     ":app",
     ":node-runtime",
-    ":core:common",
+    ":core:platform",
+    ":core:download",
     ":core:model",
     ":core:protocol",
     ":core:data",

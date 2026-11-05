@@ -1,6 +1,6 @@
 package dev.dsh.mobile.toolbridge.privilege
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.toolbridge.ShellResult
 import java.io.File
 import java.util.concurrent.TimeUnit

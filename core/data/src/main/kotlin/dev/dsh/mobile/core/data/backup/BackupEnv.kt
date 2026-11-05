@@ -114,10 +114,18 @@ class AndroidPrefsSink(private val ctx: Context) : PrefsSink {
     }
 }
 
+/**
+ * 插件包登记（清单 + 配置）。
+ *
+ * 配置值 `values.<id>` 落盘即密文（plugin-host 的 PluginConfigVault），旧版明文在写包前由
+ * [PluginConfigSeal] 换成密文，所以这个文件可以继续随设置节走：包里不含插件配置明文。
+ */
+const val PLUGIN_PACKAGES_PREFS: String = "dsh.plugin.packages"
+
 /** 设置节里导出 / 合并的 SharedPreferences 白名单（dsh.mcp 含 headers，只走凭证节）。 */
 val PREFS_WHITELIST: Set<String> = linkedSetOf(
     "dsh.plugins",
-    "dsh.plugin.packages",
+    PLUGIN_PACKAGES_PREFS,
     "dsh.plugin.placements",
     "dsh.ext.plugins",
     "dsh_context_summary",

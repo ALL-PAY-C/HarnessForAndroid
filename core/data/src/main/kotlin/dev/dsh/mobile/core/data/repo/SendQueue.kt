@@ -1,7 +1,7 @@
 package dev.dsh.mobile.core.data.repo
 
-import dev.dsh.mobile.core.common.AppLog
-import dev.dsh.mobile.core.common.DshResult
+import dev.dsh.mobile.core.platform.AppLog
+import dev.dsh.mobile.core.platform.DshResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow

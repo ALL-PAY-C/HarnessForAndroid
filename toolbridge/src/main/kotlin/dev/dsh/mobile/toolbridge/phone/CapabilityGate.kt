@@ -4,10 +4,10 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
-import dev.dsh.mobile.core.common.device.CapabilityActions
-import dev.dsh.mobile.core.common.device.CapabilityTier
-import dev.dsh.mobile.core.common.device.CapabilityTiers
-import dev.dsh.mobile.core.common.device.DeviceCapability
+import dev.dsh.mobile.core.platform.device.CapabilityActions
+import dev.dsh.mobile.core.platform.device.CapabilityTier
+import dev.dsh.mobile.core.platform.device.CapabilityTiers
+import dev.dsh.mobile.core.platform.device.DeviceCapability
 import org.json.JSONArray
 
 /**

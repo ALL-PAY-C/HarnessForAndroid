@@ -1,6 +1,6 @@
 package dev.dsh.mobile.linux
 
-import dev.dsh.mobile.core.common.ProxyEnv
+import dev.dsh.mobile.core.platform.ProxyEnv
 import java.io.File
 
 /** 一次原生调用（proot 主进程）的结果。 */

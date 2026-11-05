@@ -3,7 +3,7 @@ package dev.dsh.mobile.core.data.settings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import dev.dsh.mobile.core.common.net.HttpJson
+import dev.dsh.mobile.core.platform.net.HttpJson
 
 /**
  * Lists the models an endpoint actually serves.

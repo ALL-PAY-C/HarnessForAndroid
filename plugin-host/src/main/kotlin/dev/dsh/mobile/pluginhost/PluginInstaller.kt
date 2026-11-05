@@ -1,10 +1,10 @@
 package dev.dsh.mobile.pluginhost
 
 import android.content.Context
-import dev.dsh.mobile.core.common.AppLog
-import dev.dsh.mobile.core.common.RuntimeMirrors
-import dev.dsh.mobile.core.common.download.DownloadCache
-import dev.dsh.mobile.core.common.download.Downloads
+import dev.dsh.mobile.core.platform.AppLog
+import dev.dsh.mobile.core.platform.RuntimeMirrors
+import dev.dsh.mobile.core.download.DownloadCache
+import dev.dsh.mobile.core.download.Downloads
 import dev.dsh.mobile.pluginapi.DshPlugin
 import org.json.JSONObject
 import java.io.File

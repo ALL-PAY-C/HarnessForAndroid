@@ -71,6 +71,7 @@ import dev.dsh.mobile.core.data.settings.reasoningEfforts
 import dev.dsh.mobile.core.data.settings.sanitizeDecimalInput
 import dev.dsh.mobile.core.data.settings.sanitizeReasoningEffort
 import dev.dsh.mobile.core.model.AgentProfile
+import dev.dsh.mobile.core.model.ReasoningStyle
 import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.SessionStatus
 import dev.dsh.mobile.design.Ava
@@ -695,6 +696,10 @@ private fun ModelDialog(
         mutableStateOf(existing?.topP?.takeIf { it >= 0f }?.toString().orEmpty())
     }
     var supportsTools by remember { mutableStateOf(existing?.supportsTools ?: true) }
+    // M4/M5：图片能力位与推理档位映射；编辑已有条目时带回原值。
+    var supportsImages by remember { mutableStateOf(existing?.supportsImages ?: false) }
+    var supportsOcr by remember { mutableStateOf(existing?.supportsOcr ?: false) }
+    var reasoningMap by remember { mutableStateOf(existing?.reasoningMap ?: "") }
     val scope = rememberCoroutineScope()
 
     AlertDialog(
@@ -886,6 +891,80 @@ private fun ModelDialog(
                     }
                     Switch(checked = supportsTools, onCheckedChange = { supportsTools = it })
                 }
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(DesignR.string.agents_supports_images),
+                            color = p.t2,
+                            fontSize = qqFontBody(12.5.sp),
+                        )
+                        Text(
+                            stringResource(DesignR.string.agents_supports_images_hint),
+                            color = p.t3,
+                            fontSize = qqFontBody(10.5.sp),
+                        )
+                    }
+                    Switch(
+                        checked = supportsImages,
+                        onCheckedChange = {
+                            supportsImages = it
+                            // 关掉图片输入时 OCR 没有意义，一起回落，避免留下「认字但不能看图」的怪状态。
+                            if (!it) supportsOcr = false
+                        },
+                    )
+                }
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(DesignR.string.agents_supports_ocr),
+                            color = if (supportsImages) p.t2 else p.t3,
+                            fontSize = qqFontBody(12.5.sp),
+                        )
+                        Text(
+                            stringResource(DesignR.string.agents_supports_ocr_hint),
+                            color = p.t3,
+                            fontSize = qqFontBody(10.5.sp),
+                        )
+                    }
+                    Switch(
+                        checked = supportsOcr && supportsImages,
+                        onCheckedChange = { if (supportsImages) supportsOcr = it },
+                        enabled = supportsImages,
+                    )
+                }
+                Text(
+                    stringResource(DesignR.string.agents_reasoning_map),
+                    color = p.t3,
+                    fontSize = qqFontBody(11.sp),
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+                BasicTextField(
+                    value = reasoningMap,
+                    onValueChange = { reasoningMap = it },
+                    singleLine = false,
+                    minLines = 3,
+                    maxLines = 6,
+                    textStyle = TextStyle(color = p.t1, fontSize = qqFontBody(12.5.sp)),
+                    cursorBrush = SolidColor(p.accent),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 3.dp)
+                        .clip(QqShape.chip())
+                        .background(p.hover)
+                        .padding(horizontal = 10.dp, vertical = 9.dp),
+                )
+                Text(
+                    stringResource(DesignR.string.agents_reasoning_map_hint),
+                    color = p.t3,
+                    fontSize = qqFontBody(10.5.sp),
+                    modifier = Modifier.padding(top = 3.dp),
+                )
                 Text(provider.hint, color = p.t3, fontSize = qqFontBody(11.sp), modifier = Modifier.padding(top = QqSpace.xs()))
             }
         },
@@ -910,6 +989,11 @@ private fun ModelDialog(
                                 topP = topP.trim().toFloatOrNull()?.takeIf { it >= 0f } ?: -1f,
                                 supportsTools = supportsTools,
                                 isDefault = existing?.isDefault ?: false,
+                                // 表单没有思考风格选择器：编辑时沿用原条目的值，新建时交给推断。
+                                reasoningStyle = existing?.reasoningStyle ?: ReasoningStyle.auto,
+                                supportsImages = supportsImages,
+                                supportsOcr = supportsOcr && supportsImages,
+                                reasoningMap = reasoningMap,
                             ),
                             models = chosen,
                             existingId = existing?.id,

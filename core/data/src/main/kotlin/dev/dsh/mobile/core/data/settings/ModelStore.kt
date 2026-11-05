@@ -13,7 +13,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import dev.dsh.mobile.core.common.net.HttpJson
+import dev.dsh.mobile.core.platform.net.HttpJson
+import dev.dsh.mobile.core.model.ReasoningStyle
 
 /** 一个可接入的模型后端（DeepSeek / OpenAI 兼容 / 自定义）。 */
 data class ModelProfile(
@@ -36,6 +37,24 @@ data class ModelProfile(
     val topP: Float = -1f,
     /** 支持工具调用：false 时请求里不带 tools。 */
     val supportsTools: Boolean = true,
+    /**
+     * 思考参数发送方式；[ReasoningStyle.auto] = 按 providerId/baseUrl/模型名推断
+     * （映射表在 core:model 的 inferReasoningStyle，一处）。
+     */
+    val reasoningStyle: ReasoningStyle = ReasoningStyle.auto,
+    /** 支持图片输入：false 时输入区的图片附件按钮禁用。 */
+    val supportsImages: Boolean = false,
+    /** 支持图片内文字识别；只在 [supportsImages] 为 true 时有意义。 */
+    val supportsOcr: Boolean = false,
+    /**
+     * 推理档位映射（M5）：每行 `档位=参数名:值`，空行与 # 开头忽略。
+     * 空串 = 不映射，行为与旧版完全一致。示例：
+     * ```
+     * high=thinking_budget:8192
+     * off=
+     * ```
+     */
+    val reasoningMap: String = "",
 )
 
 /** 思考强度取值表，UI chip 与校验共用同一份。 */
@@ -82,7 +101,7 @@ interface ModelProvider {
 object ModelProviders {
     // 插件注册是异步的（装完插件就地热加载、Node 插件晚于首帧起来），所以「插件模型源」
     // 必须是可观察的：UI 订阅 [extraFlow]，插件注册晚一点也能立刻出现在列表里。
-    // 早前用普通 MutableList，界面在注册前组合过一次就再也看不到新模型源（实测 CLIProxy 缺 chip）。
+    // 早前用普通 MutableList，界面在注册前组合过一次就再也看不到新模型源（实测上游网关插件晚注册时缺 chip）。
     private val extra = MutableStateFlow<List<ModelProvider>>(emptyList())
 
     // 纯净 App 只留两家官方模板 + 自定义：其余厂商模板由插件通过 register() 注入
@@ -207,7 +226,8 @@ class ModelStore(private val context: Context) {
  * 与 [ModelStore] 拆开是为了能在 JVM 单测里直接验证旧数据兼容——ModelStore 需要 Context，
  * 而兼容性恰恰只在纯字符串层面成立。字段顺序只许往后追加：
  * 0 id,1 name,2 providerId,3 baseUrl,4 apiKey,5 model,6 isDefault,7 contextWindow,
- * 8 reasoningEffort,9 maxOutputTokens,10 temperature,11 topP,12 supportsTools。
+ * 8 reasoningEffort,9 maxOutputTokens,10 temperature,11 topP,12 supportsTools,13 reasoningStyle,
+ * 14 supportsImages,15 supportsOcr,16 reasoningMap（M4/M5 追加，末尾，带默认值）。
  */
 internal object ModelCodec {
     const val FIELD_SEP = "\u0001"
@@ -222,6 +242,10 @@ internal object ModelCodec {
             floatText(m.temperature),
             floatText(m.topP),
             if (m.supportsTools) "1" else "0",
+            m.reasoningStyle.name,
+            if (m.supportsImages) "1" else "0",
+            if (m.supportsOcr) "1" else "0",
+            m.reasoningMap,
         )
             .joinToString(FIELD_SEP)
     }
@@ -246,6 +270,11 @@ internal object ModelCodec {
                 temperature = floatOr(f.getOrNull(10)),
                 topP = floatOr(f.getOrNull(11)),
                 supportsTools = f.getOrNull(12)?.let { it == "1" } ?: true,
+                reasoningStyle = ReasoningStyle.fromWire(f.getOrNull(13)),
+                // 14–16 是新加的能力位与映射：旧记录读不到就用字段默认值 false/false/""。
+                supportsImages = f.getOrNull(14)?.let { it == "1" } ?: false,
+                supportsOcr = f.getOrNull(15)?.let { it == "1" } ?: false,
+                reasoningMap = f.getOrNull(16).orEmpty(),
             )
         }
     }

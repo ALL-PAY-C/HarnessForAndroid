@@ -1,6 +1,6 @@
 package dev.dsh.mobile.plugin.html
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.plugin.html.diagram.DiagramView
 import dev.dsh.mobile.pluginapi.DiagramRenderers
 import dev.dsh.mobile.pluginapi.DshPlugin

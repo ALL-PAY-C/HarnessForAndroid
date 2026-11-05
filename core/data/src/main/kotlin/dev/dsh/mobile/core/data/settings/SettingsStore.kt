@@ -12,9 +12,9 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import dev.dsh.mobile.core.common.ProxyEnv
-import dev.dsh.mobile.core.common.UiLanguage
-import dev.dsh.mobile.core.common.UiLocale
+import dev.dsh.mobile.core.platform.ProxyEnv
+import dev.dsh.mobile.core.platform.UiLanguage
+import dev.dsh.mobile.core.platform.UiLocale
 import dev.dsh.mobile.core.data.preset.AgentPresets
 import dev.dsh.mobile.core.model.BackMaterial
 import kotlinx.coroutines.flow.Flow
@@ -135,7 +135,7 @@ data class AppSettings(
     val groupModeratorModel: String = "",
     /** 子代理最多嵌套几层（1 = 主代理能派、子代理不能再派；默认 2）。 */
     val subagentMaxDepth: Int = 2,
-    /** 六类系统能力的三档授权，落盘形态见 [dev.dsh.mobile.core.common.device.CapabilityTiers]；空串 = 全 Ask。 */
+    /** 六类系统能力的三档授权，落盘形态见 [dev.dsh.mobile.core.platform.device.CapabilityTiers]；空串 = 全 Ask。 */
     val capabilityTiers: String = "",
 
     // ---- 工具通道 ----

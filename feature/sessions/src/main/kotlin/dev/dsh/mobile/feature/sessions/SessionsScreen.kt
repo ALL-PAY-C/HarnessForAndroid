@@ -62,7 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.dsh.mobile.core.common.TimeFmt
+import dev.dsh.mobile.core.platform.TimeFmt
 import dev.dsh.mobile.core.data.settings.ModelProfile
 import dev.dsh.mobile.core.model.Participant
 import dev.dsh.mobile.core.model.RuntimeState

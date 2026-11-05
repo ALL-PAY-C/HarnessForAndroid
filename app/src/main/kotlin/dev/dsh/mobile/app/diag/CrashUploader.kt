@@ -1,7 +1,7 @@
 package dev.dsh.mobile.app.diag
 
-import dev.dsh.mobile.core.common.AppLog
-import dev.dsh.mobile.core.common.net.HttpJson
+import dev.dsh.mobile.core.platform.AppLog
+import dev.dsh.mobile.core.platform.net.HttpJson
 import dev.dsh.mobile.core.data.settings.SettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

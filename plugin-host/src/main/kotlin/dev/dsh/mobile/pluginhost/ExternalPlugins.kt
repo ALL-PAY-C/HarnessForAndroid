@@ -8,7 +8,7 @@ import dalvik.system.DexFile
 import dalvik.system.InMemoryDexClassLoader
 import dalvik.system.PathClassLoader
 import java.nio.ByteBuffer
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.pluginapi.DshPlugin
 import org.json.JSONArray
 import org.json.JSONObject

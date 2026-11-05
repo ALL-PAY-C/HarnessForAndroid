@@ -1,6 +1,6 @@
 package dev.dsh.mobile.core.protocol.tool
 
-import dev.dsh.mobile.core.common.device.CapabilityActions
+import dev.dsh.mobile.core.platform.device.CapabilityActions
 import dev.dsh.mobile.core.protocol.ToolSensitivity
 import dev.dsh.mobile.core.protocol.str
 import dev.dsh.mobile.core.protocol.ToolSensitivity.DeviceControl

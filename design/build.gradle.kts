@@ -10,9 +10,9 @@ android {
 
 dependencies {
     api(project(":core:model"))
-    // core:common 被 Components.kt:535/:685 以全限定名 dev.dsh.mobile.core.common.TimeFmt 使用，
-    // 不是 import 形式，grep "import dev.dsh.mobile.core.common" 会漏判。保持 api 以维持下游可见性。
-    api(project(":core:common"))
+    // core:platform 被 Components.kt:279/:429 以全限定名 dev.dsh.mobile.core.platform.TimeFmt 使用，
+    // 不是 import 形式，grep "import dev.dsh.mobile.core.platform" 会漏判。保持 api 以维持下游可见性。
+    api(project(":core:platform"))
 
     val composeBom = platform(libs.compose.bom)
     api(composeBom)

@@ -1,6 +1,6 @@
 package dev.dsh.mobile.linux
 
-import dev.dsh.mobile.core.common.ProxyEnv
+import dev.dsh.mobile.core.platform.ProxyEnv
 import dev.dsh.mobile.toolbridge.ChannelKind
 import dev.dsh.mobile.toolbridge.ShellChannel
 import dev.dsh.mobile.toolbridge.ShellResult

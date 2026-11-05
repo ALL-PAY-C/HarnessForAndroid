@@ -9,10 +9,10 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Process
 import dev.dsh.mobile.app.service.RuntimeService
-import dev.dsh.mobile.core.common.AppLog
-import dev.dsh.mobile.core.common.AppRestart
-import dev.dsh.mobile.core.common.RestartHook
-import dev.dsh.mobile.core.common.RestartReason
+import dev.dsh.mobile.core.platform.AppLog
+import dev.dsh.mobile.core.platform.AppRestart
+import dev.dsh.mobile.core.platform.RestartHook
+import dev.dsh.mobile.core.platform.RestartReason
 import java.lang.ref.WeakReference
 
 /**

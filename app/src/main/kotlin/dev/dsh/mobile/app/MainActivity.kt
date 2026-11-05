@@ -18,8 +18,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.dsh.mobile.app.nav.AppNav
 import dev.dsh.mobile.app.notify.NotificationCenter
 import dev.dsh.mobile.app.service.RuntimeService
-import dev.dsh.mobile.core.common.AppLog
-import dev.dsh.mobile.core.common.UiLocale
+import dev.dsh.mobile.core.platform.AppLog
+import dev.dsh.mobile.core.platform.UiLocale
 import dev.dsh.mobile.core.data.settings.AppSettings
 import dev.dsh.mobile.core.data.settings.ThemeMode
 import dev.dsh.mobile.design.DshTheme

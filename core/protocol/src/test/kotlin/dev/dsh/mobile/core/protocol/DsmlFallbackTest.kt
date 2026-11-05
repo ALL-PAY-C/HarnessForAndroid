@@ -242,6 +242,41 @@ class DsmlFallbackTest {
     }
 
     @Test
+    fun nameOnlyJsonIsNotAToolCall() {
+        // 模型把提示词里的小标题当结构化输出吐出来：只有 name、没有 arguments，不能进工具列表。
+        val bare = "章节标题：{\"name\":\"成人内容条件门控\"}"
+        val (clean, calls) = stripDsmlToolCalls(bare)
+        assertTrue(calls.isEmpty())
+        assertEquals(bare, clean)
+
+        // 包在 <tool_call> 里也一样：认不出调用就不收编，文本原样留着。
+        val wrapped = "<tool_call>{\"name\":\"成人内容条件门控\"}</tool_call>"
+        val (wrappedClean, wrappedCalls) = stripDsmlToolCalls(wrapped)
+        assertTrue(wrappedCalls.isEmpty())
+        assertEquals(wrapped, wrappedClean)
+    }
+
+    @Test
+    fun jsonCallNeedsNameAndObjectOrStringArguments() {
+        val withObject = "<tool_call>{\"name\":\"shell\",\"arguments\":{\"command\":\"ls\"}}</tool_call>"
+        val (text, calls) = stripDsmlToolCalls(withObject)
+        assertEquals(1, calls.size)
+        assertEquals("shell", calls[0].name)
+        assertEquals("ls", argsOf(calls[0])["command"])
+        assertEquals("", text)
+
+        // arguments 是 JSON 字符串也认（OpenAI 的 function 包装就这么给）。
+        val withString = "<tool_call>{\"name\":\"shell\",\"arguments\":\"{\\\"command\\\":\\\"id\\\"}\"}</tool_call>"
+        val (_, stringCalls) = stripDsmlToolCalls(withString)
+        assertEquals(1, stringCalls.size)
+        assertEquals("id", argsOf(stringCalls[0])["command"])
+
+        // arguments 是 null 或数字：不是调用，丢掉。
+        assertTrue(stripDsmlToolCalls("<tool_call>{\"name\":\"x\",\"arguments\":null}</tool_call>").second.isEmpty())
+        assertTrue(stripDsmlToolCalls("<tool_call>{\"name\":\"x\",\"arguments\":3}</tool_call>").second.isEmpty())
+    }
+
+    @Test
     fun streamFilterKeepsOrdinaryTextThatOnlyLooksLikeMarkup() {
         val filter = DsmlStreamFilter()
         val out = StringBuilder()

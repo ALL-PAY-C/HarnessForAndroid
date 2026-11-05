@@ -1,13 +1,16 @@
 package dev.dsh.mobile.core.protocol
 
-import dev.dsh.mobile.core.common.AppLog
-import dev.dsh.mobile.core.common.PendingImageQueue
-import dev.dsh.mobile.core.common.device.DeviceCapability
+import dev.dsh.mobile.core.platform.AppLog
+import dev.dsh.mobile.core.download.PendingImageQueue
+import dev.dsh.mobile.core.platform.device.DeviceCapability
 import dev.dsh.mobile.core.model.AgentRuntimeState
 import dev.dsh.mobile.core.model.AgentTask
 import dev.dsh.mobile.core.model.ChatMessage
 import dev.dsh.mobile.core.model.GroupLedgerSink
 import dev.dsh.mobile.core.model.GroupRole
+import dev.dsh.mobile.core.model.ReasoningStyle
+import dev.dsh.mobile.core.model.isDeepSeekFamily
+import dev.dsh.mobile.core.model.resolveReasoningStyle
 import dev.dsh.mobile.core.model.PermissionOption
 import dev.dsh.mobile.core.model.PermissionRequest
 import dev.dsh.mobile.core.model.RuntimeState
@@ -71,6 +74,7 @@ import dev.dsh.mobile.core.protocol.llm.SUBAGENT_MAX_DEPTH
 import dev.dsh.mobile.core.protocol.llm.SubagentBudget
 import dev.dsh.mobile.core.protocol.llm.depthRefusal
 import dev.dsh.mobile.core.protocol.llm.parseSubagentTasks
+import dev.dsh.mobile.core.protocol.llm.reasoningParams
 import dev.dsh.mobile.core.protocol.llm.subagentToolNames
 
 /** 一个可接入的模型后端描述（协议层只认这些字段，不依赖数据层）。 */
@@ -81,8 +85,12 @@ data class LlmConfig(
     val systemPrompt: String = DEFAULT_SYSTEM,
     /** 单轮 max_tokens；0 表示不限制（推理模型会写出几万字思维链，群组一轮能跑十分钟）。 */
     val maxTokens: Int = 0,
-    /** 思考强度 off|low|medium|high；只有推理后端（DeepSeek 系）才写进请求。 */
+    /** 思考强度 off|low|medium|high；实际发不发、怎么发由 [reasoningStyle] 决定。 */
     val reasoningEffort: String = "high",
+    /** 提供方 id（推断思考风格用）；空串 = 未知，按 baseUrl/模型名推。 */
+    val providerId: String = "",
+    /** 思考参数发送方式；[ReasoningStyle.auto] = 按 providerId/baseUrl/模型名推断。 */
+    val reasoningStyle: ReasoningStyle = ReasoningStyle.auto,
     /** 采样温度，<0 表示不发送该参数（由上游默认）。 */
     val temperature: Float = -1f,
     /** top_p，<0 表示不发送该参数。 */
@@ -94,6 +102,8 @@ data class LlmConfig(
      * 留空就只用主模型重试 —— 上游只有一把 Key/一个模型时什么都不用配。
      */
     val fallbackModels: List<String> = emptyList(),
+    /** 推理档位映射（M5）：每行 `档位=参数名:值`；空串 = 不映射，行为与旧版一致。 */
+    val reasoningMap: String = "",
 ) {
     companion object {
         val DEFAULT_SYSTEM = """
@@ -614,8 +624,10 @@ class LocalEngineTransport(
         onFinal: (String) -> Unit = {},
         turnId: String? = null,
     ) {
-        val deepSeekThinking = cfg.model.contains("deepseek", ignoreCase = true) ||
-            cfg.model.contains("ds4", ignoreCase = true) || cfg.baseUrl.contains("deepseek", ignoreCase = true)
+        // 思考参数由能力驱动：手选值优先，auto 时按 providerId/baseUrl/模型名推断（映射表在 core:model 一处）。
+        val reasoningStyle = resolveReasoningStyle(cfg.reasoningStyle, cfg.providerId, cfg.baseUrl, cfg.model)
+        // 历史里回填 reasoning_content 只对 DeepSeek 系成立（别的上游会 400），与「发不发思考参数」是两件事。
+        val deepSeekHistory = isDeepSeekFamily(cfg.providerId, cfg.baseUrl, cfg.model)
         // 每次进入本轮都清掉同轮去抖状态；60 秒滑动窗口跨轮保留，跨轮死循环也要拦。
         loopGuard.beginTurn()
         val messages =
@@ -663,7 +675,7 @@ class LocalEngineTransport(
             messages += buildJsonObject {
                 put("role", role)
                 put("content", content)
-                if (deepSeekThinking && useTools && role == "assistant" && m.thought.isNotBlank()) {
+                if (deepSeekHistory && useTools && role == "assistant" && m.thought.isNotBlank()) {
                     put("reasoning_content", m.thought)
                 }
             }
@@ -799,17 +811,8 @@ class LocalEngineTransport(
             var roundShown = ""
             val body = buildJsonObject {
                 put("model", cfg.model)
-                if (deepSeekThinking) {
-                    // DeepSeek OpenAI-format controls: /guides/thinking_mode (not enable_thinking).
-                    // 强度来自模型配置（Agent 页「思考强度」），不再写死 high。
-                    val effort = cfg.reasoningEffort.lowercase().ifBlank { "high" }
-                    if (effort == "off") {
-                        putJsonObject("thinking") { put("type", "disabled") }
-                    } else {
-                        putJsonObject("thinking") { put("type", "enabled") }
-                        put("reasoning_effort", effort)
-                    }
-                }
+                // 思考参数：发什么由 reasoningParams 一处决定；none 时这里一个字段都不会加。
+                reasoningParams(reasoningStyle, cfg.reasoningEffort, cfg.reasoningMap).forEach { (k, v) -> put(k, v) }
                 if (cfg.temperature >= 0f) put("temperature", cfg.temperature)
                 if (cfg.topP >= 0f) put("top_p", cfg.topP)
                 put("messages", JsonArray(messages))
@@ -1049,7 +1052,7 @@ class LocalEngineTransport(
             messages += buildJsonObject {
                 put("role", "assistant")
                 put("content", content)
-                if (deepSeekThinking && useTools) {
+                if (deepSeekHistory && useTools) {
                     reasoningOf(msg)?.takeIf { it.isNotBlank() }?.let { put("reasoning_content", it) }
                 }
                 put("tool_calls", toolCalls)

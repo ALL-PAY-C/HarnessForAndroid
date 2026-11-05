@@ -19,13 +19,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -75,6 +78,23 @@ internal fun PluginSettingsDetail(
     var overrides by remember(entry.pluginId) { mutableStateOf<Map<String, String>>(emptyMap()) }
     // 重置计数器：本地覆盖值可能和快照里的旧值相同，只有换 key 才能把输入框里的草稿换掉。
     var resetTick by remember(entry.pluginId) { mutableStateOf(0) }
+    // 注入开关的确认态：写盘后这一页的快照不会重新读，只能自己记一份。
+    val confirmation = remember(entry.pluginId) { readConfirmation(entry.pluginId, entry.values) }
+    var promptIds by remember(entry.pluginId) { mutableStateOf(confirmation.ids) }
+    // 旧写法的确认态读到就迁到新键；写盘放 effect 里，不在组合期落。
+    LaunchedEffect(entry.pluginId) { confirmation.migrate.forEach { (key, value) -> onSave(key, value) } }
+    // 哪个插件声明了注入开关就归这道闸管，不看 id。
+    val promptGate = if (entry.fields.any { it.key == PROMPT_ENABLED_KEY && it.type == ConfigFieldType.Switch }) {
+        PromptGate(
+            pluginId = entry.pluginId,
+            confirmBody = entry.description,
+            ids = { promptIds },
+            onToggled = { promptIds = it },
+            write = { key, value -> onSave(key, value) },
+        )
+    } else {
+        null
+    }
     Column(
         Modifier
             .fillMaxSize()
@@ -114,6 +134,7 @@ internal fun PluginSettingsDetail(
                                 item = item,
                                 current = overrides[item.key] ?: currentValueOf(item, entry),
                                 resetKey = resetTick,
+                                gate = promptGate,
                                 onSave = { key, value -> onSave(key, value) },
                                 onReset = { action ->
                                     val fallback = action.default
@@ -252,9 +273,19 @@ private fun ActionRow(action: ConfigAction, onReset: () -> Unit) {
 
 /** 一行设置项：开关单独一行，其余字段用「标签 + 输入框」两段式。 */
 @Composable
-private fun ConfigFieldRow(field: ConfigField, current: String, resetKey: Int, onSave: (String) -> Unit) {
+private fun ConfigFieldRow(
+    field: ConfigField,
+    current: String,
+    resetKey: Int,
+    gate: PromptGate?,
+    onSave: (String) -> Unit,
+) {
     val p = LocalQq.current
     if (field.type == ConfigFieldType.Switch) {
+        // 同 ValueBox：写回存储后列表快照不会重组，开关状态要留在本地才即时可见。
+        var on by remember(field.key, current, resetKey) { mutableStateOf(switchOn(current)) }
+        // 注入开关「由关变开」先问一次：确认框浮在行外，取消时 on 一动不动。
+        var showConfirm by remember(field.key) { mutableStateOf(false) }
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -265,9 +296,55 @@ private fun ConfigFieldRow(field: ConfigField, current: String, resetKey: Int, o
                     Text(field.hint, color = p.t3, fontSize = MaterialTheme.typography.bodySmall.fontSize)
                 }
             }
-            // 同 ValueBox：写回存储后列表快照不会重组，开关状态要留在本地才即时可见。
-            var on by remember(field.key, current, resetKey) { mutableStateOf(switchOn(current)) }
-            Switch(checked = on, onCheckedChange = { on = it; onSave(it.toString()) })
+            Switch(
+                checked = on,
+                onCheckedChange = { next ->
+                    when (val effect = gate?.let { promptToggleEffect(it.pluginId, field.key, next, it.ids()) }) {
+                        // 还没确认过：开关先不动，等对话框给结论。
+                        is PromptToggleEffect.AskConfirm -> showConfirm = true
+                        is PromptToggleEffect.Write -> {
+                            on = next
+                            gate?.let { g ->
+                                effect.entries.forEach { (key, value) -> g.write(key, value) }
+                                // 关掉即摘掉自己的 id：同一次停留里再打开也必须重新弹。
+                                g.onToggled(if (next) g.ids() + g.pluginId else g.ids() - g.pluginId)
+                            }
+                        }
+                        // 非注入开关字段：老路直写。
+                        null -> {
+                            on = next
+                            onSave(next.toString())
+                        }
+                    }
+                },
+            )
+        }
+        val confirmGate = gate
+        if (showConfirm && confirmGate != null) {
+            AlertDialog(
+                onDismissRequest = { showConfirm = false },
+                title = { Text(stringResource(DesignR.string.plugins_purge_confirm_title)) },
+                text = {
+                    Text(stringResource(DesignR.string.plugins_purge_confirm_body, confirmGate.confirmBody))
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showConfirm = false
+                        on = true
+                        (promptConfirmAccepted(confirmGate.pluginId, confirmGate.ids()) as? PromptToggleEffect.Write)
+                            ?.entries.orEmpty()
+                            .forEach { (key, value) -> confirmGate.write(key, value) }
+                        confirmGate.onToggled(confirmGate.ids() + confirmGate.pluginId)
+                    }) {
+                        Text(stringResource(DesignR.string.plugins_purge_confirm_ok))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showConfirm = false }) {
+                        Text(stringResource(DesignR.string.common_cancel))
+                    }
+                },
+            )
         }
         return
     }
@@ -318,7 +395,7 @@ private fun ValueBox(field: ConfigField, initial: String, resetKey: Int, onSave:
                     onSave(next)
                 }
             },
-            // type=text（例如破甲注入词）按多行编辑：单行输入框既看不到全文也换不了行。
+            // type=text（例如提示词注入词）按多行编辑：单行输入框既看不到全文也换不了行。
             singleLine = field.type != ConfigFieldType.Text,
             minLines = if (field.type == ConfigFieldType.Text) 2 else 1,
             maxLines = if (field.type == ConfigFieldType.Text) 8 else 1,
@@ -396,7 +473,7 @@ private fun ExtraConfigSection(entry: PluginSettingsEntry, onSave: (key: String,
         GroupHeader(label = stringResource(DesignR.string.plugins_set_custom_group), count = saved.size, collapsible = false)
         Column(Modifier.padding(vertical = 4.dp)) {
             saved.forEach { (key, value) ->
-                ConfigFieldRow(ConfigField(key = key, label = key), value, 0) { text ->
+                ConfigFieldRow(ConfigField(key = key, label = key), value, 0, null) { text ->
                     saved = saved + (key to text)
                     onSave(key, text)
                 }
@@ -482,6 +559,7 @@ private fun SchemaRow(
     item: SettingItem,
     current: String,
     resetKey: Int,
+    gate: PromptGate?,
     onSave: (key: String, value: String) -> Unit,
     onReset: (ConfigAction) -> Unit,
 ) {
@@ -491,6 +569,7 @@ private fun SchemaRow(
             ConfigField(item.key, item.label, ConfigFieldType.Switch, current, item.hint),
             current,
             resetKey,
+            gate,
         ) { onSave(item.key, it) }
         is SettingItem.Entry -> ConfigFieldRow(
             ConfigField(
@@ -506,11 +585,13 @@ private fun SchemaRow(
             ),
             current,
             resetKey,
+            null,
         ) { onSave(item.key, it) }
         is SettingItem.Choice -> ConfigFieldRow(
             ConfigField(item.key, item.label, ConfigFieldType.Select, current, item.hint, item.options),
             current,
             resetKey,
+            null,
         ) { onSave(item.key, it) }
         is SettingItem.Slider -> SliderRow(item, current, resetKey) { onSave(item.key, it) }
         is SettingItem.Action -> ActionRow(ConfigAction(item.key, item.label, item.target, item.default)) {

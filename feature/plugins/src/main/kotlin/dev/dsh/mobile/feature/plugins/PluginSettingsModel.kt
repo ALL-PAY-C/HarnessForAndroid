@@ -5,9 +5,10 @@ import dev.dsh.mobile.design.UiText
 import dev.dsh.mobile.design.R
 import dev.dsh.mobile.pluginapi.ConfigFieldType
 import dev.dsh.mobile.pluginapi.SlotContribution
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.pluginhost.ConfigSpec
 import dev.dsh.mobile.pluginhost.PluginManifestFile
+import dev.dsh.mobile.pluginapi.PluginManifest
 
 /** 没有任何设置可操作时的统一文案（列表副标题与详情空态共用，避免两处说法不一致）。 */
 val NO_SETTINGS_TEXT: UiText = UiText.Res(R.string.plugins_no_settings)
@@ -104,6 +105,13 @@ fun pluginSettingsEntries(
     installed: List<PluginManifestFile>,
     pages: List<SlotContribution>,
     values: (String) -> Map<String, String> = { emptyMap() },
+    /**
+     * 原生（编译进 APK）插件的清单：只有声明了 settings 的才进列表。
+     *
+     * 单独一路而不是并进 installed：那一路是「装进磁盘的包」，插件设置页据此判断要不要显示
+     * 「未安装」；内置插件没有包，混进去会得到一行没有页面的幽灵设置。
+     */
+    native: List<PluginManifest> = emptyList(),
 ): List<PluginSettingsEntry> = installed
     .sortedWith(compareBy({ it.name }, { it.id }))
     .map { manifest ->
@@ -127,7 +135,7 @@ fun pluginSettingsEntries(
                 }
             },
         )
-    }
+    } + nativeSettingsEntries(native, installed.map { it.id }.toSet(), values)
 
 /** plugin.json 的 config 声明 → 宿主可渲染的字段；未知 type 一律当文本，不让插件「消失」。 */
 internal fun ConfigSpec.toConfigField(): ConfigField = ConfigField(
@@ -191,3 +199,47 @@ fun switchOn(value: String): Boolean = when (value.trim().lowercase()) {
     "1", "true", "on", "yes", "enabled" -> true
     else -> false
 }
+
+/**
+ * 原生插件的设置项：清单里的 ConfigField 折成与 plugin.json config[] 同构的 ConfigSpec，
+ * 于是设置页不需要为「内置插件」再写一条渲染路径。
+ *
+ * 已被 installed 覆盖的 id 直接跳过：同名包插件以用户装的那份为准。
+ */
+internal fun nativeSettingsEntries(
+    native: List<PluginManifest>,
+    installedIds: Set<String>,
+    values: (String) -> Map<String, String>,
+): List<PluginSettingsEntry> = native
+    .filter { it.settings.isNotEmpty() && it.id !in installedIds }
+    .sortedBy { it.name }
+    .map { manifest ->
+        PluginSettingsEntry(
+            pluginId = manifest.id,
+            name = manifest.name,
+            version = manifest.version,
+            description = manifest.description,
+            fields = manifest.settings,
+            actions = emptyList(),
+            values = values(manifest.id),
+            page = null,
+            webUrl = null,
+            schema = settingsSchema(manifest.settings.map { it.toSpec() }),
+        )
+    }
+
+/** ConfigFieldType → plugin.json 里那套字符串 type：settingsSchema 只认后者。 */
+internal fun ConfigField.toSpec(): ConfigSpec = ConfigSpec(
+    key = key,
+    label = label,
+    type = when (type) {
+        ConfigFieldType.Text -> "text"
+        ConfigFieldType.Secret -> "secret"
+        ConfigFieldType.Switch -> "switch"
+        ConfigFieldType.Number -> "number"
+        ConfigFieldType.Select -> "select"
+    },
+    default = default,
+    hint = hint,
+    options = options,
+)

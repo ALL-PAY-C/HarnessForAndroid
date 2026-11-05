@@ -2,8 +2,8 @@ package dev.dsh.mobile.runtimehost
 
 import android.content.Context
 import android.os.SystemClock
-import dev.dsh.mobile.core.common.AppLog
-import dev.dsh.mobile.core.common.archive.ZipExtract
+import dev.dsh.mobile.core.platform.AppLog
+import dev.dsh.mobile.core.download.archive.ZipExtract
 import dev.dsh.mobile.noderuntime.NodeRuntime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

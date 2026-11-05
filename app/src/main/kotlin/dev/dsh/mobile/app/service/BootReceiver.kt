@@ -3,7 +3,7 @@ package dev.dsh.mobile.app.service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 
 /**
  * Restores the runtime connection after a reboot.

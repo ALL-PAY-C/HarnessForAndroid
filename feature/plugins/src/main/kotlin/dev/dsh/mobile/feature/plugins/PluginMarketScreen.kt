@@ -43,7 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import android.provider.OpenableColumns
-import dev.dsh.mobile.core.common.TimeFmt
+import dev.dsh.mobile.core.platform.TimeFmt
 import dev.dsh.mobile.core.data.backup.BackupManager
 import dev.dsh.mobile.pluginhost.ExternalPluginStore
 import dev.dsh.mobile.pluginhost.FileMarketCache
@@ -327,66 +327,6 @@ fun PluginMarketScreen(
                 Hairline(Modifier.padding(horizontal = 16.dp))
             }
         }
-        if (gitHubOpen) {
-            item(key = "github-import") {
-                AlertDialog(
-                    onDismissRequest = { if (busy == null) gitHubOpen = false },
-                    title = { Text(stringResource(DesignR.string.market_github_title)) },
-                    text = {
-                        Column {
-                            OutlinedTextField(
-                                value = repoInput,
-                                onValueChange = { repoInput = it },
-                                singleLine = true,
-                                label = { Text(stringResource(DesignR.string.market_github_repo_label)) },
-                                placeholder = { Text("https://github.com/owner/repo") },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Text(
-                                stringResource(DesignR.string.market_github_hint),
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(top = 8.dp),
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        TextButton(
-                            enabled = busy == null && repoInput.isNotBlank(),
-                            onClick = {
-                                val input = repoInput.trim()
-                                gitHubOpen = false
-                                busy = GITHUB_BUSY
-                                notice = null
-                                noticeFailed = false
-                                scope.launch {
-                                    val result = withContext(Dispatchers.IO) {
-                                        runCatching {
-                                            GitHubPlugins.install(installer, externalStore, context.cacheDir, input) { id, args ->
-                                                context.getString(id, *args.toTypedArray())
-                                            }
-                                        }
-                                    }
-                                    busy = null
-                                    noticeFailed = result.isFailure
-                                    noticeFailed = result.isFailure
-                                    notice = result.fold(
-                                        onSuccess = { context.getString(DesignR.string.market_installed_hot, it) },
-                                        onFailure = { context.getString(DesignR.string.market_import_failed, it.message ?: it::class.java.simpleName) },
-                                    )
-                                    if (result.isSuccess) {
-                                        snapshots = backup?.list().orEmpty()
-                                        onChanged()
-                                    }
-                                }
-                            },
-                        ) { Text(stringResource(DesignR.string.market_github_install)) }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { gitHubOpen = false }) { Text(stringResource(DesignR.string.common_cancel)) }
-                    },
-                )
-            }
-        }
         // 安装结果/错误常驻在入口下面：成功与失败都必须看得见，失败时把安装器给的完整原因照抄出来。
         notice?.let { text ->
             item {
@@ -637,6 +577,64 @@ fun PluginMarketScreen(
         }
         }
         }
+        if (gitHubOpen) {
+            AlertDialog(
+                onDismissRequest = { if (busy == null) gitHubOpen = false },
+                title = { Text(stringResource(DesignR.string.market_github_title)) },
+                text = {
+                    Column {
+                        OutlinedTextField(
+                            value = repoInput,
+                            onValueChange = { repoInput = it },
+                            singleLine = true,
+                            label = { Text(stringResource(DesignR.string.market_github_repo_label)) },
+                            placeholder = { Text("https://github.com/owner/repo") },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            stringResource(DesignR.string.market_github_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = busy == null && repoInput.isNotBlank(),
+                        onClick = {
+                            val input = repoInput.trim()
+                            gitHubOpen = false
+                            busy = GITHUB_BUSY
+                            notice = null
+                            noticeFailed = false
+                            scope.launch {
+                                val result = withContext(Dispatchers.IO) {
+                                    runCatching {
+                                        GitHubPlugins.install(installer, externalStore, context.cacheDir, input) { id, args ->
+                                            context.getString(id, *args.toTypedArray())
+                                        }
+                                    }
+                                }
+                                busy = null
+                                noticeFailed = result.isFailure
+                                noticeFailed = result.isFailure
+                                notice = result.fold(
+                                    onSuccess = { context.getString(DesignR.string.market_installed_hot, it) },
+                                    onFailure = { context.getString(DesignR.string.market_import_failed, it.message ?: it::class.java.simpleName) },
+                                )
+                                if (result.isSuccess) {
+                                    snapshots = backup?.list().orEmpty()
+                                    onChanged()
+                                }
+                            }
+                        },
+                    ) { Text(stringResource(DesignR.string.market_github_install)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { gitHubOpen = false }) { Text(stringResource(DesignR.string.common_cancel)) }
+                },
+            )
+        }
         // 两个安装入口在主卡下面，常驻页面底部，不随列表滚走。
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
@@ -647,14 +645,14 @@ fun PluginMarketScreen(
                 label = stringResource(
                     if (busy == PICK_BUSY) DesignR.string.market_busy_installing else DesignR.string.market_install_from_file,
                 ),
-                enabled = (installer != null || externalStore != null) && busy == null,
+                enabled = (installer != null || externalStore != null) && busy == null && !loading,
                 modifier = Modifier.weight(1f),
             ) { filePicker.launch(arrayOf("*/*")) }
             MarketActionButton(
                 label = stringResource(
                     if (busy == GITHUB_BUSY) DesignR.string.market_loading_fetch else DesignR.string.market_install_from_link,
                 ),
-                enabled = busy == null,
+                enabled = busy == null && !loading,
                 modifier = Modifier.weight(1f),
             ) { gitHubOpen = true }
         }

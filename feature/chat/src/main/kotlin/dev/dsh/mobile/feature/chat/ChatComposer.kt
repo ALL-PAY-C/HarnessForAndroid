@@ -260,6 +260,8 @@ internal fun Composer(
     onExtra: (String) -> Unit,
     onPickFile: () -> Unit,
     onPickImage: () -> Unit,
+    /** 当前模型是否允许图片输入（M4）；false 时图片按钮置灰并在输入区上方给一行提示。 */
+    imageEnabled: Boolean = true,
     onTakePhoto: () -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
@@ -425,13 +427,21 @@ internal fun Composer(
                     modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                 )
             }
+            if (!imageEnabled) {
+                Text(
+                    stringResource(DesignR.string.chat_image_needs_model),
+                    color = p.t3,
+                    fontSize = 10.5.sp,
+                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 2.dp),
+                )
+            }
             Row(
                 Modifier.fillMaxWidth().padding(start = 6.dp, end = 8.dp, top = 2.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // 常显：不受「+」与面板开关影响。
                 ToolButton(stringResource(DesignR.string.common_file), Icons.Filled.AttachFile, onPickFile)
-                ToolButton(stringResource(DesignR.string.common_image), Icons.Filled.Image, onPickImage)
+                ToolButton(stringResource(DesignR.string.common_image), Icons.Filled.Image, onPickImage, enabled = imageEnabled)
                 ToolButton(stringResource(DesignR.string.common_take_photo), Icons.Filled.PhotoCamera, onTakePhoto)
                 Spacer(Modifier.weight(1f))
                 if (streaming && input.text.isNotBlank()) {
@@ -680,17 +690,18 @@ private fun ComposerSlotRow(slots: List<SlotContribution>, onSlot: (SlotContribu
 }
 
 @Composable
-private fun ToolButton(label: String, icon: ImageVector, onClick: () -> Unit) {
+private fun ToolButton(label: String, icon: ImageVector, onClick: () -> Unit, enabled: Boolean = true) {
     val p = LocalQq.current
+    val tint = if (enabled) p.t2 else p.t3.copy(alpha = 0.45f)
     Row(
         Modifier
             .clip(QqShape.chip())
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        Icon(icon, label, tint = p.t2, modifier = Modifier.size(17.dp))
-        Text(label, color = p.t2, fontSize = 12.5.sp)
+        Icon(icon, label, tint = tint, modifier = Modifier.size(17.dp))
+        Text(label, color = tint, fontSize = 12.5.sp)
     }
 }

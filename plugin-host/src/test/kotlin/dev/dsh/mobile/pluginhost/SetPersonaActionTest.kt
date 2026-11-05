@@ -74,7 +74,7 @@ class SetPersonaActionTest {
             ctx.registerContribution({
               slot: "chat.settings",
               id: "one-click",
-              label: "破甲注入：一键开 / 关",
+              label: "提示词注入：一键开 / 关",
               action: { kind: "setpersona", text: "人设正文" }
             });
             ctx.registerContribution({

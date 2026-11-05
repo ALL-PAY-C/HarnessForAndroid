@@ -3,7 +3,7 @@ package dev.dsh.mobile.core.data.repo
 import androidx.room.DatabaseConfiguration
 import androidx.room.InvalidationTracker
 import androidx.sqlite.db.SupportSQLiteOpenHelper
-import dev.dsh.mobile.core.common.DshResult
+import dev.dsh.mobile.core.platform.DshResult
 import dev.dsh.mobile.core.data.db.DshDatabase
 import dev.dsh.mobile.core.data.db.EndpointDao
 import dev.dsh.mobile.core.data.db.EndpointEntity

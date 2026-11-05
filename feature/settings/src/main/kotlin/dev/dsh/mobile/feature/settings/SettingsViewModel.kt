@@ -1,12 +1,12 @@
 package dev.dsh.mobile.feature.settings
 
-import dev.dsh.mobile.core.common.ProxyEnv
+import dev.dsh.mobile.core.platform.ProxyEnv
 import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.design.UiText
-import dev.dsh.mobile.core.common.UiLanguage
-import dev.dsh.mobile.core.common.device.CapabilityTier
-import dev.dsh.mobile.core.common.device.CapabilityTiers
-import dev.dsh.mobile.core.common.device.DeviceCapability
+import dev.dsh.mobile.core.platform.UiLanguage
+import dev.dsh.mobile.core.platform.device.CapabilityTier
+import dev.dsh.mobile.core.platform.device.CapabilityTiers
+import dev.dsh.mobile.core.platform.device.DeviceCapability
 import dev.dsh.mobile.core.data.secret.EndpointSecretStore
 import dev.dsh.mobile.core.data.settings.WebSecretKeys
 import kotlinx.coroutines.CancellationException

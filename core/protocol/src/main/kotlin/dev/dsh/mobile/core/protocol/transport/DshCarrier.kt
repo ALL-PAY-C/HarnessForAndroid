@@ -1,6 +1,6 @@
 package dev.dsh.mobile.core.protocol.transport
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.protocol.DshJson
 import dev.dsh.mobile.core.protocol.LineChannel
 import kotlinx.coroutines.CancellationException

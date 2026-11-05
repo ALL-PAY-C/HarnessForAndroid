@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.dsh.mobile.core.common.device.DeviceCapability
+import dev.dsh.mobile.core.platform.device.DeviceCapability
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider
 import dev.dsh.mobile.design.QqPalette

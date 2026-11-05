@@ -1,7 +1,7 @@
 package dev.dsh.mobile.plugin.html.diagram
 
 import android.content.Context
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import java.io.File
 import java.io.InputStream
 import java.util.zip.ZipFile

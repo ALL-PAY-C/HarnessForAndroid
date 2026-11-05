@@ -15,8 +15,8 @@ import dev.dsh.mobile.app.AppContainer
 import dev.dsh.mobile.app.DshApplication
 import dev.dsh.mobile.app.MainActivity
 import dev.dsh.mobile.app.notify.OngoingCenter
-import dev.dsh.mobile.core.common.AppLog
-import dev.dsh.mobile.core.common.AppScope
+import dev.dsh.mobile.core.platform.AppLog
+import dev.dsh.mobile.core.platform.AppScope
 import dev.dsh.mobile.core.model.RuntimeState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch

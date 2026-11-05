@@ -57,7 +57,7 @@ import androidx.compose.ui.text.AnnotatedString
  *
  * 折叠态分三档：
  * - 正在推理：`思考中… 1.2k 字 · 2 个工具`，字数随流式实时往上走，右侧图标放大镜在呼吸；
- * - 已有推理：`思考 · 4.2s · 1.2k 字 · 2 个工具`，耗时取落库的真实生成时间；
+ * - 已有推理：`思考过程 · 3 段，2 个工具`，段数按空行分段计，工具数单独算；
  * - 只有工具：`工具调用 · 2 个`。
  *
  * 展开态是一张二级底色卡：思维链给固定高度并**自动跟随最新一行**（流式时不用手动往下拖），
@@ -76,6 +76,13 @@ internal fun thoughtExpanded(
     live -> true
     else -> defaultOpen
 }
+
+/**
+ * 思考段数：按空行（一个或多个换行夹空白）分段，纯空白段不算。
+ * 一段都没有就是 0 —— 折叠行据此只说「思考过程 · N 段」，不再把「有思考」记成 1 步。
+ */
+internal fun thoughtSegments(thought: String): Int =
+    thought.split(Regex("""\n\s*\n""")).count { it.isNotBlank() }
 
 @Composable
 fun ActivitySummary(
@@ -100,11 +107,18 @@ fun ActivitySummary(
     val open = thoughtExpanded(live, chars > 0 || tools.isNotEmpty(), manualOpen, defaultOpen = expandDefault)
     // 折叠行只说「在干什么 / 干完了、用了多久 / 动了几个工具」。
     // 不再塞「1.2k 字」这种计数：字数对用户没有决策价值，还占掉一行里最显眼的位置。
-    val steps = tools.size + if (chars > 0) 1 else 0
+    val segments = thoughtSegments(thought)
     val head = if (live) {
         stringResource(R.string.design_activity_thinking_live)
     } else {
-        stringResource(R.string.design_activity_thought_steps, steps)
+        // 思考段数与工具数是两件事，各说各的，不相加：相加之后永远是「1 步」或「N 步」，
+        // 既看不出推理分了几段，也看不出调了几个工具。
+        val parts = buildList {
+            if (segments > 0) add(stringResource(R.string.design_activity_thought_steps, segments))
+            if (tools.isNotEmpty()) add(stringResource(R.string.design_activity_tool_count, tools.size))
+        }
+        parts.joinToString(stringResource(R.string.design_activity_phrase_sep))
+            .ifBlank { stringResource(R.string.design_activity_thought_steps, 0) }
     }
     Column(modifier.fillMaxWidth()) {
         Row(

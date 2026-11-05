@@ -1,6 +1,6 @@
 package dev.dsh.mobile.toolbridge.phone
 
-import dev.dsh.mobile.core.common.device.CapabilityActions
+import dev.dsh.mobile.core.platform.device.CapabilityActions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

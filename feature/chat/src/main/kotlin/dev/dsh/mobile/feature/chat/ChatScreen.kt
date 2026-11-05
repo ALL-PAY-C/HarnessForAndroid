@@ -85,7 +85,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import dev.dsh.mobile.core.common.TimeFmt
+import dev.dsh.mobile.core.platform.TimeFmt
 import dev.dsh.mobile.core.data.settings.SendMode
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -217,6 +217,8 @@ fun ChatScreen(
     val cameraFailedTemplate = stringResource(DesignR.string.chat_camera_open_failed)
     val cameraPermissionHint = stringResource(DesignR.string.chat_camera_permission_hint)
     val noPhotoNotice = stringResource(DesignR.string.chat_no_photo)
+    // M4：当前模型没开图片输入时的提示；按钮本身由 Composer 置灰，这里只管点下去时的回执。
+    val imageNeedsModel = stringResource(DesignR.string.chat_image_needs_model)
 
     fun attach(uri: Uri, label: String, image: Boolean) {
         scope.launch {
@@ -599,7 +601,10 @@ fun ChatScreen(
                 }
                 panelOpen = false
             },            onPickFile = { pickFile.launch("*/*") },
-            onPickImage = { pickImage.launch("image/*") },
+            imageEnabled = state.imageInputEnabled,
+            onPickImage = {
+                if (state.imageInputEnabled) pickImage.launch("image/*") else notice = imageNeedsModel
+            },
             onTakePhoto = {
                 val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
                     PackageManager.PERMISSION_GRANTED

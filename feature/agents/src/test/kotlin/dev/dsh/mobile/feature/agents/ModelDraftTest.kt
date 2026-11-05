@@ -1,6 +1,8 @@
 package dev.dsh.mobile.feature.agents
 
 import dev.dsh.mobile.core.data.settings.ModelCatalog
+import dev.dsh.mobile.core.data.settings.ModelProfile
+import dev.dsh.mobile.core.model.ReasoningStyle
 import dev.dsh.mobile.core.data.settings.ModelProviders
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -62,4 +64,63 @@ class ModelDraftTest {
     fun `没有勾选时输出空表`() {
         assertTrue(buildProfiles(ModelDraft(), emptyList()).isEmpty())
     }
+
+    @Test
+    fun `保存时带上草稿的思考风格`() {
+        val explicit = buildProfiles(
+            ModelDraft(providerId = "custom", baseUrl = "u", apiKey = "k", reasoningStyle = ReasoningStyle.thinkingBudget),
+            listOf("m1"),
+        )
+        assertEquals(ReasoningStyle.thinkingBudget, explicit.single().reasoningStyle)
+        // 表单没有选择器：草稿默认 auto，交给协议层按 provider/模型推断。
+        assertEquals(ReasoningStyle.auto, buildProfiles(ModelDraft(), listOf("m1")).single().reasoningStyle)
+    }
+
+    @Test
+    fun `编辑已有条目一次不会把思考风格打回 auto`() {
+        val saved = ModelProfile(
+            id = "m-1",
+            name = "g",
+            providerId = "custom",
+            baseUrl = "u",
+            apiKey = "k",
+            model = "m1",
+            reasoningStyle = ReasoningStyle.thinkingBudget,
+        )
+        // 表单回填原 profile 的值，保存一次后必须还是它。
+        val draft = ModelDraft(
+            providerId = saved.providerId,
+            baseUrl = saved.baseUrl,
+            apiKey = saved.apiKey,
+            reasoningStyle = saved.reasoningStyle,
+        )
+        val list = buildProfiles(draft, listOf(saved.model), existingId = saved.id, nowMs = 7L)
+        assertEquals(ReasoningStyle.thinkingBudget, list.single().reasoningStyle)
+    }
+
+    @Test
+    fun `draft 的新能力位与推理映射一路带到 profile`() {
+        val draft = ModelDraft(
+            name = "多模态",
+            providerId = "custom",
+            baseUrl = "http://127.0.0.1:8318/v1",
+            apiKey = "sk-x",
+            supportsImages = true,
+            supportsOcr = true,
+            reasoningMap = "high=thinking_budget:8192",
+        )
+        val profile = buildProfiles(draft, listOf("vision-1"), nowMs = 1L).single()
+        assertTrue(profile.supportsImages)
+        assertTrue(profile.supportsOcr)
+        assertEquals("high=thinking_budget:8192", profile.reasoningMap)
+    }
+
+    @Test
+    fun `默认 draft 不打开任何能力位`() {
+        val profile = buildProfiles(ModelDraft(baseUrl = "http://x/v1", apiKey = "k"), listOf("m"), nowMs = 2L).single()
+        assertEquals(false, profile.supportsImages)
+        assertEquals(false, profile.supportsOcr)
+        assertEquals("", profile.reasoningMap)
+    }
+
 }

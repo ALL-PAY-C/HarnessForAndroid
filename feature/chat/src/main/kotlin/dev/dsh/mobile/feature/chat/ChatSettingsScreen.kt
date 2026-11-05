@@ -120,7 +120,7 @@ fun ChatSettingsScreen(
         .ifBlank { state.agentName }
         .ifBlank { stringResource(DesignR.string.chat_no_agent_selected) }
 
-    // 会话设置槽里 kind = setpersona 的那一条就是「破甲注入」开关：渲染成开关行放在
+    // 会话设置槽里 kind = setpersona 的那一条就是「提示词注入」开关：渲染成开关行放在
     // 「特殊格式渲染」下面，不再当 chip 出现。checked 读会话真实 persona，不存本地临时值。
     val personaSlot = remember(slotPlaced) { personaSlotOf(slotPlaced) }
     val personaOn = state.persona.isNotBlank()
@@ -197,7 +197,7 @@ fun ChatSettingsScreen(
                         Spacer(Modifier.width(QqSpace.s()))
                         Switch(checked = state.renderSpecial, onCheckedChange = viewModel::setRenderSpecial)
                     }
-                    // 破甲注入：与上面同卡片同排版，点一下走既有的 SetPersona（有则清、无则写）。
+                    // 提示词注入：与上面同卡片同排版，点一下走既有的 SetPersona（有则清、无则写）。
                     personaSlot?.let { slot ->
                         Box(
                             Modifier.fillMaxWidth().padding(vertical = 10.dp).height(0.6.dp).background(p.line),
@@ -571,7 +571,7 @@ private fun AgentPresetDialog(
 }
 
 /**
- * 会话设置槽里代表「破甲注入」开关的那一条：只认 kind = setpersona（落成 [SlotAction.SetPersona]）。
+ * 会话设置槽里代表「提示词注入」开关的那一条：只认 kind = setpersona（落成 [SlotAction.SetPersona]）。
  *
  * 纯函数：插件重复注册多条时只取第一条，渲染层绝不会因此画出一排开关。
  */
@@ -579,7 +579,7 @@ internal fun personaSlotOf(slots: List<SlotContribution>): SlotContribution? =
     slots.firstOrNull { it.action is SlotAction.SetPersona }
 
 /**
- * 开关标题：插件给的 label 里可能嵌了它自己记的状态（「破甲注入：开（本会话）」），
+ * 开关标题：插件给的 label 里可能嵌了它自己记的状态（「提示词注入：开（本会话）」），
  * 状态由本行的 Switch 表达，再显示一遍就会在关掉时自相矛盾 —— 取冒号前的部分。
  */
 internal fun personaLabelOf(label: String, fallback: String): String =

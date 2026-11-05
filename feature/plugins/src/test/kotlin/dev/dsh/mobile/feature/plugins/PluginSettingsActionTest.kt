@@ -19,7 +19,7 @@ class PluginSettingsActionTest {
 
     private fun manifest(config: List<ConfigSpec>) = PluginManifestFile(
         id = "dsh.sauce",
-        name = "破甲",
+        name = "注入",
         version = "1.0.0",
         description = "",
         homepage = "",

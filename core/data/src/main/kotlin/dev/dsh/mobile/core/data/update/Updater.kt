@@ -3,10 +3,10 @@ package dev.dsh.mobile.core.data.update
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
-import dev.dsh.mobile.core.common.RuntimeMirrors
-import dev.dsh.mobile.core.common.download.DownloadCache
-import dev.dsh.mobile.core.common.download.Downloads
-import dev.dsh.mobile.core.common.download.SegmentedDownloader
+import dev.dsh.mobile.core.platform.RuntimeMirrors
+import dev.dsh.mobile.core.download.DownloadCache
+import dev.dsh.mobile.core.download.Downloads
+import dev.dsh.mobile.core.download.SegmentedDownloader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject

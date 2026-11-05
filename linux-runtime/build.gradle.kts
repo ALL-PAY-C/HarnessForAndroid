@@ -20,8 +20,8 @@ android {
 dependencies {
     // 单向依赖：linux-runtime -> toolbridge（toolbridge 不得反向依赖本模块）
     api(project(":toolbridge"))
-    // core:common 只有 ProxyEnv（LinuxNativeProbe / ProotChannel 内部用）→ implementation。
-    implementation(project(":core:common"))
+    // core:platform 只有 ProxyEnv（LinuxNativeProbe / ProotChannel 内部用）→ implementation。
+    implementation(project(":core:platform"))
     api(libs.kotlinx.coroutines.core)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

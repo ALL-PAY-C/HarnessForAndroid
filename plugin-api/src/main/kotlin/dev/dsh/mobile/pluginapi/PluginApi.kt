@@ -59,6 +59,13 @@ data class PluginManifest(
      * 宿主在拼 system 时把已启用插件的这一段按顺序接上去，插件被停用即消失。
      */
     val systemPrompt: String = "",
+    /**
+     * 原生（编译进 APK）插件声明的设置项；声明式插件用 plugin.json 的 config[]，这里留空。
+     *
+     * 宿主把它们折成设置行渲染（与 plugin.json 的 config 走同一套渲染通道），值仍然写回
+     * 插件自己的 config —— 不新增第二份存储。空列表 = 这个插件没有设置项，老插件零改动。
+     */
+    val settings: List<ConfigField> = emptyList(),
 )
 
 /**

@@ -1,6 +1,6 @@
 package dev.dsh.mobile.linux
 
-import dev.dsh.mobile.core.common.RuntimeMirrors
+import dev.dsh.mobile.core.platform.RuntimeMirrors
 import dev.dsh.mobile.toolbridge.ShellChannel
 import dev.dsh.mobile.toolbridge.ShellResult
 import java.io.File

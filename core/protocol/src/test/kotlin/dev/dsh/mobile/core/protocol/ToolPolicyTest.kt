@@ -1,8 +1,8 @@
 package dev.dsh.mobile.core.protocol
 
-import dev.dsh.mobile.core.common.device.CapabilityTier
-import dev.dsh.mobile.core.common.device.CapabilityTiers
-import dev.dsh.mobile.core.common.device.DeviceCapability
+import dev.dsh.mobile.core.platform.device.CapabilityTier
+import dev.dsh.mobile.core.platform.device.CapabilityTiers
+import dev.dsh.mobile.core.platform.device.DeviceCapability
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals

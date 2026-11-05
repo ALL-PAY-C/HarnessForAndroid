@@ -8,9 +8,10 @@ android {
 }
 dependencies {
     api(project(":core:model"))
-    // core:common 只在实现里用（AppLog 等），公共签名（LineChannel / 协议模型）不出现
-    // core.common 类型 → implementation。
-    implementation(project(":core:common"))
+    // platform（AppLog / DeviceCapability）与 download（PendingImageQueue）都只在实现里用，
+    // 公共签名（LineChannel / 协议模型）不出现它们的类型 → implementation。
+    implementation(project(":core:platform"))
+    implementation(project(":core:download"))
     api(libs.kotlinx.serialization.json)
     api(libs.kotlinx.coroutines.core)
     implementation(libs.okhttp)

@@ -35,9 +35,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.dsh.mobile.app.DshApplication
-import dev.dsh.mobile.core.common.diag.LkgPlanner
-import dev.dsh.mobile.core.common.RestartReason
-import dev.dsh.mobile.core.common.restartApp
+import dev.dsh.mobile.core.download.diag.LkgPlanner
+import dev.dsh.mobile.core.platform.RestartReason
+import dev.dsh.mobile.core.platform.restartApp
 import dev.dsh.mobile.core.data.DataModule
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider

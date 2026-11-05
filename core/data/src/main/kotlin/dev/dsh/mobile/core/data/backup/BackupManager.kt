@@ -1,7 +1,7 @@
 package dev.dsh.mobile.core.data.backup
 
 import android.content.Context
-import dev.dsh.mobile.core.common.archive.ZipExtract
+import dev.dsh.mobile.core.download.archive.ZipExtract
 import dev.dsh.mobile.core.data.EndpointTokenMigration
 import java.io.File
 import java.text.SimpleDateFormat

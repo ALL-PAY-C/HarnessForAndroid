@@ -1,11 +1,11 @@
 package dev.dsh.mobile.feature.plugins
 
-import dev.dsh.mobile.core.common.RuntimeMirrors
+import dev.dsh.mobile.core.platform.RuntimeMirrors
 import dev.dsh.mobile.design.UiText
 import dev.dsh.mobile.design.R
-import dev.dsh.mobile.core.common.archive.ZipExtract
-import dev.dsh.mobile.core.common.download.DownloadCache
-import dev.dsh.mobile.core.common.download.Downloads
+import dev.dsh.mobile.core.download.archive.ZipExtract
+import dev.dsh.mobile.core.download.DownloadCache
+import dev.dsh.mobile.core.download.Downloads
 import java.io.File
 import java.io.IOException
 

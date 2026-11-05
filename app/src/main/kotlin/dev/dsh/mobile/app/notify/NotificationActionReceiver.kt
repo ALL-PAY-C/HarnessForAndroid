@@ -5,9 +5,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import dev.dsh.mobile.app.DshApplication
-import dev.dsh.mobile.core.common.AppLog
-import dev.dsh.mobile.core.common.AppScope
-import dev.dsh.mobile.core.common.DshResult
+import dev.dsh.mobile.core.platform.AppLog
+import dev.dsh.mobile.core.platform.AppScope
+import dev.dsh.mobile.core.platform.DshResult
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 

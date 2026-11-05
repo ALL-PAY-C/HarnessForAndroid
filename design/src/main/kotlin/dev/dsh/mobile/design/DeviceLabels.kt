@@ -2,13 +2,13 @@ package dev.dsh.mobile.design
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import dev.dsh.mobile.core.common.device.CapabilityTier
-import dev.dsh.mobile.core.common.device.DeviceCapability
+import dev.dsh.mobile.core.platform.device.CapabilityTier
+import dev.dsh.mobile.core.platform.device.DeviceCapability
 
 /**
  * 设备能力词表的显示层映射。
  *
- * core:common 的枚举只带 id（数据层不夹文案），文案在这里按项查 design 自己的资源，
+ * core:platform 的枚举只带 id（数据层不夹文案），文案在这里按项查 design 自己的资源，
  * 切系统语言后重新渲染即生效，JVM 单测也不需要 Context。
  * 加一类能力：枚举加一项 + catalog.json 加两条 + 本文件加两个分支（when 是穷尽的，漏了编译不过）。
  */

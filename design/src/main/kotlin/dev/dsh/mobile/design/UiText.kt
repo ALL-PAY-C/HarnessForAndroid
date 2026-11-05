@@ -4,8 +4,8 @@ import android.content.Context
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import dev.dsh.mobile.core.common.DividerLabel
-import dev.dsh.mobile.core.common.RelativeTime
+import dev.dsh.mobile.core.platform.DividerLabel
+import dev.dsh.mobile.core.platform.RelativeTime
 
 /**
  * 一条还没定语言的界面文案。

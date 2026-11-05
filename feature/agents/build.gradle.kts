@@ -18,7 +18,7 @@ dependencies {
     implementation(project(":design"))
     implementation(project(":core:data"))
     implementation(project(":core:model"))
-    implementation(project(":core:common"))
+    implementation(project(":core:platform"))
     implementation(libs.androidx.navigation.compose)
     testImplementation(libs.junit)
     // 桌面 JVM 上 org.json 只有桩实现，单测里换成真实现（与 plugin-host 同做法）。

@@ -31,9 +31,9 @@ android {
 
 dependencies {
     compileOnly(project(":plugin-api"))
-    // AppLog 直接取自 core:common，必须显式声明：以前靠 plugin-api 的 api(core:common)
-    // 泄漏拿到，T1.2 把那条例行删了，插件这里就得自己声明（compileOnly，宿主提供实现）。
-    compileOnly(project(":core:common"))
+    // AppLog 直接取自 core:platform，必须显式声明：以前靠 plugin-api 的 api() 泄漏拿到，
+    // T1.2 把那条例行删了，插件这里就得自己声明（compileOnly，宿主提供实现）。
+    compileOnly(project(":core:platform"))
 
     val composeBom = platform(libs.compose.bom)
     compileOnly(composeBom)

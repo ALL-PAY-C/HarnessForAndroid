@@ -2,7 +2,7 @@ package dev.dsh.mobile.app.diag
 
 import android.content.Context
 import android.os.Build
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.model.diag.CrashClassifier
 import dev.dsh.mobile.core.model.diag.CrashKind
 import java.security.MessageDigest

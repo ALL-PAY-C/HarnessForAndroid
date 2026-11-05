@@ -1,6 +1,6 @@
 package dev.dsh.mobile.app
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.runtimehost.HostCallHandler
 import dev.dsh.mobile.runtimehost.NodeEngineException
 import kotlinx.coroutines.Dispatchers

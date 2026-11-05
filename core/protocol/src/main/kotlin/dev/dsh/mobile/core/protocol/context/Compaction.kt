@@ -1,6 +1,6 @@
 package dev.dsh.mobile.core.protocol.context
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.model.ChatMessage
 import dev.dsh.mobile.core.model.context.WarmLayerStore
 import dev.dsh.mobile.core.protocol.AgentThreads

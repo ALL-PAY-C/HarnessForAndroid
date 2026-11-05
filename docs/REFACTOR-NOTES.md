@@ -89,7 +89,7 @@ P0–P8 主体已落地并在模拟器上跑通：debug/release 均可构建出�
 - **release 已开 R8 与资源收缩（Q1 已执行，2026-11-05）**：`app/build.gradle.kts` release 块 `isMinifyEnabled = true`、`isShrinkResources = true`，keep 规则写在 `app/proguard-rules.pro` 八段（pluginapi/pluginhost 反射面、`**$Stub`、`@JavascriptInterface`、Rhino、kotlinx.serialization、Room、`**$WhenMappings` 等）。
   - 实测：`assembleRelease` BUILD SUCCESSFUL 2m58s，产物 105,344,356 B（压缩前 116,897,440 B，−9.9%）；装机冷启 3896 ms。
   - 实测：R8 包内模型保存、引擎 `ENGINE_REMOTE_READY`、流式回复、思考链折叠、工具调用、MCP `initialize/tools/list/tools/call`（回复「工具返回：echo:ping」）全部正常。
-  - 实测：内置插件 `HTML 渲染 / 示例 Hello / 示例 Whoami` 自检全 OK（`dsh.html selfcheck: OK 入口类可反射无参构造`），声明式 zip 插件 `pl.purge` 与市场 npm 插件 `dsh-auto-model-routing` 均装上并显示「已启用」。
+  - 实测：内置插件 `HTML 渲染 / 示例 Hello / 示例 Whoami` 自检全 OK（`dsh.html selfcheck: OK 入口类可反射无参构造`），声明式 zip 插件 `pl.example.prompt` 与市场 npm 插件 `dsh-auto-model-routing` 均装上并显示「已启用」。
   - 影响面：新增对外部插件 dex 的命名约束——插件侧不得依赖被 R8 改名的宿主类名，宿主侧 keep 规则改动后必须重跑上述三条实测。
 
 - **签名双轨（Q2）**：默认 legacy 证书，新正式证书在仓库外。
@@ -160,3 +160,50 @@ P0–P8 主体已落地并在模拟器上跑通：debug/release 均可构建出�
    `cd D:\DSH\HFA-WORK\app\engine && npm install --no-audit --no-fund`
 
 产物位置：debug `app/build/outputs/apk/debug/app-debug.apk`，release `app/build/outputs/apk/release/HarnessForAndroid-release-v0.08.apk`。
+
+## 五、vendored 与纯壳模块（O5 / O6，2026-11-06）
+
+三条结论，一个模块没删：
+
+- **`terminal` = vendored，显式标注。** 23 个 `.kt` 共 7,101 行，`com.termux.terminal` / `com.termux.view`
+  是 termux-app 终端模拟器的 Kotlin 镜像移植，`src/main/jni/termux.c` 是上游 PTY 辅助的同一份代码。
+  落地：`terminal/README.md`（来源 / 禁改约定 / 改动台账 / 升级流程）+ `terminal/build.gradle.kts` 顶部 4 行注释。
+  **不加逐文件头注释** —— 23 份同样的 vendored 声明是纯噪声，一个标注点足够。
+  口径：本模块不计入自研行数 / 复杂度 / 覆盖率，只接受编译级修补。
+- **`plugin-html-apk` 不是空壳，保留。** O6 原判断是「0 文件」，实测 3 个文件、0 个 Kotlin：
+  `build.gradle.kts`（`com.android.application`，`applicationId dev.dsh.mobile.plugin.html`）、空 `AndroidManifest.xml`、
+  `assets/plugin.json`（`entry = dev.dsh.mobile.plugin.html.HtmlPlugin`，`id = dsh.html`）。
+  它 `implementation(project(":plugin-html"))`，承担 APK 变体职责：把插件实现打成本机可独立安装的插件包。
+  删它 = 外部插件加载链路没有可安装物。O6 的备选「Gradle variant 替代」未启动，故按第二选项处置：
+  `plugin-html-apk/README.md` 写明存在理由与四条约束（版本号读 `gradle.properties` 单一来源、
+  `plugin-api` 不进包、debug key 直装、lint 关闭）。仓库里没有 `project(":plugin-html-apk")` 依赖边；
+  其余 6 处提及全是 include / 注释 / 文档（`settings.gradle.kts:36`、`build.gradle.kts:29`、
+  `app/build.gradle.kts:200`、`:302`、`plugin-html/build.gradle.kts:9`、`gradle.properties:9`、`README.md:100`），不构成待清理引用。
+- **`node-runtime` 保持不动。** 1 文件 96 行是 `downloadLibnode` 资产管道的载体（§十一 坑 23：
+  全镜像 Connection reset，需手工把 `android-libnode-v22.23.2.zip` 投到 gradle cache 才能过）。
+  并入 `runtime-host` 会让该任务类型换模块、缓存路径与镜像列表一起搬。保留理由记在此处，本轮不做合并。
+
+边界：本轮只改 `terminal/README.md`、`terminal/build.gradle.kts`（仅顶部注释）、`plugin-html-apk/README.md`、本文件；
+未删模块、未改业务代码与构建逻辑。
+
+## 六、core:common 拆成 core:platform + core:download（O3，2026-11-06）
+
+- **结论**：`core:common`（18 main + 8 test，3,112 行，14 个模块依赖）拆成 `core:platform`（13 main + 6 test）
+  与 `core:download`（5 main + 2 test），原模块目录与 `settings.gradle.kts` 条目删除，业务逻辑零改动。
+- **分层**：`core:platform` = 平台原语（Time / Log / Dispatchers / Result / Options / UiLocale / Capability /
+  HttpJson / ProxyEnv / LoopbackGateway / AppRestart / RuntimeMirrors / crypto.PassphraseCipher），**零 `project()` 依赖边**；
+  `core:download` = 下载与归档（SegmentedDownloader / Downloads / ZipExtract / LkgPlanner / PendingImageQueue），
+  单向 `implementation(project(":core:platform"))`。反向边为零，`platform` 不感知 `download`。
+- **包名**：`dev.dsh.mobile.core.common.X` → `dev.dsh.mobile.core.platform.X` / `dev.dsh.mobile.core.download.X`；
+  子包 `crypto` / `device` / `net` 归 platform，`archive` / `diag` 归 download。原 `common.download` 子包塌平到
+  `core.download` 根包（`Downloads.kt`、`SegmentedDownloader.kt`、`DownloadsTest.kt` 三个文件少一层目录）。
+- **依赖声明**：14 个消费模块按符号择一或双取，`plugin-api` 的 `:core:common` 边原本零引用、直接去掉。
+  `core:data` 由 `api(:core:common)` 改为 `api(:core:platform)` + `implementation(:core:download)`：
+  保持对外 `api` 暴露面只经 platform，download 不进下游编译类路径。
+- **唯一新增 import**：`PendingImageQueue.kt` 迁包后与 `AppLog` 不再同包，补
+  `import dev.dsh.mobile.core.platform.AppLog`（:44 / :71 两处引用）。core/common 内部原本零跨包 import，
+  所以整次迁移只有这一处「非改名」的源码改动。
+- **证据**：`assembleDebug` BUILD SUCCESSFUL in 42s；6 个模块单测 150 suites / 1031 tests / 0 fail / 0 err
+  （platform 32、download 17、data 277、protocol 366、app 22、plugin-host 317）；
+  `core.common` / `core:common` 全仓 `*.kt`、`*.kts` 命中 0（排除 `build/`）。
+- **报告**：`research/O3-report.md`（26 个文件归属表 + 14 个模块依赖前后 + rename diffstat 原文）。

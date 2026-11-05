@@ -1,6 +1,6 @@
 package dev.dsh.mobile.app.diag
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.model.diag.SafeMode
 
 /**

@@ -4,8 +4,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import dev.dsh.mobile.core.common.net.HttpJson
-import dev.dsh.mobile.core.common.net.HttpJsonException
+import dev.dsh.mobile.core.platform.net.HttpJson
+import dev.dsh.mobile.core.platform.net.HttpJsonException
 import java.net.SocketTimeoutException
 
 /** 探测失败的分类。展示文案由 UI 层按资源拼接（core:data 不带中文）。 */

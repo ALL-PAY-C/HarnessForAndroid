@@ -4,10 +4,10 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
 import java.net.URI
-import dev.dsh.mobile.core.common.RuntimeMirrors
-import dev.dsh.mobile.core.common.archive.ZipExtract
-import dev.dsh.mobile.core.common.download.DownloadCache
-import dev.dsh.mobile.core.common.download.Downloads
+import dev.dsh.mobile.core.platform.RuntimeMirrors
+import dev.dsh.mobile.core.download.archive.ZipExtract
+import dev.dsh.mobile.core.download.DownloadCache
+import dev.dsh.mobile.core.download.Downloads
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive

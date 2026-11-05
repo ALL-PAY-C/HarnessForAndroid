@@ -62,7 +62,7 @@ import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.design.IconBtn
 import dev.dsh.mobile.design.QqShape
 import dev.dsh.mobile.design.QqSpace

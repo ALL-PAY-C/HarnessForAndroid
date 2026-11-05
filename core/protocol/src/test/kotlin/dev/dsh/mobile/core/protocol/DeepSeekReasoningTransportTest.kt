@@ -3,6 +3,7 @@ package dev.dsh.mobile.core.protocol
 import java.net.ServerSocket
 import java.net.InetAddress
 import dev.dsh.mobile.core.model.ChatMessage
+import dev.dsh.mobile.core.model.ReasoningStyle
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.json.*
@@ -30,7 +31,7 @@ class DeepSeekReasoningTransportTest {
     }
 
     @Test fun otherModelsKeepTheirOriginalRequestBytes() = runBlocking {
-        for (model in listOf("gpt-4o-mini", "claude-sonnet", "ollama/llama3")) {
+        for (model in listOf("gpt-4o-mini", "ollama/llama3")) {
             Fixture().use { f ->
                 val history = listOf(assistant("prior answer", "private prior reasoning"))
                 f.run(model, history)
@@ -48,6 +49,29 @@ class DeepSeekReasoningTransportTest {
                 }
                 assertEquals(expected.toString(), f.rawRequests.single())
             }
+        }
+    }
+
+    @Test fun claudeAndRelayedGeminiNowSendReasoningEffort() = runBlocking {
+        // 这次修的 bug：以前只有 deepseek 名字白名单才发思考参数，gemini/claude 一律不发。
+        for (model in listOf("claude-sonnet", "gemini-2.5-flash")) {
+            Fixture().use { f ->
+                f.run(model)
+                val request = f.requests.single()
+                assertEquals(model, "enabled", request["thinking"]?.jsonObject?.get("type")?.jsonPrimitive?.content)
+                assertEquals(model, "high", request["reasoning_effort"]?.jsonPrimitive?.content)
+                // 中转端点不给 budget_tokens（本机网关只认 reasoning_effort）
+                assertNull(request["thinking"]?.jsonObject?.get("budget_tokens"))
+            }
+        }
+    }
+
+    @Test fun explicitNoneSendsNothingAtAll() = runBlocking {
+        Fixture().use { f ->
+            f.run("deepseek-chat", noneStyle = true)
+            val request = f.requests.single()
+            assertFalse(request.containsKey("thinking"))
+            assertFalse(request.containsKey("reasoning_effort"))
         }
     }
 
@@ -172,11 +196,18 @@ class DeepSeekReasoningTransportTest {
             }
         }.apply { isDaemon = true; start() }
 
-        suspend fun run(model: String, history: List<ChatMessage> = emptyList(), suffix: String = ""): List<DshEvent> = coroutineScope {
+        suspend fun run(model: String, history: List<ChatMessage> = emptyList(), suffix: String = "", noneStyle: Boolean = false): List<DshEvent> = coroutineScope {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
             val transport = LocalEngineTransport(
                 scope = scope,
-                configProvider = { LlmConfig("http://127.0.0.1:${server.localPort}$suffix", "test-key", model, systemPrompt = "test system", maxTokens = 512) },
+                configProvider = { LlmConfig(
+                    "http://127.0.0.1:${server.localPort}$suffix",
+                    "test-key",
+                    model,
+                    systemPrompt = "test system",
+                    maxTokens = 512,
+                    reasoningStyle = if (noneStyle) ReasoningStyle.none else ReasoningStyle.auto,
+                ) },
                 historyProvider = { history },
                 shellExec = { "ok" },
                 autoApprove = { true },

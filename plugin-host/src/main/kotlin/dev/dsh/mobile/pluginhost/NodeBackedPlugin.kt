@@ -1,6 +1,6 @@
 package dev.dsh.mobile.pluginhost
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.pluginapi.DshPlugin
 import dev.dsh.mobile.pluginapi.PluginManifest
 import dev.dsh.mobile.pluginapi.PluginRegistry

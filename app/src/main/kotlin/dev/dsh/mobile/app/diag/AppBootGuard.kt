@@ -1,8 +1,8 @@
 package dev.dsh.mobile.app.diag
 
-import dev.dsh.mobile.core.common.AppLog
-import dev.dsh.mobile.core.common.diag.LkgPlanner
-import dev.dsh.mobile.core.common.diag.SettingsSnapshot
+import dev.dsh.mobile.core.platform.AppLog
+import dev.dsh.mobile.core.download.diag.LkgPlanner
+import dev.dsh.mobile.core.download.diag.SettingsSnapshot
 import dev.dsh.mobile.core.data.settings.SettingsStore
 import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.diag.BootState
@@ -21,7 +21,7 @@ import kotlinx.coroutines.withContext
  * 启动守卫的 Android 胶水层。
  *
  * 判定逻辑（要不要计一次失败、要不要回滚）不在这里：计数用 core:model 的 [SafeMode]，
- * 差异计算用 core:common 的 [LkgPlanner]，这里只负责「在正确的时机调用它们 + 把证据写下来」。
+ * 差异计算用 core:download 的 [LkgPlanner]，这里只负责「在正确的时机调用它们 + 把证据写下来」。
  *
  * 步骤 3 之后这里多做了三件事：真进安全模式、真回滚配置、真上传崩溃文件。
  */

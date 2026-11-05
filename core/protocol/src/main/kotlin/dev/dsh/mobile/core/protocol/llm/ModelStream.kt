@@ -1,6 +1,6 @@
 package dev.dsh.mobile.core.protocol.llm
 
-import dev.dsh.mobile.core.common.LoopbackGateway
+import dev.dsh.mobile.core.platform.LoopbackGateway
 import dev.dsh.mobile.core.protocol.CONNECT_HINTS
 import dev.dsh.mobile.core.protocol.DshJson
 import dev.dsh.mobile.core.protocol.GATEWAY_ATTEMPTS

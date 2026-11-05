@@ -1,9 +1,9 @@
 package dev.dsh.mobile.core.protocol
 
-import dev.dsh.mobile.core.common.device.CapabilityActions
-import dev.dsh.mobile.core.common.device.CapabilityTier
-import dev.dsh.mobile.core.common.device.CapabilityTiers
-import dev.dsh.mobile.core.common.device.DeviceCapability
+import dev.dsh.mobile.core.platform.device.CapabilityActions
+import dev.dsh.mobile.core.platform.device.CapabilityTier
+import dev.dsh.mobile.core.platform.device.CapabilityTiers
+import dev.dsh.mobile.core.platform.device.DeviceCapability
 import dev.dsh.mobile.core.protocol.tool.ToolCatalog
 import dev.dsh.mobile.core.protocol.tool.ToolSpec
 import kotlinx.serialization.json.JsonObject

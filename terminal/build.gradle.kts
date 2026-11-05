@@ -1,3 +1,7 @@
+// vendored：本模块是第三方移植代码（com.termux.terminal / com.termux.view，源自 termux-app 终端模拟器），
+// 23 个源文件 7,101 行里自研部分为 0；namespace dev.dsh.mobile.terminal 仅作为 AAR 标识存在。
+// 约定：只接受编译级修补，不做重构、不按自研代码计入指标，改动须在提交说明与 README 台账里标注 vendored。
+// 来源、禁改范围与升级流程见 README.md；O5 决策见 docs/REFACTOR-NOTES.md §五。
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")

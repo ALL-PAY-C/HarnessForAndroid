@@ -49,9 +49,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.dsh.mobile.core.common.TimeFmt
-import dev.dsh.mobile.core.common.RestartReason
-import dev.dsh.mobile.core.common.restartApp
+import dev.dsh.mobile.core.platform.TimeFmt
+import dev.dsh.mobile.core.platform.RestartReason
+import dev.dsh.mobile.core.platform.restartApp
 import dev.dsh.mobile.core.data.backup.BackupManager
 import dev.dsh.mobile.core.data.backup.BackupManifest
 import dev.dsh.mobile.core.data.backup.BackupSelection

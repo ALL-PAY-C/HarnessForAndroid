@@ -13,7 +13,7 @@ dependencies {
     implementation(project(":render"))
     implementation(project(":core:data"))
     implementation(project(":core:model"))
-    implementation(project(":core:common"))
+    implementation(project(":core:platform"))
     implementation(project(":core:protocol"))
     implementation(project(":plugin-api"))
     // 会话设置槽直接渲染插件组件（PluginSlotItem / rememberHostThemeTokens）。

@@ -1,6 +1,6 @@
 package dev.dsh.mobile.plugin.html
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 
 /**
  * render.js 的唯一真源是 `src/main/resources/render.js`（打进 APK 的 Java 资源，

@@ -2,7 +2,7 @@ package dev.dsh.mobile.pluginhost
 
 import android.content.Context
 import androidx.compose.runtime.Composable
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.model.ChatMessage
 import dev.dsh.mobile.pluginapi.BackgroundPlugin
 import dev.dsh.mobile.pluginapi.BottomTab
@@ -18,6 +18,8 @@ import dev.dsh.mobile.pluginapi.SlotAction
 import dev.dsh.mobile.pluginapi.SlotContribution
 import dev.dsh.mobile.pluginapi.SlotId
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -115,7 +117,7 @@ interface PluginConfigBridge {
 }
 
 /**
- * 会话人设的读改写口：[SlotAction.SetPersona] 点击时宿主用它把「破甲注入」落到 session.persona。
+ * 会话人设的读改写口：[SlotAction.SetPersona] 点击时宿主用它把「提示词注入」落到 session.persona。
  *
  * 与 [PluginConfigBridge] 分开：那份写插件自己的 config，这份写宿主的会话表 —— 插件连存储长什么样
  * 都不该知道。读写必须一起提供，只给写会让「开关取反」退化成「每次都写同一份」。
@@ -549,39 +551,111 @@ class PluginHost(
     }
 
     /**
-     * 拉起需要常驻本地服务的插件（[BackgroundPlugin]）。
+     * 后台插件的守护协程：插件 id → 那个循环。
      *
-     * 网关没起来时调用方只会看到连接被拒，用户看不出要先去点启动；
-     * 所以在插件加载完就自动拉一次，失败只记日志不影响其它插件。
+     * 一个插件同时只允许一个守护（重装/重载会 cancel 旧的再起新的），
+     * 否则端口抢不到时会有两个循环抢同一个服务，日志里全是重复失败。
+     */
+    private val backgroundGuards = LinkedHashMap<String, Job>()
+
+    /**
+     * 拉起需要常驻本地服务的插件（[BackgroundPlugin]），并给每个插件留一个守护协程（B1）。
+     *
+     * 网关没起来时调用方只会看到连接被拒，用户看不出要先去点启动；所以加载完就先拉一次。
+     * 拉不起来不再是一次性的：守护协程按 1s→60s 退避重试，成功后退成周期探测，
+     * 失败原因照旧记日志 + onPluginCrash，不影响其它插件。
      */
     fun startBackgroundPlugins(context: Context, scope: CoroutineScope) {
         instances.entries
             .filter { it.value is BackgroundPlugin }
-            .filter { (id, plugin) ->
-                shouldStartBackgroundPlugin(
-                    id = id,
-                    enabledByDefault = plugin.manifest.enabledByDefault,
-                    safeMode = safeMode,
-                    isEnabled = { pluginId, default -> store?.isEnabled(pluginId, default) ?: default },
-                )
-            }
-            .forEach { (id, plugin) ->
-                plugin as BackgroundPlugin
-                scope.launch {
-                    runCatching { plugin.ensureStarted(context) }
-                        .onSuccess { result ->
-                            result.exceptionOrNull()?.let {
-                                AppLog.w("插件 " + id + " 常驻服务未就绪：" + it.message)
-                                runCatching { onPluginCrash?.invoke(id, it.message ?: "ensureStarted 未就绪") }
-                            }
-                        }
-                        .onFailure {
-                            AppLog.w("插件 " + id + " 常驻服务启动异常：" + it.message)
-                            runCatching { onPluginCrash?.invoke(id, it.message ?: (it::class.simpleName ?: "ensureStarted 异常")) }
-                        }
+            .forEach { (id, instance) ->
+                val plugin = instance as BackgroundPlugin
+                // 门控不过就连守护都不要起：禁用/安全模式挡住的插件重试只是刷日志。
+                if (!backgroundGate(id, instance)) {
+                    cancelBackgroundGuard(id)
+                    return@forEach
                 }
+                guardBackgroundPlugin(id, plugin, instance, context, scope)
             }
     }
+
+    /**
+     * 后台插件该不该跑：[shouldStartBackgroundPlugin] 的宿主侧绑参版。
+     *
+     * 首拉与每次重试都过这一条 —— 用户在重试期间关掉插件，下一轮就直接退出。
+     */
+    private fun backgroundGate(id: String, plugin: DshPlugin): Boolean =
+        shouldStartBackgroundPlugin(
+            id = id,
+            enabledByDefault = plugin.manifest.enabledByDefault,
+            safeMode = safeMode,
+            isEnabled = { pluginId, default -> store?.isEnabled(pluginId, default) ?: default },
+        )
+
+    private fun guardBackgroundPlugin(
+        id: String,
+        plugin: BackgroundPlugin,
+        instance: DshPlugin,
+        context: Context,
+        scope: CoroutineScope,
+    ) {
+        backgroundGuards.remove(id)?.cancel()
+        backgroundGuards[id] = scope.launch {
+            BackgroundSupervisor(
+                isAllowed = { backgroundGate(id, instance) },
+                start = { plugin.ensureStarted(context) },
+                onFailure = { error ->
+                    AppLog.w("插件 " + id + " 常驻服务未就绪：" + error.message)
+                    runCatching {
+                        onPluginCrash?.invoke(id, error.message ?: (error::class.simpleName ?: "ensureStarted 异常"))
+                    }
+                },
+            ).run()
+        }
+    }
+
+    /**
+     * 插件被禁用 / 卸载 / 从磁盘消失时叫停守护：不能让它继续给一个不存在的服务续命。
+     *
+     * 端口缓存一起清：下次启用要重新按存储判定，而不是拿着上一个实例的端口继续用。
+     */
+    private fun cancelBackgroundGuard(id: String) {
+        backgroundGuards.remove(id)?.cancel()
+        loopbackPorts.forget(id)
+    }
+
+    /**
+     * 端口登记器（B1）：进程内缓存 + 落盘复用，读的是插件自己的 config 键 `loopback.port`。
+     *
+     * 放这里而不是每个插件自己存：宿主是唯一知道「这个插件上次用了哪个端口」的地方，
+     * 而 config 读在 B2 之后是解密路径，必须有缓存兜住。
+     */
+    private val loopbackPorts = LoopbackPortRegistry(
+        read = { id -> runCatching { configBridge?.read(id)?.get(LoopbackPorts.CONFIG_KEY) }.getOrNull() },
+        write = { id, value -> runCatching { configBridge?.write(id, LoopbackPorts.CONFIG_KEY, value) } },
+    )
+
+    /**
+     * 插件本地服务端口：**已分配即稳定**。
+     *
+     * 有记录（进程内缓存或 config 里的 `loopback.port`）就直接返回，绝不再拿 `isFree` 复核 ——
+     * 复核必然失败，占用者就是插件自己的服务；以前每次周期探测都会顺延一格并改写 config，
+     * 结果是「存储说 8318、服务在 8317」，用户填在模型源里的地址下次冷启动就失效。
+     *
+     * 只有没有记录时才真的分配一次并落盘。要换端口请走 [reallocateLoopbackPort]。
+     */
+    fun loopbackPort(pluginId: String, preferred: Int = LoopbackPorts.DEFAULT_PREFERRED): Int =
+        loopbackPorts.port(pluginId, preferred)
+
+    /**
+     * 重分配端口：只在插件自己报「Address already in use」时调。
+     *
+     * 清掉旧记录 → 从 [preferred] 重新找一个空闲端口 → 写盘。调用方必须把返回的新端口
+     * 落到自己的服务里，并同步模型源的 Base URL；返回 -1 表示 [LoopbackPorts.MAX_PROBES]
+     * 个候选全被占用。
+     */
+    fun reallocateLoopbackPort(pluginId: String, preferred: Int = LoopbackPorts.DEFAULT_PREFERRED): Int =
+        loopbackPorts.reallocate(pluginId, preferred)
 
     fun setEnabled(id: String, enabled: Boolean) {
         val plugin = instances[id] ?: run {
@@ -607,6 +681,8 @@ class PluginHost(
             bump()
         } else {
             registry.clearPlugin(id)
+            // B1：停用即停守护，否则退避循环会一直给一个用户已经关掉的服务重试。
+            cancelBackgroundGuard(id)
             // 走同一条重算：停用后 blockedBySafeMode 必须一起清掉，否则「关掉的安全模式
             // 失败行」会跟着下一次启用又冒出来。
             _plugins.update { list -> list.map { if (it.manifest.id == id) recompute(it, null, it.error) else it } }
@@ -618,6 +694,8 @@ class PluginHost(
         onUninstall(id)
         registry.clearPlugin(id)
         instances.remove(id)
+        // B1：实例没了，守护协程不能再拿着旧实例继续重试。
+        cancelBackgroundGuard(id)
         // 卸载后旧回执必须一起丢掉：同名重装时不能继承上一份的「加载失败」/「拒载」。
         runtimeFailures.remove(id)
         runtimeNotLoaded.remove(id)
@@ -638,6 +716,7 @@ class PluginHost(
         gone.forEach {
             registry.clearPlugin(it)
             instances.remove(it)
+            cancelBackgroundGuard(it)
             runtimeFailures.remove(it)
             runtimeNotLoaded.remove(it)
             versionRejections.remove(it)

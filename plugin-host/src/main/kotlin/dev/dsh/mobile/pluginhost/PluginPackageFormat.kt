@@ -1,6 +1,6 @@
 package dev.dsh.mobile.pluginhost
 
-import dev.dsh.mobile.core.common.archive.ZipExtract
+import dev.dsh.mobile.core.download.archive.ZipExtract
 import org.json.JSONObject
 import java.io.File
 import java.util.zip.ZipFile

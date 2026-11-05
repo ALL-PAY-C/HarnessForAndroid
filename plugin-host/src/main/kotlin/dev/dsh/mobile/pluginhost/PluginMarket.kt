@@ -1,6 +1,6 @@
 package dev.dsh.mobile.pluginhost
 
-import dev.dsh.mobile.core.common.RuntimeMirrors
+import dev.dsh.mobile.core.platform.RuntimeMirrors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll

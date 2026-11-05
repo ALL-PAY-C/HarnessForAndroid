@@ -1,8 +1,8 @@
 package dev.dsh.mobile.app.diag
 
-import dev.dsh.mobile.core.common.AppLog
-import dev.dsh.mobile.core.common.diag.LkgPlanner
-import dev.dsh.mobile.core.common.diag.SettingsSnapshot
+import dev.dsh.mobile.core.platform.AppLog
+import dev.dsh.mobile.core.download.diag.LkgPlanner
+import dev.dsh.mobile.core.download.diag.SettingsSnapshot
 import java.io.File
 
 /**

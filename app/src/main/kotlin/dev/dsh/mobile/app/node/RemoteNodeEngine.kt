@@ -7,7 +7,7 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.Process
 import android.os.RemoteException
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.runtimehost.HostCallHandler
 import dev.dsh.mobile.runtimehost.NodeEngine
 import dev.dsh.mobile.runtimehost.NodeEngineException

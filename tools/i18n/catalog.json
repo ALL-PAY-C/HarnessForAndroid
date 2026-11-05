@@ -3540,8 +3540,8 @@
   },
   {
     "key": "chat_injection_default",
-    "en": "Armor-break injection (this chat)",
-    "zh": "破甲注入（本会话）",
+    "en": "Prompt injection (this chat)",
+    "zh": "提示词注入（本会话）",
     "where": "ChatSettingsScreen.kt"
   },
   {
@@ -8211,5 +8211,23 @@
     "en": "unreadable JSON",
     "zh": "JSON 读不出来",
     "where": "IdentityCardTransfer.kt"
+  },
+  {
+    "key": "plugins_purge_confirm_title",
+    "en": "Enable prompt override",
+    "zh": "启用提示词注入",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_purge_confirm_body",
+    "en": "%1$s While the switch is on the model no longer declines under its default policy; turn it off at any time to stop the injection.",
+    "zh": "%1$s 开关打开期间，模型不再按默认策略拒答；随时关掉开关即可停止注入。",
+    "where": "feature/plugins"
+  },
+  {
+    "key": "plugins_purge_confirm_ok",
+    "en": "Enable now",
+    "zh": "确认启用",
+    "where": "feature/plugins"
   }
 ]

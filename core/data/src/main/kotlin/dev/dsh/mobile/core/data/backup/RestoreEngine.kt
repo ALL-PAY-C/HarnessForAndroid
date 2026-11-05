@@ -1,8 +1,8 @@
 package dev.dsh.mobile.core.data.backup
 
-import dev.dsh.mobile.core.common.archive.ZipExtract
-import dev.dsh.mobile.core.common.crypto.PassphraseCipher
-import dev.dsh.mobile.core.common.crypto.WrongPassphraseException
+import dev.dsh.mobile.core.download.archive.ZipExtract
+import dev.dsh.mobile.core.platform.crypto.PassphraseCipher
+import dev.dsh.mobile.core.platform.crypto.WrongPassphraseException
 import org.json.JSONObject
 import java.io.File
 import java.util.Base64

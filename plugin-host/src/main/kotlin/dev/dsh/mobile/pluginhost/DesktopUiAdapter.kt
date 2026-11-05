@@ -1,6 +1,6 @@
 package dev.dsh.mobile.pluginhost
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.pluginapi.PluginUiNode
 import dev.dsh.mobile.pluginapi.PluginUiSpec
 import dev.dsh.mobile.pluginapi.WidthPolicy

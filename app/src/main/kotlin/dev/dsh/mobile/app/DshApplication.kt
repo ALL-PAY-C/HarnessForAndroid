@@ -6,9 +6,9 @@ import android.os.Build
 import dev.dsh.mobile.app.diag.AppBootGuard
 import dev.dsh.mobile.app.diag.BootGuardStore
 import dev.dsh.mobile.app.diag.CrashReporter
-import dev.dsh.mobile.core.common.AppLog
-import dev.dsh.mobile.core.common.AppScope
-import dev.dsh.mobile.core.common.UiLocale
+import dev.dsh.mobile.core.platform.AppLog
+import dev.dsh.mobile.core.platform.AppScope
+import dev.dsh.mobile.core.platform.UiLocale
 import dev.dsh.mobile.core.data.DataModule
 import dev.dsh.mobile.noderuntime.NodeRuntime
 import dev.dsh.mobile.render.RichContentInstaller
@@ -62,7 +62,7 @@ class DshApplication : Application() {
         container = AppContainer(this, crashReporter, bootGuard)
         // engineReady 只认 RuntimeState.Ready：不订阅 runtime 的话 onBootOk 之后永远写不出 LKG 快照。
         bootGuard.bindRuntime(container.runtime)
-        // 重启入口的宿主实现：core:common 的 restartApp 只是一个槽位，真正的软/硬重启在这里接上。
+        // 重启入口的宿主实现：core:platform 的 restartApp 只是一个槽位，真正的软/硬重启在这里接上。
         // 装得越早越好——安全模式横幅上的「退出并重启」首帧就能被点到。
         RestartController.install(this)
         AppLog.i("AppContainer built in " + (android.os.SystemClock.uptimeMillis() - t0) + "ms")

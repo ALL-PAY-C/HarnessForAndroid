@@ -1,6 +1,6 @@
 package dev.dsh.mobile.core.protocol.mcp
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.protocol.tool.ToolCtx
 import dev.dsh.mobile.core.protocol.tool.ToolExecution
 import dev.dsh.mobile.core.protocol.tool.ToolSpec

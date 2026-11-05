@@ -2,7 +2,7 @@ package dev.dsh.mobile.feature.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.dsh.mobile.core.common.DshResult
+import dev.dsh.mobile.core.platform.DshResult
 import dev.dsh.mobile.core.model.GroupLedger
 import dev.dsh.mobile.core.data.group.GroupLedgerStore
 import dev.dsh.mobile.core.model.LedgerEntry
@@ -146,6 +146,19 @@ data class ChatUiState(
             ?: models.firstOrNull { it.isDefault }?.name
             ?: models.firstOrNull()?.name
             ?: ""
+
+    /** 本会话实际生效的模型（先按 agentId，再按默认，最后第一条）。 */
+    private val boundModel: ModelProfile?
+        get() = models.firstOrNull { it.id == agentId }
+            ?: models.firstOrNull { it.isDefault }
+            ?: models.firstOrNull()
+
+    /**
+     * 当前模型是否允许图片输入（M4）。
+     *
+     * 没有可用模型时返回 false：这时连发送都发不出去，让用户先配模型比让他挑图更合理。
+     */
+    val imageInputEnabled: Boolean get() = boundModel?.supportsImages == true
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)

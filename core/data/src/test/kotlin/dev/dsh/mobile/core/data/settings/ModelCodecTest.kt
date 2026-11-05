@@ -3,6 +3,7 @@ package dev.dsh.mobile.core.data.settings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import dev.dsh.mobile.core.model.ReasoningStyle
 import org.junit.Test
 
 /** 旧 preferences 兼容 + 新字段往返（不碰 Context，纯字符串层面）。 */
@@ -109,4 +110,79 @@ class ModelCodecTest {
         assertEquals("high", sanitizeReasoningEffort("bogus"))
         assertEquals("off", sanitizeReasoningEffort("off"))
     }
+
+    @Test
+    fun reasoningStyleRoundTrips() {
+        val profile = ModelProfile(
+            id = "m-9",
+            name = "预算档",
+            providerId = "gemini",
+            baseUrl = "https://generativelanguage.googleapis.com/v1beta",
+            apiKey = "k",
+            model = "gemini-2.5-flash",
+            reasoningStyle = ReasoningStyle.thinkingBudget,
+        )
+        val back = ModelCodec.decode(ModelCodec.encode(listOf(profile))).single()
+        assertEquals(ReasoningStyle.thinkingBudget, back.reasoningStyle)
+        assertEquals(profile, back)
+    }
+
+    @Test
+    fun oldThirteenFieldRecordDefaultsToAutoStyle() {
+        // 加 reasoningStyle 之前的落盘：13 个字段，没有风格位
+        val raw = record("m-10", "老条目", "deepseek", "https://api.deepseek.com/v1", "k", "deepseek-chat", "1", "0", "medium", "0", "", "", "1")
+        val m = ModelCodec.decode(raw).single()
+        assertEquals(ReasoningStyle.auto, m.reasoningStyle)
+        assertEquals("medium", m.reasoningEffort)
+        assertTrue(m.isDefault)
+        // 垃圾值也不许崩
+        val broken = ModelCodec.decode(record("m-11", "x", "custom", "u", "k", "m", "0", "0", "high", "0", "", "", "1", "not-a-style")).single()
+        assertEquals(ReasoningStyle.auto, broken.reasoningStyle)
+    }
+
+    @Test
+    fun legacyFourteenFieldRecordDefaultsCapabilityBits() {
+        // M4/M5 之前的落盘格式：14 个字段，到 reasoningStyle 为止。
+        val raw = record(
+            "m-4", "旧记录", "custom", "http://10.0.0.3:8080/v1", "k", "qwen", "0", "8192",
+            "high", "0", "-1.0", "-1.0", "1", "auto",
+        )
+        val m = ModelCodec.decode(raw).single()
+        assertFalse("旧数据必须落 false", m.supportsImages)
+        assertFalse("旧数据必须落 false", m.supportsOcr)
+        assertEquals("旧数据必须落空串", "", m.reasoningMap)
+    }
+
+    @Test
+    fun capabilityBitsAndReasoningMapRoundTrip() {
+        val profile = ModelProfile(
+            id = "m-5",
+            name = "多模态",
+            providerId = "custom",
+            baseUrl = "http://127.0.0.1:8318/v1",
+            apiKey = "sk-x",
+            model = "vision",
+            contextWindow = 64_000,
+            reasoningEffort = "high",
+            supportsTools = true,
+            supportsImages = true,
+            supportsOcr = true,
+            reasoningMap = "high=thinking_budget:8192\nlow=reasoning_effort:low",
+        )
+        val back = ModelCodec.decode(ModelCodec.encode(listOf(profile))).single()
+        assertTrue(back.supportsImages)
+        assertTrue(back.supportsOcr)
+        assertEquals("high=thinking_budget:8192\nlow=reasoning_effort:low", back.reasoningMap)
+        assertEquals(profile, back)
+    }
+
+    @Test
+    fun codecFieldOrderAppendsCapabilitiesAtTheEnd() {
+        val encoded = ModelCodec.encode(listOf(ModelProfile("m-6", "n", "p", "u", "k", "mdl")))
+        val fields = encoded.split(ModelCodec.FIELD_SEP)
+        assertEquals("第 14 位是 supportsImages", "0", fields[14])
+        assertEquals("第 15 位是 supportsOcr", "0", fields[15])
+        assertEquals("第 16 位是 reasoningMap", "", fields[16])
+    }
+
 }

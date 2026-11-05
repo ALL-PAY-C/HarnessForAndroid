@@ -596,7 +596,7 @@ Write unit tests</string>
     <string name="chat_preset_apply_hint">The selected preset takes effect from the next request</string>
     <string name="chat_current_preset">Current preset</string>
     <string name="chat_manage_members">Manage members</string>
-    <string name="chat_injection_default">Armor-break injection (this chat)</string>
+    <string name="chat_injection_default">Prompt injection (this chat)</string>
     <string name="chat_queued_head">Queued %1$d · sent automatically after this round</string>
     <string name="chat_pending_head">Pending %1$d</string>
     <string name="common_collapse">Collapse</string>
@@ -756,11 +756,11 @@ Write unit tests</string>
     <string name="common_loading">Loading…</string>
     <string name="common_preview">Preview</string>
     <string name="design_activity_thinking_live">Thinking…</string>
-    <string name="design_activity_thought_steps">Thinking process · %1$d steps</string>
+    <string name="design_activity_thought_steps">Thinking process · %1$d segments</string>
     <string name="design_activity_thought_collapse">Collapse thinking</string>
     <string name="design_activity_thought_expand">Expand thinking</string>
     <string name="design_activity_phrase_sep">", "</string>
-    <string name="design_activity_tool_count">%1$d items</string>
+    <string name="design_activity_tool_count">%1$d tools</string>
     <string name="design_activity_copy_thought">Copy reasoning</string>
     <string name="design_activity_no_reasoning">This turn returned no reasoning. Switch to a model with reasoning (such as deepseek-reasoner) to see the full chain of thought here.</string>
     <string name="design_tool_phrase_shell">ran a command</string>
@@ -1377,4 +1377,14 @@ Supports https://github.com/owner/repo, owner/repo, github.com/owner/repo/tree/b
     <string name="card_skip_too_many">too many cards</string>
     <string name="card_skip_empty">empty card</string>
     <string name="card_skip_bad_json">unreadable JSON</string>
+    <string name="plugins_purge_confirm_title">Enable prompt override</string>
+    <string name="plugins_purge_confirm_body">%1$s While the switch is on the model no longer declines under its default policy; turn it off at any time to stop the injection.</string>
+    <string name="plugins_purge_confirm_ok">Enable now</string>
+    <string name="agents_supports_images">Image input</string>
+    <string name="agents_supports_images_hint">When off, the image attach button is disabled</string>
+    <string name="agents_supports_ocr">Text recognition (OCR) in images</string>
+    <string name="agents_supports_ocr_hint">Available only when image input is on</string>
+    <string name="agents_reasoning_map">Reasoning level map (one "level=param:value" per line, empty = default)</string>
+    <string name="agents_reasoning_map_hint">Example: high=thinking_budget:8192</string>
+    <string name="chat_image_needs_model">This model has image input off; enable it in model settings</string>
 </resources>

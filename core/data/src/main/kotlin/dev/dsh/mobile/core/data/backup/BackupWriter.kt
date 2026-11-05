@@ -1,6 +1,6 @@
 package dev.dsh.mobile.core.data.backup
 
-import dev.dsh.mobile.core.common.crypto.PassphraseCipher
+import dev.dsh.mobile.core.platform.crypto.PassphraseCipher
 import dev.dsh.mobile.core.data.db.DshDatabase
 import org.json.JSONArray
 import org.json.JSONObject
@@ -84,7 +84,10 @@ class BackupWriter(
                     for (name in PREFS_WHITELIST) {
                         val values = prefs.read(name)
                         if (values.isEmpty()) continue
-                        putBytes(zip, "prefs/" + name + ".json", PrefsCodec.encode(values).toByteArray(), acc)
+                        // 插件配置一律以密文进包：升级后还没被读过的旧明文在这里换成密文
+                        // （口径同下面的凭证节，见 PluginConfigSeal），恢复侧由 PluginConfigVault 解回来。
+                        val safe = PluginConfigSeal.sealPrefs(name, values, roots.noBackupDir)
+                        putBytes(zip, "prefs/" + name + ".json", PrefsCodec.encode(safe).toByteArray(), acc)
                     }
                 }
 

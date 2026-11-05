@@ -1,6 +1,6 @@
 package dev.dsh.mobile.core.protocol.transport
 
-import dev.dsh.mobile.core.common.AppLog
+import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.protocol.EventSink
 import dev.dsh.mobile.core.protocol.ReconnectPolicy
 import dev.dsh.mobile.core.protocol.long
