@@ -87,17 +87,8 @@ typealias AuthorPart = dev.dsh.mobile.core.model.chat.AuthorPart
 typealias TurnState = dev.dsh.mobile.core.model.chat.TurnState
 
 
-/**
- * 抽屉搜索「聊天记录」分区的一行：会话标题、角色、命中片段、时间都由一次查询带出，
- * UI 只负责把命中的词加粗，不再二次查库。
- */
-data class ChatSearchHit(
-    val sessionId: String,
-    val sessionTitle: String,
-    val role: String,
-    val snippet: String,
-    val at: Long,
-)
+// S4: ChatSearchHit 本体已上移 core:model.chat（S5 删桥改 import）。
+typealias ChatSearchHit = dev.dsh.mobile.core.model.chat.ChatSearchHit
 
 // ---------------------------------------------------------------- 落库常量
 

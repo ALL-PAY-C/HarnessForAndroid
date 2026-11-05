@@ -59,7 +59,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.dsh.mobile.app.AppContainer
 import dev.dsh.mobile.app.BuildConfig
 import dev.dsh.mobile.core.data.db.SessionEntity
-import dev.dsh.mobile.core.data.repo.ChatSearchHit
+import dev.dsh.mobile.core.model.chat.ChatSearchHit
 import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.Session
 import dev.dsh.mobile.design.AppIconBadge

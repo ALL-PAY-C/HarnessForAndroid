@@ -2,9 +2,8 @@ package dev.dsh.mobile.app.nav
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.dsh.mobile.core.data.db.SessionEntity
-import dev.dsh.mobile.core.data.repo.ChatRepository
-import dev.dsh.mobile.core.data.repo.ChatSearchHit
+import dev.dsh.mobile.core.model.port.ChatApi
+import dev.dsh.mobile.core.model.chat.ChatSearchHit
 import dev.dsh.mobile.core.model.Session
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -23,7 +22,7 @@ import kotlinx.coroutines.withContext
 data class DrawerSearchState(
     val query: String = "",
     val searching: Boolean = false,
-    val sessions: List<SessionEntity> = emptyList(),
+    val sessions: List<Session> = emptyList(),
     val messages: List<ChatSearchHit> = emptyList(),
 ) {
     /** 有输入、不在查、两个分区都空：此时才显示「没有找到相关内容」。 */
@@ -36,7 +35,7 @@ data class DrawerSearchState(
  * 输入框的 value 始终来自 [DrawerSearchState.query]，结果回填只写 sessions/messages，
  * 所以查询慢回来也不会把用户正在敲的字顶掉（输入不被结果刷新打断）。
  */
-class DrawerSearchViewModel(private val repo: ChatRepository) : ViewModel() {
+class DrawerSearchViewModel(private val repo: ChatApi) : ViewModel() {
 
     private val _state = MutableStateFlow(DrawerSearchState())
     val state: StateFlow<DrawerSearchState> = _state.asStateFlow()

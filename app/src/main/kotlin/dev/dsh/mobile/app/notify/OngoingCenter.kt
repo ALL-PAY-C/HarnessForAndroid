@@ -12,8 +12,8 @@ import dev.dsh.mobile.app.MainActivity
 import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.platform.DshOption
 import dev.dsh.mobile.core.platform.splitOptions
-import dev.dsh.mobile.core.data.repo.ChatRepository
-import dev.dsh.mobile.core.data.repo.TurnState
+import dev.dsh.mobile.core.model.port.ChatApi
+import dev.dsh.mobile.core.model.chat.TurnState
 import dev.dsh.mobile.core.data.settings.AppSettings
 import dev.dsh.mobile.core.model.PermissionRequest
 import dev.dsh.mobile.core.model.RuntimeState
@@ -63,7 +63,7 @@ class OngoingCenter(
     private val context: Context,
     private val scope: CoroutineScope,
     settings: Flow<AppSettings>,
-    private val repo: ChatRepository,
+    private val repo: ChatApi,
     /** 延迟取 [NotificationCenter]：两者互相引用，直接构造会成环。 */
     private val notifierOf: () -> NotificationCenter,
 ) {

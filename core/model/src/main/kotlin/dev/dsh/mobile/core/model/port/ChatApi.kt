@@ -3,6 +3,7 @@ package dev.dsh.mobile.core.model.port
 import dev.dsh.mobile.core.model.ChatMessage
 import dev.dsh.mobile.core.model.Participant
 import dev.dsh.mobile.core.model.Session
+import dev.dsh.mobile.core.model.chat.ChatSearchHit
 import dev.dsh.mobile.core.model.chat.TurnState
 import dev.dsh.mobile.core.model.compaction.CompactResult
 import dev.dsh.mobile.core.model.compaction.RecallReport
@@ -15,8 +16,8 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * 会话仓库端口：feature 只读会话/消息/投影，写会话元信息与轮次控制。
  *
- * 由 core:data 的 ChatRepository 实现。26 个成员是 feature 实际调用的子集；
- * attach / sendMessage / messageText / searchMessages / setConfigOption 等
+ * 由 core:data 的 ChatRepository 实现。28 个成员是 feature 与抽屉搜索实际调用的子集；
+ * attach / sendMessage / messageText / setConfigOption 等
  * 编排层内部用的成员不进接口。
  */
 interface ChatApi {
@@ -29,6 +30,12 @@ interface ChatApi {
     fun projection(sessionId: String): StateFlow<SessionProjection>
 
     suspend fun session(id: String): Session?
+
+    /** 抽屉搜索：会话标题/正文命中，只回模型层会话（DB 行类型不外泄）。 */
+    suspend fun searchSessions(query: String, limit: Int = 30): List<Session>
+
+    /** 抽屉搜索：消息命中，片段与角色由一次查询带出。 */
+    suspend fun searchMessages(query: String, limit: Int = 60): List<ChatSearchHit>
     suspend fun createSession(cwd: String, agentId: String? = null, title: String = ""): DshResult<Session>
     suspend fun createGroup(cwd: String, title: String, participants: List<Participant>): DshResult<Session>
     suspend fun refreshSessions(cwd: String?): DshResult<Int>

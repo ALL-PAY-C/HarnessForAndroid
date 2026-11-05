@@ -137,11 +137,12 @@ class ChatRepository(
 
     suspend fun messageText(messageId: String): String? = messageTextImpl(messageId)
 
-    suspend fun searchMessages(query: String, limit: Int = 60): List<ChatSearchHit> =
+    override suspend fun searchMessages(query: String, limit: Int): List<ChatSearchHit> =
         searchMessagesImpl(query, limit)
 
-    suspend fun searchSessions(query: String, limit: Int = 30): List<SessionEntity> =
-        searchSessionsImpl(query, limit)
+    /** 端口只回 [Session]：db.SessionEntity 是落库形态，界面不该看到。 */
+    override suspend fun searchSessions(query: String, limit: Int): List<Session> =
+        searchSessionsImpl(query, limit).map { it.toModel() }
 
     suspend fun resetStaleStatuses() = resetStaleStatusesImpl()
 

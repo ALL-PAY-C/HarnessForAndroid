@@ -17,8 +17,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import dev.dsh.mobile.app.DshApplication
 import dev.dsh.mobile.core.data.update.UpdateInfo
-import dev.dsh.mobile.core.data.update.Updater
 import dev.dsh.mobile.core.data.update.readPromptedVersion
 import dev.dsh.mobile.core.data.update.shouldPromptUpdateOnce
 import dev.dsh.mobile.core.data.update.writePromptedVersion
@@ -50,18 +50,20 @@ private sealed interface PromptState {
 @Composable
 fun AutoUpdatePrompt() {
     val context = LocalContext.current
+    // 组合根唯一来源：自建 Updater 会再开一份 prefs/网络栈，绕过 AppContainer。
+    val container = (context.applicationContext as? DshApplication)?.container ?: return
+    val updater = container.updater
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<PromptState?>(null) }
 
     LaunchedEffect(Unit) {
         val app = context.applicationContext
-        val updater = Updater(app)
         val (installedCode, _) = updater.installedVersion()
-        // check() 自己就在 Dispatchers.IO 里；失败只记日志，绝不弹错误框。
-        val info = withContext(Dispatchers.IO) { updater.check() }.getOrElse { err ->
+        // checkDetailed() 自己就在 Dispatchers.IO 里；失败只记日志，绝不弹错误框。
+        val info = withContext(Dispatchers.IO) { updater.checkDetailed() }.getOrElse { err ->
             Log.w(TAG, "更新检查失败（静默跳过）：${err.message}")
             return@LaunchedEffect
-        }
+        }.info
         val prompted = readPromptedVersion(app)
         if (shouldPromptUpdateOnce(info, installedCode, prompted)) {
             val target = info ?: return@LaunchedEffect
@@ -83,7 +85,7 @@ fun AutoUpdatePrompt() {
         text = {
             Column {
                 val (installedCode, installedName) = remember {
-                    Updater(context.applicationContext).installedVersion()
+                    updater.installedVersion()
                 }
                 Text(
                     "当前版本：${installedName.ifBlank { installedCode.toString() }}",
@@ -123,14 +125,13 @@ fun AutoUpdatePrompt() {
                     val app = context.applicationContext
                     state = PromptState.Downloading(info, 0)
                     scope.launch {
-                        val updater = Updater(app)
                         // onProgress 回调在 IO 线程：切回主线程再写状态。
-                        val result = updater.download(info) { pct ->
+                        val result = updater.downloadChecked(info) { pct ->
                             scope.launch { state = PromptState.Downloading(info, pct) }
                         }
-                        result.onSuccess { file ->
+                        result.onSuccess { report ->
                             state = null
-                            runCatching { app.startActivity(updater.installIntent(file)) }
+                            runCatching { app.startActivity(updater.installIntent(report.file)) }
                                 .onFailure { e -> Log.w(TAG, "拉起安装器失败：${e.message}") }
                         }.onFailure { e ->
                             state = PromptState.Failed(info, e.message ?: "未知错误")
