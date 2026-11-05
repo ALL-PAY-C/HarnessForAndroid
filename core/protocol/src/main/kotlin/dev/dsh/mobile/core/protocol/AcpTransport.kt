@@ -13,8 +13,8 @@ import dev.dsh.mobile.core.model.TokenUsage
 import dev.dsh.mobile.core.model.ToolCall
 import dev.dsh.mobile.core.model.TransportKind
 import dev.dsh.mobile.core.protocol.identity.IdentityInjector
-import dev.dsh.mobile.core.protocol.mcp.McpServerConfig
-import dev.dsh.mobile.core.protocol.mcp.McpTransportKind
+import dev.dsh.mobile.core.model.mcp.McpServerConfig
+import dev.dsh.mobile.core.model.mcp.McpTransportKind
 import dev.dsh.mobile.core.protocol.transport.DshCarrier
 import dev.dsh.mobile.core.protocol.transport.DshMux
 import dev.dsh.mobile.core.protocol.transport.LineCarrier

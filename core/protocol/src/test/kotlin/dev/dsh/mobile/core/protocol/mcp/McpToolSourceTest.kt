@@ -1,8 +1,17 @@
 package dev.dsh.mobile.core.protocol.mcp
 
+import dev.dsh.mobile.core.model.mcp.McpTransportKind
+import dev.dsh.mobile.core.model.mcp.McpServerConfig
+import dev.dsh.mobile.core.model.mcp.McpError
+import dev.dsh.mobile.core.model.mcp.McpException
+import dev.dsh.mobile.core.model.mcp.McpHandshake
+import dev.dsh.mobile.core.model.mcp.McpToolDef
+import dev.dsh.mobile.core.model.mcp.McpImage
+import dev.dsh.mobile.core.model.mcp.McpCallResult
+import dev.dsh.mobile.core.model.mcp.McpClientState
 import dev.dsh.mobile.core.protocol.ToolExecutor
 import dev.dsh.mobile.core.protocol.ToolOutputSpill
-import dev.dsh.mobile.core.protocol.ToolSensitivity
+import dev.dsh.mobile.core.model.mcp.ToolSensitivity
 import dev.dsh.mobile.core.protocol.tool.ToolCtx
 import dev.dsh.mobile.core.protocol.tool.ToolRegistry
 import dev.dsh.mobile.core.protocol.web.WebToolkit

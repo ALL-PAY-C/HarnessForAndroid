@@ -1,5 +1,9 @@
 package dev.dsh.mobile.core.protocol.mcp
 
+import dev.dsh.mobile.core.model.mcp.McpHandshake
+import dev.dsh.mobile.core.model.mcp.McpToolDef
+import dev.dsh.mobile.core.model.mcp.McpCallResult
+import dev.dsh.mobile.core.model.mcp.McpClientState
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.JsonObject
 

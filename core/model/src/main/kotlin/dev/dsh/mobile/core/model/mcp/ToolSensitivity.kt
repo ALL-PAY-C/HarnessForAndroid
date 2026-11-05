@@ -1,4 +1,4 @@
-package dev.dsh.mobile.core.protocol
+package dev.dsh.mobile.core.model.mcp
 
 /**
  * 工具敏感度分档（T6.1b）。

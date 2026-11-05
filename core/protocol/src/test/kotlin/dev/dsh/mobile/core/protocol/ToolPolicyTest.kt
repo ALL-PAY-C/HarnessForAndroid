@@ -1,5 +1,6 @@
 package dev.dsh.mobile.core.protocol
 
+import dev.dsh.mobile.core.model.mcp.ToolSensitivity
 import dev.dsh.mobile.core.platform.device.CapabilityTier
 import dev.dsh.mobile.core.platform.device.CapabilityTiers
 import dev.dsh.mobile.core.platform.device.DeviceCapability

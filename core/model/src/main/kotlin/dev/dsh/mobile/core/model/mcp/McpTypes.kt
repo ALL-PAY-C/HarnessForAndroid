@@ -1,6 +1,5 @@
-package dev.dsh.mobile.core.protocol.mcp
+package dev.dsh.mobile.core.model.mcp
 
-import dev.dsh.mobile.core.protocol.ToolSensitivity
 import kotlinx.serialization.json.JsonObject
 
 /**

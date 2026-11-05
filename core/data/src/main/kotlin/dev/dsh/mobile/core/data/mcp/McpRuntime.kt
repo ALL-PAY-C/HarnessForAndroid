@@ -2,7 +2,7 @@ package dev.dsh.mobile.core.data.mcp
 
 import dev.dsh.mobile.core.protocol.mcp.HttpMcpClient
 import dev.dsh.mobile.core.protocol.mcp.McpClient
-import dev.dsh.mobile.core.protocol.mcp.McpServerConfig
+import dev.dsh.mobile.core.model.mcp.McpServerConfig
 import dev.dsh.mobile.core.protocol.mcp.McpToolSource
 import dev.dsh.mobile.core.protocol.tool.ToolSpec
 import kotlinx.coroutines.CoroutineScope

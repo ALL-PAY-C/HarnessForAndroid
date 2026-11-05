@@ -1,15 +1,15 @@
 package dev.dsh.mobile.core.data.mcp
 
 import android.content.Context
-import dev.dsh.mobile.core.protocol.ToolSensitivity
+import dev.dsh.mobile.core.model.mcp.ToolSensitivity
 import dev.dsh.mobile.core.protocol.mcp.HttpMcpClient
 import dev.dsh.mobile.core.protocol.mcp.McpClient
-import dev.dsh.mobile.core.protocol.mcp.McpError
-import dev.dsh.mobile.core.protocol.mcp.McpException
-import dev.dsh.mobile.core.protocol.mcp.McpHeader
-import dev.dsh.mobile.core.protocol.mcp.McpServerConfig
-import dev.dsh.mobile.core.protocol.mcp.McpTransportKind
-import dev.dsh.mobile.core.protocol.mcp.describe
+import dev.dsh.mobile.core.model.mcp.McpError
+import dev.dsh.mobile.core.model.mcp.McpException
+import dev.dsh.mobile.core.model.mcp.McpHeader
+import dev.dsh.mobile.core.model.mcp.McpServerConfig
+import dev.dsh.mobile.core.model.mcp.McpTransportKind
+import dev.dsh.mobile.core.model.mcp.describe
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject

@@ -1,7 +1,7 @@
 package dev.dsh.mobile.core.protocol.tool
 
 import dev.dsh.mobile.core.protocol.ToolOutputSpill
-import dev.dsh.mobile.core.protocol.ToolSensitivity
+import dev.dsh.mobile.core.model.mcp.ToolSensitivity
 import dev.dsh.mobile.core.protocol.web.WebToolkit
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject

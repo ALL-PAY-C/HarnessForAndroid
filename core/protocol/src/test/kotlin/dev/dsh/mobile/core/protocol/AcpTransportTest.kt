@@ -3,9 +3,9 @@ package dev.dsh.mobile.core.protocol
 import dev.dsh.mobile.core.model.event.DshEvent
 import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.TransportKind
-import dev.dsh.mobile.core.protocol.mcp.McpHeader
-import dev.dsh.mobile.core.protocol.mcp.McpServerConfig
-import dev.dsh.mobile.core.protocol.mcp.McpTransportKind
+import dev.dsh.mobile.core.model.mcp.McpHeader
+import dev.dsh.mobile.core.model.mcp.McpServerConfig
+import dev.dsh.mobile.core.model.mcp.McpTransportKind
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch

@@ -1,12 +1,12 @@
 package dev.dsh.mobile.core.protocol.tool
 
 import dev.dsh.mobile.core.platform.device.CapabilityActions
-import dev.dsh.mobile.core.protocol.ToolSensitivity
+import dev.dsh.mobile.core.model.mcp.ToolSensitivity
 import dev.dsh.mobile.core.protocol.str
-import dev.dsh.mobile.core.protocol.ToolSensitivity.DeviceControl
-import dev.dsh.mobile.core.protocol.ToolSensitivity.Irreversible
-import dev.dsh.mobile.core.protocol.ToolSensitivity.ReadOnly
-import dev.dsh.mobile.core.protocol.ToolSensitivity.ReversibleWrite
+import dev.dsh.mobile.core.model.mcp.ToolSensitivity.DeviceControl
+import dev.dsh.mobile.core.model.mcp.ToolSensitivity.Irreversible
+import dev.dsh.mobile.core.model.mcp.ToolSensitivity.ReadOnly
+import dev.dsh.mobile.core.model.mcp.ToolSensitivity.ReversibleWrite
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject

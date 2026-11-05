@@ -1,13 +1,13 @@
 package dev.dsh.mobile.core.data.mcp
 
-import dev.dsh.mobile.core.protocol.mcp.McpCallResult
+import dev.dsh.mobile.core.model.mcp.McpCallResult
 import dev.dsh.mobile.core.protocol.mcp.McpClient
-import dev.dsh.mobile.core.protocol.mcp.McpClientState
-import dev.dsh.mobile.core.protocol.mcp.McpError
-import dev.dsh.mobile.core.protocol.mcp.McpException
-import dev.dsh.mobile.core.protocol.mcp.McpHandshake
-import dev.dsh.mobile.core.protocol.mcp.McpServerConfig
-import dev.dsh.mobile.core.protocol.mcp.McpToolDef
+import dev.dsh.mobile.core.model.mcp.McpClientState
+import dev.dsh.mobile.core.model.mcp.McpError
+import dev.dsh.mobile.core.model.mcp.McpException
+import dev.dsh.mobile.core.model.mcp.McpHandshake
+import dev.dsh.mobile.core.model.mcp.McpServerConfig
+import dev.dsh.mobile.core.model.mcp.McpToolDef
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
