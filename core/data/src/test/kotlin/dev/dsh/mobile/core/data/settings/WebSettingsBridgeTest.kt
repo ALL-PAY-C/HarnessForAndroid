@@ -8,6 +8,7 @@ import org.junit.Before
 import org.junit.Test
 import java.io.File
 import java.nio.file.Files
+import dev.dsh.mobile.core.model.web.WebSecretKeys
 
 class WebSettingsBridgeTest {
 

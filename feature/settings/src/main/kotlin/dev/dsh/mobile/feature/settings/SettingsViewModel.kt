@@ -8,7 +8,7 @@ import dev.dsh.mobile.core.platform.device.CapabilityTier
 import dev.dsh.mobile.core.platform.device.CapabilityTiers
 import dev.dsh.mobile.core.platform.device.DeviceCapability
 import dev.dsh.mobile.core.model.port.EndpointSecretApi
-import dev.dsh.mobile.core.data.settings.WebSecretKeys
+import dev.dsh.mobile.core.model.web.WebSecretKeys
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

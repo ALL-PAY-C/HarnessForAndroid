@@ -10,6 +10,7 @@ import java.util.Base64
 import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import dev.dsh.mobile.core.platform.backup.isLegacyPackage
 
 /**
  * 备份包写入（设计见 research/T913-backup.md §2.1/§2.2）。
@@ -290,7 +291,8 @@ class BackupWriter(
     }
 
     companion object {
-        const val MANIFEST_ENTRY: String = "manifest.json"
+        // O8-B④: 常量本体在 core:platform.backup，与 isLegacyPackage 判据共用一份。
+        const val MANIFEST_ENTRY: String = dev.dsh.mobile.core.platform.backup.BACKUP_MANIFEST_ENTRY
         const val SECRETS_ENTRY: String = "secrets/secrets.bin"
         const val MAX_PACKAGE_BYTES: Long = 2L * 1024 * 1024 * 1024
         const val MAX_WORKSPACE_FILE_BYTES: Long = 50L * 1024 * 1024

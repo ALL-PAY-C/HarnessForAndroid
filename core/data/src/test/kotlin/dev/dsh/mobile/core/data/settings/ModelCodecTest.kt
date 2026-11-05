@@ -5,6 +5,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import dev.dsh.mobile.core.model.ReasoningStyle
 import org.junit.Test
+import dev.dsh.mobile.core.model.settings.sanitizeDecimalInput
+import dev.dsh.mobile.core.model.settings.sanitizeReasoningEffort
 
 /** 旧 preferences 兼容 + 新字段往返（不碰 Context，纯字符串层面）。 */
 class ModelCodecTest {

@@ -9,7 +9,7 @@ import dev.dsh.mobile.core.data.backup.RestoreEngine
 import dev.dsh.mobile.core.model.backup.RestoreMode
 import dev.dsh.mobile.core.data.backup.SecretsInfo
 import dev.dsh.mobile.core.data.backup.SectionInfo
-import dev.dsh.mobile.core.data.backup.isLegacyPackage
+import dev.dsh.mobile.core.platform.backup.isLegacyPackage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

@@ -6,12 +6,12 @@ import androidx.lifecycle.viewModelScope
 import dev.dsh.mobile.core.model.port.ChatApi
 import dev.dsh.mobile.core.data.settings.AppSettings
 import dev.dsh.mobile.core.data.settings.ModelProfile
-import dev.dsh.mobile.core.data.settings.ModelProbe
-import dev.dsh.mobile.core.data.settings.ModelProvider
-import dev.dsh.mobile.core.data.settings.probeContextLengths
-import dev.dsh.mobile.core.data.settings.ModelProviders
+import dev.dsh.mobile.core.platform.net.ModelProbe
+import dev.dsh.mobile.core.model.settings.ModelProvider
+import dev.dsh.mobile.core.platform.net.probeContextLengths
+import dev.dsh.mobile.core.model.settings.ModelProviders
 import dev.dsh.mobile.core.model.port.ModelStoreApi
-import dev.dsh.mobile.core.data.settings.ProbeResult
+import dev.dsh.mobile.core.model.settings.ProbeResult
 import dev.dsh.mobile.core.model.port.SettingsApi
 import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.Session

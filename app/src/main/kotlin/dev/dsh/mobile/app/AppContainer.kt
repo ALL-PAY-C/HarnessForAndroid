@@ -16,10 +16,10 @@ import dev.dsh.mobile.core.data.repo.ChatRepository
 import dev.dsh.mobile.core.data.repo.SendQueue
 import dev.dsh.mobile.core.data.repo.toModel
 import dev.dsh.mobile.core.data.settings.ModelProfile
-import dev.dsh.mobile.core.data.settings.ModelProvider
-import dev.dsh.mobile.core.data.settings.ModelProviders
+import dev.dsh.mobile.core.model.settings.ModelProvider
+import dev.dsh.mobile.core.model.settings.ModelProviders
 import dev.dsh.mobile.core.data.settings.ModelStore
-import dev.dsh.mobile.core.data.settings.contextWindowOf
+import dev.dsh.mobile.core.model.settings.contextWindowOf
 import dev.dsh.mobile.core.data.settings.SettingsStore
 import dev.dsh.mobile.core.data.settings.toWebSettings
 import dev.dsh.mobile.core.protocol.web.WebToolkit

@@ -35,14 +35,13 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.dsh.mobile.core.data.mcp.MCP_TRANSPORTS
+import dev.dsh.mobile.core.model.mcp.MCP_TRANSPORTS
 import dev.dsh.mobile.core.data.mcp.McpKeyValue
 import dev.dsh.mobile.core.data.mcp.McpServerRecord
 import dev.dsh.mobile.core.model.port.McpServerStoreApi
-import dev.dsh.mobile.core.data.mcp.newMcpServerId
-import dev.dsh.mobile.core.data.mcp.probeMcpServer
-import dev.dsh.mobile.core.data.mcp.sanitizeServerName
-import dev.dsh.mobile.core.data.mcp.serverNameError
+import dev.dsh.mobile.core.model.mcp.newMcpServerId
+import dev.dsh.mobile.core.model.mcp.sanitizeServerName
+import dev.dsh.mobile.core.model.mcp.serverNameError
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider
 import dev.dsh.mobile.design.QqRow
@@ -78,7 +77,7 @@ fun McpServersScreen(store: McpServerStoreApi, onBack: () -> Unit) {
         probingId = record.id
         probes = probes - record.id
         scope.launch {
-            val result = probeMcpServer(record)
+            val result = store.probe(record)
             probes = probes + (record.id to ProbeMsg(
                 ok = result.ok,
                 text = if (result.ok) {

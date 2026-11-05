@@ -3,6 +3,8 @@ package dev.dsh.mobile.core.data.settings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import dev.dsh.mobile.core.model.settings.ProbeFailure
+import dev.dsh.mobile.core.platform.net.ModelProbe
 
 /** 「测试连接」的纯函数部分：模型列表解析。不联网。 */
 class ModelProbeTest {

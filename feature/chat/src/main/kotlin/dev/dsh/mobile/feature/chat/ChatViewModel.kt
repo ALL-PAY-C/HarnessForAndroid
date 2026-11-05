@@ -16,7 +16,7 @@ import dev.dsh.mobile.core.data.repo.TurnState
 import dev.dsh.mobile.core.data.settings.AppSettings
 import dev.dsh.mobile.core.data.settings.ModelProfile
 import dev.dsh.mobile.core.model.port.ModelStoreApi
-import dev.dsh.mobile.core.data.settings.contextWindowOf
+import dev.dsh.mobile.core.model.settings.contextWindowOf
 import dev.dsh.mobile.core.data.settings.SendMode
 import dev.dsh.mobile.core.model.port.SettingsApi
 import dev.dsh.mobile.core.model.AgentRunState

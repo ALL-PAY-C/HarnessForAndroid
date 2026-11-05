@@ -1,6 +1,9 @@
 package dev.dsh.mobile.core.data.preset
 
+import dev.dsh.mobile.core.model.IdentityCard
 import dev.dsh.mobile.core.model.port.AgentPresetImportApi
+import dev.dsh.mobile.core.model.preset.CardImport
+import dev.dsh.mobile.core.model.preset.ImportedCard
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
@@ -35,6 +38,19 @@ class AgentPresetImporter(private val cacheDir: File? = null) : AgentPresetImpor
         } catch (e: IllegalArgumentException) { throw e }
         catch (e: Exception) { throw IllegalArgumentException("预设导入失败：" + (e.message ?: "读取错误"), e) }
     }
+
+    // O8-B④: 身份卡 JSON 编解码委托 IdentityCardTransfer；端口只暴露这 5 个口，
+    // 面板不再直连核心数据类型（IdentityCardTransfer 本体留在本模块）。
+    override fun encodeCard(name: String, card: IdentityCard): String = IdentityCardTransfer.encodeCard(name, card)
+
+    override fun encodeAll(picked: List<Pair<String, IdentityCard>>): String = IdentityCardTransfer.encodeAll(picked)
+
+    override fun decode(text: String): CardImport = IdentityCardTransfer.decode(text)
+
+    override fun toPresets(cards: List<ImportedCard>, taken: Set<String>): List<AgentPreset> =
+        IdentityCardTransfer.toPresets(cards, taken)
+
+    override val maxCards: Int get() = IdentityCardTransfer.MAX_CARDS
 
     private fun parseJson(text: String, source: String): AgentPreset {
         require(text.toByteArray().size <= MAX_BYTES) { "预设超过 20MB 限制" }

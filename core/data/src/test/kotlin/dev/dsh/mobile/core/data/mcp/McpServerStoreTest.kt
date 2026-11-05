@@ -16,6 +16,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import dev.dsh.mobile.core.model.mcp.sanitizeServerName
+import dev.dsh.mobile.core.model.mcp.serverNameError
 
 class McpServerStoreTest {
 

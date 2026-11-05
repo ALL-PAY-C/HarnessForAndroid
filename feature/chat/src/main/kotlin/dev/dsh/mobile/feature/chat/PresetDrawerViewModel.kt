@@ -7,9 +7,8 @@ import dev.dsh.mobile.core.model.port.AgentPresetImportApi
 import dev.dsh.mobile.core.model.port.AgentPresetStoreApi
 import dev.dsh.mobile.core.data.preset.AgentPresets
 import dev.dsh.mobile.core.data.preset.CardError
-import dev.dsh.mobile.core.data.preset.CardImport
+import dev.dsh.mobile.core.model.preset.CardImport
 import dev.dsh.mobile.core.data.preset.CardSkip
-import dev.dsh.mobile.core.data.preset.IdentityCardTransfer
 import dev.dsh.mobile.core.model.IdentityCard
 import dev.dsh.mobile.core.data.preset.IdentityCards
 import dev.dsh.mobile.core.model.port.SettingsApi
@@ -207,8 +206,8 @@ class PresetDrawerViewModel(
             return@withContext null
         }
         notice.value = CardNotice.Copied(picked.size)
-        if (all) IdentityCardTransfer.encodeAll(picked)
-        else IdentityCardTransfer.encodeCard(picked.first().first, picked.first().second)
+        if (all) importer.encodeAll(picked)
+        else importer.encodeCard(picked.first().first, picked.first().second)
     }
 
     /**
@@ -227,12 +226,12 @@ class PresetDrawerViewModel(
         viewModelScope.launch {
             try {
                 val outcome = withContext(Dispatchers.IO) {
-                    val parsed = IdentityCardTransfer.decode(text)
+                    val parsed = importer.decode(text)
                     if (parsed is CardImport.Ok) {
                         val taken = HashSet(AgentPresets.builtinIds)
                         taken += "default"
                         presetStore.presets.first().forEach { taken += it.id }
-                        presetStore.upsertAll(IdentityCardTransfer.toPresets(parsed.cards, taken))
+                        presetStore.upsertAll(importer.toPresets(parsed.cards, taken))
                     }
                     parsed
                 }
@@ -266,7 +265,7 @@ class PresetDrawerViewModel(
 
     /** 整包失败的文案；单张被跳过时的短原因由面板按 [CardSkip] 渲染。 */
     private fun cardErrorText(reason: CardError): UiText = when (reason) {
-        CardError.TooManyCards -> UiText.Res(DesignR.string.card_err_too_many, listOf(IdentityCardTransfer.MAX_CARDS))
+        CardError.TooManyCards -> UiText.Res(DesignR.string.card_err_too_many, listOf(importer.maxCards))
         CardError.Blank -> UiText.Res(DesignR.string.card_err_blank)
         CardError.BadJson -> UiText.Res(DesignR.string.card_err_json)
         CardError.Shape -> UiText.Res(DesignR.string.card_err_shape)

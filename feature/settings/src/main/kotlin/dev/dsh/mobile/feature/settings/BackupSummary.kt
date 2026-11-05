@@ -70,7 +70,7 @@ internal enum class BackupKind { Current, Legacy, Broken }
 /**
  * 包的可用性判定。
  *
- * [previewFailed] 是 preview 的结果，[legacyPackage] 来自 [dev.dsh.mobile.core.data.backup.isLegacyPackage]
+ * [previewFailed] 是 preview 的结果，[legacyPackage] 来自 [dev.dsh.mobile.core.platform.backup.isLegacyPackage]
  * 的结构判定。只有「预览失败 + 结构就是老包」才算 legacy；预览失败但不是老包一律 broken ——
  * 损坏包绝不能因为「读不出 manifest」被当成旧格式放过去整机覆盖。
  */

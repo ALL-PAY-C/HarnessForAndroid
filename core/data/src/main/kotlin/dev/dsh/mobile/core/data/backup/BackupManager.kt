@@ -10,35 +10,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.zip.ZipFile
 
-
-/**
- * 旧格式包判定：包内没有 manifest.json，且带历史版本的三前缀条目（shared_prefs/ db/ plugins/）。
- *
- * 只读 zip 中央目录，不解压 —— 2 GiB 的包也只花一次目录解析。历史版本的 [BackupManager]
- * 就是用这三个前缀拍的存档，升级后用户手里一定有这种包；[BackupManager.restorePackage]
- * 的 legacy 分支能恢复它们，但只有覆盖语义（没有分节、没有合并）。
- *
- * 读不出 zip（真损坏）返回 false：调用方据此报错，不能把坏包当旧格式放过。
- */
-fun isLegacyPackage(file: File): Boolean = runCatching {
-    ZipFile(file).use { zip ->
-        var hasManifest = false
-        var hasLegacyEntry = false
-        val it = zip.entries()
-        while (it.hasMoreElements()) {
-            val entry = it.nextElement()
-            if (entry.isDirectory) continue
-            val name = entry.name.removePrefix("./").removePrefix("/")
-            if (name == BackupWriter.MANIFEST_ENTRY) hasManifest = true
-            if (name.startsWith("shared_prefs/") || name.startsWith("db/") || name.startsWith("plugins/")) {
-                hasLegacyEntry = true
-            }
-        }
-        !hasManifest && hasLegacyEntry
-    }
-}.getOrDefault(false)
-
-
 /**
  * Snapshot / rollback for everything a plugin install can disturb.
  *

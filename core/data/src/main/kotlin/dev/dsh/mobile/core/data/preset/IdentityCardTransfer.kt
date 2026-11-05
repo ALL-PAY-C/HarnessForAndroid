@@ -1,6 +1,8 @@
 package dev.dsh.mobile.core.data.preset
 
 import dev.dsh.mobile.core.model.IdentityCard
+import dev.dsh.mobile.core.model.preset.CardImport
+import dev.dsh.mobile.core.model.preset.ImportedCard
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -194,10 +196,3 @@ object IdentityCardTransfer {
 typealias CardError = dev.dsh.mobile.core.model.preset.CardError
 typealias CardSkip = dev.dsh.mobile.core.model.preset.CardSkip
 
-/** 一张读出来的卡：id 来自 JSON（可能是空串），落库前由 [IdentityCardTransfer.toPresets] 重新分配。 */
-data class ImportedCard(val id: String, val card: IdentityCard)
-
-sealed interface CardImport {
-    data class Ok(val cards: List<ImportedCard>, val skipped: List<CardSkip>) : CardImport
-    data class Failed(val reason: CardError) : CardImport
-}

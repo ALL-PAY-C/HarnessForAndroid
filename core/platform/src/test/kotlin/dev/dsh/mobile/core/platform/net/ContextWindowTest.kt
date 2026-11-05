@@ -1,8 +1,10 @@
-package dev.dsh.mobile.core.data.settings
+package dev.dsh.mobile.core.platform.net
 
+import dev.dsh.mobile.core.model.settings.contextWindowOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import dev.dsh.mobile.core.model.settings.contextWindowOf
 
 /**
  * 上下文窗口：内置表 + 端点探测的优先级，以及 /models 返回的解析。

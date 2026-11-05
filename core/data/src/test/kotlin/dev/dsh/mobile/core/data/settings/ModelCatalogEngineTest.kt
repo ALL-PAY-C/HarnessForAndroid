@@ -6,6 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import dev.dsh.mobile.core.platform.net.ModelCatalog
 
 /**
  * engine:// 端点绝不进 java.net.URL：入口就给可读失败，不联网、不抛协议层天书。

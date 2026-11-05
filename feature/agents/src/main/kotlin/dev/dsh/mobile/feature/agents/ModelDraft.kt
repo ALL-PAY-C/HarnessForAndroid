@@ -1,8 +1,8 @@
 package dev.dsh.mobile.feature.agents
 
 import dev.dsh.mobile.core.data.settings.ModelProfile
-import dev.dsh.mobile.core.data.settings.ModelProvider
-import dev.dsh.mobile.core.data.settings.sanitizeReasoningEffort
+import dev.dsh.mobile.core.model.settings.ModelProvider
+import dev.dsh.mobile.core.model.settings.sanitizeReasoningEffort
 import dev.dsh.mobile.core.model.ReasoningStyle
 
 /**

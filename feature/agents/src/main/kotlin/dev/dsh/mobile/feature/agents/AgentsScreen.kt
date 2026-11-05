@@ -62,14 +62,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.dsh.mobile.core.data.settings.ModelProfile
-import dev.dsh.mobile.core.data.settings.ProbeFailure
-import dev.dsh.mobile.core.data.settings.ModelCatalog
-import dev.dsh.mobile.core.data.settings.ModelProvider
-import dev.dsh.mobile.core.data.settings.ModelProviders
-import dev.dsh.mobile.core.data.settings.contextWindowOf
-import dev.dsh.mobile.core.data.settings.reasoningEfforts
-import dev.dsh.mobile.core.data.settings.sanitizeDecimalInput
-import dev.dsh.mobile.core.data.settings.sanitizeReasoningEffort
+import dev.dsh.mobile.core.model.settings.ProbeFailure
+import dev.dsh.mobile.core.platform.net.ModelCatalog
+import dev.dsh.mobile.core.model.settings.ModelProvider
+import dev.dsh.mobile.core.model.settings.ModelProviders
+import dev.dsh.mobile.core.model.settings.contextWindowOf
+import dev.dsh.mobile.core.model.settings.reasoningEfforts
+import dev.dsh.mobile.core.model.settings.sanitizeDecimalInput
+import dev.dsh.mobile.core.model.settings.sanitizeReasoningEffort
 import dev.dsh.mobile.core.model.AgentProfile
 import dev.dsh.mobile.core.model.ReasoningStyle
 import dev.dsh.mobile.core.model.RuntimeState
@@ -92,6 +92,7 @@ import dev.dsh.mobile.design.text
 import dev.dsh.mobile.design.resolve
 import androidx.compose.ui.platform.LocalContext
 import dev.dsh.mobile.toolbridge.ChannelStatus
+import dev.dsh.mobile.core.model.settings.ProbeResult
 
 @Composable
 fun AgentsScreen(

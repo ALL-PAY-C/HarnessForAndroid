@@ -136,7 +136,7 @@ class LocalEngineTransport(
     private val summaryStore: ContextSummaryStore = ContextSummaryStore.None,
     /**
      * 模型上下文窗口（tokens）。压缩预算 = 窗口 * [ContextBudget.COMPACT_RATIO]，
-     * 必须与顶栏 [dev.dsh.mobile.core.data.settings.contextWindowOf] 同一个来源，
+     * 必须与顶栏 [dev.dsh.mobile.core.model.settings.contextWindowOf] 同一个来源，
      * 否则又会出现「回执写预算 6000、顶栏写 / 32k」的两套口径。
      */
     private val contextWindowProvider: suspend (String) -> Int = { ContextBudget.DEFAULT_WINDOW_TOKENS },

@@ -1,16 +1,14 @@
-package dev.dsh.mobile.core.data.settings
+// O8-B①: 从 core:data.settings 上移（HTTP 探活，唯一调用方 feature:agents 已有 core:platform 依赖）。
+package dev.dsh.mobile.core.platform.net
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import dev.dsh.mobile.core.platform.net.HttpJson
-import dev.dsh.mobile.core.platform.net.HttpJsonException
 import java.net.SocketTimeoutException
 
-typealias ProbeFailure = dev.dsh.mobile.core.model.settings.ProbeFailure
-typealias ProbeResult = dev.dsh.mobile.core.model.settings.ProbeResult
-
+import dev.dsh.mobile.core.model.settings.ProbeFailure
+import dev.dsh.mobile.core.model.settings.ProbeResult
 
 /**
  * 一键验证模型配置：先问 GET {baseUrl}/models（不打 token），拿不到再退化成

@@ -1,5 +1,7 @@
 package dev.dsh.mobile.core.protocol
 
+import dev.dsh.mobile.core.model.settings.contextWindowOf
+
 /**
  * 上下文预算的唯一口径：模型窗口 → 压缩预算 → 装配字符数。
  *
