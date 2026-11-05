@@ -108,6 +108,14 @@ class BackupManager(private val context: Context) : BackupApi {
     }
 
     /** Closes the current install batch so the next install starts a new one. */
+    override fun reschedule() {
+        BackupScheduler.schedule(context, this)
+    }
+
+    override fun cancelSchedule() {
+        BackupScheduler.cancel(context)
+    }
+
     override fun closeBatch() = prefs.edit().putLong(KEY_BATCH, 0L).apply()
 
     /** Performs a scheduled backup if any configured time has passed since the last one. */

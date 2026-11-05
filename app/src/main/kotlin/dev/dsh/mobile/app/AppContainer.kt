@@ -139,8 +139,14 @@ class AppContainer(
     val secretStore: EndpointSecretStore by lazy { EndpointSecretStore(context) }
     val endpoints: EndpointRepository by lazy { EndpointRepository(db, settings, secretStore) }
     val models by lazy { ModelStore(context) }
+    /** MCP 服务器存储：界面只持 McpServerStoreApi，实例由组合根给（O8-S3a）。 */
+    val mcpServers by lazy { dev.dsh.mobile.core.data.mcp.McpServerStore(context) }
 
     val presetStore by lazy { dev.dsh.mobile.core.data.preset.AgentPresetStore(context) }
+    /** 预设导入器：无状态，给抽屉与设置页共用一份。 */
+    val presetImporter: dev.dsh.mobile.core.model.port.AgentPresetImportApi by lazy {
+        dev.dsh.mobile.core.data.preset.AgentPresetImporter()
+    }
 
     /** 群聊规划书（T9.7a）：一个会话一本，DataStore 单条 JSON，不建表不迁移。 */
     val groupLedger by lazy { dev.dsh.mobile.core.data.group.GroupLedgerStore(context) }
@@ -284,6 +290,11 @@ class AppContainer(
     val installedPlugins: InstalledPlugins by lazy { InstalledPlugins(context) }
 
     val backupManager: BackupManager by lazy { BackupManager(context) }
+
+    /** 自更新：设置页与抽屉路由共用这一份，界面不再自己 new。 */
+    val updater: dev.dsh.mobile.core.model.port.UpdaterApi by lazy {
+        dev.dsh.mobile.core.data.update.Updater(context)
+    }
 
     /**
      * Installing a package snapshots state first, once per batch — see

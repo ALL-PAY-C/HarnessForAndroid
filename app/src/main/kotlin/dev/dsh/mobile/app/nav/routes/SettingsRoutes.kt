@@ -114,7 +114,7 @@ internal fun SettingsRoute(container: dev.dsh.mobile.app.AppContainer, nav: andr
                                         linuxActions = dev.dsh.mobile.app.LinuxSettingsController(settingsContext.applicationContext, container),
                                         endpoints = container.endpoints,
                                         runtime = runtimeControl,
-                                        updater = dev.dsh.mobile.core.data.update.Updater(settingsContext),
+                                        updater = container.updater,
                                         onReconnect = { container.connectActive(force = true) },
                                     )
                                 }
@@ -180,8 +180,8 @@ internal fun CapabilityRoute(container: dev.dsh.mobile.app.AppContainer, nav: an
 }
 
 @Composable
-internal fun McpServersRoute(nav: androidx.navigation.NavHostController) {
-                        McpServersScreen(onBack = { nav.popBackStack() })
+internal fun McpServersRoute(container: dev.dsh.mobile.app.AppContainer, nav: androidx.navigation.NavHostController) {
+                        McpServersScreen(store = container.mcpServers, onBack = { nav.popBackStack() })
 }
 
 @Composable
@@ -210,7 +210,7 @@ internal fun ExtrasRoute(container: dev.dsh.mobile.app.AppContainer, nav: androi
                                         linuxActions = dev.dsh.mobile.app.LinuxSettingsController(extrasContext.applicationContext, container),
                                         endpoints = container.endpoints,
                                         runtime = container.runtimeControl,
-                                        updater = dev.dsh.mobile.core.data.update.Updater(extrasContext),
+                                        updater = container.updater,
                                         onReconnect = { container.connectActive(force = true) },
                                     )
                                 }

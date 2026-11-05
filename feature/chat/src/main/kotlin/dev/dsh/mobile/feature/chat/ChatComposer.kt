@@ -3,7 +3,6 @@ package dev.dsh.mobile.feature.chat
 
 import androidx.compose.ui.res.stringResource
 import dev.dsh.mobile.design.R as DesignR
-import dev.dsh.mobile.core.data.repo.SendQueue
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll

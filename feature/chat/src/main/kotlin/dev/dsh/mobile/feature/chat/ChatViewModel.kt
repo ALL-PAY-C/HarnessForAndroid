@@ -4,18 +4,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.dsh.mobile.core.platform.DshResult
 import dev.dsh.mobile.core.model.GroupLedger
-import dev.dsh.mobile.core.data.group.GroupLedgerStore
+import dev.dsh.mobile.core.model.GroupLedgerSink
 import dev.dsh.mobile.core.model.LedgerEntry
 import dev.dsh.mobile.core.model.LedgerStatus
-import dev.dsh.mobile.core.data.repo.ChatRepository
-import dev.dsh.mobile.core.data.repo.SendQueue
+import dev.dsh.mobile.core.model.port.ChatApi
+import dev.dsh.mobile.core.model.port.SendQueueApi
 import dev.dsh.mobile.core.model.GroupRole
 import dev.dsh.mobile.core.data.preset.AgentPresets
 import dev.dsh.mobile.core.data.preset.PresetSwitch
 import dev.dsh.mobile.core.data.repo.TurnState
 import dev.dsh.mobile.core.data.settings.AppSettings
 import dev.dsh.mobile.core.data.settings.ModelProfile
-import dev.dsh.mobile.core.data.settings.ModelStore
+import dev.dsh.mobile.core.model.port.ModelStoreApi
 import dev.dsh.mobile.core.data.settings.contextWindowOf
 import dev.dsh.mobile.core.data.settings.SendMode
 import dev.dsh.mobile.core.data.settings.SettingsStore
@@ -164,14 +164,14 @@ data class ChatUiState(
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModel(
-    private val repo: ChatRepository,
+    private val repo: ChatApi,
     private val settingsStore: SettingsStore,
-    private val modelStore: ModelStore,
+    private val modelStore: ModelStoreApi,
     /** 发送队列（活过页面销毁，见 [SendQueue]）。 */
-    private val sendQueue: SendQueue,
+    private val sendQueue: SendQueueApi,
     private val sessionId: String,
     /** 群聊规划书仓库（T9.7a）：一个会话一本，DataStore 单条 JSON，与房间账本不是同一份数据。 */
-    private val ledgerStore: GroupLedgerStore,
+    private val ledgerStore: GroupLedgerSink,
     /** 执行池的 Agent 快照（core:protocol ExecutionPool.agents）；拿不到就传 null。 */
     executionAgents: StateFlow<List<AgentRuntimeState>>? = null,
     /** T9.19：系统回执按当前语言解析，ViewModel 自己没有 Context，由 AppNav 注入 applicationContext。 */

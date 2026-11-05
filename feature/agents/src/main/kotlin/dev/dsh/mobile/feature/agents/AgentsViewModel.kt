@@ -3,14 +3,14 @@ package dev.dsh.mobile.feature.agents
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.dsh.mobile.core.data.repo.ChatRepository
+import dev.dsh.mobile.core.model.port.ChatApi
 import dev.dsh.mobile.core.data.settings.AppSettings
 import dev.dsh.mobile.core.data.settings.ModelProfile
 import dev.dsh.mobile.core.data.settings.ModelProbe
 import dev.dsh.mobile.core.data.settings.ModelProvider
 import dev.dsh.mobile.core.data.settings.probeContextLengths
 import dev.dsh.mobile.core.data.settings.ModelProviders
-import dev.dsh.mobile.core.data.settings.ModelStore
+import dev.dsh.mobile.core.model.port.ModelStoreApi
 import dev.dsh.mobile.core.data.settings.ProbeResult
 import dev.dsh.mobile.core.data.settings.SettingsStore
 import dev.dsh.mobile.core.model.RuntimeState
@@ -53,9 +53,9 @@ data class AgentsUiState(
 )
 
 class AgentsViewModel(
-    repo: ChatRepository,
+    repo: ChatApi,
     settingsStore: SettingsStore,
-    private val modelStore: ModelStore,
+    private val modelStore: ModelStoreApi,
     runtime: StateFlow<RuntimeState>,
     private val shell: ShellBridge,
     /**

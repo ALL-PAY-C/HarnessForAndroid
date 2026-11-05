@@ -7,7 +7,7 @@ import dev.dsh.mobile.core.platform.UiLanguage
 import dev.dsh.mobile.core.platform.device.CapabilityTier
 import dev.dsh.mobile.core.platform.device.CapabilityTiers
 import dev.dsh.mobile.core.platform.device.DeviceCapability
-import dev.dsh.mobile.core.data.secret.EndpointSecretStore
+import dev.dsh.mobile.core.model.port.EndpointSecretApi
 import dev.dsh.mobile.core.data.settings.WebSecretKeys
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.asStateFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.dsh.mobile.core.data.EndpointRepository
+import dev.dsh.mobile.core.model.port.EndpointApi
 import dev.dsh.mobile.core.data.settings.AppSettings
 import dev.dsh.mobile.core.data.settings.SendMode
 import dev.dsh.mobile.core.data.settings.SettingsStore
@@ -23,7 +23,7 @@ import dev.dsh.mobile.core.data.settings.ThemeMode
 import dev.dsh.mobile.core.data.update.ShaMismatchException
 import dev.dsh.mobile.core.model.update.ShaStatus
 import dev.dsh.mobile.core.data.update.UpdateInfo
-import dev.dsh.mobile.core.data.update.Updater
+import dev.dsh.mobile.core.model.port.UpdaterApi
 import java.io.File
 import dev.dsh.mobile.core.model.BackMaterial
 import dev.dsh.mobile.core.model.Endpoint
@@ -73,11 +73,11 @@ data class SettingsUiState(
 
 class SettingsViewModel(
     private val settingsStore: SettingsStore,
-    private val secretStore: EndpointSecretStore,
+    private val secretStore: EndpointSecretApi,
     private val linuxActions: LinuxSettingsActions,
-    private val endpoints: EndpointRepository,
+    private val endpoints: EndpointApi,
     private val runtime: RuntimeControl,
-    private val updater: Updater,
+    private val updater: UpdaterApi,
     private val onReconnect: () -> Unit,
 ) : ViewModel() {
 
@@ -85,6 +85,9 @@ class SettingsViewModel(
     private val message = MutableStateFlow<UiText?>(null)
     private val storage = MutableStateFlow(0L)
     private val updateSource = MutableStateFlow(updater.sourceUrl())
+
+    /** 内置源判定交给 Updater（常量与反代前缀都在 data，界面不碰）。 */
+    fun isBuiltinSource(url: String): Boolean = updater.isBuiltinSource(url)
     private val updateInfo = MutableStateFlow<UpdateInfo?>(null)
     private val updateStatus = MutableStateFlow<UiText?>(null)
     private val updateProgress = MutableStateFlow(0)

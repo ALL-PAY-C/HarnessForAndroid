@@ -38,7 +38,7 @@ import androidx.compose.ui.unit.sp
 import dev.dsh.mobile.core.data.mcp.MCP_TRANSPORTS
 import dev.dsh.mobile.core.data.mcp.McpKeyValue
 import dev.dsh.mobile.core.data.mcp.McpServerRecord
-import dev.dsh.mobile.core.data.mcp.McpServerStore
+import dev.dsh.mobile.core.model.port.McpServerStoreApi
 import dev.dsh.mobile.core.data.mcp.newMcpServerId
 import dev.dsh.mobile.core.data.mcp.probeMcpServer
 import dev.dsh.mobile.core.data.mcp.sanitizeServerName
@@ -63,10 +63,9 @@ private data class ProbeMsg(val ok: Boolean, val text: String)
  * 测试连接走真实网络，失败也只是把错误文案画在行下面，不弹窗、不崩。
  */
 @Composable
-fun McpServersScreen(onBack: () -> Unit) {
+fun McpServersScreen(store: McpServerStoreApi, onBack: () -> Unit) {
     val p = LocalQq.current
     val ctx = LocalContext.current
-    val store = remember(ctx) { McpServerStore(ctx) }
     val scope = rememberCoroutineScope()
 
     var servers by remember { mutableStateOf(store.load()) }

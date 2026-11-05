@@ -3,9 +3,9 @@ package dev.dsh.mobile.feature.sessions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.dsh.mobile.core.platform.DshResult
-import dev.dsh.mobile.core.data.repo.ChatRepository
+import dev.dsh.mobile.core.model.port.ChatApi
 import dev.dsh.mobile.core.data.settings.ModelProfile
-import dev.dsh.mobile.core.data.settings.ModelStore
+import dev.dsh.mobile.core.model.port.ModelStoreApi
 import dev.dsh.mobile.core.data.settings.AppSettings
 import dev.dsh.mobile.core.data.settings.SettingsStore
 import dev.dsh.mobile.core.model.Participant
@@ -70,9 +70,9 @@ data class SessionsUiState(
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionsViewModel(
-    private val repo: ChatRepository,
+    private val repo: ChatApi,
     private val settingsStore: SettingsStore,
-    private val modelStore: ModelStore,
+    private val modelStore: ModelStoreApi,
     private val cwdProvider: () -> String,
     /** 新会话的默认标题：由 UI 层按当前语言取资源传入，仓库层只接受已有标题。 */
     private val defaultChatTitle: String = "",

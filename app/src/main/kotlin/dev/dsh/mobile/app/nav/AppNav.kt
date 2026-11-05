@@ -163,6 +163,7 @@ fun AppNav(container: AppContainer) {
                 PresetDrawerViewModel(
                     container.presetStore,
                     container.settings,
+                    container.presetImporter,
                     // 旧自由文本人设还在会话实体上：没有卡时用它合成只读卡展示。
                     personaOf = { id -> container.db.sessionDao().byId(id)?.persona.orEmpty() },
                 )
@@ -386,7 +387,7 @@ fun AppNav(container: AppContainer) {
 
                     // T9.10 P1 MCP 服务器：列表 + 增删改 + 启停 + 测试连接。
                     composable(Routes.SETTINGS_MCP) {
-                        McpServersRoute(nav)
+                        McpServersRoute(container, nav)
                     }
 
                     // T9.12 步骤3 诊断：崩溃记录 / 安全模式状态 / 退出安全模式 / 撤销回滚。

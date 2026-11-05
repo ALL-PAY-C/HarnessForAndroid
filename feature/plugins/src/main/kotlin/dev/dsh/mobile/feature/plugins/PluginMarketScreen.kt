@@ -44,7 +44,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import android.provider.OpenableColumns
 import dev.dsh.mobile.core.platform.TimeFmt
-import dev.dsh.mobile.core.data.backup.BackupManager
+import dev.dsh.mobile.core.model.port.BackupApi
 import dev.dsh.mobile.pluginhost.ExternalPluginStore
 import dev.dsh.mobile.pluginhost.FileMarketCache
 import dev.dsh.mobile.pluginhost.MarketEntry
@@ -101,7 +101,7 @@ private const val GITHUB_BUSY = "github-pull"
 @Composable
 fun PluginMarketScreen(
     installer: PluginInstaller?,
-    backup: BackupManager?,
+    backup: BackupApi?,
     installedIds: List<String>,
     onChanged: () -> Unit = {},
     /** 外部插件仓库：统一安装入口，zip 包与旧 .apk 都由它按内容分流。 */

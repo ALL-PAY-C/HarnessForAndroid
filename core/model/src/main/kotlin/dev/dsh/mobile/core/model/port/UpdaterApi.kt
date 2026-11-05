@@ -16,6 +16,9 @@ interface UpdaterApi {
     fun setSourceUrl(url: String)
     fun installedVersion(): Pair<Long, String>
 
+    /** 该地址是不是内置清单源（界面据此把「内置/自定义」翻成一句话）。 */
+    fun isBuiltinSource(url: String): Boolean
+
     suspend fun checkDetailed(): Result<UpdateCheck>
     suspend fun downloadChecked(info: UpdateInfo, onProgress: (Int) -> Unit = {}): Result<DownloadReport>
     fun installIntent(file: File): Intent

@@ -35,6 +35,8 @@ class RoleOrchestratorTest {
         override suspend fun upsert(sessionId: String, entry: LedgerEntry): GroupLedger =
             write(sessionId) { it.upsert(entry, ++clock) }
 
+        override suspend fun remove(sessionId: String, id: String): GroupLedger = write(sessionId) { it.remove(id) }
+
         override suspend fun updateStatus(sessionId: String, id: String, status: LedgerStatus): GroupLedger =
             write(sessionId) { it.updateStatus(id, status, ++clock) }
 

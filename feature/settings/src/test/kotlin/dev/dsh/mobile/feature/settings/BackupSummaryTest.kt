@@ -6,6 +6,7 @@ import dev.dsh.mobile.core.data.backup.BackupSections
 import dev.dsh.mobile.core.data.backup.Counts
 import dev.dsh.mobile.core.data.backup.DeviceInfo
 import dev.dsh.mobile.core.data.backup.RestoreEngine
+import dev.dsh.mobile.core.model.backup.RestoreMode
 import dev.dsh.mobile.core.data.backup.SecretsInfo
 import dev.dsh.mobile.core.data.backup.SectionInfo
 import dev.dsh.mobile.core.data.backup.isLegacyPackage

@@ -162,7 +162,7 @@ internal fun settingsSubViewModel(container: AppContainer, key: String): Setting
                     linuxActions = dev.dsh.mobile.app.LinuxSettingsController(ctx.applicationContext, container),
                     endpoints = container.endpoints,
                     runtime = container.runtimeControl,
-                    updater = dev.dsh.mobile.core.data.update.Updater(ctx),
+                    updater = container.updater,
                     onReconnect = { container.connectActive(force = true) },
                 )
             }

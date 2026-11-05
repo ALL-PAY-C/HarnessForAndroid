@@ -3,8 +3,8 @@ package dev.dsh.mobile.feature.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.dsh.mobile.core.data.preset.AgentPreset
-import dev.dsh.mobile.core.data.preset.AgentPresetImporter
-import dev.dsh.mobile.core.data.preset.AgentPresetStore
+import dev.dsh.mobile.core.model.port.AgentPresetImportApi
+import dev.dsh.mobile.core.model.port.AgentPresetStoreApi
 import dev.dsh.mobile.core.data.preset.AgentPresets
 import dev.dsh.mobile.core.data.preset.CardError
 import dev.dsh.mobile.core.data.preset.CardImport
@@ -72,9 +72,9 @@ sealed interface CardNotice {
  * 切的是那个会话（下一轮请求即生效），没有打开的会话就改全局默认。
  */
 class PresetDrawerViewModel(
-    private val presetStore: AgentPresetStore,
+    private val presetStore: AgentPresetStoreApi,
     private val settingsStore: SettingsStore,
-    private val importer: AgentPresetImporter = AgentPresetImporter(),
+    private val importer: AgentPresetImportApi,
     /** 取会话旧人设文本（会话实体上那个 persona 字段）；默认空实现 = 没有旧数据。 */
     private val personaOf: suspend (String) -> String = { "" },
 ) : ViewModel() {

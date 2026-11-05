@@ -86,7 +86,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import dev.dsh.mobile.core.data.preset.AgentPresetStore
+import dev.dsh.mobile.core.model.port.AgentPresetStoreApi
 import dev.dsh.mobile.core.data.settings.SendMode
 import dev.dsh.mobile.core.data.settings.ThemeMode
 import dev.dsh.mobile.core.model.TransportKind
@@ -165,7 +165,7 @@ fun SettingsScreen(
     /** null = 根列表；否则是当前子页的分类 id。 */
     section: String? = null,
     /** 群聊角色卡仓库（T9.7a）；null 时整个「群聊角色卡」分组不渲染。 */
-    roleCardStore: AgentPresetStore? = null,
+    roleCardStore: AgentPresetStoreApi? = null,
     /** 宿主是否已经为底部 tab 栏单独留过位置（根页 true，子页 false）。 */
     tabBarVisible: Boolean = true,
     onOpenSection: (String) -> Unit = {},
@@ -284,8 +284,7 @@ fun SettingsScreen(
                             title = stringResource(DesignR.string.settings_update_source),
                             subtitle = when {
                                 state.updateSource.isBlank() -> stringResource(DesignR.string.settings_update_source_builtin)
-                                state.updateSource in dev.dsh.mobile.core.data.update.Updater.DEFAULT_SOURCES ||
-                                    state.updateSource == dev.dsh.mobile.core.data.update.Updater.DEFAULT_SOURCE ->
+                                viewModel.isBuiltinSource(state.updateSource) ->
                                     stringResource(DesignR.string.settings_update_source_builtin)
                                 else -> state.updateSource
                             },

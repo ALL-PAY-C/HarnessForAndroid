@@ -108,6 +108,9 @@ class Updater(
         prefs.edit().putString(KEY_SOURCE, url.trim()).apply()
     }
 
+    /** 内置源判定：候选表与默认源都依赖反代前缀，只在 data 侧算，界面只问结果。 */
+    override fun isBuiltinSource(url: String): Boolean = url in DEFAULT_SOURCES || url == DEFAULT_SOURCE
+
     /** 当前安装的版本号 / 版本名，直接读系统，不依赖 BuildConfig（debug/release 都对）。 */
     override fun installedVersion(): Pair<Long, String> = runCatching {
         val pm = context.packageManager

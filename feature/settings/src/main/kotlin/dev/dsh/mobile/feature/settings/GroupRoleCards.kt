@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.dsh.mobile.core.model.GroupRole
-import dev.dsh.mobile.core.data.preset.AgentPresetStore
+import dev.dsh.mobile.core.model.port.AgentPresetStoreApi
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider
 import dev.dsh.mobile.design.QqIdentityCardEditor
@@ -38,7 +38,7 @@ import kotlinx.coroutines.launch
  * 编辑器与「智能体预设 → 身份卡」共用 design 里的 [QqIdentityCardEditor]，不复制表单。
  */
 @Composable
-internal fun GroupRoleCardsSection(store: AgentPresetStore) {
+internal fun GroupRoleCardsSection(store: AgentPresetStoreApi) {
     val p = LocalQq.current
     val scope = rememberCoroutineScope()
     val overrides by store.roleCards.collectAsStateWithLifecycle(initialValue = emptyMap())

@@ -27,10 +27,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import dev.dsh.mobile.core.data.backup.BackupManager
-import dev.dsh.mobile.core.data.backup.BackupScheduler
+import dev.dsh.mobile.core.model.port.BackupApi
 import dev.dsh.mobile.design.LocalQq
 
 /**
@@ -42,9 +40,8 @@ import dev.dsh.mobile.design.LocalQq
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun BackupScheduleCard(backup: BackupManager?, onChanged: () -> Unit = {}) {
+fun BackupScheduleCard(backup: BackupApi?, onChanged: () -> Unit = {}) {
     if (backup == null) return
-    val context = LocalContext.current
     var times by remember { mutableStateOf(backup.times()) }
     var auto by remember { mutableStateOf(backup.autoEnabled()) }
     var adding by remember { mutableStateOf(false) }
@@ -70,9 +67,9 @@ fun BackupScheduleCard(backup: BackupManager?, onChanged: () -> Unit = {}) {
                         auto = enabled
                         backup.setAutoEnabled(enabled)
                         if (enabled) {
-                            BackupScheduler.schedule(context, backup)
+                            backup.reschedule()
                         } else {
-                            BackupScheduler.cancel(context)
+                            backup.cancelSchedule()
                         }
                         onChanged()
                     },
@@ -87,7 +84,7 @@ fun BackupScheduleCard(backup: BackupManager?, onChanged: () -> Unit = {}) {
                             val next = times - time
                             times = next
                             backup.setTimes(next)
-                            BackupScheduler.schedule(context, backup)
+                            backup.reschedule()
                             onChanged()
                         },
                         label = { Text(time) },
@@ -120,7 +117,7 @@ fun BackupScheduleCard(backup: BackupManager?, onChanged: () -> Unit = {}) {
                         val next = (times + normalised).sorted()
                         times = next
                         backup.setTimes(next)
-                        BackupScheduler.schedule(context, backup)
+                        backup.reschedule()
                         onChanged()
                     }
                     adding = false

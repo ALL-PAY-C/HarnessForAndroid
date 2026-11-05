@@ -52,7 +52,7 @@ import androidx.compose.ui.unit.sp
 import dev.dsh.mobile.core.platform.TimeFmt
 import dev.dsh.mobile.core.platform.RestartReason
 import dev.dsh.mobile.core.platform.restartApp
-import dev.dsh.mobile.core.data.backup.BackupManager
+import dev.dsh.mobile.core.model.port.BackupApi
 import dev.dsh.mobile.core.data.backup.BackupManifest
 import dev.dsh.mobile.core.data.backup.BackupSelection
 import dev.dsh.mobile.core.data.backup.RestoreEngine
@@ -85,7 +85,7 @@ import dev.dsh.mobile.core.model.backup.BackupEntry
  * 写包与恢复共用一把 busy 锁，任何一个在跑另一个按钮就禁掉，避免并发写同一批文件。
  */
 @Composable
-fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
+fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupApi) {
     val p = LocalQq.current
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -600,7 +600,7 @@ private data class LoadedBackups(
  * 预览失败不再一律报错：结构与历史三前缀包一致（无 manifest.json）的放行成 legacy，
  * 真损坏的仍然抛出去，别把坏包当旧格式放过。
  */
-private fun readPicked(ctx: Context, manager: BackupManager, uri: Uri, previous: File?): PickedBackup {
+private fun readPicked(ctx: Context, manager: BackupApi, uri: Uri, previous: File?): PickedBackup {
     val displayName = displayNameOf(ctx, uri) ?: "imported-backup.hfabak"
     previous?.delete()
     val local = File(ctx.cacheDir, IMPORT_FILE_PREFIX + System.currentTimeMillis() + ".hfabak")
