@@ -10,7 +10,7 @@ import kotlinx.serialization.json.contentOrNull
 internal const val SUBAGENT_MAX_TASKS = 8
 
 /** 子代理结论里显式给出的一个子任务：标题 + 说明。 */
-internal data class SubagentTaskSpec(val title: String, val detail: String)
+data class SubagentTaskSpec(val title: String, val detail: String)
 
 /**
  * 从子代理的结论文本里抠任务清单（T5.3）。
@@ -19,7 +19,7 @@ internal data class SubagentTaskSpec(val title: String, val detail: String)
  * 或者 `- 任务：<标题>｜<说明>` 这类列表。宽容解析、失败返回空表 —— 结论文本本身
  * 由调用方原样带回去，解析失败只表示「这轮没派活」，绝不吞掉结论、绝不抛异常。
  */
-internal fun parseSubagentTasks(text: String): List<SubagentTaskSpec> {
+fun parseSubagentTasks(text: String): List<SubagentTaskSpec> {
     if (text.isBlank()) return emptyList()
     return fromJsonArray(text).ifEmpty { fromBulletList(text) }.take(SUBAGENT_MAX_TASKS)
 }

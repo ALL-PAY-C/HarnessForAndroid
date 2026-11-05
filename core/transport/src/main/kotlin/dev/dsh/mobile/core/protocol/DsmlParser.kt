@@ -29,7 +29,7 @@ import kotlinx.serialization.json.putJsonObject
  *
  * 失败必须无声：任何解析异常都退回「原文 + 空结果」，绝不把异常带给调用方。
  */
-internal data class DsmlToolCall(val name: String, val arguments: String) {
+data class DsmlToolCall(val name: String, val arguments: String) {
     /** 翻成 message.tool_calls 里的那一项，id 用 UUID（上游没给）。 */
     fun toToolCallJson(id: String = UUID.randomUUID().toString()): JsonObject = buildJsonObject {
         put("id", id)
@@ -269,7 +269,7 @@ private fun tidy(s: String): String =
  * 只有真解析出调用时才删文本；解析不出来（缺闭合标签、JSON 坏了、认不出的写法）一律原样返回，
  * 让上层继续按「模型自己收尾」走，用户看得见的还是模型写的东西。
  */
-internal fun stripDsmlToolCalls(text: String): Pair<String, List<DsmlToolCall>> {
+fun stripDsmlToolCalls(text: String): Pair<String, List<DsmlToolCall>> {
     if (text.isEmpty() || text.indexOf('<') < 0) return text to emptyList()
     return runCatching { scanBlocks(text) }.getOrElse { text to emptyList() }
 }
@@ -355,7 +355,7 @@ private fun scanBlocks(text: String): Pair<String, List<DsmlToolCall>> {
 }
 
 /** 已闭合块整段跳过；遇到开了头却没闭合的块就从那个 '<' 起切掉尾巴。 */
-internal fun truncateOpenBlock(text: String): Pair<String, Boolean> {
+fun truncateOpenBlock(text: String): Pair<String, Boolean> {
     if (text.isEmpty() || text.indexOf('<') < 0) return text to false
     var i = 0
     while (i < text.length) {
@@ -412,7 +412,7 @@ private fun xmlOpenAt(s: String, from: Int): Pair<String, Int>? {
  * 做法和 ThinkSplitter 一样：末尾留一截「可能是某个标记前缀」的字符串不发，
  * 等下一个 chunk 拼上再决定；一旦确认进了标记块，就一直吞到对应的闭合标签。
  */
-internal class DsmlStreamFilter {
+class DsmlStreamFilter {
     private val pending = StringBuilder()
     private var suppressDsmlTag: String? = null
     private var suppressXmlClose: String? = null

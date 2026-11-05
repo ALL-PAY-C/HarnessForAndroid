@@ -34,7 +34,7 @@ private fun innerThoughtText(obj: JsonObject): String? {
 }
 
 /** 从 delta / message 里认出思维链：字段名五选一，值可能是字符串、数组或对象。 */
-internal fun reasoningOf(obj: JsonObject?): String? {
+fun reasoningOf(obj: JsonObject?): String? {
     if (obj == null) return null
     for (key in REASONING_KEYS) {
         val v = obj[key] ?: continue

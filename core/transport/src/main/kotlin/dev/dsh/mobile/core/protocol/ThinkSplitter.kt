@@ -12,7 +12,7 @@ internal val THINK_OPEN: List<String> = listOf(" thinking", "<thinking>", "<｜b
 
 internal val THINK_CLOSE: List<String> = listOf("<｜end▁of▁thinking｜>", "</thinking>")
 
-internal class ThinkSplitter(
+class ThinkSplitter(
     private val onThink: (String) -> Unit = {},
 ) {
     private val pending = StringBuilder()

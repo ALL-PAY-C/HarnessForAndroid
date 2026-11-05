@@ -7,6 +7,9 @@ android {
     namespace = "dev.dsh.mobile.core.protocol"
 }
 dependencies {
+    // 传输/流解析层已下沉到 :core:transport（包名不变），protocol 自身源码与它的公共 API
+    // 都直接引用这些类型，消费方（core:data / feature / app）也按包名 import 它们 → api。
+    api(project(":core:transport"))
     api(project(":core:model"))
     // platform（AppLog / DeviceCapability）与 download（PendingImageQueue）都只在实现里用，
     // 公共签名（LineChannel / 协议模型）不出现它们的类型 → implementation。

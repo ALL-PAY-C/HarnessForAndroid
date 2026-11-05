@@ -28,4 +28,4 @@ fun JsonObject.obj(key: String): JsonObject? = this[key]?.let { runCatching { it
 fun JsonObject.arr(key: String): List<JsonElement>? = this[key]?.let { runCatching { it.jsonArray.toList() }.getOrNull() }
 
 /** [JsonPrimitive] 的取值：JsonNull 当缺失处理（拆分前 LocalEngineTransport 的同名私有扩展）。 */
-internal fun JsonPrimitive.contentOrNullSafe(): String? = if (this is JsonNull) null else content
+fun JsonPrimitive.contentOrNullSafe(): String? = if (this is JsonNull) null else content

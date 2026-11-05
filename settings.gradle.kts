@@ -24,6 +24,7 @@ include(
     ":core:download",
     ":core:model",
     ":core:protocol",
+    ":core:transport",
     ":core:data",
     ":design",
     ":render",

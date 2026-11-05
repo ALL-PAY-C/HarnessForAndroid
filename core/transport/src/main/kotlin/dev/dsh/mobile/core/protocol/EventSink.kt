@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicLong
  * 长回合的流式 delta 会把进程撑死；有界 + 满则计数，至少丢了多少是可查的。
  * 需要保留「只留最新值」语义的流（例如世代流）显式传 capacity / replay / overflow。
  */
-internal class EventSink<T : Any>(
+class EventSink<T : Any>(
     capacity: Int = DEFAULT_CAPACITY,
     replay: Int = 0,
     overflow: BufferOverflow = BufferOverflow.SUSPEND,

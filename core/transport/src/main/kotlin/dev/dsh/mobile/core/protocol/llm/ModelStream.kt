@@ -52,7 +52,7 @@ import kotlin.coroutines.resumeWithException
  * **HTTP 客户端与端点/凭据由构造方注入**（换 client 的地方永远只有传输层一处），
  * 本类不自建 OkHttpClient、不读设置。
  */
-internal class ModelStream(
+class ModelStream(
     private val http: OkHttpClient,
     /** 引擎路由的 chat 桥；null = 这台设备没有 :node 引擎。 */
     private val engineChat: (suspend (JSONObject) -> JSONObject)?,
@@ -60,7 +60,7 @@ internal class ModelStream(
     private val engineRpc: (suspend (String, String, JSONObject) -> JSONObject)?,
 ) {
 
-    internal suspend fun postOnce(
+    suspend fun postOnce(
         cfg: LlmConfig,
         body: JsonObject,
         onReasoning: (String) -> Unit = {},
@@ -314,7 +314,7 @@ internal class ModelStream(
      * 模型地址常填本机网关（插件提供的进程）：它可能没起来、被系统杀掉、或上一次还在绑端口。
      * 连不上时先把网关拉起来再试，别让用户看到「断断续续」。
      */
-    internal suspend fun post(
+    suspend fun post(
         cfg: LlmConfig,
         body: JsonObject,
         onReasoning: (String) -> Unit = {},
@@ -346,7 +346,7 @@ internal class ModelStream(
         return CONNECT_HINTS.any { msg.contains(it) }
     }
 
-    internal suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
+    suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
         enqueue(
             object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
@@ -367,7 +367,7 @@ internal class ModelStream(
      *
      * 带图时 content 是 parts 数组：框架作为第一个 text 段插进去，图片段原样保留。
      */
-    internal fun frameUserMessage(body: JsonObject, frame: String): JsonObject {
+    fun frameUserMessage(body: JsonObject, frame: String): JsonObject {
         val messages = (body["messages"] as? JsonArray)?.toMutableList() ?: return body
         val index = messages.indexOfLast {
             (it as? JsonObject)?.get("role")?.jsonPrimitive?.contentOrNullSafe() == "user"
@@ -396,7 +396,7 @@ internal class ModelStream(
     }
 
     /** 把连接类错误翻成人话：本机网关没起来时，用户根本不知道要去哪点一下。 */
-    internal fun friendlyRequestError(e: Throwable, baseUrl: String, hasImages: Boolean = false): String {
+    fun friendlyRequestError(e: Throwable, baseUrl: String, hasImages: Boolean = false): String {
         // 上游给了明确状态码：文案已经是「谁的问题、去哪改」，别再叠一层。
         if (e is UpstreamHttpException) return e.message ?: httpFailureReason(e.status, e.body)
         val raw = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
