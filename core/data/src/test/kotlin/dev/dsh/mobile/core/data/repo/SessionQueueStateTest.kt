@@ -12,7 +12,7 @@ import org.junit.Test
  */
 class SessionQueueStateTest {
 
-    private fun item(id: String) = SendQueue.Item(id = id, text = "t-$id")
+    private fun item(id: String) = SendQueueItem(id = id, text = "t-$id")
 
     @Test
     fun enqueueRespectsLimitAndOrder() {

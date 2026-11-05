@@ -12,12 +12,12 @@ package dev.dsh.mobile.core.data.repo
  */
 internal class SessionQueueState {
 
-    private val items = ArrayDeque<SendQueue.Item>()
+    private val items = ArrayDeque<SendQueueItem>()
     private var generation = 0L
 
     /** 入队；已到 [limit] 返回 false。 */
     @Synchronized
-    fun enqueue(item: SendQueue.Item, limit: Int): Boolean {
+    fun enqueue(item: SendQueueItem, limit: Int): Boolean {
         if (items.size >= limit) return false
         items.addLast(item)
         return true
@@ -40,7 +40,7 @@ internal class SessionQueueState {
 
     /** 摘出某一条（「立刻发」用），带当前代际；没找到返回 null。 */
     @Synchronized
-    fun take(id: String): Pair<SendQueue.Item, Long>? {
+    fun take(id: String): Pair<SendQueueItem, Long>? {
         val idx = items.indexOfFirst { it.id == id }
         if (idx < 0) return null
         val item = items.removeAt(idx)
@@ -49,7 +49,7 @@ internal class SessionQueueState {
 
     /** 弹队首，带当前代际；空返回 null。 */
     @Synchronized
-    fun pop(): Pair<SendQueue.Item, Long>? {
+    fun pop(): Pair<SendQueueItem, Long>? {
         val item = items.removeFirstOrNull() ?: return null
         return item to generation
     }
@@ -66,7 +66,7 @@ internal class SessionQueueState {
     fun isCurrent(gen: Long): Boolean = generation == gen
 
     @Synchronized
-    fun snapshot(): List<SendQueue.Item> = items.toList()
+    fun snapshot(): List<SendQueueItem> = items.toList()
 
     @get:Synchronized
     val size: Int get() = items.size

@@ -16,6 +16,7 @@ import org.junit.Test
 import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import dev.dsh.mobile.core.model.backup.RestoreReport
 
 /** 备份页文案纯函数的单测：这些字符串直接上屏，错一个字就是用户看不懂状态。 */
 class BackupSummaryTest {
@@ -102,8 +103,8 @@ class BackupSummaryTest {
 
     @Test
     fun reportSummary_namesModeAndSkipsZeroCounts() {
-        val merge = RestoreEngine.Report(
-            mode = RestoreEngine.Mode.Merge,
+        val merge = RestoreReport(
+            mode = RestoreMode.Merge,
             sessions = 1,
             messages = 8,
             plugins = 0,
@@ -112,8 +113,8 @@ class BackupSummaryTest {
         )
         assertEquals(copy(DesignR.string.backup_mode_merge, emptyList()) + " · " + copy(DesignR.string.backup_counts_sessions, listOf(1)) + " · " + copy(DesignR.string.backup_counts_messages, listOf(8)), reportSummary(merge, copy))
 
-        val replace = RestoreEngine.Report(
-            mode = RestoreEngine.Mode.Replace,
+        val replace = RestoreReport(
+            mode = RestoreMode.Replace,
             sessions = 4,
             messages = 40,
             plugins = 2,

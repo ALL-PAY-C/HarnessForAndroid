@@ -69,6 +69,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import dev.dsh.mobile.core.model.backup.RestoreMode
+import dev.dsh.mobile.core.model.backup.RestoreReport
+import dev.dsh.mobile.core.model.backup.BackupEntry
 
 /**
  * 设置 → 备份与恢复（T9.13 P3，设计见 research/T913-backup.md §2）。
@@ -102,12 +105,12 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
     var lastBackupAt by remember { mutableStateOf(0L) }
 
     // ---- 区块二：已有备份 ----
-    var entries by remember { mutableStateOf<List<BackupManager.Entry>>(emptyList()) }
+    var entries by remember { mutableStateOf<List<BackupEntry>>(emptyList()) }
     var manifests by remember { mutableStateOf<Map<String, BackupManifest>>(emptyMap()) }
 
     // preview 失败但结构是历史三前缀包的：允许整机还原，别当坏包禁掉。
     var legacyNames by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var pendingDelete by remember { mutableStateOf<BackupManager.Entry?>(null) }
+    var pendingDelete by remember { mutableStateOf<BackupEntry?>(null) }
 
     // ---- 区块三：从文件恢复 ----
     var picked by remember { mutableStateOf<PickedBackup?>(null) }
@@ -115,9 +118,9 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
 
     // ---- 恢复确认 / 结果 ----
     var target by remember { mutableStateOf<PickedBackup?>(null) }
-    var mode by remember { mutableStateOf(RestoreEngine.Mode.Merge) }
+    var mode by remember { mutableStateOf(RestoreMode.Merge) }
     var restorePass by remember { mutableStateOf("") }
-    var report by remember { mutableStateOf<RestoreEngine.Report?>(null) }
+    var report by remember { mutableStateOf<RestoreReport?>(null) }
     var restoreError by remember { mutableStateOf<String?>(null) }
 
     var busy by remember { mutableStateOf(false) }
@@ -189,7 +192,7 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
         }
     }
 
-    fun startRestore(source: PickedBackup, restoreMode: RestoreEngine.Mode, passphrase: String) {
+    fun startRestore(source: PickedBackup, restoreMode: RestoreMode, passphrase: String) {
         if (busy) return
         busy = true
         restoreError = null
@@ -230,7 +233,7 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                     importFile.value = source.file
                     picked = source
                     target = source
-                    mode = if (source.legacy) RestoreEngine.Mode.Replace else RestoreEngine.Mode.Merge
+                    mode = if (source.legacy) RestoreMode.Replace else RestoreMode.Merge
                     restorePass = ""
                 }.onFailure { e -> pickError = e.message ?: ctx.getString(DesignR.string.backup_err_pick_failed) }
             }
@@ -359,14 +362,14 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                                         when {
                                             manifest != null -> {
                                                 target = PickedBackup(entry.file, entry.file.name, manifest, false)
-                                                mode = RestoreEngine.Mode.Merge
+                                                mode = RestoreMode.Merge
                                                 restorePass = ""
                                             }
 
                                             legacy -> {
                                                 // 老包没有分节信息，也没有合并语义：只给整机覆盖。
                                                 target = PickedBackup(entry.file, entry.file.name, null, true)
-                                                mode = RestoreEngine.Mode.Replace
+                                                mode = RestoreMode.Replace
                                                 restorePass = ""
                                             }
 
@@ -428,7 +431,7 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                                 enabled = !busy,
                                 onClick = {
                                     target = source
-                                    mode = if (source.legacy) RestoreEngine.Mode.Replace else RestoreEngine.Mode.Merge
+                                    mode = if (source.legacy) RestoreMode.Replace else RestoreMode.Merge
                                     restorePass = ""
                                 },
                             ) { Text(stringResource(DesignR.string.backup_start_restore)) }
@@ -526,15 +529,15 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                         )
                     } else {
                         ModeRow(
-                            selected = mode == RestoreEngine.Mode.Merge,
+                            selected = mode == RestoreMode.Merge,
                             title = stringResource(DesignR.string.backup_mode_merge_title),
                             subtitle = stringResource(DesignR.string.backup_mode_merge_desc),
-                        ) { mode = RestoreEngine.Mode.Merge }
+                        ) { mode = RestoreMode.Merge }
                         ModeRow(
-                            selected = mode == RestoreEngine.Mode.Replace,
+                            selected = mode == RestoreMode.Replace,
                             title = stringResource(DesignR.string.backup_mode_replace_title),
                             subtitle = stringResource(DesignR.string.backup_mode_replace_desc),
-                        ) { mode = RestoreEngine.Mode.Replace }
+                        ) { mode = RestoreMode.Replace }
                         if (needsPass) {
                             Spacer(Modifier.height(4.dp))
                             Text(stringResource(DesignR.string.backup_needs_pass), color = p.warn, fontSize = qqFontBody(11.5.sp))
@@ -556,7 +559,7 @@ fun BackupRestoreScreen(onBack: () -> Unit, manager: BackupManager) {
                     onClick = {
                         startRestore(
                             source,
-                            if (legacyOnly) RestoreEngine.Mode.Replace else mode,
+                            if (legacyOnly) RestoreMode.Replace else mode,
                             if (needsPass) restorePass else "",
                         )
                     },
@@ -582,7 +585,7 @@ private data class PickedBackup(
 
 /** 一次 reload 的四个结果（没有四元组，单独给个类型比 Triple 套 Pair 好读）。 */
 private data class LoadedBackups(
-    val entries: List<BackupManager.Entry>,
+    val entries: List<BackupEntry>,
     val manifests: Map<String, BackupManifest>,
     val legacyNames: Set<String>,
     val lastBackupAt: Long,

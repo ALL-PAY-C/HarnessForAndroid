@@ -30,7 +30,7 @@ class BackupRoundTripTest {
         val target = FakeBackupDb()
         val targetRoots = tempRoots("roundtrip-target")
         val report = RestoreEngine(targetRoots, target, PrefsSource.Empty, PrefsSink.Noop)
-            .restore(pkg, RestoreEngine.Mode.Merge)
+            .restore(pkg, RestoreMode.Merge)
             .getOrThrow()
 
         assertEquals(1, report.sessions)
@@ -75,7 +75,7 @@ class BackupRoundTripTest {
 
         val target = FakeBackupDb()
         RestoreEngine(tempRoots("endpoint-target"), target, PrefsSource.Empty, PrefsSink.Noop)
-            .restore(pkg, RestoreEngine.Mode.Merge)
+            .restore(pkg, RestoreMode.Merge)
             .getOrThrow()
 
         assertEquals("", target.sessions["s1"]?.str("endpointId"))

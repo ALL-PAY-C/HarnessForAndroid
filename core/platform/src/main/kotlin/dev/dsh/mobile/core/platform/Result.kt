@@ -2,14 +2,8 @@ package dev.dsh.mobile.core.platform
 
 import kotlinx.coroutines.CancellationException
 
-/** Minimal result type so protocol/data layers never throw into the UI. */
-sealed interface DshResult<out T> {
-    data class Ok<T>(val value: T) : DshResult<T>
-    data class Err(val message: String, val cause: Throwable? = null) : DshResult<Nothing>
-
-    fun getOrNull(): T? = (this as? Ok)?.value
-    fun errorOrNull(): String? = (this as? Err)?.message
-}
+// S1: DshResult 本体已上移 core:model（文件 core/model/.../core/platform/DshResult.kt，包名保持不变），
+// 让 core:model 的契约类型能直接用 DshResult 而不反向依赖 core:platform。
 
 inline fun <T> runCatchingDsh(block: () -> T): DshResult<T> =
     try {

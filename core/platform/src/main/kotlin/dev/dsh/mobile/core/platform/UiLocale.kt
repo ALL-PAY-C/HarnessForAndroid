@@ -7,8 +7,8 @@ import android.content.res.Configuration
 import android.content.res.Resources
 import java.util.Locale
 
-/** 界面语言三态。System = 跟随系统首选语言（zh* → 中文，其余 → 英文）。 */
-enum class UiLanguage { System, Zh, En }
+/** 界面语言三态本体已上移 core:model（S1）；这里只留桥，S5 删桥改 import。 */
+typealias UiLanguage = dev.dsh.mobile.core.model.UiLanguage
 
 /**
  * 进程级语言锁存（T9.11 方案 §2.2 第一段）。

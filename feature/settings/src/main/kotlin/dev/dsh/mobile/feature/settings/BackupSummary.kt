@@ -5,6 +5,7 @@ import dev.dsh.mobile.core.data.backup.BackupManifest
 import dev.dsh.mobile.core.data.backup.BackupSections
 import dev.dsh.mobile.core.data.backup.RestoreEngine
 import java.util.Locale
+import dev.dsh.mobile.core.model.backup.RestoreReport
 
 /**
  * 备份页的纯文案逻辑：分节中文名、包摘要、体积、恢复结果摘要。
@@ -90,8 +91,8 @@ internal fun isStaleImport(name: String, lastModified: Long, now: Long): Boolean
     name.startsWith(IMPORT_FILE_PREFIX) && now - lastModified > IMPORT_TTL_MILLIS
 
 /** 恢复成功后的结果摘要（成功页第一行）。 */
-internal fun reportSummary(r: RestoreEngine.Report, copy: CopyResolver): String = buildList {
-    add(copy(if (r.mode == RestoreEngine.Mode.Replace) DesignR.string.backup_mode_replace else DesignR.string.backup_mode_merge, emptyList()))
+internal fun reportSummary(r: RestoreReport, copy: CopyResolver): String = buildList {
+    add(copy(if (r.mode == RestoreMode.Replace) DesignR.string.backup_mode_replace else DesignR.string.backup_mode_merge, emptyList()))
     add(copy(DesignR.string.backup_counts_sessions, listOf(r.sessions)))
     add(copy(DesignR.string.backup_counts_messages, listOf(r.messages)))
     if (r.plugins > 0) add(copy(DesignR.string.backup_counts_plugins, listOf(r.plugins)))

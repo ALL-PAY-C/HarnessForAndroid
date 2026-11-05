@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
  * 4. 代际校验：drain/sendNow 摘出的条目若代际已过期（期间 clear 过）就跳过不发送。
  */
 internal class SendQueueEngine(
-    private val sendItem: suspend (sessionId: String, item: SendQueue.Item) -> DshResult<Unit>,
+    private val sendItem: suspend (sessionId: String, item: SendQueueItem) -> DshResult<Unit>,
     private val cancel: suspend (sessionId: String) -> DshResult<Unit>,
     private val onSendError: (sessionId: String, message: String) -> Unit = { _, _ -> },
     private val onChange: () -> Unit = {},
@@ -28,14 +28,14 @@ internal class SendQueueEngine(
     private val controlGate = SessionSendGate()
     private val interrupting = ConcurrentHashMap<String, Int>()
 
-    fun snapshot(): Map<String, List<SendQueue.Item>> =
+    fun snapshot(): Map<String, List<SendQueueItem>> =
         queues.mapValues { it.value.snapshot() }.filterValues { it.isNotEmpty() }
 
-    fun of(sessionId: String): List<SendQueue.Item> = queues[sessionId]?.snapshot() ?: emptyList()
+    fun of(sessionId: String): List<SendQueueItem> = queues[sessionId]?.snapshot() ?: emptyList()
 
     fun enqueue(sessionId: String, text: String, images: List<String>, limit: Int): Boolean {
         val ok = queues.computeIfAbsent(sessionId) { SessionQueueState() }
-            .enqueue(SendQueue.Item(text = text, images = images), limit)
+            .enqueue(SendQueueItem(text = text, images = images), limit)
         onChange()
         return ok
     }
@@ -64,7 +64,7 @@ internal class SendQueueEngine(
 
     /** 直接发一条新消息（不打断）：结果交给调用方 error UI 展示。 */
     suspend fun sendText(sessionId: String, text: String, images: List<String> = emptyList()): DshResult<Unit> =
-        sendGate.withLockOrNull(sessionId, GATE_WAIT_MS) { sendItem(sessionId, SendQueue.Item(text = text, images = images)) }
+        sendGate.withLockOrNull(sessionId, GATE_WAIT_MS) { sendItem(sessionId, SendQueueItem(text = text, images = images)) }
             ?: DshResult.Err("发送超时：上一轮回复仍在处理，请稍后重试")
 
     /** 打断当前这轮并立刻发一条新消息（Steer）。 */
@@ -78,7 +78,7 @@ internal class SendQueueEngine(
         }
         return try {
             sendGate.withLockOrNull(sessionId, GATE_WAIT_MS) {
-                sendItem(sessionId, SendQueue.Item(text = text, images = images))
+                sendItem(sessionId, SendQueueItem(text = text, images = images))
             } ?: DshResult.Err("发送超时：上一轮回复仍在处理，请稍后重试")
         } finally {
             endInterrupt(sessionId)

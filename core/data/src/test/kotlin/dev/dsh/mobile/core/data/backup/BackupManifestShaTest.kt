@@ -42,7 +42,7 @@ class BackupManifestShaTest {
 
         val target = FakeBackupDb()
         val result = RestoreEngine(tempRoots("sha-db-dst"), target, PrefsSource.Empty, PrefsSink.Noop)
-            .restore(tampered, RestoreEngine.Mode.Merge)
+            .restore(tampered, RestoreMode.Merge)
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()!!.message!!.contains("校验失败"))
@@ -61,7 +61,7 @@ class BackupManifestShaTest {
         }
 
         val result = RestoreEngine(tempRoots("sha-manifest-dst"), FakeBackupDb(), PrefsSource.Empty, PrefsSink.Noop)
-            .restore(tampered, RestoreEngine.Mode.Merge)
+            .restore(tampered, RestoreMode.Merge)
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()!!.message!!.contains("校验失败"))
@@ -72,7 +72,7 @@ class BackupManifestShaTest {
         val (roots, pkg) = writePackage("sha-ok")
         val target = FakeBackupDb()
         val report = RestoreEngine(tempRoots("sha-ok-dst"), target, PrefsSource.Empty, PrefsSink.Noop)
-            .restore(pkg, RestoreEngine.Mode.Merge)
+            .restore(pkg, RestoreMode.Merge)
             .getOrThrow()
 
         assertEquals(1, report.sessions)

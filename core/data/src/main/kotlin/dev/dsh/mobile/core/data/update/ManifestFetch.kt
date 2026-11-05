@@ -12,7 +12,8 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** 一个清单源的失败原因。多源同时挂掉时要能看到每一个，而不是只有第一个。 */
-data class SourceFailure(val url: String, val reason: String)
+// S1: 源失败/源统计已上移 core:model.update。
+typealias SourceFailure = dev.dsh.mobile.core.model.update.SourceFailure
 
 /**
  * 单个源的实测结果：耗时 + 失败原因（成功为 null）。
@@ -20,7 +21,7 @@ data class SourceFailure(val url: String, val reason: String)
  * 界面那行小字（「源：gh-proxy.com · 486ms」）与 [SourceSpeedStore] 的 EMA 都吃这份数据，
  * 不为「测速」多发任何一次请求。
  */
-data class SourceStat(val url: String, val elapsedMs: Long, val failure: String? = null)
+typealias SourceStat = dev.dsh.mobile.core.model.update.SourceStat
 
 /**
  * 发车计划：[hot] 立刻发，[delayed] 等 [delayMs] 再发。
@@ -35,9 +36,7 @@ data class RacePlan(
     val all: List<String> get() = hot + delayed
 }
 
-/** 源短名，给界面用：「源：gh-proxy.com」比整条 URL 好读。解析不出来就原样返回。 */
-fun sourceLabel(url: String): String =
-    runCatching { java.net.URI(url).host?.removePrefix("www.") ?: url }.getOrDefault(url)
+// S1: sourceLabel 已上移 core:model.update（UpdateCheck.sourceLine 在 model 内自用）。
 
 /** 一次并行竞速的结果。 */
 sealed class ManifestAttempt {

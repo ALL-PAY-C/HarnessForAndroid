@@ -80,6 +80,7 @@ import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import dev.dsh.mobile.core.model.backup.BackupEntry
 
 /** 从文件安装时占住 [busy] 的哨兵值（和条目 id 不会撞）。 */
 private const val PICK_BUSY = "file-pick"
@@ -111,7 +112,7 @@ fun PluginMarketScreen(
     var busy by remember { mutableStateOf<String?>(null) }
     var notice by remember { mutableStateOf<String?>(null) }
     var noticeFailed by remember { mutableStateOf(false) }
-    var snapshots by remember { mutableStateOf<List<BackupManager.Entry>>(emptyList()) }
+    var snapshots by remember { mutableStateOf<List<BackupEntry>>(emptyList()) }
     val context = LocalContext.current
     val p = LocalQq.current
     // 「从文件安装」：插件包正常是 zip（里面放 package.json + 入口，或 plugin.json）；

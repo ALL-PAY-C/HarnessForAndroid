@@ -25,18 +25,13 @@ import java.util.concurrent.ConcurrentHashMap
  * [ChatRepository] 收窄成引擎要的两个函数、监听 turns 下降沿触发排空、把快照发布成
  * [StateFlow] 供界面订阅。
  */
+typealias SendQueueItem = dev.dsh.mobile.core.model.chat.SendQueueItem
+
 class SendQueue(
     private val repo: ChatRepository,
     /** 应用级作用域（AppContainer 的 AppScope）：本轮执行活过页面销毁，见 [submit]。 */
     private val scope: CoroutineScope,
 ) {
-
-    /** 一条排队待发的消息：文本 + 附件 + 稳定 id（界面 key 与「撤下 / 插队」用）。 */
-    data class Item(
-        val id: String = UUID.randomUUID().toString(),
-        val text: String,
-        val images: List<String> = emptyList(),
-    )
 
     /**
      * 每会话「排队/插队发送」失败的错误出口。
@@ -78,9 +73,9 @@ class SendQueue(
         onChange = { publish() },
     )
 
-    private val _items = MutableStateFlow<Map<String, List<Item>>>(emptyMap())
+    private val _items = MutableStateFlow<Map<String, List<SendQueueItem>>>(emptyMap())
     /** 全量快照（按会话分组），界面只取自己那一段。 */
-    val items: StateFlow<Map<String, List<Item>>> = _items.asStateFlow()
+    val items: StateFlow<Map<String, List<SendQueueItem>>> = _items.asStateFlow()
 
     init {
         scope.launch {
@@ -101,7 +96,7 @@ class SendQueue(
         }
     }
 
-    fun of(sessionId: String): List<Item> = engine.of(sessionId)
+    fun of(sessionId: String): List<SendQueueItem> = engine.of(sessionId)
 
     /** 入队；返回 false 表示已到上限。 */
     fun enqueue(sessionId: String, text: String, images: List<String>, limit: Int): Boolean =

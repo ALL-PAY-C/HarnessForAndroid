@@ -1,0 +1,93 @@
+package dev.dsh.mobile.core.model.port
+
+import dev.dsh.mobile.core.model.UiLanguage
+import dev.dsh.mobile.core.model.settings.AppSettings
+import dev.dsh.mobile.core.model.settings.SendMode
+import dev.dsh.mobile.core.model.settings.ThemeMode
+import kotlinx.coroutines.flow.Flow
+
+/**
+ * 设置读写端口：feature 侧只认这 77 个成员，不认 DataStore / Context。
+ *
+ * 由 core:data 的 SettingsStore 实现（S3b 切换）。读口 settings + 76 个写口；
+ * 实现类的其余成员（setActiveEndpoint / setGroupModeratorModel 等内部用）不进接口。
+ */
+interface SettingsApi {
+    val settings: Flow<AppSettings>
+    suspend fun setThemeMode(mode: ThemeMode)
+    suspend fun setUiLanguage(language: UiLanguage)
+    suspend fun setAccent(color: Long)
+    suspend fun setBubbleMine(color: Long)
+    suspend fun setBubbleOther(color: Long)
+    suspend fun setRadius(dp: Int)
+    suspend fun setFontScale(scale: Float)
+    suspend fun setDensity(d: Float)
+    suspend fun setCompact(compact: Boolean)
+    suspend fun setShowAgentStatus(v: Boolean)
+    suspend fun setShowTokenUsage(v: Boolean)
+    suspend fun setGroupSessions(v: Boolean)
+    suspend fun setDefaultCwd(v: String)
+    suspend fun setNotifications(v: Boolean)
+    suspend fun setDnd(v: Boolean)
+    suspend fun setHeartbeat(ms: Long)
+    suspend fun setRuntimeVersion(v: String)
+    suspend fun setQuickCommands(list: List<String>)
+    suspend fun setPromptTemplates(list: List<String>)
+    suspend fun setShowThoughts(v: Boolean)
+    suspend fun setAutoApprove(v: Boolean)
+    suspend fun setPluginUiExtend(v: Boolean)
+    suspend fun setCwdTreeUri(v: String)
+    suspend fun setNotifyOnComplete(v: Boolean)
+    suspend fun setNotifyOnPermission(v: Boolean)
+    suspend fun setNotifyVibrate(v: Boolean)
+    suspend fun setNotifyHeadsUp(v: Boolean)
+    suspend fun setNotifyOngoing(v: Boolean)
+    suspend fun setNotifyShowThought(v: Boolean)
+    suspend fun setNotifyThoughtLines(v: Int)
+    suspend fun setNotifySuppressForeground(v: Boolean)
+    suspend fun setNotifyInlineActions(v: Boolean)
+    suspend fun setNotifyReplySnippet(v: Boolean)
+    suspend fun setNotifyKeepAfterDone(v: Boolean)
+    suspend fun setNotifyVibrateStrength(v: Int)
+    suspend fun setDefaultPresetId(v: String)
+    suspend fun setSessionPresetId(sessionId: String, presetId: String)
+    suspend fun setSessionPresetSwitches(sessionId: String, on: Set<String>)
+    suspend fun setSendMode(v: SendMode)
+    suspend fun setQueueLimit(v: Int)
+    suspend fun setAutoScroll(v: Boolean)
+    suspend fun setShowDuration(v: Boolean)
+    suspend fun setColorizeAuthors(v: Boolean)
+    suspend fun setThoughtsExpanded(v: Boolean)
+    suspend fun setMaxOutputTokens(v: Int)
+    suspend fun setRenderSpecialFormats(v: Boolean)
+    suspend fun setRenderSpecialOverride(sessionId: String, v: Boolean)
+    suspend fun setGroupMaxParallel(v: Int)
+    suspend fun setGroupAllowTools(v: Boolean)
+    suspend fun setGroupMode(v: String)
+    suspend fun setGroupOfficePrompt(v: Boolean)
+    suspend fun setGroupContextBudget(v: Int)
+    suspend fun setSubagentMaxDepth(v: Int)
+    suspend fun setCapabilityTiers(v: String)
+    suspend fun setGroupIsolateMembers(v: Boolean)
+    suspend fun setGroupScheduler(v: String)
+    suspend fun setShellChannel(v: String)
+    suspend fun setCollapsedGroups(v: List<String>)
+    suspend fun setCustomFolders(v: List<String>)
+    suspend fun setWebSearchEngine(v: String)
+    suspend fun setSearxngInstance(v: String)
+    suspend fun setMaxDownloadBytes(v: Long)
+    suspend fun setProxyUrl(v: String)
+    suspend fun setAppIconStyle(v: String)
+    suspend fun setCustomIconUri(v: String)
+    suspend fun setStartupAnimation(v: String)
+    suspend fun setStartupAnimationMs(v: Int)
+    suspend fun setBackgroundUri(v: String)
+    suspend fun setBackgroundDim(v: Float)
+    suspend fun setAccentHue(v: Float)
+    suspend fun setBorderWidth(dp: Int)
+    suspend fun setBackMaterial(v: String)
+    suspend fun setGlassEnabled(v: Boolean)
+    suspend fun setGlassAlpha(v: Float)
+    suspend fun setGlassBlur(dp: Int)
+    suspend fun setCrashUpload(enabled: Boolean, endpoint: String)
+}

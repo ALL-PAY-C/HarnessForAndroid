@@ -79,6 +79,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.alpha
+import dev.dsh.mobile.core.model.chat.SendQueueItem
 
 /**
  * 排队区。
@@ -91,7 +92,7 @@ internal const val QUEUE_EXPANDED_DEFAULT = false
 
 @Composable
 internal fun QueueStrip(
-    items: List<SendQueue.Item>,
+    items: List<SendQueueItem>,
     streaming: Boolean,
     onPromote: (String) -> Unit,
     onDrop: (String) -> Unit,

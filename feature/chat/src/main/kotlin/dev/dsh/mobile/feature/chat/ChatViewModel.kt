@@ -50,6 +50,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
+import dev.dsh.mobile.core.model.chat.SendQueueItem
 
 data class ChatUiState(
     val sessionId: String,
@@ -82,7 +83,7 @@ data class ChatUiState(
     val renderSpecial: Boolean = true,
     /** 排队等待发送的消息数。 */
     val queued: Int = 0,
-    val queue: List<SendQueue.Item> = emptyList(),
+    val queue: List<SendQueueItem> = emptyList(),
     /** 执行池快照（只读）；空 = 拿不到或全空闲，消息区顶部状态条不渲染。 */
     val agents: List<AgentRuntimeState> = emptyList(),
     /**
@@ -239,7 +240,7 @@ class ChatViewModel(
     }
 
     /** 排队区快照：只取本会话那一段（队列实体活在 [SendQueue] 里，页面销毁也不丢）。 */
-    private val queueFlow: Flow<List<SendQueue.Item>> = sendQueue.items.map { it[sessionId] ?: emptyList() }
+    private val queueFlow: Flow<List<SendQueueItem>> = sendQueue.items.map { it[sessionId] ?: emptyList() }
 
     private val runtime: StateFlow<RuntimeState> = repo.transport
         .flatMapLatest { t -> t?.state ?: flowOf(RuntimeState.NotConfigured) }
@@ -260,7 +261,7 @@ class ChatViewModel(
         val error: UiText?,
         val models: List<ModelProfile>,
         val groups: List<String>,
-        val queue: List<SendQueue.Item> = emptyList(),
+        val queue: List<SendQueueItem> = emptyList(),
     )
 
     /** 没有执行池就发一个空流，顶部状态条整条不渲染。 */

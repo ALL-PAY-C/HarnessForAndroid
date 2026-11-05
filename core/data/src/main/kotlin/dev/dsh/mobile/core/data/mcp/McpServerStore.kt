@@ -24,19 +24,10 @@ import java.util.UUID
 private const val PREFS_NAME = "dsh.mcp"
 private const val KEY_SERVERS = "key_servers"
 
-/** UI 与存储共用的扁平 record：feature:settings 看不到 core:protocol，转换只在这里做。 */
-data class McpKeyValue(val name: String, val value: String)
+// S1: 记录类型本体已上移 core:model.mcp（S5 删桥改 import）。
+typealias McpKeyValue = dev.dsh.mobile.core.model.mcp.McpKeyValue
+typealias McpServerRecord = dev.dsh.mobile.core.model.mcp.McpServerRecord
 
-data class McpServerRecord(
-    val id: String,
-    /** 已 sanitize 的短名，工具名前缀 mcp__<name>__<tool>。 */
-    val name: String,
-    val transport: String,
-    val url: String,
-    val headers: List<McpKeyValue> = emptyList(),
-    val enabled: Boolean = true,
-    val toolCallTimeoutMs: Long = 120_000L,
-)
 
 /** P2 只做应用内直连的两种传输；stdio 只能由引擎 spawn（见 McpTransportKind 注释）。 */
 val MCP_TRANSPORTS: List<String> = listOf("http", "sse")

@@ -58,7 +58,7 @@ class BackupManager(private val context: Context) {
     private val dir: File get() = File(context.filesDir, "backups").apply { mkdirs() }
     private val prefs by lazy { context.getSharedPreferences("dsh.backup", Context.MODE_PRIVATE) }
 
-    data class Entry(val file: File, val reason: String, val createdAt: Long)
+    data class BackupEntry(val file: File, val reason: String, val createdAt: Long)
 
     private fun rawFiles(): List<File> = dir.listFiles { f -> f.name.endsWith(".zip") }
         ?.sortedByDescending { it.lastModified() }
@@ -68,13 +68,13 @@ class BackupManager(private val context: Context) {
      * 存档按队列管理：只留最近 [MAX_BACKUPS] 个，多出来的最旧的直接删。
      * 读列表时顺手清一次，老版本留下的 20 个也会在这一刻收敿到 8 个。
      */
-    fun list(): List<Entry> {
+    fun list(): List<BackupEntry> {
         val files = rawFiles()
         if (files.size > MAX_BACKUPS) {
             files.drop(MAX_BACKUPS).forEach { runCatching { it.delete() } }
         }
         return files.take(MAX_BACKUPS).map {
-            Entry(it, prefs.getString("reason.${it.name}", "").orEmpty(), it.lastModified())
+            BackupEntry(it, prefs.getString("reason.${it.name}", "").orEmpty(), it.lastModified())
         }
     }
 
@@ -159,14 +159,14 @@ class BackupManager(private val context: Context) {
      */
     fun restorePackage(
         file: File,
-        mode: RestoreEngine.Mode = RestoreEngine.Mode.Merge,
+        mode: RestoreMode = RestoreMode.Merge,
         passphrase: String = "",
-    ): Result<RestoreEngine.Report> = runCatching {
+    ): Result<RestoreReport> = runCatching {
         val engine = engine()
         val manifest = runCatching { engine.preview(file) }.getOrNull()
         if (manifest == null) {
             legacyRestore(file).getOrThrow()
-            RestoreEngine.Report(mode, 0, 0, 0, 0, listOf("旧版存档：按文件覆盖恢复，未做校验"))
+            RestoreReport(mode, 0, 0, 0, 0, listOf("旧版存档：按文件覆盖恢复，未做校验"))
         } else {
             val report = engine.restore(file, mode, passphrase).getOrThrow()
             // 库被整包换掉后可能带回迁移前的明文 token：重置屏障，让下次快照重新迁移。

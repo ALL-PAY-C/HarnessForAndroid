@@ -30,7 +30,7 @@ class RestoreMergeTest {
         target.messages["s2m"] = FakeBackupDb.messageRow("s2m", "s2", "本地消息")
 
         RestoreEngine(tempRoots("merge-dst"), target, PrefsSource.Empty, PrefsSink.Noop)
-            .restore(pkg, RestoreEngine.Mode.Merge)
+            .restore(pkg, RestoreMode.Merge)
             .getOrThrow()
 
         assertEquals("覆盖后的标题", target.sessions["s1"]?.str("title"))
@@ -60,7 +60,7 @@ class RestoreMergeTest {
             mapOf("default_cwd" to PbValue.Str("/local"), "theme" to PbValue.Str("light")),
         )
         RestoreEngine(dst, FakeBackupDb(), PrefsSource.Empty, PrefsSink.Noop)
-            .restore(pkg, RestoreEngine.Mode.Merge)
+            .restore(pkg, RestoreMode.Merge)
             .getOrThrow()
 
         val merged = dst.readDatastore("dsh_settings")
@@ -85,7 +85,7 @@ class RestoreMergeTest {
 
         val sink = RecordingSink()
         RestoreEngine(tempRoots("merge-sp-dst"), FakeBackupDb(), PrefsSource.Empty, sink)
-            .restore(pkg, RestoreEngine.Mode.Merge)
+            .restore(pkg, RestoreMode.Merge)
             .getOrThrow()
 
         val applied = sink.applied["dsh.plugins"]

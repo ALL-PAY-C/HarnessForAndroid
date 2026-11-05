@@ -27,17 +27,7 @@ class RestoreEngine(
     private val clock: () -> Long = { System.currentTimeMillis() },
 ) {
 
-    enum class Mode { Merge, Replace }
-
-    data class Report(
-        val mode: Mode,
-        val sessions: Int,
-        val messages: Int,
-        val plugins: Int,
-        val files: Int,
-        val warnings: List<String>,
-        val preRestore: File? = null,
-    )
+    // S1: RestoreMode / RestoreReport 已上移 core:model.backup，改名为 RestoreMode / RestoreReport。
 
     /** 只读 manifest，不动磁盘。 */
     fun preview(file: File): BackupManifest {
@@ -54,7 +44,7 @@ class RestoreEngine(
         return BackupManifestCodec.decode(body)
     }
 
-    fun restore(file: File, mode: Mode, passphrase: String = ""): Result<Report> = runCatching {
+    fun restore(file: File, mode: RestoreMode, passphrase: String = ""): Result<RestoreReport> = runCatching {
         val manifest = preview(file)
         val verdict = compareDb(manifest.dbVersion, db.version)
         if (verdict == DbVerdict.Newer) {
@@ -62,7 +52,7 @@ class RestoreEngine(
         }
 
         var preRestore: File? = null
-        if (mode == Mode.Replace) {
+        if (mode == RestoreMode.Replace) {
             preRestore = snapshotBeforeReplace()
                 ?: throw IllegalStateException("恢复前快照失败，已中止恢复")
         }
@@ -88,7 +78,7 @@ class RestoreEngine(
             restoreSecrets(staging, manifest, passphrase)
 
             db.clearWarmLayers(touched)
-            Report(
+            RestoreReport(
                 mode = mode,
                 sessions = touched.size,
                 messages = messageCount,
@@ -138,7 +128,7 @@ class RestoreEngine(
     private fun restoreDatabase(
         staging: File,
         manifest: BackupManifest,
-        mode: Mode,
+        mode: RestoreMode,
     ): Pair<Set<String>, Int> {
         val dumpFile = File(staging, "db/dsh-mobile.db")
         if (!dumpFile.isFile) {
@@ -158,7 +148,7 @@ class RestoreEngine(
                 val copy = LinkedHashMap(row.values)
                 // endpointId 指向产包设备的端点，搬过来必然失效：置空，让用户在设置里重选。
                 if (copy.containsKey("endpointId")) copy["endpointId"] = ""
-                if (mode == Mode.Merge) {
+                if (mode == RestoreMode.Merge) {
                     val id = row.str("id").orEmpty()
                     val title = row.str("title").orEmpty()
                     if (id !in liveTitles && title.isNotEmpty() &&
@@ -171,7 +161,7 @@ class RestoreEngine(
             }
 
             return db.transaction {
-                if (mode == Mode.Replace) db.clearContent()
+                if (mode == RestoreMode.Replace) db.clearContent()
                 db.upsert(TABLE_SESSIONS, prepared)
                 db.upsert(TABLE_MESSAGES, incomingMessages)
                 touched to incomingMessages.size
@@ -183,7 +173,7 @@ class RestoreEngine(
 
     // ---- 设置 ----
 
-    private fun restoreSettings(staging: File, mode: Mode) {
+    private fun restoreSettings(staging: File, mode: RestoreMode) {
         val datastoreDir = File(staging, "datastore")
         if (datastoreDir.isDirectory) {
             roots.datastoreDir.mkdirs()
@@ -192,7 +182,7 @@ class RestoreEngine(
                 val name = f.name.removeSuffix(".preferences_pb")
                 if (name !in DATASTORE_WHITELIST) continue
                 val target = File(roots.datastoreDir, f.name)
-                val merged = if (mode == Mode.Merge) {
+                val merged = if (mode == RestoreMode.Merge) {
                     val local = runCatching { PreferencesPb.decode(target.readBytes()) }.getOrDefault(LinkedHashMap())
                     val incoming = PreferencesPb.decode(f.readBytes())
                     PreferencesPb.merge(local, incoming, DEVICE_SETTING_KEYS)
@@ -216,14 +206,14 @@ class RestoreEngine(
                 if (name !in PREFS_WHITELIST) continue
                 val values = runCatching { PrefsCodec.decode(f.readText()) }.getOrElse { emptyMap() }
                 if (values.isEmpty()) continue
-                prefsSink.apply(name, values, mode == Mode.Replace)
+                prefsSink.apply(name, values, mode == RestoreMode.Replace)
             }
         }
     }
 
     // ---- 插件 ----
 
-    private fun restorePlugins(staging: File, mode: Mode): Int {
+    private fun restorePlugins(staging: File, mode: RestoreMode): Int {
         val src = File(staging, "plugins")
         if (!src.isDirectory) return 0
         var count = 0
@@ -232,7 +222,7 @@ class RestoreEngine(
             val target = File(roots.pluginsDir, dir.name)
             val incoming = versionOf(dir)
             val local = versionOf(target)
-            if (mode == Mode.Merge && local != null && incoming != null && compareVersion(incoming, local) <= 0) {
+            if (mode == RestoreMode.Merge && local != null && incoming != null && compareVersion(incoming, local) <= 0) {
                 continue
             }
             target.deleteRecursively()
@@ -247,7 +237,7 @@ class RestoreEngine(
 
     // ---- 附件 / 工作区 ----
 
-    private fun restoreTrees(staging: File, mode: Mode): Int {
+    private fun restoreTrees(staging: File, mode: RestoreMode): Int {
         var count = 0
         for ((rel, target) in listOf(
             "files/attachments" to roots.attachmentsDir,
@@ -255,7 +245,7 @@ class RestoreEngine(
         )) {
             val src = File(staging, rel)
             if (!src.isDirectory) continue
-            if (mode == Mode.Replace) target.deleteRecursively()
+            if (mode == RestoreMode.Replace) target.deleteRecursively()
             target.mkdirs()
             count += copyTree(src, target)
         }

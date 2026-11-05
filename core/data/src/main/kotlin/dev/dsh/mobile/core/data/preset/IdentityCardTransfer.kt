@@ -190,14 +190,12 @@ object IdentityCardTransfer {
     }
 }
 
-/** 导入失败的整包原因；中文文案在 UI 层按资源映射。 */
-enum class CardError { Blank, BadJson, Shape, UnsupportedSchema, TooManyCards, EmptyCards, MissingName, TooLong, BadType }
+// S1: CardError / CardSkip 本体已上移 core:model.preset。
+typealias CardError = dev.dsh.mobile.core.model.preset.CardError
+typealias CardSkip = dev.dsh.mobile.core.model.preset.CardSkip
 
 /** 一张读出来的卡：id 来自 JSON（可能是空串），落库前由 [IdentityCardTransfer.toPresets] 重新分配。 */
 data class ImportedCard(val id: String, val card: IdentityCard)
-
-/** 单张被跳过的卡：原因 + 出事的字段 + 卡名（可能为空，用于提示）。 */
-data class CardSkip(val reason: CardError, val field: String = "", val name: String = "")
 
 sealed interface CardImport {
     data class Ok(val cards: List<ImportedCard>, val skipped: List<CardSkip>) : CardImport

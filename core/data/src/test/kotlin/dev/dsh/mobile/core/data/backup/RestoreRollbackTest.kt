@@ -26,7 +26,7 @@ class RestoreRollbackTest {
 
         val dstRoots = tempRoots("rollback-dst")
         val result = RestoreEngine(dstRoots, target, PrefsSource.Empty, PrefsSink.Noop)
-            .restore(pkg, RestoreEngine.Mode.Merge)
+            .restore(pkg, RestoreMode.Merge)
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()!!.message!!.contains("模拟写库失败"))
@@ -50,7 +50,7 @@ class RestoreRollbackTest {
         target.sessions["keep"] = FakeBackupDb.sessionRow("keep", "本地会话")
 
         val result = RestoreEngine(tempRoots("newer-dst"), target, PrefsSource.Empty, PrefsSink.Noop)
-            .restore(pkg, RestoreEngine.Mode.Merge)
+            .restore(pkg, RestoreMode.Merge)
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()!!.message!!.contains("请先升级 App"))
@@ -76,7 +76,7 @@ class RestoreRollbackTest {
             prefs = PrefsSource.Empty,
             prefsSink = PrefsSink.Noop,
             snapshotBeforeReplace = { null },
-        ).restore(pkg, RestoreEngine.Mode.Replace)
+        ).restore(pkg, RestoreMode.Replace)
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()!!.message!!.contains("恢复前快照失败"))
