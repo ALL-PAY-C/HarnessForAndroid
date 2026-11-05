@@ -22,6 +22,7 @@ import dev.dsh.mobile.core.protocol.WORKER_MAX_TOKENS
 import dev.dsh.mobile.core.protocol.automatonRounds
 import dev.dsh.mobile.core.protocol.automatonVerdict
 import dev.dsh.mobile.core.protocol.buildUserContent
+import dev.dsh.mobile.core.protocol.contentOrNullSafe
 import dev.dsh.mobile.core.protocol.detectGroupMode
 import dev.dsh.mobile.core.protocol.digest
 import dev.dsh.mobile.core.protocol.groupStateLine
@@ -33,7 +34,6 @@ import dev.dsh.mobile.core.protocol.parseMentions
 import dev.dsh.mobile.core.protocol.planGroupRound
 import dev.dsh.mobile.core.protocol.planGroupTasks
 import dev.dsh.mobile.core.protocol.sharedText
-import dev.dsh.mobile.core.protocol.tool.contentOrNullSafe
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.serialization.json.JsonObject

@@ -4,6 +4,7 @@ import dev.dsh.mobile.core.model.AgentRunState
 import dev.dsh.mobile.core.model.AgentRuntimeState
 import dev.dsh.mobile.core.model.AgentTask
 import dev.dsh.mobile.core.model.TaskState
+import dev.dsh.mobile.core.protocol.transport.reasoningOf
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonArray

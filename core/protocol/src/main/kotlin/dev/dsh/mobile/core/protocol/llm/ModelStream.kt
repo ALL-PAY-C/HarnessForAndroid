@@ -1,16 +1,16 @@
 package dev.dsh.mobile.core.protocol.llm
 
 import dev.dsh.mobile.core.platform.LoopbackGateway
-import dev.dsh.mobile.core.protocol.CONNECT_HINTS
 import dev.dsh.mobile.core.protocol.DshJson
-import dev.dsh.mobile.core.protocol.GATEWAY_ATTEMPTS
-import dev.dsh.mobile.core.protocol.GATEWAY_BACKOFF_MS
 import dev.dsh.mobile.core.protocol.LlmConfig
 import dev.dsh.mobile.core.protocol.UpstreamHttpException
+import dev.dsh.mobile.core.protocol.contentOrNullSafe
 import dev.dsh.mobile.core.protocol.httpFailureReason
-import dev.dsh.mobile.core.protocol.reasoningOf
 import dev.dsh.mobile.core.protocol.stripDsmlToolCalls
-import dev.dsh.mobile.core.protocol.tool.contentOrNullSafe
+import dev.dsh.mobile.core.protocol.transport.CONNECT_HINTS
+import dev.dsh.mobile.core.protocol.transport.GATEWAY_ATTEMPTS
+import dev.dsh.mobile.core.protocol.transport.GATEWAY_BACKOFF_MS
+import dev.dsh.mobile.core.protocol.transport.reasoningOf
 import dev.dsh.mobile.core.protocol.truncateOpenBlock
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay

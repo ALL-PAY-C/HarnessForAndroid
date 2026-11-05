@@ -5,7 +5,7 @@ package dev.dsh.mobile.core.protocol
  *
  * 上游有多种表达方式：DeepSeek 走 `reasoning_content` 字段，另一些模型把推理直接写进
  * 正文并用 `<｜begin▁of▁thinking｜>…<｜end▁of▁thinking｜>` 或 ` thinking…</thinking>` 包起来。
- * 字段那一路在 [reasoningOf] 里取；这里负责正文里混着的那一路，
+ * 字段那一路在 [dev.dsh.mobile.core.protocol.transport.reasoningOf] 里取；这里负责正文里混着的那一路，
  * 而且要能处理「标签被切在两个 chunk 之间」——所以必须留住末尾可能不完整的标签前缀。
  */
 internal val THINK_OPEN: List<String> = listOf(" thinking", "<thinking>", "<｜begin▁of▁thinking｜>")

@@ -12,7 +12,7 @@ import dev.dsh.mobile.core.protocol.ContextBudget
 import dev.dsh.mobile.core.protocol.ContextSummaryStore
 import dev.dsh.mobile.core.protocol.LlmConfig
 import dev.dsh.mobile.core.protocol.SessionProjections
-import dev.dsh.mobile.core.protocol.tool.contentOrNullSafe
+import dev.dsh.mobile.core.protocol.contentOrNullSafe
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.addJsonObject

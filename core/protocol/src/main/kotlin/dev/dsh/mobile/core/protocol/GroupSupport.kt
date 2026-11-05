@@ -7,7 +7,6 @@ import dev.dsh.mobile.core.model.AgentTask
 import dev.dsh.mobile.core.model.ChatMessage
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -21,29 +20,11 @@ import java.util.UUID
 /** 换行常量：群聊文本按行切段时要拼回去。 */
 private const val NL = "\n"
 
-/** 思维链可能出现的字段名（各家上游不统一）。 */
-private val REASONING_KEYS = listOf("reasoning_content", "reasoning", "thinking", "reasoning_details", "analysis")
-private val REASONING_INNER_KEYS = listOf("summary", "text", "content")
-
 /** 群聊最多同时几个成员在跑（设置里的并行度只在这个上限内生效）。 */
 internal const val GROUP_MAX_PARALLEL = 3
 
-/** 本机网关的自举重试：连不上才重试，非连接类错误一次就抛。 */
-internal const val GATEWAY_ATTEMPTS = 3
-internal const val GATEWAY_BACKOFF_MS = 700L
-
 /** 展开面板里贴请求原文的上限：再长就不是给人看的了。 */
 internal const val JSON_VIEW_LIMIT = 6_000
-
-internal val CONNECT_HINTS = listOf(
-    "failed to connect",
-    "connection refused",
-    "connect timed out",
-    "econnrefused",
-    "connection reset",
-    "broken pipe",
-    "no route to host",
-)
 
 /** 「这是一件新活」的动词：命中就不当成追问。 */
 private val NEW_TASK_VERBS = listOf(
@@ -213,36 +194,6 @@ internal fun buildUserContent(userText: String, userImages: List<String>): JsonE
     // 纯文本必须保持字符串形态：不少网关只吃字符串 content，塞 parts 数组会 400。
     val plainOnly = parts.size == 1 && userImages.isEmpty()
     return if (parts.isEmpty() || plainOnly) JsonPrimitive(text) else JsonArray(parts)
-}
-
-private fun innerThoughtText(obj: JsonObject): String? {
-    for (k in REASONING_INNER_KEYS) {
-        val v = obj[k]
-        if (v is JsonPrimitive && v.isString) return v.content
-    }
-    return null
-}
-
-/** 从 delta / message 里认出思维链：字段名五选一，值可能是字符串、数组或对象。 */
-internal fun reasoningOf(obj: JsonObject?): String? {
-    if (obj == null) return null
-    for (key in REASONING_KEYS) {
-        val v = obj[key] ?: continue
-        val text = when (v) {
-            is JsonPrimitive -> if (v.isString) v.content else null
-            is JsonArray -> v.mapNotNull {
-                when (it) {
-                    is JsonPrimitive -> if (it.isString) it.content else null
-                    is JsonObject -> innerThoughtText(it)
-                    else -> null
-                }
-            }.filter { it.isNotBlank() }.joinToString("")
-            is JsonObject -> innerThoughtText(v)
-            else -> null
-        } ?: continue
-        if (text.isNotBlank()) return text
-    }
-    return null
 }
 
 /** 剥掉正文里混着的  thinking 段，返回（可见正文, 思维链）。 */

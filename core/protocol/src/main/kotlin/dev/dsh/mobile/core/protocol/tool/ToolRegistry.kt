@@ -2,6 +2,7 @@ package dev.dsh.mobile.core.protocol.tool
 
 import dev.dsh.mobile.core.platform.device.CapabilityActions
 import dev.dsh.mobile.core.model.mcp.ToolSensitivity
+import dev.dsh.mobile.core.protocol.contentOrNullSafe
 import dev.dsh.mobile.core.protocol.str
 import dev.dsh.mobile.core.model.mcp.ToolSensitivity.DeviceControl
 import dev.dsh.mobile.core.model.mcp.ToolSensitivity.Irreversible

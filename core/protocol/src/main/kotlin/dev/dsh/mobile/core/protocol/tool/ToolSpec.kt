@@ -3,9 +3,7 @@ package dev.dsh.mobile.core.protocol.tool
 import dev.dsh.mobile.core.protocol.ToolOutputSpill
 import dev.dsh.mobile.core.model.mcp.ToolSensitivity
 import dev.dsh.mobile.core.protocol.web.WebToolkit
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * 工具执行时用得上的东西（T7.1）。
@@ -69,7 +67,3 @@ data class ToolSpec(
     val handler: (suspend (args: JsonObject, ctx: ToolCtx) -> String)?
         get() = (execution as? ToolExecution.Runner)?.handler
 }
-
-/** [JsonPrimitive] 的取值：JsonNull 当缺失处理（拆分前 LocalEngineTransport 的同名私有扩展）。 */
-internal fun JsonPrimitive.contentOrNullSafe(): String? = if (this is JsonNull) null else content
-
