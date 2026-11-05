@@ -16,6 +16,7 @@ import dev.dsh.mobile.core.platform.ProxyEnv
 import dev.dsh.mobile.core.platform.UiLanguage
 import dev.dsh.mobile.core.platform.UiLocale
 import dev.dsh.mobile.core.data.preset.AgentPresets
+import dev.dsh.mobile.core.model.port.SettingsApi
 import dev.dsh.mobile.core.model.BackMaterial
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -36,7 +37,7 @@ private val Context.settingsStore: DataStore<Preferences> by preferencesDataStor
 /** 快照里 Set<String> 的分隔符：stringSetPreferencesKey 只能存集合本身，序列化要自己定分隔。 */
 private const val LIST_SEP = "\u0001"
 
-class SettingsStore(private val context: Context) {
+class SettingsStore(private val context: Context) : SettingsApi {
 
     // internal 而不是 private：同文件的顶层纯函数 [resolveBackMaterial] / [writeBackMaterial]
     // 要读写这批键，好让「材质读写与旧键迁移」能在纯 JVM 单测里覆盖，不必起 Android Context。
@@ -128,7 +129,7 @@ class SettingsStore(private val context: Context) {
         val glassBlur = intPreferencesKey("glass_blur")
     }
 
-    val settings: Flow<AppSettings> = context.settingsStore.data.map { p ->
+    override val settings: Flow<AppSettings> = context.settingsStore.data.map { p ->
         val d = AppSettings.DEFAULT
         val material = resolveBackMaterial(p)
         AppSettings(
@@ -213,61 +214,61 @@ class SettingsStore(private val context: Context) {
         )
     }
 
-    suspend fun setThemeMode(mode: ThemeMode) = edit { it[K.themeMode] = mode.name }
+    override suspend fun setThemeMode(mode: ThemeMode) = edit { it[K.themeMode] = mode.name }
 
     /**
      * 写语言：DataStore 是唯一事实来源，同时同步写 SharedPreferences 镜像。
      * 镜像存在的唯一理由是 Application.attachBaseContext 必须同步拿到语言（T9.11 §2.1），
      * 不加镜像的话冷启动第一帧会先画中文再跳英文。
      */
-    suspend fun setUiLanguage(language: UiLanguage) {
+    override suspend fun setUiLanguage(language: UiLanguage) {
         edit { it[K.uiLanguage] = language.name }
         UiLocale.mirror(context, language)
     }
-    suspend fun setAccent(color: Long) = edit { it[K.accent] = color }
-    suspend fun setBubbleMine(color: Long) = edit { it[K.bubbleMine] = color }
-    suspend fun setBubbleOther(color: Long) = edit { it[K.bubbleOther] = color }
-    suspend fun setRadius(dp: Int) = edit { it[K.radius] = dp }
-    suspend fun setFontScale(scale: Float) = edit { it[K.fontScale] = scale }
-    suspend fun setDensity(d: Float) = edit { it[K.density] = d }
-    suspend fun setCompact(compact: Boolean) = edit { it[K.compact] = compact }
-    suspend fun setShowAgentStatus(v: Boolean) = edit { it[K.showAgentStatus] = v }
-    suspend fun setShowTokenUsage(v: Boolean) = edit { it[K.showTokens] = v }
-    suspend fun setGroupSessions(v: Boolean) = edit { it[K.groupSessions] = v }
+    override suspend fun setAccent(color: Long) = edit { it[K.accent] = color }
+    override suspend fun setBubbleMine(color: Long) = edit { it[K.bubbleMine] = color }
+    override suspend fun setBubbleOther(color: Long) = edit { it[K.bubbleOther] = color }
+    override suspend fun setRadius(dp: Int) = edit { it[K.radius] = dp }
+    override suspend fun setFontScale(scale: Float) = edit { it[K.fontScale] = scale }
+    override suspend fun setDensity(d: Float) = edit { it[K.density] = d }
+    override suspend fun setCompact(compact: Boolean) = edit { it[K.compact] = compact }
+    override suspend fun setShowAgentStatus(v: Boolean) = edit { it[K.showAgentStatus] = v }
+    override suspend fun setShowTokenUsage(v: Boolean) = edit { it[K.showTokens] = v }
+    override suspend fun setGroupSessions(v: Boolean) = edit { it[K.groupSessions] = v }
 
-    suspend fun setDefaultCwd(v: String) = edit { it[K.defaultCwd] = v }
-    suspend fun setNotifications(v: Boolean) = edit { it[K.notifications] = v }
-    suspend fun setDnd(v: Boolean) = edit { it[K.dnd] = v }
-    suspend fun setHeartbeat(ms: Long) = edit { it[K.heartbeat] = ms }
+    override suspend fun setDefaultCwd(v: String) = edit { it[K.defaultCwd] = v }
+    override suspend fun setNotifications(v: Boolean) = edit { it[K.notifications] = v }
+    override suspend fun setDnd(v: Boolean) = edit { it[K.dnd] = v }
+    override suspend fun setHeartbeat(ms: Long) = edit { it[K.heartbeat] = ms }
     suspend fun setActiveEndpoint(id: String) = edit { it[K.endpoint] = id }
-    suspend fun setRuntimeVersion(v: String) = edit { it[K.runtimeVersion] = v }
-    suspend fun setQuickCommands(list: List<String>) = edit { it[K.quickCommands] = list.joinToString("\u0001") }
-    suspend fun setPromptTemplates(list: List<String>) = edit { it[K.templates] = list.joinToString("\u0001") }
-    suspend fun setShowThoughts(v: Boolean) = edit { it[K.showThoughts] = v }
-    suspend fun setAutoApprove(v: Boolean) = edit { it[K.autoApprove] = v }
-    suspend fun setPluginUiExtend(v: Boolean) = edit { it[K.pluginUiExtend] = v }
-    suspend fun setCwdTreeUri(v: String) = edit { it[K.cwdTreeUri] = v }
-    suspend fun setNotifyOnComplete(v: Boolean) = edit { it[K.notifyOnComplete] = v }
-    suspend fun setNotifyOnPermission(v: Boolean) = edit { it[K.notifyOnPermission] = v }
-    suspend fun setNotifyVibrate(v: Boolean) = edit { it[K.notifyVibrate] = v }
-    suspend fun setNotifyHeadsUp(v: Boolean) = edit { it[K.notifyHeadsUp] = v }
+    override suspend fun setRuntimeVersion(v: String) = edit { it[K.runtimeVersion] = v }
+    override suspend fun setQuickCommands(list: List<String>) = edit { it[K.quickCommands] = list.joinToString("\u0001") }
+    override suspend fun setPromptTemplates(list: List<String>) = edit { it[K.templates] = list.joinToString("\u0001") }
+    override suspend fun setShowThoughts(v: Boolean) = edit { it[K.showThoughts] = v }
+    override suspend fun setAutoApprove(v: Boolean) = edit { it[K.autoApprove] = v }
+    override suspend fun setPluginUiExtend(v: Boolean) = edit { it[K.pluginUiExtend] = v }
+    override suspend fun setCwdTreeUri(v: String) = edit { it[K.cwdTreeUri] = v }
+    override suspend fun setNotifyOnComplete(v: Boolean) = edit { it[K.notifyOnComplete] = v }
+    override suspend fun setNotifyOnPermission(v: Boolean) = edit { it[K.notifyOnPermission] = v }
+    override suspend fun setNotifyVibrate(v: Boolean) = edit { it[K.notifyVibrate] = v }
+    override suspend fun setNotifyHeadsUp(v: Boolean) = edit { it[K.notifyHeadsUp] = v }
 
-    suspend fun setNotifyOngoing(v: Boolean) = edit { it[K.notifyOngoing] = v }
-    suspend fun setNotifyShowThought(v: Boolean) = edit { it[K.notifyShowThought] = v }
-    suspend fun setNotifyThoughtLines(v: Int) = edit { it[K.notifyThoughtLines] = v }
-    suspend fun setNotifySuppressForeground(v: Boolean) = edit { it[K.notifySuppressForeground] = v }
-    suspend fun setNotifyInlineActions(v: Boolean) = edit { it[K.notifyInlineActions] = v }
-    suspend fun setNotifyReplySnippet(v: Boolean) = edit { it[K.notifyReplySnippet] = v }
-    suspend fun setNotifyKeepAfterDone(v: Boolean) = edit { it[K.notifyKeepAfterDone] = v }
-    suspend fun setNotifyVibrateStrength(v: Int) = edit { it[K.notifyVibrateStrength] = v }
+    override suspend fun setNotifyOngoing(v: Boolean) = edit { it[K.notifyOngoing] = v }
+    override suspend fun setNotifyShowThought(v: Boolean) = edit { it[K.notifyShowThought] = v }
+    override suspend fun setNotifyThoughtLines(v: Int) = edit { it[K.notifyThoughtLines] = v }
+    override suspend fun setNotifySuppressForeground(v: Boolean) = edit { it[K.notifySuppressForeground] = v }
+    override suspend fun setNotifyInlineActions(v: Boolean) = edit { it[K.notifyInlineActions] = v }
+    override suspend fun setNotifyReplySnippet(v: Boolean) = edit { it[K.notifyReplySnippet] = v }
+    override suspend fun setNotifyKeepAfterDone(v: Boolean) = edit { it[K.notifyKeepAfterDone] = v }
+    override suspend fun setNotifyVibrateStrength(v: Int) = edit { it[K.notifyVibrateStrength] = v }
 
-    suspend fun setDefaultPresetId(v: String) = edit { it[K.defaultPresetId] = v }
+    override suspend fun setDefaultPresetId(v: String) = edit { it[K.defaultPresetId] = v }
 
     /**
      * 会话内切换预设：只改这一个会话，全局默认不动（下次新建会话仍按默认）。
      * 同时清掉本会话的开关覆盖 —— 开关属于上一个预设，换了预设就该按新预设的默认来。
      */
-    suspend fun setSessionPresetId(sessionId: String, presetId: String) = edit {
+    override suspend fun setSessionPresetId(sessionId: String, presetId: String) = edit {
         val cur = parseSessionMap(it[K.sessionPresetIds]).toMutableMap()
         cur[sessionId] = presetId
         it[K.sessionPresetIds] = encodeSessionMap(cur)
@@ -276,84 +277,84 @@ class SettingsStore(private val context: Context) {
     }
 
     /** 会话内开关：写整份「打开的开关 id」，空集合 = 这个会话的开关全关。 */
-    suspend fun setSessionPresetSwitches(sessionId: String, on: Set<String>) = edit {
+    override suspend fun setSessionPresetSwitches(sessionId: String, on: Set<String>) = edit {
         val cur = parseSessionMap(it[K.sessionPresetSwitches]).toMutableMap()
         cur[sessionId] = on.joinToString(",")
         it[K.sessionPresetSwitches] = encodeSessionMap(cur)
     }
 
-    suspend fun setSendMode(v: SendMode) = edit { it[K.sendMode] = v.name }
-    suspend fun setQueueLimit(v: Int) = edit { it[K.queueLimit] = v }
-    suspend fun setAutoScroll(v: Boolean) = edit { it[K.autoScroll] = v }
-    suspend fun setShowDuration(v: Boolean) = edit { it[K.showDuration] = v }
-    suspend fun setColorizeAuthors(v: Boolean) = edit { it[K.colorizeAuthors] = v }
-    suspend fun setThoughtsExpanded(v: Boolean) = edit { it[K.thoughtsExpanded] = v }
-    suspend fun setMaxOutputTokens(v: Int) = edit { it[K.maxOutputTokens] = v }
+    override suspend fun setSendMode(v: SendMode) = edit { it[K.sendMode] = v.name }
+    override suspend fun setQueueLimit(v: Int) = edit { it[K.queueLimit] = v }
+    override suspend fun setAutoScroll(v: Boolean) = edit { it[K.autoScroll] = v }
+    override suspend fun setShowDuration(v: Boolean) = edit { it[K.showDuration] = v }
+    override suspend fun setColorizeAuthors(v: Boolean) = edit { it[K.colorizeAuthors] = v }
+    override suspend fun setThoughtsExpanded(v: Boolean) = edit { it[K.thoughtsExpanded] = v }
+    override suspend fun setMaxOutputTokens(v: Int) = edit { it[K.maxOutputTokens] = v }
 
     /** 全局默认：新会话是否默认渲染特殊格式。 */
-    suspend fun setRenderSpecialFormats(v: Boolean) = edit { it[K.renderSpecialFormats] = v }
+    override suspend fun setRenderSpecialFormats(v: Boolean) = edit { it[K.renderSpecialFormats] = v }
 
     /** 会话内部滑块：只改这一个会话，不碰全局默认。 */
-    suspend fun setRenderSpecialOverride(sessionId: String, v: Boolean) = edit {
+    override suspend fun setRenderSpecialOverride(sessionId: String, v: Boolean) = edit {
         val cur = parseRenderSpecialOverrides(it[K.renderSpecialOverrides]).toMutableMap()
         cur[sessionId] = v
         it[K.renderSpecialOverrides] = encodeRenderSpecialOverrides(cur)
     }
 
-    suspend fun setGroupMaxParallel(v: Int) = edit { it[K.groupMaxParallel] = v }
-    suspend fun setGroupAllowTools(v: Boolean) = edit { it[K.groupAllowTools] = v }
-    suspend fun setGroupMode(v: String) = edit { it[K.groupMode] = v }
-    suspend fun setGroupOfficePrompt(v: Boolean) = edit { it[K.groupOfficePrompt] = v }
-    suspend fun setGroupContextBudget(v: Int) = edit { it[K.groupContextBudget] = v }
+    override suspend fun setGroupMaxParallel(v: Int) = edit { it[K.groupMaxParallel] = v }
+    override suspend fun setGroupAllowTools(v: Boolean) = edit { it[K.groupAllowTools] = v }
+    override suspend fun setGroupMode(v: String) = edit { it[K.groupMode] = v }
+    override suspend fun setGroupOfficePrompt(v: Boolean) = edit { it[K.groupOfficePrompt] = v }
+    override suspend fun setGroupContextBudget(v: Int) = edit { it[K.groupContextBudget] = v }
 
     /** 子代理嵌套深度：1..3，越界就地夹紧（滑杆/预置写错不会把工具永久关死）。 */
-    suspend fun setSubagentMaxDepth(v: Int) = edit { it[K.subagentMaxDepth] = v.coerceIn(1, 3) }
+    override suspend fun setSubagentMaxDepth(v: Int) = edit { it[K.subagentMaxDepth] = v.coerceIn(1, 3) }
 
     /** 六类能力档位：整表覆盖写。读侧解析失败只会回落 Ask，配置坏了也不会静默放行。 */
-    suspend fun setCapabilityTiers(v: String) = edit { it[K.capabilityTiers] = v }
-    suspend fun setGroupIsolateMembers(v: Boolean) = edit { it[K.groupIsolateMembers] = v }
-    suspend fun setGroupScheduler(v: String) = edit { it[K.groupScheduler] = v }
+    override suspend fun setCapabilityTiers(v: String) = edit { it[K.capabilityTiers] = v }
+    override suspend fun setGroupIsolateMembers(v: Boolean) = edit { it[K.groupIsolateMembers] = v }
+    override suspend fun setGroupScheduler(v: String) = edit { it[K.groupScheduler] = v }
     suspend fun setGroupModeratorModel(v: String) = edit { it[K.groupModeratorModel] = v }
-    suspend fun setShellChannel(v: String) = edit { it[K.shellChannel] = v }
-    suspend fun setCollapsedGroups(v: List<String>) = edit { it[K.collapsedGroups] = v.joinToString("\u0001") }
+    override suspend fun setShellChannel(v: String) = edit { it[K.shellChannel] = v }
+    override suspend fun setCollapsedGroups(v: List<String>) = edit { it[K.collapsedGroups] = v.joinToString("\u0001") }
 
-    suspend fun setCustomFolders(v: List<String>) = edit { it[K.customFolders] = v.joinToString("\u0001") }
+    override suspend fun setCustomFolders(v: List<String>) = edit { it[K.customFolders] = v.joinToString("\u0001") }
 
-    suspend fun setWebSearchEngine(v: String) = edit { it[K.webSearchEngine] = v }
+    override suspend fun setWebSearchEngine(v: String) = edit { it[K.webSearchEngine] = v }
 
-    suspend fun setSearxngInstance(v: String) = edit { it[K.searxngInstance] = v }
+    override suspend fun setSearxngInstance(v: String) = edit { it[K.searxngInstance] = v }
 
-    suspend fun setMaxDownloadBytes(v: Long) = edit { it[K.maxDownloadBytes] = v }
+    override suspend fun setMaxDownloadBytes(v: Long) = edit { it[K.maxDownloadBytes] = v }
 
     /** 存规整后的代理地址；空串 = 直连（ProxyEnv 只在非空时注入）。 */
-    suspend fun setProxyUrl(v: String) = edit { it[K.proxyUrl] = ProxyEnv.normalize(v) }
+    override suspend fun setProxyUrl(v: String) = edit { it[K.proxyUrl] = ProxyEnv.normalize(v) }
 
     // ---- 外观 ----
-    suspend fun setAppIconStyle(v: String) = edit { it[K.appIconStyle] = if (v == "custom") "custom" else "system" }
-    suspend fun setCustomIconUri(v: String) = edit { it[K.customIconUri] = v }
-    suspend fun setStartupAnimation(v: String) = edit { it[K.startupAnimation] = v }
-    suspend fun setStartupAnimationMs(v: Int) = edit { it[K.startupAnimationMs] = v.coerceIn(0, 5000) }
-    suspend fun setBackgroundUri(v: String) = edit { it[K.backgroundUri] = v }
-    suspend fun setBackgroundDim(v: Float) = edit { it[K.backgroundDim] = v.coerceIn(0f, 0.8f) }
-    suspend fun setAccentHue(v: Float) = edit { it[K.accentHue] = if (v < 0f) -1f else v.coerceIn(0f, 360f) }
-    suspend fun setBorderWidth(dp: Int) = edit { it[K.borderWidth] = dp.coerceIn(0, 8) }
+    override suspend fun setAppIconStyle(v: String) = edit { it[K.appIconStyle] = if (v == "custom") "custom" else "system" }
+    override suspend fun setCustomIconUri(v: String) = edit { it[K.customIconUri] = v }
+    override suspend fun setStartupAnimation(v: String) = edit { it[K.startupAnimation] = v }
+    override suspend fun setStartupAnimationMs(v: Int) = edit { it[K.startupAnimationMs] = v.coerceIn(0, 5000) }
+    override suspend fun setBackgroundUri(v: String) = edit { it[K.backgroundUri] = v }
+    override suspend fun setBackgroundDim(v: Float) = edit { it[K.backgroundDim] = v.coerceIn(0f, 0.8f) }
+    override suspend fun setAccentHue(v: Float) = edit { it[K.accentHue] = if (v < 0f) -1f else v.coerceIn(0f, 360f) }
+    override suspend fun setBorderWidth(dp: Int) = edit { it[K.borderWidth] = dp.coerceIn(0, 8) }
     /**
      * 写材质：新键落盘，同时镜像旧键 `glass_enabled`，这样降级回 v0.05 也还是同样的观感。
      */
-    suspend fun setBackMaterial(v: String) = edit { writeBackMaterial(it, v) }
+    override suspend fun setBackMaterial(v: String) = edit { writeBackMaterial(it, v) }
 
     /** 旧入口：只表达「开 / 关玻璃」，保留给尚未改成材质选择的调用方。 */
-    suspend fun setGlassEnabled(v: Boolean) = setBackMaterial(if (v) BackMaterial.MATTE.key else BackMaterial.NONE.key)
-    suspend fun setGlassAlpha(v: Float) = edit { it[K.glassAlpha] = BackMaterial.clampStrength(v) }
-    suspend fun setGlassBlur(dp: Int) = edit { it[K.glassBlur] = dp.coerceIn(0, 40) }
+    override suspend fun setGlassEnabled(v: Boolean) = setBackMaterial(if (v) BackMaterial.MATTE.key else BackMaterial.NONE.key)
+    override suspend fun setGlassAlpha(v: Float) = edit { it[K.glassAlpha] = BackMaterial.clampStrength(v) }
+    override suspend fun setGlassBlur(dp: Int) = edit { it[K.glassBlur] = dp.coerceIn(0, 40) }
 
     /** 崩溃上传开关与端点；步骤 3 的 CrashUploader 读这里。 */
-    suspend fun crashUpload(): Pair<Boolean, String> {
+    override suspend fun crashUpload(): Pair<Boolean, String> {
         val p = context.settingsStore.data.first()
         return (p[K.crashUploadEnabled] ?: false) to (p[K.crashUploadEndpoint] ?: "")
     }
 
-    suspend fun setCrashUpload(enabled: Boolean, endpoint: String) = edit {
+    override suspend fun setCrashUpload(enabled: Boolean, endpoint: String) = edit {
         it[K.crashUploadEnabled] = enabled
         it[K.crashUploadEndpoint] = endpoint
     }
@@ -362,7 +363,7 @@ class SettingsStore(private val context: Context) {
      * 全量快照（步骤 3 的 LastKnownGood 用）：键名 → 字符串化值。
      * 键名带命名空间前缀，回滚时不至于把别的 DataStore 的键写进来。
      */
-    suspend fun snapshotEntries(): Map<String, String> =
+    override suspend fun snapshotEntries(): Map<String, String> =
         context.settingsStore.data.first().asMap()
             .mapKeys { it.key.name }
             .mapValues { encodeEntry(it.value) }
@@ -372,7 +373,7 @@ class SettingsStore(private val context: Context) {
      * 类型由「当前配置里该键的实际类型」决定 —— DataStore 的强类型键不能用字符串硬塞，
      * 塞错类型下次读出来就是 ClassCastException，所以按现有值反推。
      */
-    suspend fun applyEntries(entries: Map<String, String>) = edit { p ->
+    override suspend fun applyEntries(entries: Map<String, String>) = edit { p ->
         val typed = p.asMap().entries.associate { it.key.name to it.key }
         entries.forEach { (name, raw) ->
             val key = typed[name]

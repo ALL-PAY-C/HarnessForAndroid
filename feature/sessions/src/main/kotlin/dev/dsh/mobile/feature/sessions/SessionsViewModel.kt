@@ -7,7 +7,7 @@ import dev.dsh.mobile.core.model.port.ChatApi
 import dev.dsh.mobile.core.data.settings.ModelProfile
 import dev.dsh.mobile.core.model.port.ModelStoreApi
 import dev.dsh.mobile.core.data.settings.AppSettings
-import dev.dsh.mobile.core.data.settings.SettingsStore
+import dev.dsh.mobile.core.model.port.SettingsApi
 import dev.dsh.mobile.core.model.Participant
 import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.Session
@@ -71,7 +71,7 @@ data class SessionsUiState(
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionsViewModel(
     private val repo: ChatApi,
-    private val settingsStore: SettingsStore,
+    private val settingsStore: SettingsApi,
     private val modelStore: ModelStoreApi,
     private val cwdProvider: () -> String,
     /** 新会话的默认标题：由 UI 层按当前语言取资源传入，仓库层只接受已有标题。 */

@@ -18,7 +18,7 @@ import androidx.lifecycle.viewModelScope
 import dev.dsh.mobile.core.model.port.EndpointApi
 import dev.dsh.mobile.core.data.settings.AppSettings
 import dev.dsh.mobile.core.data.settings.SendMode
-import dev.dsh.mobile.core.data.settings.SettingsStore
+import dev.dsh.mobile.core.model.port.SettingsApi
 import dev.dsh.mobile.core.data.settings.ThemeMode
 import dev.dsh.mobile.core.data.update.ShaMismatchException
 import dev.dsh.mobile.core.model.update.ShaStatus
@@ -72,7 +72,7 @@ data class SettingsUiState(
 )
 
 class SettingsViewModel(
-    private val settingsStore: SettingsStore,
+    private val settingsStore: SettingsApi,
     private val secretStore: EndpointSecretApi,
     private val linuxActions: LinuxSettingsActions,
     private val endpoints: EndpointApi,
@@ -103,7 +103,7 @@ class SettingsViewModel(
     /**
      * 运行时版本归一化（一次性、幂等）。
      *
-     * 历史设置把 [SettingsStore] 的 runtimeVersion 默认落成占位值 "bundled"，而现在
+     * 历史设置把 [SettingsApi] 的 runtimeVersion 默认落成占位值 "bundled"，而现在
      * [RuntimeControl.versions] 只报 :node 侧的真实引擎版本（"engine-v1"）。设置页的版本 chip 是按
      * 字符串相等判定的，占位值留着会表现为「默认不高亮、点一次才高亮」，且点那一次会白跑一次重连。
      * 这里只在检测到占位值时把真实版本写回一次；写完之后条件不再成立，不会重复写。

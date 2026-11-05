@@ -12,7 +12,7 @@ import dev.dsh.mobile.core.data.settings.probeContextLengths
 import dev.dsh.mobile.core.data.settings.ModelProviders
 import dev.dsh.mobile.core.model.port.ModelStoreApi
 import dev.dsh.mobile.core.data.settings.ProbeResult
-import dev.dsh.mobile.core.data.settings.SettingsStore
+import dev.dsh.mobile.core.model.port.SettingsApi
 import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.Session
 import dev.dsh.mobile.core.model.SessionStatus
@@ -54,7 +54,7 @@ data class AgentsUiState(
 
 class AgentsViewModel(
     repo: ChatApi,
-    settingsStore: SettingsStore,
+    settingsStore: SettingsApi,
     private val modelStore: ModelStoreApi,
     runtime: StateFlow<RuntimeState>,
     private val shell: ShellBridge,

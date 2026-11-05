@@ -7,9 +7,10 @@ import dev.dsh.mobile.core.model.settings.ThemeMode
 import kotlinx.coroutines.flow.Flow
 
 /**
- * 设置读写端口：feature 侧只认这 77 个成员，不认 DataStore / Context。
+ * 设置读写端口：feature 侧只认这 80 个成员，不认 DataStore / Context。
  *
- * 由 core:data 的 SettingsStore 实现（S3b 切换）。读口 settings + 76 个写口；
+ * 由 core:data 的 SettingsStore 实现（S3b 切换）。读口 settings + 76 个写口 + 3 个维护口
+ * （crashUpload / snapshotEntries / applyEntries：崩溃上传配置与配置快照回放，语义同属设置存储）；
  * 实现类的其余成员（setActiveEndpoint / setGroupModeratorModel 等内部用）不进接口。
  */
 interface SettingsApi {
@@ -90,4 +91,9 @@ interface SettingsApi {
     suspend fun setGlassAlpha(v: Float)
     suspend fun setGlassBlur(dp: Int)
     suspend fun setCrashUpload(enabled: Boolean, endpoint: String)
+
+    // —— 维护口（app/diag 用：崩溃上传配置、配置快照与回放）——
+    suspend fun crashUpload(): Pair<Boolean, String>
+    suspend fun snapshotEntries(): Map<String, String>
+    suspend fun applyEntries(entries: Map<String, String>)
 }

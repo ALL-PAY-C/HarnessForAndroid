@@ -18,7 +18,7 @@ import dev.dsh.mobile.core.data.settings.ModelProfile
 import dev.dsh.mobile.core.model.port.ModelStoreApi
 import dev.dsh.mobile.core.data.settings.contextWindowOf
 import dev.dsh.mobile.core.data.settings.SendMode
-import dev.dsh.mobile.core.data.settings.SettingsStore
+import dev.dsh.mobile.core.model.port.SettingsApi
 import dev.dsh.mobile.core.model.AgentRunState
 import dev.dsh.mobile.core.model.AgentRuntimeState
 import dev.dsh.mobile.core.model.ChatMessage
@@ -165,7 +165,7 @@ data class ChatUiState(
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModel(
     private val repo: ChatApi,
-    private val settingsStore: SettingsStore,
+    private val settingsStore: SettingsApi,
     private val modelStore: ModelStoreApi,
     /** 发送队列（活过页面销毁，见 [SendQueue]）。 */
     private val sendQueue: SendQueueApi,

@@ -2,7 +2,7 @@ package dev.dsh.mobile.app.diag
 
 import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.platform.net.HttpJson
-import dev.dsh.mobile.core.data.settings.SettingsStore
+import dev.dsh.mobile.core.model.port.SettingsApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -16,7 +16,7 @@ import kotlinx.coroutines.withContext
  * 交给 CrashStore.prune 按 20 条 / 14 天老化。
  */
 class CrashUploader(
-    private val settings: SettingsStore,
+    private val settings: SettingsApi,
     private val timeoutMs: Int = TIMEOUT_MS,
 ) {
 

@@ -3,7 +3,7 @@ package dev.dsh.mobile.app.diag
 import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.download.diag.LkgPlanner
 import dev.dsh.mobile.core.download.diag.SettingsSnapshot
-import dev.dsh.mobile.core.data.settings.SettingsStore
+import dev.dsh.mobile.core.model.port.SettingsApi
 import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.diag.BootState
 import dev.dsh.mobile.core.model.diag.SafeMode
@@ -31,7 +31,7 @@ class AppBootGuard(
     private val scope: CoroutineScope,
     private val versionCode: Int = 0,
     /** 配置快照/回滚的读写口；null 时回滚与快照退化为只打日志（不阻断启动）。 */
-    private val settings: SettingsStore? = null,
+    private val settings: SettingsApi? = null,
     /** 快照目录（filesDir/lkg）；null 时同样退化为只打日志。 */
     lkgDir: File? = null,
     private val clock: () -> Long = System::currentTimeMillis,

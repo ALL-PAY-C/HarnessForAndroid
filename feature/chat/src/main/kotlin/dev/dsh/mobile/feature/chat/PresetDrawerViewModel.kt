@@ -12,7 +12,7 @@ import dev.dsh.mobile.core.data.preset.CardSkip
 import dev.dsh.mobile.core.data.preset.IdentityCardTransfer
 import dev.dsh.mobile.core.model.IdentityCard
 import dev.dsh.mobile.core.data.preset.IdentityCards
-import dev.dsh.mobile.core.data.settings.SettingsStore
+import dev.dsh.mobile.core.model.port.SettingsApi
 import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.design.UiText
 import kotlinx.coroutines.CancellationException
@@ -73,7 +73,7 @@ sealed interface CardNotice {
  */
 class PresetDrawerViewModel(
     private val presetStore: AgentPresetStoreApi,
-    private val settingsStore: SettingsStore,
+    private val settingsStore: SettingsApi,
     private val importer: AgentPresetImportApi,
     /** 取会话旧人设文本（会话实体上那个 persona 字段）；默认空实现 = 没有旧数据。 */
     private val personaOf: suspend (String) -> String = { "" },

@@ -38,7 +38,7 @@ import dev.dsh.mobile.app.DshApplication
 import dev.dsh.mobile.core.download.diag.LkgPlanner
 import dev.dsh.mobile.core.platform.RestartReason
 import dev.dsh.mobile.core.platform.restartApp
-import dev.dsh.mobile.core.data.DataModule
+import dev.dsh.mobile.core.model.port.SettingsApi
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqCardDivider
 import dev.dsh.mobile.design.QqRow
@@ -67,9 +67,12 @@ import kotlinx.coroutines.withContext
 fun DiagnosticsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val container = (context.applicationContext as? DshApplication)?.container
-    val crashStore = remember { container?.crashReporter?.store }
-    val guard = container?.bootGuard
-    val settings = remember { DataModule.createSettings(context) }
+    // 设置只能从组合根取：自建实例会开出第二个 DataStore，绕过 AppContainer（上一轮消灭的同类问题）。
+    // 没有组合根（预览/测试宿主）时本页无意义，直接不渲染。
+    if (container == null) return
+    val crashStore = remember { container.crashReporter.store }
+    val guard = container.bootGuard
+    val settings: SettingsApi = container.settings
     val lkgStore = remember { LkgStore(File(context.filesDir, "lkg")) }
     val scope = rememberCoroutineScope()
     val p = LocalQq.current
