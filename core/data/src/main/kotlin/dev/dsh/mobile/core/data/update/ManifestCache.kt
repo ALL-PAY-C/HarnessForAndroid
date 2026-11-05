@@ -1,11 +1,11 @@
 package dev.dsh.mobile.core.data.update
 
 import java.io.File
+import dev.dsh.mobile.core.model.update.ManifestOrigin
+import dev.dsh.mobile.core.model.update.SourceFailure
+import dev.dsh.mobile.core.model.update.SourceStat
 
 /** 清单这一版是从哪来的。界面/日志靠它区分「刚拉的」与「回退的」。 */
-typealias ManifestOrigin = dev.dsh.mobile.core.model.update.ManifestOrigin
-
-// S1: 枚举本体已上移 core:model.update。
 
 sealed class ManifestResult {
     class Ok(

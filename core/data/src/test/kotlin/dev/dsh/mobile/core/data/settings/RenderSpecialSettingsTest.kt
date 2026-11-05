@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import dev.dsh.mobile.core.model.settings.AppSettings
 
 /**
  * 特殊格式渲染的契约：全局默认 + 会话级覆盖。

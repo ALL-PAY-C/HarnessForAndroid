@@ -15,18 +15,15 @@ import androidx.datastore.preferences.preferencesDataStore
 import dev.dsh.mobile.core.platform.ProxyEnv
 import dev.dsh.mobile.core.platform.UiLanguage
 import dev.dsh.mobile.core.platform.UiLocale
-import dev.dsh.mobile.core.data.preset.AgentPresets
+import dev.dsh.mobile.core.model.preset.AgentPresets
 import dev.dsh.mobile.core.model.port.SettingsApi
 import dev.dsh.mobile.core.model.BackMaterial
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-
-// S1: 类型本体已上移 core:model.settings，这里只留源级兼容桥（S5 删桥改 import）。
-typealias ThemeMode = dev.dsh.mobile.core.model.settings.ThemeMode
-typealias SendMode = dev.dsh.mobile.core.model.settings.SendMode
-typealias AppSettings = dev.dsh.mobile.core.model.settings.AppSettings
-
+import dev.dsh.mobile.core.model.settings.ThemeMode
+import dev.dsh.mobile.core.model.settings.SendMode
+import dev.dsh.mobile.core.model.settings.AppSettings
 
 // 旧版本 prefs proto 解不开时（升级/降级/写入被打断）退回默认值，不让首启直接崩
 private val Context.settingsStore: DataStore<Preferences> by preferencesDataStore(

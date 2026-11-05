@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import dev.dsh.mobile.core.model.chat.TurnState
+import dev.dsh.mobile.core.model.chat.SendQueueItem
 
 /**
  * 会话级发送队列。
@@ -26,7 +28,6 @@ import java.util.concurrent.ConcurrentHashMap
  * [ChatRepository] 收窄成引擎要的两个函数、监听 turns 下降沿触发排空、把快照发布成
  * [StateFlow] 供界面订阅。
  */
-typealias SendQueueItem = dev.dsh.mobile.core.model.chat.SendQueueItem
 
 class SendQueue(
     private val repo: ChatRepository,

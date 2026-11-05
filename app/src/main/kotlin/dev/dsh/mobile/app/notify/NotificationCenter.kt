@@ -13,7 +13,7 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import dev.dsh.mobile.app.MainActivity
 import dev.dsh.mobile.core.platform.AppLog
-import dev.dsh.mobile.core.data.settings.AppSettings
+import dev.dsh.mobile.core.model.settings.AppSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch

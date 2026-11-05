@@ -11,6 +11,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
+import dev.dsh.mobile.core.model.mcp.McpServerRecord
 
 /**
  * MCP 工具源的宿主装配（T9.10 P3）。

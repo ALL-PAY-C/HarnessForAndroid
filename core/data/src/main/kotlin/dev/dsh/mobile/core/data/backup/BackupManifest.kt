@@ -7,17 +7,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-
-// S1: 备份包 DTO 与分节常量已上移 core:model.backup（S5 删桥改 import）。
-typealias BackupManifest = dev.dsh.mobile.core.model.backup.BackupManifest
-typealias DeviceInfo = dev.dsh.mobile.core.model.backup.DeviceInfo
-typealias SectionInfo = dev.dsh.mobile.core.model.backup.SectionInfo
-typealias Counts = dev.dsh.mobile.core.model.backup.Counts
-typealias SecretsInfo = dev.dsh.mobile.core.model.backup.SecretsInfo
-typealias BackupSections = dev.dsh.mobile.core.model.backup.BackupSections
-typealias BackupEntry = dev.dsh.mobile.core.model.backup.BackupEntry
-typealias RestoreMode = dev.dsh.mobile.core.model.backup.RestoreMode
-typealias RestoreReport = dev.dsh.mobile.core.model.backup.RestoreReport
+import dev.dsh.mobile.core.model.backup.BackupManifest
 
 /** 包格式版本高于本应用支持上限。message 直接面向用户。 */
 class ManifestTooNewException(val schemaVersion: Int) : Exception(

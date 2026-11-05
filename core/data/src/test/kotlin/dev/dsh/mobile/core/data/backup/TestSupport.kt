@@ -1,6 +1,8 @@
 package dev.dsh.mobile.core.data.backup
 
 import java.io.File
+import dev.dsh.mobile.core.model.backup.DeviceInfo
+import dev.dsh.mobile.core.model.backup.BackupSelection
 
 /** 测试用的临时目录树：四个根各一个子目录，互不干扰。 */
 internal fun tempRoots(tag: String): BackupRoots {

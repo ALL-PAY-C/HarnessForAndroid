@@ -1,6 +1,6 @@
 package dev.dsh.mobile.core.data.preset
 
-import dev.dsh.mobile.core.data.settings.AppSettings
+import dev.dsh.mobile.core.model.settings.AppSettings
 import org.junit.Assert.*
 import org.junit.Test
 

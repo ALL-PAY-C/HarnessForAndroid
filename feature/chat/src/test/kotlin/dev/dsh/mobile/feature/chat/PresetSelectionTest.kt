@@ -1,6 +1,6 @@
 package dev.dsh.mobile.feature.chat
 
-import dev.dsh.mobile.core.data.preset.AgentPresets
+import dev.dsh.mobile.core.model.preset.AgentPresets
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

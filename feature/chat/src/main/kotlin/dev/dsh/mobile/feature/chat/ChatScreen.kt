@@ -8,7 +8,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import dev.dsh.mobile.core.data.preset.AgentPresets
+import dev.dsh.mobile.core.model.preset.AgentPresets
 import dev.dsh.mobile.core.model.GroupRole
 import dev.dsh.mobile.core.model.LedgerStatus
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -85,7 +85,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import dev.dsh.mobile.core.platform.TimeFmt
-import dev.dsh.mobile.core.data.settings.SendMode
+import dev.dsh.mobile.core.model.settings.SendMode
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog

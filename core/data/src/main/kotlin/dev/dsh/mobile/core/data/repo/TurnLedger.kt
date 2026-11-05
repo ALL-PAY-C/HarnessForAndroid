@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.util.concurrent.ConcurrentHashMap
+import dev.dsh.mobile.core.model.chat.AuthorPart
+import dev.dsh.mobile.core.model.chat.TurnState
 
 /**
  * 轮次状态机：只负责 [TurnState] 的代际正确性（turnId 关联 + 结算幂等），不含 DB 落库。

@@ -82,14 +82,6 @@ internal data class ParticipantDto(
 
 internal val toolJson = Json { ignoreUnknownKeys = true }
 
-// S1: AuthorPart / TurnState 本体已上移 core:model.chat（finishPart 随之上移并放开为 public）。
-typealias AuthorPart = dev.dsh.mobile.core.model.chat.AuthorPart
-typealias TurnState = dev.dsh.mobile.core.model.chat.TurnState
-
-
-// S4: ChatSearchHit 本体已上移 core:model.chat（S5 删桥改 import）。
-typealias ChatSearchHit = dev.dsh.mobile.core.model.chat.ChatSearchHit
-
 // ---------------------------------------------------------------- 落库常量
 
 /** 被用户中断的那一轮留下的占位正文。 */

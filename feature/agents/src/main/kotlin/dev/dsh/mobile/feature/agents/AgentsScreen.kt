@@ -61,7 +61,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.dsh.mobile.core.data.settings.ModelProfile
+import dev.dsh.mobile.core.model.settings.ModelProfile
 import dev.dsh.mobile.core.model.settings.ProbeFailure
 import dev.dsh.mobile.core.platform.net.ModelCatalog
 import dev.dsh.mobile.core.model.settings.ModelProvider
@@ -425,7 +425,7 @@ private fun runtimeLabel(r: RuntimeState): String = when (r) {
     RuntimeState.NotConfigured -> stringResource(DesignR.string.agents_runtime_not_started)
 }
 
-/** 思考强度的显示名：关 / 低 / 中 / 高（文案在 design 资源里，core/data 只存 off/low/medium/high）。 */
+/** 思考强度的显示名：关 / 低 / 中 / 高（文案在 design 资源里，核心数据层只存 off/low/medium/high）。 */
 @Composable
 private fun reasoningLabel(effort: String): String = stringResource(
     when (effort) {

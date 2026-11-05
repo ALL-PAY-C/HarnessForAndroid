@@ -22,14 +22,11 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import java.util.UUID
+import dev.dsh.mobile.core.model.mcp.McpKeyValue
+import dev.dsh.mobile.core.model.mcp.McpServerRecord
 
 private const val PREFS_NAME = "dsh.mcp"
 private const val KEY_SERVERS = "key_servers"
-
-// S1: 记录类型本体已上移 core:model.mcp（S5 删桥改 import）。
-typealias McpKeyValue = dev.dsh.mobile.core.model.mcp.McpKeyValue
-typealias McpServerRecord = dev.dsh.mobile.core.model.mcp.McpServerRecord
-
 
 fun McpServerRecord.toProtocolConfig(): McpServerConfig = McpServerConfig(
     id = id,

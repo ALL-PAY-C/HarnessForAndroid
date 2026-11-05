@@ -7,6 +7,7 @@ import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
+import dev.dsh.mobile.core.model.backup.RestoreMode
 
 class BackupManifestShaTest {
 

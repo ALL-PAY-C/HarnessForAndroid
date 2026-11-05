@@ -40,10 +40,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.dsh.mobile.core.data.preset.AgentPreset
-import dev.dsh.mobile.core.data.preset.CardError
+import dev.dsh.mobile.core.model.preset.AgentPreset
+import dev.dsh.mobile.core.model.preset.CardError
 import dev.dsh.mobile.core.model.IdentityCard
-import dev.dsh.mobile.core.data.preset.IdentityCards
+import dev.dsh.mobile.core.model.preset.IdentityCards
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.QqIdentityCardEditor
 import dev.dsh.mobile.design.R as DesignR

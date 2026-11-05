@@ -20,8 +20,8 @@ import dev.dsh.mobile.app.notify.NotificationCenter
 import dev.dsh.mobile.app.service.RuntimeService
 import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.platform.UiLocale
-import dev.dsh.mobile.core.data.settings.AppSettings
-import dev.dsh.mobile.core.data.settings.ThemeMode
+import dev.dsh.mobile.core.model.settings.AppSettings
+import dev.dsh.mobile.core.model.settings.ThemeMode
 import dev.dsh.mobile.design.DshTheme
 import dev.dsh.mobile.design.LocalUiLanguage
 import dev.dsh.mobile.design.startup.StartupAnimationGate

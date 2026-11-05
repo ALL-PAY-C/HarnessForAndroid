@@ -1,7 +1,7 @@
 package dev.dsh.mobile.feature.agents
 
 import dev.dsh.mobile.core.platform.net.ModelCatalog
-import dev.dsh.mobile.core.data.settings.ModelProfile
+import dev.dsh.mobile.core.model.settings.ModelProfile
 import dev.dsh.mobile.core.model.ReasoningStyle
 import dev.dsh.mobile.core.model.settings.ModelProviders
 import org.junit.Assert.assertEquals

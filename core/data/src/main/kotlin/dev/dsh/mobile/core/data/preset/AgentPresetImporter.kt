@@ -15,6 +15,7 @@ import dev.dsh.mobile.core.download.Downloads
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import dev.dsh.mobile.core.model.preset.AgentPreset
 
 /**
  * @param cacheDir 预设包的下载缓存目录；null 时不缓存（[importPreset] 的调用方多数没有 Context）。

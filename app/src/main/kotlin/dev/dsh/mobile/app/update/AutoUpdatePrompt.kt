@@ -18,7 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.dsh.mobile.app.DshApplication
-import dev.dsh.mobile.core.data.update.UpdateInfo
+import dev.dsh.mobile.core.model.update.UpdateInfo
 import dev.dsh.mobile.core.data.update.readPromptedVersion
 import dev.dsh.mobile.core.data.update.shouldPromptUpdateOnce
 import dev.dsh.mobile.core.data.update.writePromptedVersion

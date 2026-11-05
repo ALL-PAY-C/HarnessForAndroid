@@ -3,6 +3,7 @@ package dev.dsh.mobile.core.data.update
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import dev.dsh.mobile.core.model.update.UpdateInfo
 
 private fun info(code: Long) = UpdateInfo(
     versionCode = code,

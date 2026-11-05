@@ -1,6 +1,8 @@
 package dev.dsh.mobile.core.data.repo
 
 import dev.dsh.mobile.core.model.ToolCall
+import dev.dsh.mobile.core.model.chat.AuthorPart
+import dev.dsh.mobile.core.model.chat.TurnState
 
 /**
  * 流式三条事件各自的归并（T2），从 [ChatRepository.handleEvent] 提出来做纯函数，

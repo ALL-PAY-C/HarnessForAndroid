@@ -6,6 +6,10 @@ import dev.dsh.mobile.core.platform.crypto.WrongPassphraseException
 import org.json.JSONObject
 import java.io.File
 import java.util.Base64
+import dev.dsh.mobile.core.model.backup.BackupManifest
+import dev.dsh.mobile.core.model.backup.BackupSections
+import dev.dsh.mobile.core.model.backup.RestoreMode
+import dev.dsh.mobile.core.model.backup.RestoreReport
 
 /**
  * 恢复引擎（设计见 research/T913-backup.md §2.3）。

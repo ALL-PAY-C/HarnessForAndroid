@@ -1,5 +1,7 @@
 package dev.dsh.mobile.core.data.update
 
+import dev.dsh.mobile.core.model.update.UpdateInfo
+
 /**
  * 该不该提示更新 —— 纯判断，不碰 Android，便于单测。
  *

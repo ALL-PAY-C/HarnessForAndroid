@@ -3,6 +3,7 @@ package dev.dsh.mobile.core.data.backup
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import dev.dsh.mobile.core.model.backup.Counts
 
 /**
  * 内存版 [BackupDb]：把库状态序列化成 JSON 落盘，[open] 再读回来。

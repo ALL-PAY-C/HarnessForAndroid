@@ -3,6 +3,7 @@ package dev.dsh.mobile.core.data.settings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import dev.dsh.mobile.core.model.settings.ModelProfile
 
 /** 插件自动注册条目的清理：升级后列表里不该再冒出旧插件塞的模型。 */
 class AutoRegisteredModelPruneTest {

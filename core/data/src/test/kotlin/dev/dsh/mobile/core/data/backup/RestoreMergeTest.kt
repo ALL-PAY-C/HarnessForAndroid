@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import dev.dsh.mobile.core.model.backup.RestoreMode
 
 class RestoreMergeTest {
 

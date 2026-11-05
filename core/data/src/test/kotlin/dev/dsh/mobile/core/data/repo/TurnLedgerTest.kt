@@ -7,6 +7,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import dev.dsh.mobile.core.model.chat.AuthorPart
 
 /**
  * 直接驱动 [TurnLedger]（handleEvent / sendMessage / cancel 实际走的那份状态机），

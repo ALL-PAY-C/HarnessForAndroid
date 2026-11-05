@@ -10,7 +10,6 @@ android {
 
 dependencies {
     implementation(project(":design"))
-    implementation(project(":core:data"))
     implementation(project(":core:model"))
     implementation(project(":plugin-api"))
     implementation(project(":plugin-host"))

@@ -4,8 +4,8 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.dsh.mobile.core.model.port.ChatApi
-import dev.dsh.mobile.core.data.settings.AppSettings
-import dev.dsh.mobile.core.data.settings.ModelProfile
+import dev.dsh.mobile.core.model.settings.AppSettings
+import dev.dsh.mobile.core.model.settings.ModelProfile
 import dev.dsh.mobile.core.platform.net.ModelProbe
 import dev.dsh.mobile.core.model.settings.ModelProvider
 import dev.dsh.mobile.core.platform.net.probeContextLengths

@@ -5,6 +5,7 @@ import androidx.room.Room
 import dev.dsh.mobile.core.data.DataModule
 import dev.dsh.mobile.core.data.db.DshDatabase
 import java.io.File
+import dev.dsh.mobile.core.model.backup.Counts
 
 /**
  * [BackupDb] 的 Android 实现：本机库走 Room，包内库临时升到本机版本后裸读。

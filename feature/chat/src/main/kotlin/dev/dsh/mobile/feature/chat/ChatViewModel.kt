@@ -10,14 +10,14 @@ import dev.dsh.mobile.core.model.LedgerStatus
 import dev.dsh.mobile.core.model.port.ChatApi
 import dev.dsh.mobile.core.model.port.SendQueueApi
 import dev.dsh.mobile.core.model.GroupRole
-import dev.dsh.mobile.core.data.preset.AgentPresets
-import dev.dsh.mobile.core.data.preset.PresetSwitch
-import dev.dsh.mobile.core.data.repo.TurnState
-import dev.dsh.mobile.core.data.settings.AppSettings
-import dev.dsh.mobile.core.data.settings.ModelProfile
+import dev.dsh.mobile.core.model.preset.AgentPresets
+import dev.dsh.mobile.core.model.preset.PresetSwitch
+import dev.dsh.mobile.core.model.chat.TurnState
+import dev.dsh.mobile.core.model.settings.AppSettings
+import dev.dsh.mobile.core.model.settings.ModelProfile
 import dev.dsh.mobile.core.model.port.ModelStoreApi
 import dev.dsh.mobile.core.model.settings.contextWindowOf
-import dev.dsh.mobile.core.data.settings.SendMode
+import dev.dsh.mobile.core.model.settings.SendMode
 import dev.dsh.mobile.core.model.port.SettingsApi
 import dev.dsh.mobile.core.model.AgentRunState
 import dev.dsh.mobile.core.model.AgentRuntimeState
@@ -416,7 +416,7 @@ class ChatViewModel(
     /**
      * 会话只读投影：待办 / 目标 / 上下文用量 / 压缩统计。
      *
-     * 写侧在运行时（core:protocol / core:data 共用同一个 SessionProjections 实例），
+     * 写侧在运行时（core:protocol 与核心数据层共用同一个 SessionProjections 实例），
      * 这里只订阅，不产生任何写入。
      */
     val projection: StateFlow<SessionProjection> = repo.projection(sessionId)
@@ -434,7 +434,7 @@ class ChatViewModel(
     /**
      * 本地系统回执（/compact 结果）。
      *
-     * 只活在页面里：仓库没有「插一条系统消息」的出口，写库要动 core:data（不在本任务边界）。
+     * 只活在页面里：仓库没有「插一条系统消息」的出口，写库要动核心数据层（不在本任务边界）。
      * 换页即消失，但同样的结果已经进了 [projection] 的压缩统计，顶栏徽标不会丢。
      */
     val systemNotes: StateFlow<List<ChatMessage>> = notesState.asStateFlow()
@@ -665,7 +665,7 @@ class ChatViewModel(
             when (mode) {
                 SendMode.Steer -> {
                     // 打断 + 立刻发：cancelAndSend 成功时在 finally 里 drain、失败时 skip drain 保队列
-                    // （core/data 已处理，见 SendQueueEngine.cancelAndSend）。这里不再额外 drain，
+                    // （核心数据层已处理，见 SendQueueEngine.cancelAndSend）。这里不再额外 drain，
                     // 否则 cancel 失败时会把保留的排队项发到仍在跑的旧 remote，破坏保队列。
                     sendQueue.submit(sessionId, exclusive = false) { deliver(outgoing, images, interrupt = true) }
                     return
@@ -723,7 +723,7 @@ class ChatViewModel(
     }
 
     fun cancel() = viewModelScope.launch {
-        // 取消也走 error 通道：远端取消失败（ACP 15s 超时）时，本地 finalize/Idle 由 core:data 兜底，
+        // 取消也走 error 通道：远端取消失败（ACP 15s 超时）时，本地 finalize/Idle 由核心数据层兜底，
         // 这里把失败原因写进 error，让标题下的可读横幅呈现出来，而不是静默吞掉。
         when (val r = repo.cancel(sessionId)) {
             is DshResult.Err -> error.value = UiText.Raw(r.message)

@@ -2,15 +2,15 @@ package dev.dsh.mobile.feature.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.dsh.mobile.core.data.preset.AgentPreset
+import dev.dsh.mobile.core.model.preset.AgentPreset
 import dev.dsh.mobile.core.model.port.AgentPresetImportApi
 import dev.dsh.mobile.core.model.port.AgentPresetStoreApi
-import dev.dsh.mobile.core.data.preset.AgentPresets
-import dev.dsh.mobile.core.data.preset.CardError
+import dev.dsh.mobile.core.model.preset.AgentPresets
+import dev.dsh.mobile.core.model.preset.CardError
 import dev.dsh.mobile.core.model.preset.CardImport
-import dev.dsh.mobile.core.data.preset.CardSkip
+import dev.dsh.mobile.core.model.preset.CardSkip
 import dev.dsh.mobile.core.model.IdentityCard
-import dev.dsh.mobile.core.data.preset.IdentityCards
+import dev.dsh.mobile.core.model.preset.IdentityCards
 import dev.dsh.mobile.core.model.port.SettingsApi
 import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.design.UiText

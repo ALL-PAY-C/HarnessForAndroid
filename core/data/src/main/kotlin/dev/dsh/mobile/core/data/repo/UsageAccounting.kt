@@ -2,6 +2,8 @@ package dev.dsh.mobile.core.data.repo
 
 import dev.dsh.mobile.core.model.TokenUsage
 import dev.dsh.mobile.core.model.event.DshEvent
+import dev.dsh.mobile.core.model.chat.AuthorPart
+import dev.dsh.mobile.core.model.chat.TurnState
 
 /** ACP reports session snapshots; the local engine reports one request at a time. */
 internal fun usageDelta(previous: TokenUsage, event: DshEvent.Usage): TokenUsage = TokenUsage(

@@ -9,6 +9,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.zip.ZipFile
+import dev.dsh.mobile.core.model.backup.BackupManifest
+import dev.dsh.mobile.core.model.backup.BackupEntry
+import dev.dsh.mobile.core.model.backup.RestoreMode
+import dev.dsh.mobile.core.model.backup.RestoreReport
+import dev.dsh.mobile.core.model.backup.BackupSelection
 
 /**
  * Snapshot / rollback for everything a plugin install can disturb.

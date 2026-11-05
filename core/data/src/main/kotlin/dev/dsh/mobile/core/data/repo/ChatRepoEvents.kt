@@ -47,6 +47,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import dev.dsh.mobile.core.model.chat.TurnState
 
 // ---------------------------------------------------------------- 事件处理与落库
 

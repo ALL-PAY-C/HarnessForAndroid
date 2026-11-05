@@ -5,6 +5,12 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+import dev.dsh.mobile.core.model.backup.BackupManifest
+import dev.dsh.mobile.core.model.backup.DeviceInfo
+import dev.dsh.mobile.core.model.backup.SectionInfo
+import dev.dsh.mobile.core.model.backup.Counts
+import dev.dsh.mobile.core.model.backup.SecretsInfo
+import dev.dsh.mobile.core.model.backup.BackupSections
 
 class BackupManifestTest {
 

@@ -18,6 +18,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import dev.dsh.mobile.core.model.mcp.sanitizeServerName
 import dev.dsh.mobile.core.model.mcp.serverNameError
+import dev.dsh.mobile.core.model.mcp.McpKeyValue
+import dev.dsh.mobile.core.model.mcp.McpServerRecord
 
 class McpServerStoreTest {
 

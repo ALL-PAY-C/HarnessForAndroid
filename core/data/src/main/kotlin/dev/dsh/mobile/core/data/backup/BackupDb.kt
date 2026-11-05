@@ -2,6 +2,7 @@ package dev.dsh.mobile.core.data.backup
 
 import java.io.Closeable
 import java.io.File
+import dev.dsh.mobile.core.model.backup.Counts
 
 /**
  * 一行数据：列名 → 值，保留列顺序（拼 INSERT 时列顺序必须稳定）。

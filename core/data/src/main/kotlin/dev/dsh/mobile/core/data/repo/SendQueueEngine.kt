@@ -2,6 +2,7 @@ package dev.dsh.mobile.core.data.repo
 
 import dev.dsh.mobile.core.platform.DshResult
 import java.util.concurrent.ConcurrentHashMap
+import dev.dsh.mobile.core.model.chat.SendQueueItem
 
 /**
  * 同会话发送引擎：把「排队 / 中断让路 / 代际失效」的核心行为从 [SendQueue] 抽出来，

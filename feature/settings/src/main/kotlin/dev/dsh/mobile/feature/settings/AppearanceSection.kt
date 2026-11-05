@@ -34,7 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.dsh.mobile.core.platform.UiLanguage
-import dev.dsh.mobile.core.data.settings.ThemeMode
+import dev.dsh.mobile.core.model.settings.ThemeMode
 import dev.dsh.mobile.core.model.BackMaterial
 import dev.dsh.mobile.design.AppIconBadge
 import dev.dsh.mobile.design.LocalQq
@@ -47,6 +47,7 @@ import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.design.startup.StartupSpec
 import java.util.Locale
 import kotlinx.coroutines.launch
+import dev.dsh.mobile.core.model.settings.AppSettings
 
 /**
  * 设置页「外观」区块的全部内容（Wallpaper 式可配置）。

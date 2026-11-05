@@ -87,8 +87,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import dev.dsh.mobile.core.model.port.AgentPresetStoreApi
-import dev.dsh.mobile.core.data.settings.SendMode
-import dev.dsh.mobile.core.data.settings.ThemeMode
+import dev.dsh.mobile.core.model.settings.SendMode
+import dev.dsh.mobile.core.model.settings.ThemeMode
 import dev.dsh.mobile.core.model.TransportKind
 import dev.dsh.mobile.design.IconBtn
 import dev.dsh.mobile.design.LocalQq

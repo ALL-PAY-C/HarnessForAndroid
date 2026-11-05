@@ -21,6 +21,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.ConcurrentHashMap
+import dev.dsh.mobile.core.model.chat.ChatSearchHit
 
 /**
  * 抽屉搜索的数据层：正文命中、标题命中、通配符不误匹配。

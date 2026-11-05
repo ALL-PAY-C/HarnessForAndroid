@@ -11,6 +11,13 @@ import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import dev.dsh.mobile.core.platform.backup.isLegacyPackage
+import dev.dsh.mobile.core.model.backup.BackupManifest
+import dev.dsh.mobile.core.model.backup.DeviceInfo
+import dev.dsh.mobile.core.model.backup.SectionInfo
+import dev.dsh.mobile.core.model.backup.Counts
+import dev.dsh.mobile.core.model.backup.SecretsInfo
+import dev.dsh.mobile.core.model.backup.BackupSections
+import dev.dsh.mobile.core.model.backup.BackupSelection
 
 /**
  * 备份包写入（设计见 research/T913-backup.md §2.1/§2.2）。

@@ -11,7 +11,6 @@ android {
 dependencies {
     implementation(project(":design"))
     implementation(project(":render"))
-    implementation(project(":core:data"))
     implementation(project(":core:model"))
     implementation(project(":core:platform"))
     implementation(project(":core:agent"))

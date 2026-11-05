@@ -3,6 +3,8 @@ package dev.dsh.mobile.core.data.preset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import dev.dsh.mobile.core.model.preset.AgentPreset
+import dev.dsh.mobile.core.model.preset.AgentPresets
 
 class CapabilityGuideTest {
     @Test fun augmentsBaseWithinPromptBudget() {

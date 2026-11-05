@@ -6,6 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import dev.dsh.mobile.core.model.preset.ImportedCard
 import dev.dsh.mobile.core.model.preset.CardImport
+import dev.dsh.mobile.core.model.preset.CardError
 
 /** 身份卡交换格式（T9.26）：导出导入往返保真、三种外壳、坏数据逐字段拒绝、id 冲突不覆盖。 */
 class IdentityCardTransferTest {

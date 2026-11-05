@@ -14,7 +14,7 @@ import dev.dsh.mobile.core.platform.DshOption
 import dev.dsh.mobile.core.platform.splitOptions
 import dev.dsh.mobile.core.model.port.ChatApi
 import dev.dsh.mobile.core.model.chat.TurnState
-import dev.dsh.mobile.core.data.settings.AppSettings
+import dev.dsh.mobile.core.model.settings.AppSettings
 import dev.dsh.mobile.core.model.PermissionRequest
 import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.ToolCall

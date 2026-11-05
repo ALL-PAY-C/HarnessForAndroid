@@ -13,6 +13,10 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 import dev.dsh.mobile.core.model.update.ShaStatus
+import dev.dsh.mobile.core.model.update.UpdateInfo
+import dev.dsh.mobile.core.model.update.DownloadReport
+import dev.dsh.mobile.core.model.update.ShaMismatchException
+import dev.dsh.mobile.core.model.update.UpdateCheck
 
 /**
  * App 自更新：从一个静态 JSON 清单里读版本号，比当前包高就下载 APK 并交给系统安装器。
@@ -27,12 +31,7 @@ import dev.dsh.mobile.core.model.update.ShaStatus
  * 之所以不内嵌 git 客户端：手机上装个 APK 不需要 clone 仓库，只需要一个稳定的
  * 清单 URL。仓库那边更新清单 + 传 APK，App 这边就能收到，等价于「用 git 发版」。
  */
-// S1: 更新 DTO 与结果类型已上移 core:model.update（S5 删桥改 import）。
 // ShaStatus 带嵌套类型，Kotlin 的 typealias 无法透传嵌套，故这里不留桥、直接 import 真实类型。
-typealias UpdateInfo = dev.dsh.mobile.core.model.update.UpdateInfo
-typealias DownloadReport = dev.dsh.mobile.core.model.update.DownloadReport
-typealias ShaMismatchException = dev.dsh.mobile.core.model.update.ShaMismatchException
-typealias UpdateCheck = dev.dsh.mobile.core.model.update.UpdateCheck
 
 class Updater(
     private val context: Context,

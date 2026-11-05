@@ -16,6 +16,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import dev.dsh.mobile.core.model.GroupRole
 import dev.dsh.mobile.core.model.IdentityCard
+import dev.dsh.mobile.core.model.preset.AgentPreset
+import dev.dsh.mobile.core.model.preset.AgentPresets
 
 private val Context.presetDataStore by preferencesDataStore(
     name = "dsh_presets",

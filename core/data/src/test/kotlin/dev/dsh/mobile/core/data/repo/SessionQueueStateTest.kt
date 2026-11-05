@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import dev.dsh.mobile.core.model.chat.SendQueueItem
 
 /**
  * [SessionQueueState] 的纯逻辑单测：代际（generation）是 N1「clear 后已取条目不发」的

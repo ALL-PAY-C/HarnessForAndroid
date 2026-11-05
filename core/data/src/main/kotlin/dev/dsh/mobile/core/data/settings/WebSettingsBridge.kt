@@ -3,6 +3,7 @@ package dev.dsh.mobile.core.data.settings
 import dev.dsh.mobile.core.data.secret.EndpointSecretStore
 import dev.dsh.mobile.core.model.web.WebSecretKeys
 import dev.dsh.mobile.core.model.web.WebSettings
+import dev.dsh.mobile.core.model.settings.AppSettings
 
 /**
  * 把设置页里的引擎选择 + 独立密钥存储拼成 [WebSettings]。

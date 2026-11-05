@@ -17,7 +17,7 @@ import dev.dsh.mobile.core.data.secret.EndpointSecretStore
 import dev.dsh.mobile.core.data.repo.ChatRepository
 import dev.dsh.mobile.core.data.repo.SendQueue
 import dev.dsh.mobile.core.data.repo.toModel
-import dev.dsh.mobile.core.data.settings.ModelProfile
+import dev.dsh.mobile.core.model.settings.ModelProfile
 import dev.dsh.mobile.core.model.settings.ModelProvider
 import dev.dsh.mobile.core.model.settings.ModelProviders
 import dev.dsh.mobile.core.data.settings.ModelStore
@@ -109,8 +109,8 @@ internal suspend fun AppContainer.presetSystemPrompt(sessionId: String): String 
         // 技能目录按库现取而不是按会话存：装了/关了技能，下一轮就生效，不用重建会话。
         val skills = skillsBlock(skillsCatalog())
         val preset = presetStore.get(s.presetFor(sessionId)) ?: return base + skills
-        val on = dev.dsh.mobile.core.data.preset.AgentPresets.switchOn(preset, s.switchOnFor(sessionId))
-        return dev.dsh.mobile.core.data.preset.AgentPresets.compose(preset, base, cwd(), on) + skills
+        val on = dev.dsh.mobile.core.model.preset.AgentPresets.switchOn(preset, s.switchOnFor(sessionId))
+        return dev.dsh.mobile.core.model.preset.AgentPresets.compose(preset, base, cwd(), on) + skills
     }
 
 internal suspend fun AppContainer.identityText(sessionId: String): String {

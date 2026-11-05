@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
+import dev.dsh.mobile.core.model.preset.AgentPreset
+import dev.dsh.mobile.core.model.preset.AgentPresets
 
 class AgentPresetTest {
     private val importer = AgentPresetImporter()

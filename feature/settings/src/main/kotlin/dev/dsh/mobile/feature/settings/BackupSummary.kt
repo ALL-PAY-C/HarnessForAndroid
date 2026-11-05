@@ -1,8 +1,8 @@
 package dev.dsh.mobile.feature.settings
 
 import dev.dsh.mobile.design.R as DesignR
-import dev.dsh.mobile.core.data.backup.BackupManifest
-import dev.dsh.mobile.core.data.backup.BackupSections
+import dev.dsh.mobile.core.model.backup.BackupManifest
+import dev.dsh.mobile.core.model.backup.BackupSections
 import java.util.Locale
 import dev.dsh.mobile.core.model.backup.RestoreReport
 import dev.dsh.mobile.core.model.backup.RestoreMode

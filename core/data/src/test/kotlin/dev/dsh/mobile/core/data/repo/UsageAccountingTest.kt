@@ -4,6 +4,7 @@ import dev.dsh.mobile.core.model.TokenUsage
 import dev.dsh.mobile.core.model.event.DshEvent
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import dev.dsh.mobile.core.model.chat.TurnState
 
 class UsageAccountingTest {
     @Test fun cachedAndLastPromptSurviveDeltaAndEntityMapping() {

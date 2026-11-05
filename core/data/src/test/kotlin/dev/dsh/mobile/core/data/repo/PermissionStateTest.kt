@@ -3,6 +3,8 @@ package dev.dsh.mobile.core.data.repo
 import dev.dsh.mobile.core.model.PermissionRequest
 import org.junit.Assert.*
 import org.junit.Test
+import dev.dsh.mobile.core.model.chat.AuthorPart
+import dev.dsh.mobile.core.model.chat.TurnState
 
 class PermissionStateTest {
     @Test fun firstMemberFinishingKeepsTurnAliveForSilentMemberPermission() {

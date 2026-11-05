@@ -1,7 +1,7 @@
 package dev.dsh.mobile.feature.chat
 
-import dev.dsh.mobile.core.data.repo.AuthorPart
-import dev.dsh.mobile.core.data.repo.TurnState
+import dev.dsh.mobile.core.model.chat.AuthorPart
+import dev.dsh.mobile.core.model.chat.TurnState
 import dev.dsh.mobile.core.model.ChatMessage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

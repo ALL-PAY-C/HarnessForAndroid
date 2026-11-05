@@ -50,6 +50,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import dev.dsh.mobile.core.model.chat.TurnState
+import dev.dsh.mobile.core.model.chat.ChatSearchHit
 
 /**
  * Single source of truth for conversations. Persists everything through Room so a

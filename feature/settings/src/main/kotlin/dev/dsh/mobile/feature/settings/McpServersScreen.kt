@@ -36,8 +36,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.dsh.mobile.core.model.mcp.MCP_TRANSPORTS
-import dev.dsh.mobile.core.data.mcp.McpKeyValue
-import dev.dsh.mobile.core.data.mcp.McpServerRecord
+import dev.dsh.mobile.core.model.mcp.McpKeyValue
+import dev.dsh.mobile.core.model.mcp.McpServerRecord
 import dev.dsh.mobile.core.model.port.McpServerStoreApi
 import dev.dsh.mobile.core.model.mcp.newMcpServerId
 import dev.dsh.mobile.core.model.mcp.sanitizeServerName

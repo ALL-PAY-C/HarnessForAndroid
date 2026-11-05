@@ -16,7 +16,6 @@ dependencies {
     implementation(project(":terminal"))
     implementation(project(":toolbridge"))
     implementation(project(":design"))
-    implementation(project(":core:data"))
     implementation(project(":core:model"))
     implementation(project(":core:platform"))
     implementation(libs.androidx.navigation.compose)

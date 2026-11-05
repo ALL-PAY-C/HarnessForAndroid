@@ -10,6 +10,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.nio.file.Files
+import dev.dsh.mobile.core.model.update.ManifestOrigin
+import dev.dsh.mobile.core.model.update.SourceFailure
 
 /**
  * 清单并行 + 三级回退的 JVM 单测。

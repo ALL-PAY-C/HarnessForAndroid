@@ -4,6 +4,7 @@ import dev.dsh.mobile.core.model.ToolCall
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import dev.dsh.mobile.core.model.chat.TurnState
 
 /**
  * T2：思考正文必须真正进 turn.parts（按作者），且与工具调用是两套互不污染的数据源。

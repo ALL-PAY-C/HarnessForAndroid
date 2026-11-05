@@ -4,7 +4,7 @@ package dev.dsh.mobile.feature.chat
 import androidx.compose.ui.res.stringResource
 import dev.dsh.mobile.design.R as DesignR
 import android.content.Intent
-import dev.dsh.mobile.core.data.preset.AgentPresets
+import dev.dsh.mobile.core.model.preset.AgentPresets
 import dev.dsh.mobile.core.model.GroupRole
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts

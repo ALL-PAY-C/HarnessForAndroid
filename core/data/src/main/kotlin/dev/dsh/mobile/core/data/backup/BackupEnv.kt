@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.os.Build
 import dev.dsh.mobile.core.data.db.DshDatabase
 import java.io.File
+import dev.dsh.mobile.core.model.backup.DeviceInfo
 
 /**
  * 备份包要碰的四个目录，全部显式传进来而不是从 Context 现取。

@@ -9,6 +9,9 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import dev.dsh.mobile.core.model.preset.AgentPreset
+import dev.dsh.mobile.core.model.preset.CardError
+import dev.dsh.mobile.core.model.preset.CardSkip
 
 /**
  * 身份卡的剪贴板交换格式（T9.26）：单卡、全量两种颗粒度，字段与 [IdentityCard] 一一对应。
@@ -191,8 +194,4 @@ object IdentityCardTransfer {
         data class Bad(val skip: CardSkip) : Parsed
     }
 }
-
-// S1: CardError / CardSkip 本体已上移 core:model.preset。
-typealias CardError = dev.dsh.mobile.core.model.preset.CardError
-typealias CardSkip = dev.dsh.mobile.core.model.preset.CardSkip
 

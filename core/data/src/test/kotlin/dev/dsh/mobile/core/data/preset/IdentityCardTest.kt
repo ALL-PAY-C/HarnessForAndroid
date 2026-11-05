@@ -6,6 +6,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import dev.dsh.mobile.core.model.preset.IdentityCards
+import dev.dsh.mobile.core.model.preset.AgentPresets
 
 /** 身份卡渲染与兼容口径：顺序固定、空字段不渲染、没卡时与改造前逐字等价。 */
 class IdentityCardTest {

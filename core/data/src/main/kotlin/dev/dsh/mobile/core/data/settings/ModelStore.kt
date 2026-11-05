@@ -17,10 +17,7 @@ import org.json.JSONObject
 import dev.dsh.mobile.core.platform.net.HttpJson
 import dev.dsh.mobile.core.model.ReasoningStyle
 import dev.dsh.mobile.core.model.settings.sanitizeReasoningEffort
-
-typealias ModelProfile = dev.dsh.mobile.core.model.settings.ModelProfile
-
-
+import dev.dsh.mobile.core.model.settings.ModelProfile
 
 // 同 SettingsStore：坏文件退回默认值，不让首启崩在模型配置上
 private val Context.modelStore: androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>

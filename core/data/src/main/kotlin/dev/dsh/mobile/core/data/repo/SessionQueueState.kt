@@ -1,5 +1,7 @@
 package dev.dsh.mobile.core.data.repo
 
+import dev.dsh.mobile.core.model.chat.SendQueueItem
+
 /**
  * 单个会话的排队状态：队列 + 代际（generation）。
  *
