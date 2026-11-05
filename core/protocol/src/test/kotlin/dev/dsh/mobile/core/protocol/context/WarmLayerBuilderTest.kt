@@ -3,6 +3,7 @@ package dev.dsh.mobile.core.protocol.context
 import dev.dsh.mobile.core.model.context.KeyFile
 import dev.dsh.mobile.core.model.context.Pitfall
 import dev.dsh.mobile.core.model.context.WarmLayer
+import dev.dsh.mobile.core.model.context.WarmMessage
 import dev.dsh.mobile.core.model.context.WarmNote
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals

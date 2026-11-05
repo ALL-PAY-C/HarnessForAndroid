@@ -54,7 +54,7 @@ import dev.dsh.mobile.core.data.mcp.McpServerStore
 import dev.dsh.mobile.core.data.mcp.toProtocolConfig
 import dev.dsh.mobile.core.data.context.RoomWarmLayerStore
 import dev.dsh.mobile.core.protocol.context.RecallHit
-import dev.dsh.mobile.core.protocol.context.WarmMessage
+import dev.dsh.mobile.core.model.context.WarmMessage
 import dev.dsh.mobile.core.data.backup.BackupScheduler
 import dev.dsh.mobile.plugin.html.HtmlPlugin
 import dev.dsh.mobile.pluginapi.PluginModelSource

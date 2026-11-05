@@ -1,5 +1,7 @@
 package dev.dsh.mobile.core.protocol
 
+import dev.dsh.mobile.core.model.projection.ProjectedGoal
+import dev.dsh.mobile.core.model.projection.ProjectedTodo
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put

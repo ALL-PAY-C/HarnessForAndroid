@@ -2,6 +2,7 @@ package dev.dsh.mobile.core.protocol
 
 import dev.dsh.mobile.core.model.event.DshEvent
 import dev.dsh.mobile.core.model.ChatMessage
+import dev.dsh.mobile.core.model.projection.ProjectedGoal
 import dev.dsh.mobile.core.model.ToolCall.ToolStatus
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect

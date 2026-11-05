@@ -1,10 +1,10 @@
 package dev.dsh.mobile.feature.chat
 
-import dev.dsh.mobile.core.protocol.CompactionStats
-import dev.dsh.mobile.core.protocol.CompactResult
-import dev.dsh.mobile.core.protocol.ContextUsage
-import dev.dsh.mobile.core.protocol.ProjectedGoal
-import dev.dsh.mobile.core.protocol.ProjectedTodo
+import dev.dsh.mobile.core.model.projection.CompactionStats
+import dev.dsh.mobile.core.model.compaction.CompactResult
+import dev.dsh.mobile.core.model.projection.ContextUsage
+import dev.dsh.mobile.core.model.projection.ProjectedGoal
+import dev.dsh.mobile.core.model.projection.ProjectedTodo
 import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.design.UiText
 import org.junit.Assert.assertEquals

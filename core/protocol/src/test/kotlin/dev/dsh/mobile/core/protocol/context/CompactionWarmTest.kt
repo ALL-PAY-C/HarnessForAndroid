@@ -3,6 +3,7 @@ package dev.dsh.mobile.core.protocol.context
 import dev.dsh.mobile.core.model.ChatMessage
 import dev.dsh.mobile.core.model.context.WarmLayer
 import dev.dsh.mobile.core.model.context.WarmLayerStore
+import dev.dsh.mobile.core.model.context.WarmMessage
 import dev.dsh.mobile.core.model.context.WarmSource
 import dev.dsh.mobile.core.protocol.AgentThreads
 import dev.dsh.mobile.core.protocol.ContextSummaryStore

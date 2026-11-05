@@ -119,9 +119,9 @@ import dev.dsh.mobile.design.QqTopBar
 import dev.dsh.mobile.design.ContextRing
 import dev.dsh.mobile.design.SessionStatusDot
 import dev.dsh.mobile.core.model.SessionStatus
-import dev.dsh.mobile.core.protocol.ProjectedTodo
+import dev.dsh.mobile.core.model.projection.ProjectedTodo
 import dev.dsh.mobile.core.protocol.group.GROUP_SCHEDULER_MODERATED
-import dev.dsh.mobile.core.protocol.SessionProjection
+import dev.dsh.mobile.core.model.projection.SessionProjection
 import androidx.compose.ui.text.style.TextDecoration
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers

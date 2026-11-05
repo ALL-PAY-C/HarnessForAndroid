@@ -1,4 +1,4 @@
-package dev.dsh.mobile.core.protocol.context
+package dev.dsh.mobile.core.model.context
 
 import dev.dsh.mobile.core.model.context.WarmLayer
 

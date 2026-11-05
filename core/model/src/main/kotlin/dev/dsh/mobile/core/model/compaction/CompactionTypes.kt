@@ -1,4 +1,4 @@
-package dev.dsh.mobile.core.protocol
+package dev.dsh.mobile.core.model.compaction
 
 /**
  * 一次压缩的结果：是否真的压了、摘要多长、前后 token 粗估（字符数 / 4）。

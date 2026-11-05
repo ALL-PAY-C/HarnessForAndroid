@@ -1,5 +1,9 @@
 package dev.dsh.mobile.core.protocol
 
+import dev.dsh.mobile.core.model.projection.ContextUsage
+import dev.dsh.mobile.core.model.projection.ProjectedGoal
+import dev.dsh.mobile.core.model.projection.ProjectedTodo
+import dev.dsh.mobile.core.model.projection.SessionProjection
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

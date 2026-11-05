@@ -1,4 +1,4 @@
-package dev.dsh.mobile.core.protocol
+package dev.dsh.mobile.core.model.projection
 
 import kotlinx.coroutines.flow.StateFlow
 

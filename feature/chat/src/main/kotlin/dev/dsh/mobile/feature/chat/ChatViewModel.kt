@@ -28,10 +28,10 @@ import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.Session
 import dev.dsh.mobile.core.model.SessionKind
 import dev.dsh.mobile.core.model.TokenUsage
-import dev.dsh.mobile.core.protocol.RecallReport
+import dev.dsh.mobile.core.model.compaction.RecallReport
 import dev.dsh.mobile.core.protocol.group.LedgerSnapshot
 import dev.dsh.mobile.core.protocol.group.RoomLedgers
-import dev.dsh.mobile.core.protocol.SessionProjection
+import dev.dsh.mobile.core.model.projection.SessionProjection
 import dev.dsh.mobile.design.R as DesignR
 import dev.dsh.mobile.design.UiText
 import dev.dsh.mobile.design.resolve

@@ -1,6 +1,10 @@
 package dev.dsh.mobile.core.protocol
 
+import dev.dsh.mobile.core.model.compaction.CompactResult
+import dev.dsh.mobile.core.model.compaction.RecallReport
 import dev.dsh.mobile.core.model.event.DshEvent
+import dev.dsh.mobile.core.model.projection.ProjectedGoal
+import dev.dsh.mobile.core.model.projection.ProjectedTodo
 import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.download.PendingImageQueue
 import dev.dsh.mobile.core.platform.device.DeviceCapability
@@ -63,8 +67,8 @@ import dev.dsh.mobile.core.protocol.context.Compaction
 import dev.dsh.mobile.core.protocol.context.RecallHit
 import dev.dsh.mobile.core.protocol.context.RecallPlanner
 import dev.dsh.mobile.core.protocol.context.WarmAssembly
-import dev.dsh.mobile.core.protocol.context.WarmMessage
-import dev.dsh.mobile.core.protocol.context.WarmRefreshReport
+import dev.dsh.mobile.core.model.context.WarmMessage
+import dev.dsh.mobile.core.model.context.WarmRefreshReport
 import dev.dsh.mobile.core.protocol.group.GroupRunner
 import dev.dsh.mobile.core.protocol.group.MemberTurn
 import dev.dsh.mobile.core.protocol.llm.ModelStream

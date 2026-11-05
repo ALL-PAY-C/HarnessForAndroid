@@ -46,8 +46,8 @@ import dev.dsh.mobile.design.ContextRing
 import dev.dsh.mobile.design.SessionStatusDot
 import dev.dsh.mobile.design.text
 import dev.dsh.mobile.core.model.SessionStatus
-import dev.dsh.mobile.core.protocol.ProjectedTodo
-import dev.dsh.mobile.core.protocol.SessionProjection
+import dev.dsh.mobile.core.model.projection.ProjectedTodo
+import dev.dsh.mobile.core.model.projection.SessionProjection
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.heightIn

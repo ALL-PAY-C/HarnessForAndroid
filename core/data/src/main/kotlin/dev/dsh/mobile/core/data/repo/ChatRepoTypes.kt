@@ -16,12 +16,12 @@ import dev.dsh.mobile.core.model.SessionStatus
 import dev.dsh.mobile.core.model.TokenUsage
 import dev.dsh.mobile.core.model.ToolCall
 import dev.dsh.mobile.core.protocol.AcpTransport
-import dev.dsh.mobile.core.protocol.CompactResult
+import dev.dsh.mobile.core.model.compaction.CompactResult
 import dev.dsh.mobile.core.protocol.Compactor
 import dev.dsh.mobile.core.model.event.DshEvent
 import dev.dsh.mobile.core.protocol.DshTransport
 import dev.dsh.mobile.core.protocol.LocalEngineTransport
-import dev.dsh.mobile.core.protocol.SessionProjection
+import dev.dsh.mobile.core.model.projection.SessionProjection
 import dev.dsh.mobile.core.protocol.SessionProjections
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope

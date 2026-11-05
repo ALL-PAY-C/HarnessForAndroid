@@ -45,7 +45,7 @@ import androidx.compose.ui.unit.sp
 import dev.dsh.mobile.core.model.AgentRunState
 import dev.dsh.mobile.core.model.ChatMessage
 import dev.dsh.mobile.core.model.PermissionRequest
-import dev.dsh.mobile.core.protocol.RecallReport
+import dev.dsh.mobile.core.model.compaction.RecallReport
 import dev.dsh.mobile.design.LocalQq
 import dev.dsh.mobile.design.MessageBubble
 import dev.dsh.mobile.design.dividerText

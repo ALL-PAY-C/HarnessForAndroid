@@ -59,7 +59,7 @@ import dev.dsh.mobile.design.EmptyState
 import dev.dsh.mobile.design.QqShape
 import dev.dsh.mobile.design.UiText
 import dev.dsh.mobile.design.text
-import dev.dsh.mobile.core.protocol.SessionProjection
+import dev.dsh.mobile.core.model.projection.SessionProjection
 import kotlinx.coroutines.launch
 
 @Composable

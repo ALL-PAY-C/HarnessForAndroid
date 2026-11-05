@@ -1,6 +1,8 @@
 package dev.dsh.mobile.core.protocol
 
-import dev.dsh.mobile.core.protocol.context.WarmRefreshReport
+import dev.dsh.mobile.core.model.compaction.CompactResult
+import dev.dsh.mobile.core.model.compaction.RecallReport
+import dev.dsh.mobile.core.model.context.WarmRefreshReport
 
 /**
  * 「立即压缩上下文」的可选能力。
