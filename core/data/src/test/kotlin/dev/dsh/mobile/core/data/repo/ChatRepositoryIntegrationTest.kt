@@ -18,7 +18,7 @@ import dev.dsh.mobile.core.model.Session
 import dev.dsh.mobile.core.model.SessionStatus
 import dev.dsh.mobile.core.model.ToolCall
 import dev.dsh.mobile.core.model.TransportKind
-import dev.dsh.mobile.core.protocol.DshEvent
+import dev.dsh.mobile.core.model.event.DshEvent
 import dev.dsh.mobile.core.protocol.DshTransport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope

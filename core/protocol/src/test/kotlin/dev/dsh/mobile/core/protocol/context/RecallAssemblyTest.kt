@@ -3,7 +3,7 @@ package dev.dsh.mobile.core.protocol.context
 import dev.dsh.mobile.core.model.ChatMessage
 import dev.dsh.mobile.core.model.context.WarmLayer
 import dev.dsh.mobile.core.model.context.WarmLayerStore
-import dev.dsh.mobile.core.protocol.DshEvent
+import dev.dsh.mobile.core.model.event.DshEvent
 import dev.dsh.mobile.core.protocol.LlmConfig
 import dev.dsh.mobile.core.protocol.LocalEngineTransport
 import kotlinx.coroutines.CompletableDeferred

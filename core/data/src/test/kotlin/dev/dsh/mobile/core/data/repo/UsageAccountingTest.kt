@@ -1,7 +1,7 @@
 package dev.dsh.mobile.core.data.repo
 
 import dev.dsh.mobile.core.model.TokenUsage
-import dev.dsh.mobile.core.protocol.DshEvent
+import dev.dsh.mobile.core.model.event.DshEvent
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

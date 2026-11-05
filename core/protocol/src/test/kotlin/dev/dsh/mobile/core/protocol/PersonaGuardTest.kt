@@ -1,5 +1,6 @@
 package dev.dsh.mobile.core.protocol
 
+import dev.dsh.mobile.core.model.event.DshEvent
 import dev.dsh.mobile.core.model.ChatMessage
 import dev.dsh.mobile.core.protocol.web.HttpReply
 import dev.dsh.mobile.core.protocol.web.LocalHttpServer

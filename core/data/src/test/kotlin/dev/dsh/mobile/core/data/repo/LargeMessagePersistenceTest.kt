@@ -19,7 +19,7 @@ import dev.dsh.mobile.core.model.ChatMessage
 import dev.dsh.mobile.core.model.RuntimeState
 import dev.dsh.mobile.core.model.Session
 import dev.dsh.mobile.core.model.TransportKind
-import dev.dsh.mobile.core.protocol.DshEvent
+import dev.dsh.mobile.core.model.event.DshEvent
 import dev.dsh.mobile.core.protocol.DshTransport
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow

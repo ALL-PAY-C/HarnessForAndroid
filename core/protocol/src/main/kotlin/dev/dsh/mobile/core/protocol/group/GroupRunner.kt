@@ -7,7 +7,7 @@ import dev.dsh.mobile.core.model.ChatMessage
 import dev.dsh.mobile.core.model.GroupRole
 import dev.dsh.mobile.core.model.TaskState
 import dev.dsh.mobile.core.protocol.AgentThreads
-import dev.dsh.mobile.core.protocol.DshEvent
+import dev.dsh.mobile.core.model.event.DshEvent
 import dev.dsh.mobile.core.protocol.ExecutionPool
 import dev.dsh.mobile.core.protocol.GroupMember
 import dev.dsh.mobile.core.protocol.GroupMode

@@ -1,4 +1,4 @@
-package dev.dsh.mobile.core.protocol
+package dev.dsh.mobile.core.model.event
 
 import dev.dsh.mobile.core.model.PermissionRequest
 import dev.dsh.mobile.core.model.TokenUsage

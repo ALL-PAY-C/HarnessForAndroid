@@ -1,5 +1,6 @@
 package dev.dsh.mobile.core.protocol
 
+import dev.dsh.mobile.core.model.event.DshEvent
 import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.download.PendingImageQueue
 import dev.dsh.mobile.core.platform.device.DeviceCapability

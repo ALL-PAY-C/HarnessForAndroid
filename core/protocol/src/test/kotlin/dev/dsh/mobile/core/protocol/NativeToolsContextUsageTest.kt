@@ -1,5 +1,6 @@
 package dev.dsh.mobile.core.protocol
 
+import dev.dsh.mobile.core.model.event.DshEvent
 import java.net.ServerSocket
 import java.net.InetAddress
 import dev.dsh.mobile.core.model.ChatMessage
