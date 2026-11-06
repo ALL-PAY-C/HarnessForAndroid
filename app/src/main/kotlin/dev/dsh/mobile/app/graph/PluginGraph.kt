@@ -58,6 +58,7 @@ import dev.dsh.mobile.core.model.context.WarmMessage
 import dev.dsh.mobile.core.data.backup.BackupScheduler
 import dev.dsh.mobile.plugin.html.HtmlPlugin
 import dev.dsh.mobile.pluginapi.PluginModelSource
+import dev.dsh.mobile.pluginhost.GatewayUrlBatch
 import dev.dsh.mobile.pluginhost.InstalledPlugins
 import dev.dsh.mobile.pluginhost.PluginInstaller
 import kotlinx.coroutines.Dispatchers
@@ -135,7 +136,7 @@ internal fun AppContainer.buildPluginHost(): PluginHost {
             // 内置插件：HTML 渲染器（dsh.html / html.web，含 html 代码围栏的 WebView 渲染）。
             // 源码随 app 编译（app/build.gradle.kts 的 sourceSets），这里排在最前注册，
             // 于是用户额外装的同名插件会被 PluginHost 按 id 去重掉，不会重复注册渲染器。
-            val builtinPlugins = appBuiltinPlugins(this)
+            val builtinPlugins = appBuiltinPlugins()
             // 其余插件：插件页初始就是「无插件」，能力全部来自用户自己安装的插件。
             // 三条安装通路都要接上：
             //  · 独立 APK 插件（外部进程，DshPlugin 实现）→ externalPlugins.load()
@@ -165,18 +166,31 @@ internal fun AppContainer.buildPluginHost(): PluginHost {
             // Node 插件（node:/@deepseek-ai/ 依赖）异步加载到 NodeEngineHost；失败只记该插件不吞别的。
             if (nodePlugins.isNotEmpty()) {
                 scope.launch(Dispatchers.IO) {
-                    NodeBackedPlugin.loadNodePlugins(host = this@apply, engine = nodeEngine, plugins = nodePlugins)
+                    // 端口回写走批次：两个网关插件各回写一次，逐条重注册会让模型源在中间
+                    // 露出「一个旧端口 + 一个新端口」的混合态（真机 03:10:17，约 0.8 s）。
+                    val gatewayUrls = GatewayUrlBatch(
+                        record = { id, url -> writeGatewayBaseUrl(this@apply, id, url, register = false) },
+                        flush = { syncPluginModelSources(this@apply) },
+                    )
+                    try {
+                        NodeBackedPlugin.loadNodePlugins(
+                            host = this@apply,
+                            engine = nodeEngine,
+                            plugins = nodePlugins,
+                            // 插件自己的 webServer 端口回写进配置：WebUI 入口靠 baseUrl 派生地址。
+                            onGatewayUrl = gatewayUrls::accept,
+                        )
+                    } finally {
+                        // 全部回写完只重注册一次；loadNodePlugins 抛了也要收口，别把新端口留在配置里不生效。
+                        gatewayUrls.close()
+                    }
                 }
             }
         }
         }
     }
 
-internal fun AppContainer.appBuiltinPlugins(host: PluginHost): List<DshPlugin> =
-        listOf(HtmlPlugin()) +
-            dev.dsh.mobile.pluginhost.builtin.builtinPluginsWith { id, preferred ->
-                host.loopbackPort(id, preferred)
-            }
+internal fun AppContainer.appBuiltinPlugins(): List<DshPlugin> = listOf(HtmlPlugin())
 
 internal fun AppContainer.reloadPluginsImpl() {
         runCatching {
@@ -185,7 +199,7 @@ internal fun AppContainer.reloadPluginsImpl() {
             runCatching { pluginInstaller.packages.resync() }
             val jsPlugins = externalPlugins.load() + pluginInstaller.loadablePlugins()
             val nodePlugins = pluginInstaller.loadableNodePlugins()
-            val all = appBuiltinPlugins(pluginHost) + jsPlugins + nodePlugins
+            val all = appBuiltinPlugins() + jsPlugins + nodePlugins
             pluginHost.loadAll(all, force = true)
             // load 只加不删，幽灵行（目录已删）要靠 keepOnly 收口。
             pluginHost.keepOnly(all.map { it.manifest.id })
@@ -194,7 +208,21 @@ internal fun AppContainer.reloadPluginsImpl() {
             syncPluginModelSources(pluginHost)
             if (nodePlugins.isNotEmpty()) {
                 scope.launch(Dispatchers.IO) {
-                    NodeBackedPlugin.loadNodePlugins(pluginHost, nodeEngine, nodePlugins)
+                    // 与初始化路径同一套批次收口：全部回写完只重注册一次模型源。
+                    val gatewayUrls = GatewayUrlBatch(
+                        record = { id, url -> this@reloadPluginsImpl.writeGatewayBaseUrl(pluginHost, id, url, register = false) },
+                        flush = { syncPluginModelSources(pluginHost) },
+                    )
+                    try {
+                        NodeBackedPlugin.loadNodePlugins(
+                            pluginHost,
+                            nodeEngine,
+                            nodePlugins,
+                            onGatewayUrl = gatewayUrls::accept,
+                        )
+                    } finally {
+                        gatewayUrls.close()
+                    }
                 }
             }
         }
@@ -249,6 +277,25 @@ internal fun AppContainer.persistPersona(sessionId: String, text: String) {
                 .onFailure { AppLog.w("写会话人设失败 " + sessionId + "：" + it.message) }
         }
     }
+
+/**
+ * 端口回写的唯一入口：先落配置，再补一次模型源注册。
+ *
+ * 顺序是重点 —— defaultBaseUrl 在 register 那一刻定格，启动早期那次注册带的是上一轮端口；
+ * 只写配置不重注册，模型列表整场都指着死地址。回调在 Dispatchers.IO：setConfig 走
+ * SharedPreferences/concurrent map，register 走 MutableStateFlow.update，都不必再切线程。
+ */
+internal fun AppContainer.writeGatewayBaseUrl(
+        host: PluginHost,
+        pluginId: String,
+        url: String,
+        register: Boolean = true,
+) {
+        installedPlugins.setConfig(pluginId, "baseUrl", url)
+        // 批次模式传 register=false：一次 plugins.load 里多个插件的端口要全部落盘后再统一重注册，
+        // 逐条重注册会把模型列表停在「一个旧端口 + 一个新端口」的混合态（真机 03:10:17）。
+        if (register) syncPluginModelSources(host)
+}
 
 internal fun AppContainer.syncPluginModelSources(host: PluginHost) {
         val sources = host.modelSources()

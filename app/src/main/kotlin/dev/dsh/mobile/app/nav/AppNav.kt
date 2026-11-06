@@ -419,6 +419,14 @@ fun AppNav(container: AppContainer) {
                         PluginPageRoute(container, nav, scope, entry)
                     }
 
+                    // 插件自带 WebUI：全屏 WebView 加载网关地址，参数只有插件 id。
+                    composable(
+                        Routes.PLUGIN_UI,
+                        arguments = listOf(navArgument("pluginId") { type = NavType.StringType }),
+                    ) { entry ->
+                        PluginWebUiRoute(container, nav, entry)
+                    }
+
                     composable(Routes.TERMINAL) {
                         TerminalRoute(container, nav)
                     }

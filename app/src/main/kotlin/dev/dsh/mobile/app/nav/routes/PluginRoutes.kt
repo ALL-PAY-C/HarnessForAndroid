@@ -176,6 +176,9 @@ internal fun PluginHubRoute(container: dev.dsh.mobile.app.AppContainer, nav: and
                                             // 声明式面板里的按钮/开关/滑杆要靠这个回调才有反应；
                                             // 不传会落到默认空实现，面板看起来能点其实全是死的。
                                             onSlotAction = { action -> handleSlot(action, null, hubContext, nav, scope) },
+                                            // 端口回写到配置里的 baseUrl，入口是否出现由它决定。
+                                            pluginConfig = { id -> container.installedPlugins.config(id) },
+                                            onOpenPluginUi = { id -> nav.navigate(Routes.pluginUi(id)) },
                                         )
                                     },
                                 ),
@@ -184,8 +187,8 @@ internal fun PluginHubRoute(container: dev.dsh.mobile.app.AppContainer, nav: and
                                 installed = container.installedPlugins.all().values.toList(),
                                 pages = hubRegistry.inSlot(SlotId.PluginPage),
                                 values = { id -> container.installedPlugins.config(id) },
-                                // 内置 Kotlin 插件的设置项（B3-0）：清单自带 settings，读的是同一份 config 存储。
-                                native = dev.dsh.mobile.pluginhost.builtin.builtinPlugins.map { it.manifest },
+                                // 内置 Kotlin 反代已删除，设置页只剩装出来的插件（字段保留给未来内置插件）。
+                                native = emptyList(),
                             ),
                             onConfigSave = { id, key, value ->
                                 container.installedPlugins.setConfig(id, key, value)
@@ -252,5 +255,7 @@ internal fun PluginsRoute(container: dev.dsh.mobile.app.AppContainer, nav: andro
                             probes = probes,
                             onRescan = { container.reloadPlugins() },
                             onSlotAction = { action -> handleSlot(action, null, pluginsContext, nav, scope) },
+                            pluginConfig = { id -> container.installedPlugins.config(id) },
+                            onOpenPluginUi = { id -> nav.navigate(Routes.pluginUi(id)) },
                         )
 }

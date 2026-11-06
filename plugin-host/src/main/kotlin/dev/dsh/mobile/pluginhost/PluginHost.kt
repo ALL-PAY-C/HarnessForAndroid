@@ -497,7 +497,9 @@ class PluginHost(
      */
     fun modelSources(): List<PluginModelSource> {
         val used = HashSet<String>()
-        return activeRows().flatMap { row ->
+        // 顺序按 manifest.id 定：plugins 里的行是「谁先 load 完谁先入列」，列表项会跟着加载
+        // 完成顺序换位（真机 03:10:17 的两次 MODEL_SOURCES 里 local / stream 的位置就对调了）。
+        return activeRows().sortedBy { it.manifest.id }.flatMap { row ->
             val override = pluginBaseUrl(row.manifest.id)
             row.manifest.modelSources.map { src ->
                 src.copy(

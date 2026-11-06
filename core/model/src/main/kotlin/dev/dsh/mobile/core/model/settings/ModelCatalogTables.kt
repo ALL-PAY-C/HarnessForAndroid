@@ -82,8 +82,12 @@ object ModelProviders {
         ?: builtin.last()
 
     fun register(provider: ModelProvider) {
-        // 幂等 + 原子：并发注册（插件热加载与首帧同时发生）不会重复进表。
-        extra.update { current -> if (current.any { it.id == provider.id }) current else current + provider }
+        // 同一 id 再注册要顶掉旧条目，不能「有了就丢」：插件网关端口每次启动都变，
+        // 先到的那次已把上一轮端口定格在对象里，丢掉后来的更新 = 整场启动都指着死地址。
+        extra.update { current ->
+            if (current.none { it.id == provider.id }) current + provider
+            else current.map { if (it.id == provider.id) provider else it }
+        }
     }
 }
 

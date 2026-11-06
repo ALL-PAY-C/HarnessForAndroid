@@ -14,6 +14,7 @@ import dev.dsh.mobile.pluginapi.UiTextEmphasis
 import dev.dsh.mobile.runtimehost.NodeEngine
 import dev.dsh.mobile.runtimehost.NodeEngineException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -109,18 +110,38 @@ open class NodeBackedPlugin(
     }
 
     companion object {
+        /** 插件目录里自带的 WebUI 文件名：存在就说明这个插件带了自己的页面。 */
+        const val UI_PAGE_FILE: String = "ui.html"
+
+        /** transport 阶段的判据：与引擎回传的 error.stage 对齐（引擎刚起、本端还没连上）。 */
+        const val STAGE_TRANSPORT: String = "transport"
+
+        /** 「引擎没连上」的消息原文：老引擎包不回 stage 时靠它兜底判据。 */
+        const val ENGINE_NOT_CONNECTED: String = "引擎未连接"
+
+        /** transport 重试上限：真机冷启动一次就够，留一次余量给引擎刚 accept 的抖动。 */
+        private const val TRANSPORT_RETRIES: Int = 2
+
+        /** 两次重试的固定间隔；不退避 —— 竞态是「连接还没挂上」，等太久用户就在看失败卡片了。 */
+        private const val TRANSPORT_RETRY_DELAY_MS: Long = 250L
+
         /**
          * Node 插件编排：先按启用态筛出该真执行的插件，再确保引擎起来，逐个 `plugins.load`。
          * 每个插件的成败只落到自己的 [status]，不吞掉其它插件的加载；
          * 成功/失败都 refresh 一次，插件页卡片才显示最终状态。
          *
          * [isEnabled] 默认走 [PluginHost.isEnabled]（安全模式 + store 启用态）；测试可注入恒 false 验证禁用不执行 JS。
+         *
+         * [onGatewayUrl] 装配侧注入的端口回写口：带 WebUI 的插件加载成功后，宿主按 [gatewayRpcPath]
+         * 派生的路径向引擎问一次 status，把拿到的 url 交回去（宿主写进该插件配置的 baseUrl）。
+         * 默认 null = 不回写；rpc 失败只记日志，不影响这次加载的「已应用」态。
          */
         suspend fun loadNodePlugins(
             host: PluginHost,
             engine: NodeEngine,
             plugins: List<NodeBackedPlugin>,
             isEnabled: (NodeBackedPlugin) -> Boolean = { p -> host.isEnabled(p.spec.id, p.manifest.enabledByDefault) },
+            onGatewayUrl: ((pluginId: String, url: String) -> Unit)? = null,
         ) {
             // 装配期已判失败的占位（目录已丢失）不送引擎：送也只会拿回一个「目录不存在」的
             // 二次错误，而真正的原因（哪个路径没了）已经在占位实例里，由 PluginHost.load 落行。
@@ -154,13 +175,19 @@ open class NodeBackedPlugin(
             }
             runnable.forEach { p ->
                 try {
-                    val res = engine.call("plugins.load", JSONObject().put("dir", p.dir.absolutePath))
+                    val res = loadWithTransportRetry(engine, p)
                     p.status.value = NodePluginStatus.Applied(
                         name = res.optString("name").ifBlank { p.spec.name },
                         version = res.optString("version").ifBlank { p.spec.version },
                         appliedAt = System.currentTimeMillis(),
                     )
                     host.noteLoadResult(p.spec.id, null)
+                    // 自带 WebUI 的插件在 node 侧起 webServer：加载成功就把端口问回来交给装配侧，
+                    // 用户下次打开它的页面（或模型源里的地址）不必自己填。只在有 ui.html 且 id
+                    // 落在网关注册命名内时探一次，不给每个插件都加一次 rpc。
+                    if (onGatewayUrl != null && File(p.dir, UI_PAGE_FILE).isFile) {
+                        gatewayRpcPath(p.spec.id)?.let { path -> reportGatewayUrl(p, engine, path, onGatewayUrl) }
+                    }
                 } catch (e: CancellationException) {
                     throw e // 取消必须上抛，不能被当成插件加载失败吞掉。
                 } catch (t: Throwable) {
@@ -195,6 +222,92 @@ open class NodeBackedPlugin(
                 host.refresh(p)
             }
         }
+
+        /**
+         * 是不是「引擎没连上」这类可重试失败。
+         *
+         * 只有 transport 阶段 / 「引擎未连接」算：load 阶段的清单解析错误、包损坏、目录不存在
+         * 重试只会把同一个错重演一遍，还让用户在插件页多等半秒才看到真正原因。
+         */
+        internal fun isTransportFailure(t: Throwable): Boolean =
+            (t as? NodeEngineException)?.stage == STAGE_TRANSPORT ||
+                t.message.orEmpty().contains(ENGINE_NOT_CONNECTED)
+
+        /**
+         * `plugins.load` 的有界 transport 重试（任务 66 / 竞态 A）。
+         *
+         * 真机 2026-11-06 03:09:33 的现场：node 侧「已加载插件 pl.gateway.local」+ ENGINE_PLUGIN_LOADED
+         * 都已成功，宿主同一时刻却抛 [transport] 引擎未连接 —— 引擎刚起、本端的 reader/writer 还没挂上，
+         * 第一次 call 抢在连接建立之前。重试一次就拿到结果，用户不必先看「加载失败」再点重试。
+         *
+         * 有界：最多 [TRANSPORT_RETRIES] 次、固定 [TRANSPORT_RETRY_DELAY_MS] 间隔、不退避；
+         * 非 transport 异常原样抛出（交给调用方落 Failed），取消照样上抛。
+         */
+        private suspend fun loadWithTransportRetry(
+            engine: NodeEngine,
+            plugin: NodeBackedPlugin,
+        ): JSONObject {
+            val params = JSONObject().put("dir", plugin.dir.absolutePath)
+            var attempt = 0
+            while (true) {
+                try {
+                    val res = engine.call("plugins.load", params)
+                    if (attempt > 0) {
+                        AppLog.i("Node 插件 " + plugin.spec.id + " plugins.load retried after transport，第 " + attempt + " 次重试成功")
+                    }
+                    return res
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (t: Throwable) {
+                    if (attempt >= TRANSPORT_RETRIES || !isTransportFailure(t)) throw t
+                    attempt++
+                    AppLog.w("Node 插件 " + plugin.spec.id + " plugins.load 命中 transport 失败，第 " + attempt + " 次重试：" + t.message)
+                    delay(TRANSPORT_RETRY_DELAY_MS)
+                }
+            }
+        }
+
+        /**
+         * 插件 id → 引擎 rpc 路径：`pl.gateway.local` → `/gateway.local`，`pl.gateway.stream` → `/gateway.stream`。
+         *
+         * 两个网关插件各自注册一条独立路径，写死一条会串到另一个插件身上；不在这套命名下的
+         * 插件没有网关注册，返回 null 让调用点直接跳过。
+         */
+        internal fun gatewayRpcPath(pluginId: String): String? {
+            val bare = pluginId.removePrefix("pl.")
+            return if (bare == pluginId || bare.isEmpty()) null else "/" + bare
+        }
+
+        /**
+         * 问 node 侧 webServer 当前地址并交给 [sink]。
+         *
+         * 取不到 / 回空 / 回调自己抛，都只记日志：端口回写是便利，不是加载条件 ——
+         * 插件已经跑起来了，不能因为「地址没问着」把它标成失败。
+         */
+        private suspend fun reportGatewayUrl(
+            plugin: NodeBackedPlugin,
+            engine: NodeEngine,
+            path: String,
+            sink: (String, String) -> Unit,
+        ) {
+            val url = try {
+                engine.rpc(path, "status").optString("url").trim()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                AppLog.w("Node 插件 " + plugin.spec.id + " 取 " + path + " 地址失败：" + t.message)
+                return
+            }
+            if (url.isEmpty()) {
+                AppLog.w("Node 插件 " + plugin.spec.id + " " + path + " 未返回 url，跳过端口回写")
+                return
+            }
+            try {
+                sink(plugin.spec.id, url)
+            } catch (t: Throwable) {
+                AppLog.w("Node 插件 " + plugin.spec.id + " 端口回写失败：" + t.message)
+            }
+        }
     }
 }
 
@@ -223,4 +336,33 @@ class NodeMissingDirPlugin(
 
     override val loadFailure: String
         get() = "[" + BrokenPlugin.STAGE_MISSING + "] 插件目录已不存在：" + this.dir.absolutePath
+}
+
+/**
+ * 一次 `plugins.load` 批次的端口回写收口（任务 66 / 竞态 B）。
+ *
+ * 以前每回写一个插件的端口就全量 `syncPluginModelSources` 一次，两个网关插件各触发一次，
+ * 中间那一版模型列表是「一个旧端口 + 一个新端口」（真机 03:10:17：local=36191, stream=42117，
+ * 约 0.8 s）。批次版：逐条只落配置（[record]），批次结束 [close] 时统一重注册一次。
+ *
+ * [close] 只在真写过端口时才 flush：没有插件带 WebUI 的批次不该多打一条 MODEL_SOURCES。
+ */
+class GatewayUrlBatch(
+    private val record: (pluginId: String, url: String) -> Unit,
+    private val flush: () -> Unit,
+) {
+    private var touched = false
+
+    /** 收下一条回写：只落配置，本轮不触达模型源注册。 */
+    fun accept(pluginId: String, url: String) {
+        record(pluginId, url)
+        touched = true
+    }
+
+    /** 批次结束：本次写过端口才全量重注册一次。可重复调用，第二次起是 no-op。 */
+    fun close() {
+        if (!touched) return
+        touched = false
+        flush()
+    }
 }

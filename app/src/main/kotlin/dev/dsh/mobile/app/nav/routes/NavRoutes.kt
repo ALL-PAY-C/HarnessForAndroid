@@ -119,9 +119,12 @@ internal object Routes {
     const val SETTINGS_BACKUP = "settings/backup"
     const val DIAGNOSTICS = "settings/diagnostics"
     const val PLUGIN_PAGE = "plugin-page/{pageId}"
+    /** 插件自带 WebUI：全屏 WebView 加载网关 http 地址，参数只带插件 id。 */
+    const val PLUGIN_UI = "plugin-ui/{pluginId}"
     fun chat(id: String) = "chat/$id"
     fun chatSettings(id: String) = "chat/$id/settings"
     fun pluginPage(id: String) = "plugin-page/$id"
+    fun pluginUi(id: String) = "plugin-ui/$id"
     fun settingsSection(id: String) = "settings/section/$id"
 }
 

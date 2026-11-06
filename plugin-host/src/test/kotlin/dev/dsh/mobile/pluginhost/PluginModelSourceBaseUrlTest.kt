@@ -63,6 +63,20 @@ class PluginModelSourceBaseUrlTest {
         assertEquals("http://default/v1", missing.modelSources().single().baseUrl)
     }
 
+    @Test fun modelSourcesStayOrderedByPluginId() {
+        val host = PluginHost(configBridge = FakeBridge())
+        // 真机 03:10:17 的两次 MODEL_SOURCES 里 local / stream 的位置对调过：列表项跟着
+        // 「谁先 load 完」换位，两次全量注册之间还夹着混合态。顺序必须由 manifest.id 定。
+        host.load(plugin(id = "zz.gw"))
+        host.load(plugin(id = "aa.gw"))
+
+        assertEquals(
+            "顺序按 manifest.id 排，不许跟着加载完成顺序换位",
+            listOf("plugin.aa.gw.m0", "plugin.zz.gw.m0"),
+            host.modelSources().map { it.id },
+        )
+    }
+
     @Test fun throwingBridgeFallsBackToManifestDefault() {
         val host = PluginHost(configBridge = FakeBridge(throws = true))
         host.load(plugin())

@@ -5,6 +5,7 @@ import android.os.SystemClock
 import dev.dsh.mobile.core.platform.AppLog
 import dev.dsh.mobile.core.download.archive.ZipExtract
 import dev.dsh.mobile.noderuntime.NodeRuntime
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -15,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -27,6 +29,7 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -58,6 +61,12 @@ class NodeEngineHost(
     private val startLock = Mutex()
     private val callLock = Mutex()
     private val ids = AtomicLong(1)
+
+    /** 写 socket 只有两处来源（call 与反向请求应答），必须串行，否则两行 JSON 会交错。 */
+    private val writeLock = Any()
+
+    /** 在途的宿主调用：id → 等它的 CompletableDeferred，由常驻读线程填。 */
+    private val pending = ConcurrentHashMap<String, CompletableDeferred<LineProtocol.Reply>>()
 
     @Volatile private var socket: Socket? = null
     @Volatile private var reader: BufferedReader? = null
@@ -179,36 +188,31 @@ class NodeEngineHost(
     }
 
     override suspend fun call(method: String, params: JSONObject): JSONObject = callLock.withLock {
-        withContext(Dispatchers.IO) {
-            val id = ids.getAndIncrement().toString()
-            val line = LineProtocol.encode(method, params, id)
-            val w = writer ?: throw NodeEngineException("transport", "引擎未连接")
-            val r = reader ?: throw NodeEngineException("transport", "引擎未连接")
-            try {
-                w.write(line)
-                w.write("\n")
-                w.flush()
-                val reply = LineProtocol.readMatchingReply(
-                    readLine = { r.readLine() },
-                    expectedId = id,
-                    onStale = { staleId -> AppLog.w("ENGINE_RPC 丢弃错配回复（期望 $id，实际 $staleId）") },
-                    // 反向请求就地服务：引擎此刻正阻塞等这次应答，不可能同时发自己的回复，不会死锁。
-                    onRequest = { request -> serveHostRequest(request) },
-                )
-                when (reply) {
-                    is LineProtocol.Reply.Ok -> reply.result
-                    is LineProtocol.Reply.Error ->
-                        throw NodeEngineException(reply.stage, reply.message, detail = reply.detail)
-                }
-            } catch (t: NodeEngineException) {
-                throw t
-            } catch (t: Throwable) {
-                closeSocket()
-                val msg = "引擎连接中断: ${t.message}"
-                AppLog.e("ENGINE_CALL $method failed: $msg", t)
-                _state.value = NodeEngineState.Failed(msg)
-                throw NodeEngineException("transport", msg, t)
-            }
+        val id = ids.getAndIncrement().toString()
+        if (writer == null || reader == null) throw NodeEngineException("transport", "引擎未连接")
+        val waiter = CompletableDeferred<LineProtocol.Reply>()
+        pending[id] = waiter
+        try {
+            // 写 socket 是阻塞操作，不能落在调用方的线程（可能是主线程）。
+            withContext(Dispatchers.IO) { writeLine(LineProtocol.encode(method, params, id)) }
+        } catch (t: Throwable) {
+            pending.remove(id)
+            throw NodeEngineException("transport", "引擎连接中断: ${t.message}", t)
+        }
+        val reply = try {
+            withTimeoutOrNull(CALL_TIMEOUT_MS) { waiter.await() }
+        } catch (t: Throwable) {
+            pending.remove(id)
+            throw NodeEngineException("transport", "引擎连接中断: ${t.message}", t)
+        } ?: run {
+            pending.remove(id)
+            AppLog.e("ENGINE_CALL $method 超时（${CALL_TIMEOUT_MS}ms）")
+            throw NodeEngineException("transport", "引擎应答超时（${CALL_TIMEOUT_MS}ms）: $method")
+        }
+        when (reply) {
+            is LineProtocol.Reply.Ok -> reply.result
+            is LineProtocol.Reply.Error ->
+                throw NodeEngineException(reply.stage, reply.message, detail = reply.detail)
         }
     }
 
@@ -279,12 +283,60 @@ class NodeEngineHost(
     }
 
     private fun writeHostReply(line: String) {
-        val w = writer ?: return
-        runCatching {
+        runCatching { writeLine(line) }
+            .onFailure { AppLog.w("ENGINE_HOST_CALL 写回应答失败: ${it.message}") }
+    }
+
+    /** 唯一的写入口：call 的请求与反向请求的应答共用，锁内一次写完一行。 */
+    private fun writeLine(line: String) {
+        val w = writer ?: throw NodeEngineException("transport", "引擎未连接")
+        synchronized(writeLock) {
             w.write(line)
             w.write("\n")
             w.flush()
-        }.onFailure { AppLog.w("ENGINE_HOST_CALL 写回应答失败: ${it.message}") }
+        }
+    }
+
+    /**
+     * 常驻读线程：这条 socket 上所有宿主方向的回复与引擎反向请求都由这里分发。
+     *
+     * 之前读循环埋在 [call] 里，只有在途调用时才有人读 —— 插件 HTTP 请求（webServer 跑在引擎
+     * 进程内，不经宿主 call）发起的 credentials.set 就永远没人应答，一直挂到引擎侧 120s 超时。
+     */
+    private fun startReadLoop(s: Socket, r: BufferedReader) {
+        val thread = Thread({
+            try {
+                while (true) {
+                    val line = r.readLine() ?: break
+                    if (line.isBlank()) continue
+                    val decoded = LineProtocol.decodeInbound(line)
+                    if (decoded.isFailure) {
+                        AppLog.w("ENGINE_READER 丢弃非法行: ${decoded.exceptionOrNull()?.message}")
+                        continue
+                    }
+                    when (val inbound = decoded.getOrThrow()) {
+                        // 反向请求就地服务：引擎此刻在等这次应答，handle 里不会再回调 call。
+                        is LineProtocol.Inbound.RequestIn -> serveHostRequest(inbound.request)
+                        is LineProtocol.Inbound.Response -> {
+                            val reply = inbound.reply
+                            val waiter = reply.id?.let { pending.remove(it) }
+                            if (waiter == null) {
+                                AppLog.w("ENGINE_RPC 丢弃无人等待的回复 id=${reply.id}")
+                            } else {
+                                waiter.complete(reply)
+                            }
+                        }
+                    }
+                }
+                AppLog.w("ENGINE_READER 引擎关闭了连接")
+            } catch (t: Throwable) {
+                if (!stopping) AppLog.w("ENGINE_READER 结束: ${t.message}")
+            } finally {
+                if (socket === s) closeSocket()
+            }
+        }, "engine-reader")
+        thread.isDaemon = true
+        thread.start()
     }
 
     private fun onNodeExit(rc: Result<Int>) {
@@ -303,6 +355,10 @@ class NodeEngineHost(
         socket = null
         reader = null
         writer = null
+        // 在途调用不能干等到超时：立刻带原因失败。
+        for (id in pending.keys.toList()) {
+            pending.remove(id)?.completeExceptionally(IOException("引擎连接已关闭"))
+        }
     }
 
     private fun pickPort(): Int =
@@ -311,10 +367,15 @@ class NodeEngineHost(
     private fun openSocket(target: Int) {
         val s = Socket()
         s.connect(InetSocketAddress("127.0.0.1", target), CONNECT_TIMEOUT_MS)
-        s.soTimeout = READ_TIMEOUT_MS
-        socket = s
-        reader = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.UTF_8))
-        writer = BufferedWriter(OutputStreamWriter(s.getOutputStream(), Charsets.UTF_8))
+        // 读循环是常驻线程，不再用 soTimeout 收尾：超时会把整条 socket 判死，连带后面所有反向请求。
+        s.soTimeout = 0
+        val bufferedReader = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.UTF_8))
+        synchronized(writeLock) {
+            socket = s
+            reader = bufferedReader
+            writer = BufferedWriter(OutputStreamWriter(s.getOutputStream(), Charsets.UTF_8))
+        }
+        startReadLoop(s, bufferedReader)
     }
 
     @Volatile private var hostHandler: HostCallHandler? = null
@@ -421,7 +482,8 @@ class NodeEngineHost(
         private const val PORT_WAIT_MS = 25_000L
         private const val POLL_INTERVAL_MS = 50L
         private const val CONNECT_TIMEOUT_MS = 3_000
-        private const val READ_TIMEOUT_MS = 30_000
+        /** 单次宿主调用的应答超时；读 socket 交给常驻读线程，不靠 soTimeout。 */
+        private const val CALL_TIMEOUT_MS = 30_000L
         private const val ERR_CODE = -1
     }
 }

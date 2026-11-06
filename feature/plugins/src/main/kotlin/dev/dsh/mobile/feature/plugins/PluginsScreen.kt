@@ -63,6 +63,7 @@ import dev.dsh.mobile.pluginhost.PluginBoundary
 import dev.dsh.mobile.pluginhost.PluginProbe
 import dev.dsh.mobile.pluginhost.PluginSlotItem
 import dev.dsh.mobile.pluginhost.rememberHostThemeTokens
+import dev.dsh.mobile.pluginhost.gatewayUiUrl
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -78,6 +79,10 @@ fun PluginsScreen(
     probes: List<PluginProbe> = emptyList(),
     /** 重新扫描（含系统里已安装的插件 App）。 */
     onRescan: () -> Unit = {},
+    /** 打开插件自带的全屏 WebUI；入口只在 [gatewayUiUrl] 派生得出地址时出现。 */
+    onOpenPluginUi: (String) -> Unit = {},
+    /** 插件配置键值：入口要不要出现看 baseUrl，界面不自己猜端口。 */
+    pluginConfig: (String) -> Map<String, String> = { emptyMap() },
 ) {
     val plugins by viewModel.plugins.collectAsStateWithLifecycle()
     // 订阅注册表版本号，贡献增删后卡片里的槽位预览会重组。
@@ -223,6 +228,11 @@ fun PluginsScreen(
                     onGrant = { viewModel.grant(plugin.manifest.id, it) },
                     onRevoke = { viewModel.revoke(plugin.manifest.id, it) },
                     onUninstall = { pending = plugin },
+                    // 网关端口是加载后回写的，配置变了才可能变；按 revision 收一次。
+                    uiUrl = remember(revision, plugin.manifest.id) {
+                        gatewayUiUrl(pluginConfig(plugin.manifest.id)["baseUrl"], plugin.manifest.id)
+                    },
+                    onOpenUi = { onOpenPluginUi(plugin.manifest.id) },
                 )
             }
             item {
@@ -336,6 +346,9 @@ private fun PluginCard(
     onGrant: (Set<PluginPermission>) -> Unit,
     onRevoke: (Set<PluginPermission>) -> Unit,
     onUninstall: () -> Unit,
+    /** 该插件的 WebUI 地址；null = 这个插件没有可打开的全屏页面，入口整行不出现。 */
+    uiUrl: String?,
+    onOpenUi: () -> Unit,
 ) {
     val p = LocalQq.current
     var expanded by rememberSaveable(plugin.manifest.id) { mutableStateOf(false) }
@@ -440,6 +453,12 @@ private fun PluginCard(
                 if (plugin.manifest.description.isNotBlank()) {
                     Spacer(Modifier.height(4.dp))
                     Text(plugin.manifest.description, style = MaterialTheme.typography.bodySmall, color = p.t1)
+                }
+                if (uiUrl != null) {
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(onClick = onOpenUi) {
+                        Text("打开插件界面")
+                    }
                 }
                 if (plugin.manifest.capabilities.isNotEmpty()) {
                     Spacer(Modifier.height(6.dp))
