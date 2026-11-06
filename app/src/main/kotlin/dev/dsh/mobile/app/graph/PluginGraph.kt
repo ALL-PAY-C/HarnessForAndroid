@@ -120,7 +120,6 @@ internal fun AppContainer.buildPluginInstaller(): PluginInstaller {
 
 internal fun AppContainer.buildPluginHost(): PluginHost {
         return run {
-        pluginStore.beginBoot()
         PluginHost(
             pluginStore,
             configBridge = pluginConfigBridge,
@@ -133,6 +132,9 @@ internal fun AppContainer.buildPluginHost(): PluginHost {
             externalPlugins.remove(id)
             pluginHost.placements(context).removePlugin(id)
         }).apply {
+            // 启动计数必须在任何插件加载之前打点：宿主自己记住这次自增，判安全模式时再扣掉
+            // （否则健康的本轮会被算成一次失败，历史两次就够把第三方插件全挡掉）。
+            beginBoot()
             // 内置插件：HTML 渲染器（dsh.html / html.web，含 html 代码围栏的 WebView 渲染）。
             // 源码随 app 编译（app/build.gradle.kts 的 sourceSets），这里排在最前注册，
             // 于是用户额外装的同名插件会被 PluginHost 按 id 去重掉，不会重复注册渲染器。

@@ -149,6 +149,19 @@ internal fun defaultSlotCap(slot: SlotId): Int? = when (slot) {
     else -> null
 }
 
+/** 与 [PluginStore] 的 SAFE_MODE_AFTER 同值：连续这么多次「没到首帧」才算崩溃循环。 */
+internal const val SAFE_MODE_AFTER_BOOTS: Int = 3
+
+/** 判安全模式只看「之前的启动」：本进程 [PluginHost.beginBoot] 自己加的那一次必须扣掉。 */
+internal fun previousBootFailures(failures: Int, countedInThisProcess: Int): Int =
+    (failures - countedInThisProcess).coerceAtLeast(0)
+
+internal fun safeModeFrom(
+    failures: Int,
+    countedInThisProcess: Int,
+    threshold: Int = SAFE_MODE_AFTER_BOOTS,
+): Boolean = previousBootFailures(failures, countedInThisProcess) >= threshold
+
 class PluginHost(
     private val store: PluginStore? = null,
     private val onUninstall: (String) -> Unit = {},
@@ -203,8 +216,23 @@ class PluginHost(
 
     val slots: PluginRegistry get() = registry
 
+    /**
+     * 本进程已自增过几次 `boot.failures`（见 [beginBoot]）。判安全模式时必须扣掉：
+     * 自增发生在「本轮还没证明自己健康」之前，直接读 [PluginStore.safeMode] 等于把健康的本轮
+     * 也记成一次失败 —— 「历史 2 次 + 本轮 1 次 = 3」就够把首次冷启动的第三方插件全挡掉
+     * （真机 07:43:48：ENGINE_NODE_START plugins=2、MODEL_SOURCES 空，第二次启动才恢复）。
+     */
+    private var bootsCountedHere = 0
+
     /** True when repeated boot failures turned third-party plugins off. */
-    val safeMode: Boolean get() = store?.safeMode == true || extraSafeMode()
+    val safeMode: Boolean
+        get() = safeModeFrom(store?.bootFailures ?: 0, bootsCountedHere) || extraSafeMode()
+
+    /** 装配侧启动时调一次：计数交给 store，同时记住本次进程的那次自增（判 [safeMode] 要扣掉）。 */
+    fun beginBoot() {
+        store?.beginBoot()
+        bootsCountedHere++
+    }
 
     fun clearSafeMode() {
         store?.clearSafeMode()

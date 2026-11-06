@@ -154,6 +154,15 @@ open class NodeBackedPlugin(
                 // 让人在插件自己的设置页也能看见「没跑」，但不污染插件管理行的失败态（T9.27）。
                 p.status.value = NodePluginStatus.Failed(stage = "disabled", message = "插件已禁用或处于安全模式", retryable = false)
             }
+            if (runnable.size < candidates.size) {
+                // 被挡下的插件以前是彻底静默的：真机 07:43:48 首启 plugins=2、MODEL_SOURCES 空，
+                // 日志里一个字都没有。谁被挡、是不是安全模式，这里一次说清。
+                AppLog.w(
+                    "PLUGIN_SKIP blocked=" +
+                        candidates.filterNot { it in runnable }.joinToString(",") { it.spec.id } +
+                        " safeMode=" + host.safeMode,
+                )
+            }
             if (runnable.isEmpty()) return
 
             runnable.forEach { it.status.value = NodePluginStatus.Starting }
